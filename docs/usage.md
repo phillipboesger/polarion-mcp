@@ -22,10 +22,22 @@ Typical MCP workflow:
 3. Ask the client to list or use tools.
 4. For project-specific create or update tasks, call refresh_polarion_config first.
 
-## HTTP Mode
+## MCP over HTTP (Streamable HTTP — for Claude.ai)
 
-- Start the HTTP server with `npm run start:http`.
+- Start with `npm run start:mcp-http`.
+- This serves the real MCP Streamable HTTP transport (not the REST wrapper below), so remote MCP clients such as Claude.ai custom connectors can use it.
+- `MCP_HTTP_TOKEN` must be set or the server exits on startup; every `/mcp` request requires `Authorization: Bearer <MCP_HTTP_TOKEN>`.
+- Endpoints:
+  - GET /health (no auth)
+  - POST/GET/DELETE /mcp (Streamable HTTP MCP transport; Bearer auth required)
+- Sessions are stateful: the client receives an `mcp-session-id` on initialize and echoes it on later requests.
+- Optionally set `MCP_ALLOWED_HOSTS` to enable DNS-rebinding protection for public deployments.
+
+## REST HTTP Mode (for ChatGPT Custom GPTs)
+
+- Start the REST wrapper with `npm run start:http`.
 - HTTP_API_KEY must be set or the server exits on startup.
+- This is a plain REST surface (not MCP) intended for ChatGPT Custom GPT Actions.
 - Endpoints:
   - GET /health
   - GET /api/tools
@@ -48,9 +60,9 @@ Typical HTTP workflow:
 
 ## When to Use Each Mode
 
-- Use MCP mode for local assistant integrations that support stdio MCP.
-- Use HTTP mode for remote or hosted integrations that require HTTPS endpoints.
-- Use /openapi-gpt.json when the consumer has operation count limits.
+- Use stdio MCP mode for local assistant integrations that launch the server as a subprocess (Claude Code, Claude Desktop, VS Code).
+- Use the Streamable HTTP MCP mode (`start:mcp-http`) for remote MCP clients that connect by URL, such as Claude.ai custom connectors.
+- Use the REST HTTP mode (`start:http`) for ChatGPT Custom GPT Actions, and `/openapi-gpt.json` when the consumer has operation-count limits.
 
 ## read_when
 

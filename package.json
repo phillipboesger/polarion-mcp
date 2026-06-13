@@ -35,6 +35,7 @@
   "scripts": {
     "start": "node build/index.js",
     "start:http": "node build/http-server.js",
+    "start:mcp-http": "node build/mcp-http-server.js",
     "dev:http": "tsc && node build/http-server.js",
     "build": "rm -rf build && tsc && chmod 755 build/index.js build/http-server.js",
     "build:http": "rm -rf build && tsc && chmod 755 build/http-server.js && cp build/http-server.js build/index.js",

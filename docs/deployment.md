@@ -27,8 +27,9 @@ Optional environment variables:
 ## Mode-Specific Deployment Notes
 
 - MCP stdio mode is usually not deployed as a public service. It is launched by the assistant client on demand.
-- HTTP mode is the network-facing deployment target in this repository.
-- The HTTP wrapper still depends on Polarion credentials at runtime because it delegates all tool execution to the same execution core.
+- Streamable HTTP MCP mode (`node build/mcp-http-server.js`, `npm run start:mcp-http`) is the network-facing target for remote MCP clients such as Claude.ai custom connectors. It requires MCP_HTTP_TOKEN, and you should terminate TLS in front of it (reverse proxy / platform) and set MCP_ALLOWED_HOSTS for DNS-rebinding protection.
+- REST HTTP mode (`node build/http-server.js`) is the network-facing target for ChatGPT Custom GPT Actions.
+- All network modes still depend on Polarion credentials at runtime because they delegate tool execution to the same execution core.
 
 ## read_when
 

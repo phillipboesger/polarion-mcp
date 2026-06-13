@@ -10,9 +10,13 @@ A TypeScript **MCP (Model Context Protocol) server** that turns the Polarion ALM
 
 ## What you get
 
-- An **MCP stdio server** exposing ~210 Polarion REST operations as tools.
-- An **HTTP wrapper** for Custom GPTs and other HTTP-only clients.
-- Polarion-specific extras: cached project configuration, SDK documentation access, and guided prompts for creating/searching/updating work items.
+Three transports, one shared tool set (~210 Polarion REST operations):
+
+- **stdio MCP** — for local clients that launch the server as a subprocess (Claude Code, Claude Desktop, VS Code).
+- **Streamable HTTP MCP** (`/mcp`) — a real remote MCP endpoint for clients that connect by URL, such as **Claude.ai** custom connectors.
+- **REST HTTP wrapper** — a plain REST surface for **ChatGPT** Custom GPT Actions.
+
+Plus Polarion-specific extras: cached project configuration, SDK documentation access, and guided prompts for creating/searching/updating work items.
 
 ## Contents
 
@@ -158,12 +162,23 @@ ChatGPT cannot launch a local MCP server, so use the **HTTP wrapper** and wire i
 
 ### Claude.ai (web)
 
-Claude.ai (Pro/Max/Team/Enterprise) supports **custom connectors**, which are *remote MCP servers* reachable over HTTPS. This repository ships a **local stdio** server (ideal for Claude Desktop/Code/VS Code) and a **REST HTTP wrapper** (built for ChatGPT Actions). The REST wrapper is **not** an MCP-over-HTTP transport, so it cannot be added directly as a Claude.ai connector yet.
+Claude.ai (Pro/Max/Team/Enterprise) supports **custom connectors** — remote MCP servers reached over HTTPS. This repo ships a real **Streamable HTTP MCP transport** for exactly this.
 
-Today, the practical options are:
+1. Generate a token and start the MCP HTTP server (host it behind HTTPS — see [Run with Docker](#run-with-docker) and [docs/deployment.md](./docs/deployment.md)):
 
-- **Recommended:** use **Claude Desktop** (above) — it signs in with the same Claude account and gives you the full Polarion tool set.
-- **Remote connector:** exposing this server as a native Claude.ai connector requires an MCP *Streamable HTTP* endpoint. That transport is not implemented here yet — contributions/tracking welcome via an issue.
+   ```bash
+   export MCP_HTTP_TOKEN="$(openssl rand -hex 32)"
+   export API_BASE_URL="https://your-polarion-server/polarion/rest/v1"
+   export BEARER_TOKEN="your-polarion-personal-access-token"
+   export MCP_ALLOWED_HOSTS="mcp.example.com"   # optional: DNS-rebinding protection
+   npm run start:mcp-http                        # serves POST/GET/DELETE /mcp
+   ```
+
+2. Expose it publicly over HTTPS, e.g. `https://mcp.example.com/mcp`.
+3. In Claude.ai → **Settings → Connectors → Add custom connector**, enter the `/mcp` URL.
+4. **Auth:** the endpoint always requires `Authorization: Bearer <MCP_HTTP_TOKEN>` (the server refuses to start without `MCP_HTTP_TOKEN`). If the Claude.ai connector dialog cannot send a static bearer header for your plan, front the server with an OAuth-capable proxy or restrict it at the network layer.
+
+> Prefer no hosting? **Claude Desktop** (above) uses the same Claude account over local stdio and needs no public endpoint.
 
 ## Run with Docker
 
@@ -183,6 +198,16 @@ docker run --rm -p 3000:3000 \
   polarion-mcp
 ```
 
+Streamable HTTP MCP mode — for Claude.ai (override the command):
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e API_BASE_URL="https://your-polarion-server/polarion/rest/v1" \
+  -e BEARER_TOKEN="your-polarion-personal-access-token" \
+  -e MCP_HTTP_TOKEN="your-generated-mcp-token" \
+  polarion-mcp node build/mcp-http-server.js
+```
+
 stdio MCP mode (override the command):
 
 ```bash
@@ -192,7 +217,7 @@ docker run --rm -i \
   polarion-mcp node build/index.js
 ```
 
-HTTP endpoints: `GET /health`, `GET /api/tools`, `POST /api/tools/:toolName`, `GET /openapi.json`, `GET /openapi-gpt.json`.
+Endpoints — Streamable HTTP MCP: `POST/GET/DELETE /mcp` (+ `GET /health`). REST wrapper: `GET /health`, `GET /api/tools`, `POST /api/tools/:toolName`, `GET /openapi.json`, `GET /openapi-gpt.json`.
 
 ## Configuration reference
 
@@ -200,8 +225,11 @@ HTTP endpoints: `GET /health`, `GET /api/tools`, `POST /api/tools/:toolName`, `G
 | --- | --- | --- |
 | `API_BASE_URL` | yes | Polarion REST base, e.g. `https://host/polarion/rest/v1` |
 | `BEARER_TOKEN` | yes | Polarion Personal Access Token |
-| `HTTP_API_KEY` | HTTP mode | Protects the HTTP wrapper; **not** the Polarion token |
-| `HTTP_PORT` | no | HTTP server port (default `3000`) |
+| `MCP_HTTP_TOKEN` | Streamable HTTP MCP | Bearer token required on `/mcp` (Claude.ai); server won't start without it |
+| `MCP_HTTP_PORT` | no | MCP HTTP port (falls back to `HTTP_PORT`, then `3000`) |
+| `MCP_ALLOWED_HOSTS` | no | Comma-separated Host allow-list; enables DNS-rebinding protection |
+| `HTTP_API_KEY` | REST HTTP mode | Protects the ChatGPT REST wrapper; **not** the Polarion token |
+| `HTTP_PORT` | no | REST HTTP server port (default `3000`) |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | no | Set to `0` only for trusted internal self-signed servers |
 
 Copy [`.env.example`](./.env.example) to `.env` for local development. See [docs/configuration.md](./docs/configuration.md) for advanced per-scheme auth overrides.

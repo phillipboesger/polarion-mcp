@@ -1,9 +1,10 @@
 # Polarion MCP Server
 #
 # Multi-stage build: compile TypeScript in a builder stage, then ship a slim
-# runtime image. The default command starts the HTTP wrapper (useful for hosted
-# deployments and Custom GPTs). For stdio MCP mode, override the command:
-#   docker run --rm -i -e API_BASE_URL=... -e BEARER_TOKEN=... polarion-mcp node build/index.js
+# runtime image. The default command starts the REST wrapper (for ChatGPT Custom
+# GPTs). Override the command for the other transports:
+#   stdio MCP:            ... polarion-mcp node build/index.js
+#   Streamable HTTP MCP:  ... -e MCP_HTTP_TOKEN=... -p 3000:3000 polarion-mcp node build/mcp-http-server.js  (Claude.ai)
 
 # ---- Builder ----
 FROM node:20-alpine AS builder

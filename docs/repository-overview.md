@@ -25,9 +25,11 @@ This repository contains a Model Context Protocol (MCP) server that exposes the 
 
 ## Entry Points
 
-- src/index.ts - MCP server entry point (stdio).
-- src/http-server.ts - HTTP server implementation.
-- src/index-http.ts - HTTP server entry for deployment platforms.
+- src/server.ts - Shared MCP server factory (tools/resources/prompts); used by every transport.
+- src/index.ts - stdio MCP entry point (local clients).
+- src/mcp-http-server.ts - Streamable HTTP MCP transport (remote clients, e.g. Claude.ai).
+- src/http-server.ts - REST HTTP wrapper for ChatGPT Custom GPT Actions.
+- src/index-http.ts - REST HTTP entry for deployment platforms.
 
 ## Handwritten vs Generated Code
 
