@@ -33,3 +33,87 @@ jobs:
 
       - name: Test
         run: npm test
+
+  package:
+    name: Build and verify release ZIP
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: Assemble release ZIP
+        id: pack
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          NAME="polarion-mcp"
+          ZIP="${NAME}-v${VERSION}.zip"
+          rm -rf dist-stage && mkdir -p "dist-stage/${NAME}"
+          # Slim, runnable distribution (production install required at use time).
+          cp -r build package.json package-lock.json sdk README.md LICENSE .env.example "dist-stage/${NAME}/"
+          ( cd dist-stage && zip -qr "../${ZIP}" "${NAME}" )
+          echo "zip=${ZIP}" >> "$GITHUB_OUTPUT"
+          echo "Created ${ZIP}:"
+          unzip -l "${ZIP}"
+
+      - name: Verify release ZIP runs (install + MCP initialize)
+        run: |
+          set -euo pipefail
+          ZIP="${{ steps.pack.outputs.zip }}"
+          rm -rf _verify && mkdir _verify
+          unzip -q "${ZIP}" -d _verify
+          cd _verify/polarion-mcp
+
+          # Install only production dependencies — no dev tools, no build step.
+          npm ci --omit=dev --ignore-scripts
+
+          export MCP_HTTP_TOKEN="ci-verify-token"
+          export API_BASE_URL="https://polarion.example.com/polarion/rest/v1"
+          export BEARER_TOKEN="dummy"
+          export MCP_HTTP_PORT="3010"
+
+          node build/mcp-http-server.js & SRV=$!
+          trap 'kill ${SRV} 2>/dev/null || true' EXIT
+
+          ok=""
+          for _ in $(seq 1 40); do
+            if curl -sf http://localhost:3010/health >/dev/null; then ok=1; break; fi
+            sleep 0.5
+          done
+          test "${ok}" = "1" || { echo "::error::server did not become healthy"; exit 1; }
+
+          # Unauthenticated requests must be rejected.
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3010/mcp \
+            -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}')"
+          test "${code}" = "401" || { echo "::error::expected 401 without token, got ${code}"; exit 1; }
+
+          # Authenticated MCP initialize must succeed and hand out a session id.
+          body="$(curl -s -D headers.txt -X POST http://localhost:3010/mcp \
+            -H "authorization: Bearer ${MCP_HTTP_TOKEN}" \
+            -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}')"
+          echo "${body}" | grep -q '"serverInfo"' || { echo "::error::initialize failed: ${body}"; exit 1; }
+          grep -qi '^mcp-session-id:' headers.txt || { echo "::error::missing mcp-session-id header"; exit 1; }
+
+          echo "Release ZIP verified: production install succeeds, server starts, MCP initialize works."
+
+      - name: Upload release ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: polarion-mcp-dist
+          path: ${{ steps.pack.outputs.zip }}
+          if-no-files-found: error

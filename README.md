@@ -241,13 +241,43 @@ Copy [`.env.example`](./.env.example) to `.env` for local development. See [docs
 - Use `NODE_TLS_REJECT_UNAUTHORIZED=0` only for trusted internal servers.
 - Use a distinct `HTTP_API_KEY` for the HTTP wrapper — it is not the Polarion bearer token.
 
+## Repository layout
+
+Only entry points live at the root; everything else is grouped into folders.
+
+```
+.
+├── README.md            Start here
+├── LICENSE              MIT
+├── package.json         Scripts, dependencies, npm bin
+├── Dockerfile           Container image (all three transports)
+├── render.yaml          Render.com deployment blueprint
+├── tsconfig*.json       TypeScript config (app + tests)
+├── .env.example         Environment variable template
+├── src/                 TypeScript source
+│   ├── server.ts            Shared MCP server factory (tools/resources/prompts)
+│   ├── index.ts             stdio entry point (local clients)
+│   ├── mcp-http-server.ts   Streamable HTTP MCP entry point (Claude.ai)
+│   ├── http-server.ts       REST wrapper entry point (ChatGPT)
+│   ├── executor.ts          Tool execution + auth against Polarion
+│   ├── tools.ts             Generated Polarion tool definitions
+│   └── …                    config, polarion, utils, types, auth, gpt-tools
+├── tests/               Node.js test suite
+├── docs/                Full documentation (see docs/README.md index)
+├── scripts/             Maintainer helpers (codegen patch, API-key generator)
+├── sdk/                 Optional local Polarion PDFs (not bundled; see sdk/README.md)
+└── .github/             CI workflow + CONTRIBUTING.md
+```
+
+Detailed map: [docs/repository-overview.md](./docs/repository-overview.md).
+
 ## Documentation
 
 See [docs/README.md](./docs/README.md) for architecture, features, workflows, configuration, deployment, security, and troubleshooting guides. A worked end-to-end example lives in [docs/example-task.md](./docs/example-task.md).
 
 ## Contributing
 
-Contributions welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md).
+Contributions welcome — see [CONTRIBUTING.md](./.github/CONTRIBUTING.md).
 
 ## License
 
