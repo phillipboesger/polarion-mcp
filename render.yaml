@@ -1,0 +1,67 @@
+# Render.com Blueprint
+# This file defines the deployment configuration for Render.com
+#
+# For multiple Polarion servers, you can:
+# 1. Deploy this repo multiple times in Render Dashboard (recommended)
+# 2. OR: Create multiple render.yaml files (render-demo.yaml, render-prod.yaml)
+
+services:
+  # Main Polarion MCP Service
+  - type: web
+    name: polarion-mcp-server
+    env: node
+    region: frankfurt # EU region (options: frankfurt, oregon, singapore)
+    plan: free
+
+    # Build configuration
+    buildCommand: npm ci && npm run build:http
+    startCommand: node build/index.js
+
+    # Health check
+    healthCheckPath: /health
+
+    # Auto-deploy on push
+    autoDeploy: true
+
+    # Environment variables
+    # IMPORTANT: Set these in Render Dashboard (not here for security)
+    envVars:
+      # Node.js version
+      - key: NODE_VERSION
+        value: "20.11.0"
+
+      # HTTP Server port (Render will override this automatically)
+      - key: HTTP_PORT
+        value: "3000"
+
+      # Polarion API Configuration
+      # Set these in Render Dashboard → Environment → Add Environment Variable
+      - key: API_BASE_URL
+        sync: false # Must be set manually in Dashboard
+        # Example: https://your-polarion-server/polarion/rest/v1
+
+      - key: BEARER_TOKEN
+        sync: false # Must be set manually in Dashboard
+        # Example: Your Polarion Personal Access Token
+
+      - key: HTTP_API_KEY
+        sync: false # Must be set manually in Dashboard
+        # Example: Generate with: openssl rand -hex 32
+
+      - key: LOG_LEVEL
+        value: "info"
+# For deploying multiple Polarion servers:
+#
+# Option 1 (Recommended): Deploy via Render Dashboard
+# --------------------------------------------------------
+# 1. Go to Render Dashboard → New Web Service
+# 2. Connect this GitHub repo
+# 3. Name it: "polarion-mcp-demo" (or prod, staging, etc.)
+# 4. Set environment variables for this specific server
+# 5. Deploy!
+# 6. Repeat for each Polarion server
+#
+# Option 2: Use separate render-*.yaml files
+# --------------------------------------------------------
+# Create render-demo.yaml, render-prod.yaml, etc.
+# Deploy each with: render blueprint deploy -f render-demo.yaml

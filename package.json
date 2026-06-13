@@ -1,0 +1,71 @@
+{
+  "name": "mcp-polarion",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) server for the Polarion ALM REST API, with an optional HTTP wrapper for Custom GPTs.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Phillip Bösger",
+  "homepage": "https://github.com/phillipboesger/mcp-polarion#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phillipboesger/mcp-polarion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/phillipboesger/mcp-polarion/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "polarion",
+    "alm",
+    "rest-api",
+    "openapi",
+    "claude",
+    "custom-gpt",
+    "ai-tools"
+  ],
+  "main": "build/index.js",
+  "bin": {
+    "mcp-polarion": "build/index.js"
+  },
+  "files": [
+    "build",
+    "src"
+  ],
+  "scripts": {
+    "start": "node build/index.js",
+    "start:http": "node build/http-server.js",
+    "dev:http": "tsc && node build/http-server.js",
+    "build": "rm -rf build && tsc && chmod 755 build/index.js build/http-server.js",
+    "build:http": "rm -rf build && tsc && chmod 755 build/http-server.js && cp build/http-server.js build/index.js",
+    "test": "rm -rf build-tests && tsc -p tsconfig.test.json && node --test build-tests/tests/**/*.test.js",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build",
+    "prestart": "npm run build",
+    "download-spec": "curl -H \"Authorization: Bearer ${BEARER_TOKEN}\" \"${API_BASE_URL}/definition\" -o openapi.json",
+    "fix-sparse-fields": "node fix-sparse-fields.cjs",
+    "generate-mcp": "openapi-mcp-generator --input ./openapi.json --output ./ --force --transport stdio",
+    "fix-brackets": "node fix-brackets.js",
+    "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run fix-brackets && npm run build",
+    "update": "npm run regenerate"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "axios": "^1.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "json-schema-to-zod": "^2.6.1",
+    "pdf-parse": "^1.1.1",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.15.2",
+    "typescript": "^5.8.3"
+  }
+}

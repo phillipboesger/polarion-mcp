@@ -1,0 +1,7 @@
+# Track PDF files with Git LFS
+*.pdf filter=lfs diff=lfs merge=lfs -text
+# Track large JSON files (OpenAPI specs) with Git LFS
+openapi.json filter=lfs diff=lfs merge=lfs -text
+# Track other potentially large documentation files
+*.zip filter=lfs diff=lfs merge=lfs -text
+*.tar.gz filter=lfs diff=lfs merge=lfs -text
