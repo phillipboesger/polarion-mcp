@@ -6,6 +6,8 @@
 
 A TypeScript **MCP (Model Context Protocol) server** that turns the Polarion ALM REST API into a tool-based interface for AI assistants — Claude Code, Claude Desktop, VS Code (GitHub Copilot), and any other MCP-aware client. It also ships an optional **HTTP wrapper** so HTTP-only clients such as ChatGPT Custom GPTs can call the same tools.
 
+> 🙏 **Thanks to [@Jonasdero](https://github.com/Jonasdero)**, whose work is the foundation this MCP server builds on.
+
 > **Note:** Independent, community open-source project. Not affiliated with or endorsed by Siemens / Polarion. "Polarion" is a trademark of Siemens. Polarion SDK/help PDFs are **not** bundled — see [`sdk/README.md`](./sdk/README.md).
 
 ## What you get
