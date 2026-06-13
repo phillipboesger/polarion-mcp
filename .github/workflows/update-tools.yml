@@ -1,0 +1,65 @@
+name: Update Polarion tools
+
+# Regenerates src/tools.ts from a Polarion OpenAPI definition and opens a pull
+# request when the tool set changed. Run it manually whenever you move to a newer
+# Polarion version (point spec_url at that version's published REST spec), or let
+# the weekly schedule catch drift from the public Polarion demo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      spec_url:
+        description: "OpenAPI spec URL (blank = public Polarion demo)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Regenerate tools from the Polarion spec
+        env:
+          # Empty for scheduled runs -> the npm script falls back to the public demo.
+          SPEC_URL: ${{ github.event.inputs.spec_url }}
+        run: npm run regenerate
+
+      - name: Report tool count
+        id: count
+        run: echo "tools=$(grep -c 'name: \"' src/tools.ts)" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request if tools changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bot/update-polarion-tools
+          base: main
+          title: "chore: update Polarion tools from latest OpenAPI spec"
+          commit-message: "chore: regenerate src/tools.ts (${{ steps.count.outputs.tools }} tools)"
+          body: |
+            Automated regeneration of `src/tools.ts` from the Polarion OpenAPI definition.
+
+            - Spec source: `${{ github.event.inputs.spec_url || 'public Polarion demo' }}`
+            - Tool count: **${{ steps.count.outputs.tools }}**
+            - `npm run regenerate` (build + tests) passed in CI before this PR was opened.
+
+            Review the diff, then merge to ship the updated tool set.
+          add-paths: |
+            src/tools.ts
+          delete-branch: true

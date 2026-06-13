@@ -7,6 +7,9 @@ node_modules
 dist
 build
 build-tests
+# Tool regeneration intermediates (see docs/openapi-and-generation.md)
+.gen
+openapi.json
 logs
 *.log
 npm-debug.log*

@@ -43,10 +43,11 @@
     "typecheck": "tsc --noEmit",
     "prepare": "npm run build",
     "prestart": "npm run build",
-    "download-spec": "curl -H \"Authorization: Bearer ${BEARER_TOKEN}\" \"${API_BASE_URL}/definition\" -o openapi.json",
+    "download-spec": "curl -fsSL ${BEARER_TOKEN:+-H \"Authorization: Bearer ${BEARER_TOKEN}\"} \"${SPEC_URL:-https://testdrive.polarion.com/polarion/sdk/doc/rest/polarionrest.json}\" -o openapi.json",
     "fix-sparse-fields": "node scripts/fix-sparse-fields.cjs",
-    "generate-mcp": "openapi-mcp-generator --input ./openapi.json --output ./ --force --transport stdio",
-    "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run build",
+    "generate-mcp": "rm -rf .gen && openapi-mcp-generator --input ./openapi.json --output ./.gen --force --transport stdio",
+    "generate-tools": "node scripts/generate-tools.mjs .gen/src/index.ts src/tools.ts",
+    "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run generate-tools && npm run build && npm test",
     "update": "npm run regenerate"
   },
   "engines": {
@@ -66,6 +67,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/node": "^22.15.2",
+    "openapi-mcp-generator": "^3.3.0",
     "typescript": "^5.8.3"
   }
 }

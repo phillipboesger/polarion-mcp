@@ -273,6 +273,19 @@ Only entry points live at the root; everything else is grouped into folders.
 
 Detailed map: [docs/repository-overview.md](./docs/repository-overview.md).
 
+## Polarion version support
+
+The tool set (`src/tools.ts`) is generated from a Polarion OpenAPI definition, so it
+tracks whichever spec you last generated from. The REST path `/polarion/rest/v1` is
+stable across releases; newer Polarion versions mainly add endpoints, which a
+regeneration picks up — there is **no continuous maintenance**, only an occasional
+refresh when you move to a newer version.
+
+- **Default source:** the public Polarion demo spec (always reasonably current).
+- **Refresh:** run the *Update Polarion tools* GitHub Action (it regenerates, tests, and opens a PR), or locally `npm run regenerate` (optionally `SPEC_URL=… BEARER_TOKEN=… npm run regenerate` for a specific instance/version).
+
+Details: [docs/polarion-versioning.md](./docs/polarion-versioning.md) and [docs/openapi-and-generation.md](./docs/openapi-and-generation.md).
+
 ## Documentation
 
 See [docs/README.md](./docs/README.md) for architecture, features, workflows, configuration, deployment, security, and troubleshooting guides. A worked end-to-end example lives in [docs/example-task.md](./docs/example-task.md).
