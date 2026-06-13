@@ -1,17 +1,17 @@
 {
-  "name": "mcp-polarion",
+  "name": "polarion-mcp",
   "version": "1.0.0",
   "description": "Model Context Protocol (MCP) server for the Polarion ALM REST API, with an optional HTTP wrapper for Custom GPTs.",
   "type": "module",
   "license": "MIT",
   "author": "Phillip Bösger",
-  "homepage": "https://github.com/phillipboesger/mcp-polarion#readme",
+  "homepage": "https://github.com/phillipboesger/polarion-mcp#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/phillipboesger/mcp-polarion.git"
+    "url": "git+https://github.com/phillipboesger/polarion-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/phillipboesger/mcp-polarion/issues"
+    "url": "https://github.com/phillipboesger/polarion-mcp/issues"
   },
   "keywords": [
     "mcp",
@@ -26,7 +26,7 @@
   ],
   "main": "build/index.js",
   "bin": {
-    "mcp-polarion": "build/index.js"
+    "polarion-mcp": "build/index.js"
   },
   "files": [
     "build",
@@ -38,15 +38,14 @@
     "dev:http": "tsc && node build/http-server.js",
     "build": "rm -rf build && tsc && chmod 755 build/index.js build/http-server.js",
     "build:http": "rm -rf build && tsc && chmod 755 build/http-server.js && cp build/http-server.js build/index.js",
-    "test": "rm -rf build-tests && tsc -p tsconfig.test.json && node --test build-tests/tests/**/*.test.js",
+    "test": "rm -rf build-tests && tsc -p tsconfig.test.json && node --test build-tests/tests/*.test.js",
     "typecheck": "tsc --noEmit",
     "prepare": "npm run build",
     "prestart": "npm run build",
     "download-spec": "curl -H \"Authorization: Bearer ${BEARER_TOKEN}\" \"${API_BASE_URL}/definition\" -o openapi.json",
-    "fix-sparse-fields": "node fix-sparse-fields.cjs",
+    "fix-sparse-fields": "node scripts/fix-sparse-fields.cjs",
     "generate-mcp": "openapi-mcp-generator --input ./openapi.json --output ./ --force --transport stdio",
-    "fix-brackets": "node fix-brackets.js",
-    "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run fix-brackets && npm run build",
+    "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run build",
     "update": "npm run regenerate"
   },
   "engines": {

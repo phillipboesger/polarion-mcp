@@ -10,11 +10,11 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR-USERNAME/mcp-polarion.git
-cd mcp-polarion
+git clone https://github.com/YOUR-USERNAME/polarion-mcp.git
+cd polarion-mcp
 
 # Add upstream remote to stay in sync
-git remote add upstream https://github.com/phillipboesger/mcp-polarion.git
+git remote add upstream https://github.com/phillipboesger/polarion-mcp.git
 ```
 
 ### 2. Install Dependencies

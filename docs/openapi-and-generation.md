@@ -4,7 +4,7 @@
 
 - openapi.json is the source OpenAPI file and should live in the repository root.
 - The download-spec script retrieves the definition from `${API_BASE_URL}/definition`, so set API_BASE_URL (and BEARER_TOKEN) before running it.
-- fix-sparse-fields.cjs simplifies the sparseFields schema before generation.
+- scripts/fix-sparse-fields.cjs simplifies the sparseFields schema before generation.
 
 ## Regeneration Pipeline
 
@@ -13,8 +13,7 @@ The npm run update script chains these steps:
 1. download-spec
 2. fix-sparse-fields
 3. generate-mcp
-4. fix-brackets
-5. build
+4. build
 
 ## Generated Files
 
@@ -23,7 +22,7 @@ The npm run update script chains these steps:
 
 ## Notes
 
-- fix-brackets.js is a helper to normalize bracketed parameters in generated code.
+- Invalid MCP property names (e.g. bracketed `page[size]`) are normalized generically at runtime by `sanitizeInputSchema`/`nameMap` in src/utils.ts, so no post-generation patching is required.
 - If you need custom post-processing, add a step to the `regenerate` script in package.json.
 
 ## read_when

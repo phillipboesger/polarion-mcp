@@ -3,7 +3,7 @@
 ## Render Deployment
 
 - render.yaml defines a web service using Node.
-- render-build.sh runs npm ci and npm run build:http.
+- The build command runs `npm ci && npm run build:http`.
 - The service starts with node build/index.js (HTTP server).
 - Configure environment variables in the Render dashboard.
 

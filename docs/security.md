@@ -17,7 +17,7 @@
 ## HTTP Server Protection
 
 - HTTP_API_KEY is required for all HTTP endpoints except /health and OpenAPI specs.
-- Generate a long random key (see generate-api-key.sh).
+- Generate a long random key (see scripts/generate-api-key.sh).
 - Treat the HTTP API key as a second security boundary. It protects the wrapper service, while BEARER_TOKEN protects access to Polarion.
 
 ## TLS Handling

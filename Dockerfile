@@ -3,7 +3,7 @@
 # Multi-stage build: compile TypeScript in a builder stage, then ship a slim
 # runtime image. The default command starts the HTTP wrapper (useful for hosted
 # deployments and Custom GPTs). For stdio MCP mode, override the command:
-#   docker run --rm -i -e API_BASE_URL=... -e BEARER_TOKEN=... mcp-polarion node build/index.js
+#   docker run --rm -i -e API_BASE_URL=... -e BEARER_TOKEN=... polarion-mcp node build/index.js
 
 # ---- Builder ----
 FROM node:20-alpine AS builder
