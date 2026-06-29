@@ -1,19 +1,16 @@
 # polarion-mcp — Multi-stage build
 #
-# Default transport: HTTP on port 7332 (set PORT env var to override).
-# For stdio mode (VS Code, Claude Desktop): set TRANSPORT_TYPE=stdio
+# Runs the MCP Streamable HTTP server on port 3000 (MCP_HTTP_PORT overrides).
 #
 # Required env vars at runtime:
-#   POLARION_BASE_URL  — e.g. https://polarion.example.com/polarion/rest/v1
-#   POLARION_PAT       — Personal Access Token
+#   API_BASE_URL    — e.g. https://your-polarion.com/polarion/rest/v1
+#   BEARER_TOKEN    — Polarion Personal Access Token
+#   MCP_HTTP_TOKEN  — Bearer token clients must send to /mcp
 #
 # Optional:
-#   PORT                     (default 7332)
-#   TRANSPORT_TYPE           stdio | http  (default http)
-#   ENABLE_HEALTH_ENDPOINT   true | false  (exposes GET /healthz)
-#   AUTH_SCHEME              Bearer | Basic (default Bearer)
-#   HTTP_TIMEOUT_MS          (default 15000)
-#   LOG_LEVEL                silent | error | warn | info | debug
+#   MCP_HTTP_PORT               (default 3000)
+#   MCP_ALLOWED_HOSTS           comma-separated allow-list for DNS-rebinding protection
+#   NODE_TLS_REJECT_UNAUTHORIZED=0  disable SSL verification for self-signed certs
 
 # ── Builder ──────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
@@ -24,6 +21,7 @@ RUN npm ci --ignore-scripts
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY scripts ./scripts
 RUN npm run build
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
@@ -34,12 +32,10 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/build ./build
 
 USER node
 
-EXPOSE 7332
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:7332/healthz || exit 1
+EXPOSE 3000
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "build/mcp-http-server.js"]

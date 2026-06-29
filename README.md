@@ -2,7 +2,7 @@
 
 > **Product page:** [phillipboesger.github.io/polarion-mcp](https://phillipboesger.github.io/polarion-mcp/) · **Docker image:** `ghcr.io/phillipboesger/polarion-mcp:latest`
 
-An open-source **Model Context Protocol** server that exposes **210 Polarion REST operations** as AI-native tools — for VS Code Copilot, Claude, ChatGPT Custom GPTs, and any MCP-compatible client.
+An open-source **Model Context Protocol** server that exposes **271 Polarion REST operations** as AI-native tools — for VS Code Copilot, Claude, ChatGPT Custom GPTs, and any MCP-compatible client.
 
 ---
 
@@ -18,8 +18,6 @@ An open-source **Model Context Protocol** server that exposes **210 Polarion RES
 - [Usage Examples](#usage-examples)
 - [Architecture](#architecture)
 - [Security](#security)
-- [Health Checks](#health-checks)
-- [Pagination](#pagination)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
@@ -29,18 +27,17 @@ An open-source **Model Context Protocol** server that exposes **210 Polarion RES
 ## Features
 
 - **Strict Type Validation** — Zod schemas validate all inputs with Polarion query grammar support
-- **Health Endpoint** — Optional `/healthz` route for monitoring and readiness checks
-- **Hardened Error Handling** — Standardized MCP errors with automatic PAT sanitization
+- **Hardened Error Handling** — Standardized MCP errors with automatic token sanitization
 - **Pagination Helpers** — Built-in utilities for easy result navigation
 - **Security Checks** — Validates required environment variables and never logs sensitive data
-- **Multiple Transports** — HTTP (Streamable) and stdio support
-- **CI/CD Ready** — ESLint, TypeScript checks, and pre-commit hooks included
+- **Multiple Transports** — HTTP (Streamable MCP) and stdio support
+- **CI/CD Ready** — TypeScript checks and automated Docker publishing included
 
 ---
 
 ## Requirements
 
-- Node.js v18+ (global `fetch` — polyfilled with `undici`)
+- Node.js v20+
 - Polarion Personal Access Token (PAT) with read permissions
 
 ---
@@ -51,28 +48,28 @@ An open-source **Model Context Protocol** server that exposes **210 Polarion RES
 
 The image is published automatically to GitHub Container Registry on every push to `main`.
 
-**HTTP mode** (VS Code Copilot, Custom GPTs, any HTTP MCP client):
+**HTTP mode** (VS Code Copilot, Claude.ai connector, any HTTP MCP client):
 
 ```bash
 docker run -d \
-  -e POLARION_BASE_URL=https://your-polarion.com/polarion/rest/v1 \
-  -e POLARION_PAT=your_pat_here \
-  -e ENABLE_HEALTH_ENDPOINT=true \
-  -p 7332:7332 \
+  -e API_BASE_URL=https://your-polarion.com/polarion/rest/v1 \
+  -e BEARER_TOKEN=your_polarion_pat \
+  -e MCP_HTTP_TOKEN=your_mcp_secret \
+  -p 3000:3000 \
   --name polarion-mcp \
   ghcr.io/phillipboesger/polarion-mcp:latest
 ```
 
-Connect your AI client to `http://localhost:7332/mcp`.
+Connect your MCP client to `http://localhost:3000/mcp` with `Authorization: Bearer your_mcp_secret`.
 
 **stdio mode** (VS Code, Claude Desktop):
 
 ```bash
 docker run --rm -i \
-  -e POLARION_BASE_URL=https://your-polarion.com/polarion/rest/v1 \
-  -e POLARION_PAT=your_pat_here \
-  -e TRANSPORT_TYPE=stdio \
-  ghcr.io/phillipboesger/polarion-mcp:latest
+  -e API_BASE_URL=https://your-polarion.com/polarion/rest/v1 \
+  -e BEARER_TOKEN=your_polarion_pat \
+  ghcr.io/phillipboesger/polarion-mcp:latest \
+  node build/index.js
 ```
 
 ### Local development
@@ -80,8 +77,8 @@ docker run --rm -i \
 ```bash
 npm install
 cp .env.example .env
-# edit .env — set POLARION_BASE_URL, POLARION_PAT, AUTH_SCHEME
-npm run dev        # HTTP transport on :7332
+# edit .env — set API_BASE_URL, BEARER_TOKEN, MCP_HTTP_TOKEN
+npm run dev:http      # starts MCP HTTP transport on :3000
 ```
 
 See `docs/examples.http` for ready-to-run HTTP requests and `docs/client-example.ts` for a complete Node.js client example.
@@ -90,14 +87,20 @@ See `docs/examples.http` for ready-to-run HTTP requests and `docs/client-example
 
 ## Available Tools
 
+271 tools are generated from the Polarion OpenAPI spec. A few representative examples:
+
 | Tool | Description |
 |---|---|
-| `search_work_items` | Search work items with Polarion query syntax |
-| `get_work_item` | Fetch a specific work item by ID |
-| `search_documents` | Search documents in a project |
-| `get_document` | Get a specific document by ID |
+| `getAllWorkItems` | List work items across a project |
+| `getWorkItem` | Fetch a specific work item by ID |
+| `getAllDocuments` | List documents in a project |
+| `getDocument` | Get a specific document |
+| `postWorkItems` | Create new work items |
+| `patchWorkItem` | Update an existing work item |
 
 All tools accept an optional `rawPath` parameter to override REST endpoint paths without code changes — useful when your Polarion version uses non-standard paths.
+
+The full list is generated from `src/tools.ts` via `npm run generate-tools`.
 
 ---
 
@@ -107,21 +110,16 @@ All tools accept an optional `rawPath` parameter to override REST endpoint paths
 
 ```bash
 # Required
-POLARION_BASE_URL=https://your-polarion.com/polarion/rest
-POLARION_PAT=your_personal_access_token_here
+API_BASE_URL=https://your-polarion.com/polarion/rest/v1
+BEARER_TOKEN=your_polarion_personal_access_token
+
+# Required for HTTP MCP transport
+MCP_HTTP_TOKEN=your_mcp_bearer_token   # clients must send this to /mcp
 
 # Optional
-PORT=7332
-AUTH_SCHEME=Bearer        # or Basic
-HTTP_TIMEOUT_MS=15000
-LOG_LEVEL=info            # silent | error | warn | info | debug
-
-# Health Endpoint
-ENABLE_HEALTH_ENDPOINT=false
-HEALTH_PORT=7333          # separate port for health checks (optional)
-
-# Transport
-TRANSPORT_TYPE=http       # or stdio for local integrations
+MCP_HTTP_PORT=3000                     # port for MCP HTTP server (default 3000)
+MCP_ALLOWED_HOSTS=your-host.com        # DNS-rebinding protection (comma-separated)
+NODE_TLS_REJECT_UNAUTHORIZED=0         # disable SSL verification for self-signed certs
 ```
 
 ---
@@ -136,28 +134,25 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 
 const client = new Client({ name: "my-client", version: "1.0.0" });
 await client.connect(
-  new StreamableHTTPClientTransport(new URL("http://localhost:7332/mcp"))
+  new StreamableHTTPClientTransport(new URL("http://localhost:3000/mcp"), {
+    requestInit: { headers: { Authorization: "Bearer your_mcp_secret" } },
+  })
 );
 
 const result = await client.callTool({
-  name: "search_work_items",
-  arguments: { query: "status:open", limit: 10 },
+  name: "getAllWorkItems",
+  arguments: { projectId: "MYPROJECT", query: "status:open", pageSize: 10 },
 });
 ```
 
 ### Pagination
 
-```typescript
-// First page
-const page1 = await client.callTool({
-  name: "search_work_items",
-  arguments: { query: "status:open", limit: 50, offset: 0 },
-});
+All list operations support `pageSize` and `pageStartIndex` parameters:
 
-// Next page
-const page2 = await client.callTool({
-  name: "search_work_items",
-  arguments: { query: "status:open", limit: 50, offset: page1.nextOffset },
+```typescript
+const page1 = await client.callTool({
+  name: "getAllWorkItems",
+  arguments: { projectId: "MYPROJECT", query: "status:open", pageSize: 50, pageStartIndex: 0 },
 });
 ```
 
@@ -167,52 +162,33 @@ const page2 = await client.callTool({
 
 ```
 src/
-  config.ts          — configuration with security validation
-  polarionClient.ts  — REST client with error mapping and health checks
-  validation.ts      — Zod schemas for input validation
-  errors.ts          — standardized error mapping and PAT sanitization
-  pagination.ts      — pagination helper utilities
-  tools.ts           — MCP tool definitions with validation
-  server.ts          — MCP server with HTTP/stdio transport support
+  config.ts           — API base URL, token, and resource URL constants
+  server.ts           — shared MCP server factory (transport-agnostic)
+  tools.ts            — generated MCP tool definitions (271 tools)
+  executor.ts         — tool call dispatcher
+  mcp-http-server.ts  — Streamable HTTP MCP transport (remote clients)
+  http-server.ts      — plain REST wrapper for ChatGPT Custom GPT Actions
+  index.ts            — stdio entry point (local MCP clients)
+  polarion.ts         — resource and prompt handlers
+  auth.ts             — authentication helpers
+  utils.ts            — shared utilities
 ```
 
 **Design notes:**
 
+- Tools are auto-generated from the Polarion OpenAPI spec via `npm run regenerate`.
 - REST paths may differ across Polarion versions. Every tool supports `rawPath` to override endpoints without code edits.
 - No caching by design. Retries only on 429/5xx with short backoff.
-- PAT is automatically sanitized from all logs and error messages.
-- Health endpoint is optional and can run on a separate port.
+- Bearer token is automatically sanitized from all logs and error messages.
 
 ---
 
 ## Security
 
-- **Environment Validation** — Server refuses to start if `POLARION_BASE_URL` or `POLARION_PAT` are missing, invalid, or set to placeholder values (`__REPLACE_ME__`)
-- **Automatic Sanitization** — PAT is removed from all logs and error messages
-- **Error Mapping** — HTTP errors are mapped to standardized MCP error codes
-- **No Secrets in Logs** — Configuration logging explicitly excludes sensitive data
-
----
-
-## Health Checks
-
-When `ENABLE_HEALTH_ENDPOINT=true`, a `/healthz` endpoint is available:
-
-```bash
-curl http://localhost:7332/healthz
-```
-
-Response:
-
-```json
-{
-  "status": "ok",
-  "service": "polarion-mcp",
-  "version": "0.1.0",
-  "polarionBaseUrl": "https://polarion.example.com/polarion/rest",
-  "timestamp": "2025-10-19T12:00:00.000Z"
-}
-```
+- **Token Validation** — MCP HTTP server refuses to start without `MCP_HTTP_TOKEN`; every `/mcp` request must supply it as a Bearer token
+- **Credential isolation** — Polarion credentials (`API_BASE_URL`, `BEARER_TOKEN`) stay server-side and are never exposed to MCP clients
+- **DNS-rebinding protection** — optional `MCP_ALLOWED_HOSTS` allow-list validates the `Host` header on every request
+- **No Secrets in Logs** — tokens are automatically removed from all log output and error messages
 
 ---
 
@@ -222,10 +198,15 @@ Contributions are welcome. To get started:
 
 ```bash
 npm install
-npm run typecheck   # TypeScript check
-npm run lint        # ESLint
-npm run build       # compile to dist/
-npm start           # run compiled server
+npm run typecheck      # TypeScript check
+npm run build          # compile to build/
+npm run dev:http       # run locally
+```
+
+To regenerate tools from the latest Polarion OpenAPI spec:
+
+```bash
+npm run regenerate     # downloads spec, generates tools, builds, and tests
 ```
 
 Please open an issue before submitting a larger change so we can discuss the approach. Pull requests should include a description of what changed and why.
@@ -234,7 +215,7 @@ Please open an issue before submitting a larger change so we can discuss the app
 
 ## Acknowledgements
 
-Thanks to **Jonas** for the initial foundation this project is built on.
+🙏 Thanks to [@Jonasdero](https://github.com/Jonasdero), whose work is the foundation this MCP server builds on.
 
 ---
 
