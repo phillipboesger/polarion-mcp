@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>polarion-mcp · Connect your AI to Polarion</title>
+  <meta name="description" content="An open-source MCP server exposing 210 Polarion REST operations to Claude, GitHub Copilot, and ChatGPT. Built by Phillip Bösger." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" href="https://digital.boesger.com/favicon.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0b0f1a;
+      --bg-card:    #111827;
+      --bg-card-2:  #0f1520;
+      --accent:     #3BA8F1;
+      --accent-dim: rgba(59,168,241,0.15);
+      --accent-glow:rgba(59,168,241,0.35);
+      --text:       #ffffff;
+      --text-sub:   rgba(255,255,255,0.6);
+      --text-dim:   rgba(255,255,255,0.35);
+      --border:     rgba(255,255,255,0.07);
+      --border-acc: rgba(59,168,241,0.25);
+      --radius:     12px;
+      --radius-lg:  20px;
+      --font:       'Inter', -apple-system, sans-serif;
+      --mono:       'JetBrains Mono', 'Menlo', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: #050c1c;
+      background-image:
+        linear-gradient(rgba(5,12,28,0.80), rgba(5,12,28,0.90)),
+        url('https://digital.boesger.com/images/background.png');
+      background-size: cover;
+      background-position: center top;
+      background-attachment: fixed;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ─── CANVAS BACKGROUND ─── */
+    #particles {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.35;
+      transform: translateZ(0);
+      will-change: transform;
+    }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 48px;
+      background: rgba(11,15,26,0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      transform: translateZ(0);
+      will-change: transform;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .nav-brand-logo {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+
+    .nav-brand-logo img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+
+    .nav-brand span {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-sub);
+      letter-spacing: 0.01em;
+    }
+
+    .nav-brand strong {
+      color: var(--text);
+    }
+
+    .nav-links {
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .nav-link {
+      color: var(--text-sub);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+    .nav-cta {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .nav-cta:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    /* ─── HERO ─── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -30%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(ellipse at center, rgba(59,168,241,0.18) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent-dim);
+      border: 1px solid var(--border-acc);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .hero h1 {
+      font-size: clamp(52px, 8vw, 96px);
+      font-weight: 700;
+      font-family: var(--mono);
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 80px rgba(59,168,241,0.3);
+      margin-bottom: 10px;
+    }
+
+    .hero h1 span {
+      color: var(--accent);
+    }
+
+    .hero-sub {
+      font-size: clamp(18px, 2.5vw, 24px);
+      color: var(--text-sub);
+      font-weight: 300;
+      max-width: 640px;
+      margin: 16px auto 0;
+      line-height: 1.5;
+    }
+
+    .hero-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 32px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .hero-meta-item {
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .hero-meta-sep {
+      width: 1px; height: 14px;
+      background: var(--border);
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 44px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 13px 28px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(59,168,241,0.35);
+    }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(59,168,241,0.4); }
+
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 13px 28px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
+
+    .hero-install {
+      margin-top: 44px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      max-width: 520px;
+      width: 100%;
+    }
+
+    .install-label {
+      font-size: 11px;
+      font-family: var(--mono);
+      color: var(--accent);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .install-cmd {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text-sub);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font);
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .hero-scroll {
+      position: absolute;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-dim);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-scroll-line {
+      width: 1px;
+      height: 36px;
+      background: linear-gradient(to bottom, var(--accent), transparent);
+      animation: scrollpulse 2s ease-in-out infinite;
+    }
+
+    @keyframes scrollpulse {
+      0%, 100% { opacity: 0.3; }
+      50%       { opacity: 1; }
+    }
+
+    /* ─── STATS BAR ─── */
+    .stats-bar {
+      position: relative; z-index: 1;
+      background: rgba(59,168,241,0.06);
+      border-top: 1px solid var(--border-acc);
+      border-bottom: 1px solid var(--border-acc);
+      padding: 28px 24px;
+    }
+
+    .stats-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 36px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--accent);
+      line-height: 1;
+      display: block;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 6px;
+      display: block;
+    }
+
+    .stat-sep {
+      width: 1px;
+      height: 40px;
+      background: var(--border);
+    }
+
+    /* ─── SECTIONS ─── */
+    section {
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 96px 24px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+
+    .section-heading {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      font-size: 17px;
+      color: var(--text-sub);
+      max-width: 560px;
+      line-height: 1.65;
+    }
+
+    /* ─── VIDEO / DEMO ─── */
+    .demo-section .section-inner {
+      padding-top: 80px;
+    }
+
+    .demo-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    /* ─── DEMO TABS ─── */
+    .demo-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .demo-tab {
+      padding: 8px 20px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-sub);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .demo-tab .tab-icon { font-size: 15px; }
+    .demo-tab:hover { border-color: var(--border-acc); color: var(--text); }
+    .demo-tab.active {
+      background: rgba(59,168,241,0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .demo-wrap {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-acc);
+      box-shadow: 0 0 80px rgba(59,168,241,0.12), 0 32px 64px rgba(0,0,0,0.5);
+      background: #0a0d14;
+      aspect-ratio: 900 / 560;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .demo-panel { display: none; width: 100%; height: 100%; }
+    .demo-panel.active { display: block; }
+    .demo-panel--terminal { padding: 0; background: #0a0d14; }
+    .demo-panel--terminal .terminal { margin: 0; border: none; border-radius: var(--radius-lg); height: 100%; }
+
+    .demo-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: linear-gradient(135deg, #0a0e1a 0%, #0f1520 100%);
+    }
+
+    .demo-placeholder-grid {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(59,168,241,0.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(59,168,241,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .play-btn {
+      width: 80px; height: 80px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 0 40px rgba(59,168,241,0.5);
+      position: relative; z-index: 1;
+    }
+    .play-btn:hover { transform: scale(1.08); box-shadow: 0 0 60px rgba(59,168,241,0.7); }
+
+    .play-btn svg { margin-left: 5px; }
+
+    .demo-caption {
+      position: relative; z-index: 1;
+      font-size: 15px;
+      color: var(--text-sub);
+      font-family: var(--mono);
+    }
+
+    /* ─── TERMINAL MOCK ─── */
+    .terminal {
+      background: #0a0d14;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 48px;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+    }
+
+    .terminal-body {
+      padding: 20px 24px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .t-prompt { color: var(--accent); }
+    .t-cmd    { color: #e2e8f0; }
+    .t-out    { color: var(--text-sub); }
+    .t-key    { color: #f9a8d4; }
+    .t-val    { color: #86efac; }
+    .t-str    { color: #fde68a; }
+    .t-comment{ color: var(--text-dim); }
+
+    /* ─── FEATURES ─── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-top: 56px;
+    }
+
+    .feature-card {
+      background: var(--bg-card-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      transition: border-color 0.3s, transform 0.2s, box-shadow 0.3s;
+      cursor: default;
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-acc);
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4), 0 0 40px rgba(59,168,241,0.06);
+    }
+
+    .feature-icon {
+      width: 48px; height: 48px;
+      background: var(--accent-dim);
+      border: 1px solid var(--border-acc);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+
+    .feature-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: var(--text-sub);
+      line-height: 1.65;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 3px 10px;
+      background: var(--accent-dim);
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+
+    /* ─── HOW IT WORKS ─── */
+    .how-section {
+      background: rgba(255,255,255,0.02);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .how-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      margin-top: 56px;
+      position: relative;
+    }
+
+    .how-steps::before {
+      content: '';
+      position: absolute;
+      top: 32px;
+      left: calc(33.33% / 2 + 16px);
+      right: calc(33.33% / 2 + 16px);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.3;
+    }
+
+    .how-step {
+      padding: 0 32px;
+      text-align: center;
+    }
+
+    .step-num {
+      width: 64px; height: 64px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-acc);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--accent);
+      margin: 0 auto 24px;
+    }
+
+    .step-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .step-desc {
+      font-size: 14px;
+      color: var(--text-sub);
+      line-height: 1.65;
+    }
+
+    .step-code {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    /* ─── CLIENTS ─── */
+    .clients-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 52px;
+    }
+
+    .client-card {
+      background: var(--bg-card-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      text-align: center;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .client-card:hover { border-color: var(--border-acc); transform: translateY(-3px); }
+
+    .client-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .client-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .client-type {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .client-transport {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 2px 8px;
+      background: var(--accent-dim);
+      border-radius: 100px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+
+    /* ─── INSTALL TABS ─── */
+    .install-section .section-inner { padding-bottom: 80px; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-top: 52px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0;
+    }
+
+    .tab-btn {
+      padding: 10px 18px;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: var(--font);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+      margin-bottom: -1px;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn:hover:not(.active) { color: var(--text-sub); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .code-block {
+      background: #080b13;
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      padding: 24px 24px;
+      position: relative;
+    }
+
+    .code-block pre {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text-sub);
+      overflow-x: auto;
+    }
+
+    .code-copy {
+      position: absolute;
+      top: 14px; right: 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: all 0.2s;
+    }
+    .code-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ─── ABOUT ─── */
+    .about-section {
+      background: transparent;
+      border-top: 1px solid var(--border);
+    }
+
+    .about-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 96px 24px;
+      display: flex;
+      gap: 48px;
+      align-items: center;
+    }
+
+    .about-avatar {
+      flex-shrink: 0;
+      width: 100px; height: 100px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--border-acc);
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(59,168,241,0.2);
+    }
+
+    .about-avatar img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+
+    .about-text h3 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .about-role {
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 14px;
+      letter-spacing: 0.03em;
+    }
+
+    .about-bio {
+      font-size: 15px;
+      color: var(--text-sub);
+      line-height: 1.65;
+      margin-bottom: 20px;
+    }
+
+    .about-links {
+      display: flex; gap: 12px; flex-wrap: wrap;
+    }
+
+    .about-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text-sub);
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .about-link:hover { border-color: var(--border-acc); color: var(--text); background: rgba(59,168,241,0.08); }
+
+    /* ─── CTA BANNER ─── */
+    .cta-section {
+      background: transparent;
+      border-top: 1px solid var(--border);
+    }
+
+    .cta-inner {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 96px 24px;
+      text-align: center;
+    }
+
+    .cta-inner h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    .cta-inner p {
+      font-size: 17px;
+      color: var(--text-sub);
+      margin-bottom: 36px;
+    }
+
+    .cta-actions {
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      position: relative; z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 32px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .footer-brand {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--text-sub);
+      font-size: 13px;
+    }
+
+    .footer-brand-logo {
+      width: 22px; height: 22px;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+
+    .footer-brand-logo img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+
+    .footer-links {
+      display: flex; gap: 24px; align-items: center;
+    }
+
+    .footer-link {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+    .footer-link:hover { color: var(--text); }
+
+    .footer-copy {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    /* ─── UTILS ─── */
+    .highlight { color: var(--accent); }
+    .mono { font-family: var(--mono); }
+
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .nav-links { display: none; }
+      .how-steps { grid-template-columns: 1fr; gap: 40px; }
+      .how-steps::before { display: none; }
+      .about-inner { flex-direction: column; text-align: center; }
+      .about-links { justify-content: center; }
+      footer { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<!-- ─── NAV ─── -->
+<nav>
+  <a href="https://digital.boesger.com" class="nav-brand">
+    <div class="nav-brand-logo">
+      <img src="https://digital.boesger.com/favicon.png" alt="Bösger Digital" />
+    </div>
+    <span><strong>Bösger</strong> Digital</span>
+  </a>
+  <div class="nav-links">
+    <a href="#features" class="nav-link">Features</a>
+    <a href="#how" class="nav-link">How it works</a>
+    <a href="#clients" class="nav-link">Clients</a>
+    <a href="#install" class="nav-link">Install</a>
+    <a href="https://polarion.boesger.com" class="nav-link" target="_blank">Blog ↗</a>
+    <a href="https://github.com/phillipboesger/polarion-mcp" class="nav-cta" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      View on GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-badge">Open Source · MIT License</div>
+
+  <h1>polarion<span>-mcp</span></h1>
+  <p class="hero-sub">
+    Connect your AI to Polarion in minutes.<br>
+    210 REST operations. One server. Every client.
+  </p>
+
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      TypeScript
+    </div>
+    <div class="hero-meta-sep"></div>
+    <div class="hero-meta-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      Node.js 20+
+    </div>
+    <div class="hero-meta-sep"></div>
+    <div class="hero-meta-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Polarion REST API
+    </div>
+  </div>
+
+  <div class="hero-actions">
+    <a href="https://github.com/phillipboesger/polarion-mcp" class="btn-primary" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      Star on GitHub
+    </a>
+    <a href="https://polarion.boesger.com/your-ai-assistant-cant-see-polarion" class="btn-ghost" target="_blank">
+      Read the Blog Post ↗
+    </a>
+  </div>
+
+  <div class="hero-install">
+    <span class="install-label">$ install</span>
+    <span class="install-cmd">claude mcp add polarion-mcp -e API_BASE_URL=... -e BEARER_TOKEN=...</span>
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('claude mcp add polarion-mcp -e API_BASE_URL=... -e BEARER_TOKEN=...');this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
+  </div>
+
+  <div class="hero-scroll">
+    <span>Explore</span>
+    <div class="hero-scroll-line"></div>
+  </div>
+</section>
+
+<!-- ─── STATS ─── -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat">
+      <span class="stat-num">210</span>
+      <span class="stat-label">REST Operations</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-num">5</span>
+      <span class="stat-label">AI Clients</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-num">3</span>
+      <span class="stat-label">Transports</span>
+    </div>
+    <div class="stat-sep"></div>
+    <div class="stat">
+      <span class="stat-num">MIT</span>
+      <span class="stat-label">License</span>
+    </div>
+  </div>
+</div>
+
+<!-- ─── DEMO ─── -->
+<section class="demo-section">
+  <div class="section-inner">
+    <div class="demo-header">
+      <p class="section-label">See it in action</p>
+      <h2 class="section-heading">Your AI, inside Polarion</h2>
+      <p class="section-sub">
+        Ask questions in plain language. Get real data from your Polarion instance in seconds — no API knowledge required.
+      </p>
+    </div>
+
+    <div class="demo-tabs">
+      <button class="demo-tab active" onclick="switchDemo('vscode', this)">
+        <span class="tab-icon">💻</span> VS Code · GitHub Copilot
+      </button>
+      <button class="demo-tab" onclick="switchDemo('cloud', this)">
+        <span class="tab-icon">☁️</span> Cloud AI · For everyone
+      </button>
+      <button class="demo-tab" onclick="switchDemo('terminal', this)">
+        <span class="tab-icon">⌨️</span> Terminal output
+      </button>
+    </div>
+
+    <div class="demo-wrap">
+      <div class="demo-panel active" id="demo-vscode">
+        <img
+          src="assets/demo.gif"
+          alt="GitHub Copilot queries Polarion work items via polarion-mcp in VS Code"
+          style="width:100%;height:100%;object-fit:cover;display:block;border-radius:var(--radius-lg);"
+        />
+      </div>
+      <div class="demo-panel" id="demo-cloud">
+        <img
+          src="assets/demo-cloud.gif"
+          alt="Cloud AI assistant queries Polarion in the browser — no developer skills needed"
+          style="width:100%;height:100%;object-fit:cover;display:block;border-radius:var(--radius-lg);"
+        />
+      </div>
+      <div class="demo-panel demo-panel--terminal" id="demo-terminal">
+        <div class="terminal" style="margin:0;border:none;border-radius:var(--radius-lg);height:100%;display:flex;flex-direction:column;">
+          <div class="terminal-bar">
+            <div class="dot dot-r"></div>
+            <div class="dot dot-y"></div>
+            <div class="dot dot-g"></div>
+            <span class="terminal-title">polarion-mcp · tool response</span>
+          </div>
+          <div class="terminal-body" style="flex:1;overflow:auto;">
+            <div><span class="t-prompt">You ›</span> <span class="t-cmd">List all open defects in the DEMO project assigned to me</span></div>
+            <div style="margin-top:12px"><span class="t-comment">// polarion-mcp calls getWorkItems</span></div>
+            <div style="margin-top:8px"><span class="t-key">project</span><span class="t-out">: </span><span class="t-str">"DEMO"</span><span class="t-out">,</span> <span class="t-key">type</span><span class="t-out">: </span><span class="t-str">"defect"</span><span class="t-out">,</span> <span class="t-key">status</span><span class="t-out">: </span><span class="t-str">"open"</span><span class="t-out">,</span> <span class="t-key">assignedTo</span><span class="t-out">: </span><span class="t-str">"me"</span></div>
+            <div style="margin-top:14px"><span class="t-val">✓ Found 3 open defects assigned to you:</span></div>
+            <div style="margin-top:10px"><span class="t-out">  DEMO-421</span><span class="t-comment"> · High     · </span><span class="t-cmd">Login page crashes on Safari mobile</span></div>
+            <div style="margin-top:5px"><span class="t-out">  DEMO-435</span><span class="t-comment"> · Medium   · </span><span class="t-cmd">Export dialog does not close after save</span></div>
+            <div style="margin-top:5px"><span class="t-out">  DEMO-447</span><span class="t-comment"> · Critical · </span><span class="t-cmd">NullPointerException in report generator</span></div>
+            <div style="margin-top:14px"><span class="t-comment">// Copilot: Want me to open DEMO-447 in Polarion and suggest a fix?</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FEATURES ─── -->
+<section id="features">
+  <div class="section-inner">
+    <p class="section-label">What it does</p>
+    <h2 class="section-heading">Everything Polarion, <span class="highlight">AI-native</span></h2>
+    <p class="section-sub">
+      One MCP server that turns the entire Polarion REST API into tool calls your AI assistant can use directly.
+    </p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔌</div>
+        <div class="feature-title">210 REST Operations</div>
+        <p class="feature-desc">Every Polarion REST endpoint exposed as a typed tool — work items, test runs, documents, plans, users, and more. Full coverage, auto-generated from the OpenAPI spec.</p>
+        <span class="feature-tag">auto-generated</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <div class="feature-title">Every Major AI Client</div>
+        <p class="feature-desc">Claude Code, Claude Desktop, VS Code GitHub Copilot, ChatGPT Custom GPT, Claude.ai web — one server, five clients, three transports. Pick your stack.</p>
+        <span class="feature-tag">stdio · http · streamable</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🐳</div>
+        <div class="feature-title">Docker-Ready</div>
+        <p class="feature-desc">Multi-transport container image with configurable entrypoints. Run locally or deploy on your own infrastructure. No cloud dependency.</p>
+        <span class="feature-tag">self-hosted</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📚</div>
+        <div class="feature-title">SDK Documentation Access</div>
+        <p class="feature-desc">Optional Polarion SDK docs loaded as tool context. Your AI understands not just the REST API, but the Polarion programming model.</p>
+        <span class="feature-tag">in-context docs</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">Secure by Design</div>
+        <p class="feature-desc">Personal Access Tokens stored in .env, gitignored by default. Separate API keys per transport. TLS support with cert bypass only for internal servers.</p>
+        <span class="feature-tag">pat · env · tls</span>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">Cached Project Config</div>
+        <p class="feature-desc">Project-level configuration is cached on first use. Your AI stays fast even when exploring a complex Polarion instance with dozens of projects.</p>
+        <span class="feature-tag">performance</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─── -->
+<section class="how-section" id="how">
+  <div class="section-inner">
+    <div style="text-align:center;">
+      <p class="section-label">Setup</p>
+      <h2 class="section-heading">Up and running in 3 steps</h2>
+    </div>
+
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="step-num">01</div>
+        <div class="step-title">Clone & Build</div>
+        <p class="step-desc">Clone the repo, install dependencies, and build. Takes less than two minutes.</p>
+        <span class="step-code">npm install && npm run build</span>
+      </div>
+      <div class="how-step">
+        <div class="step-num">02</div>
+        <div class="step-title">Configure</div>
+        <p class="step-desc">Add your Polarion URL and Personal Access Token. Point your AI client to the server.</p>
+        <span class="step-code">API_BASE_URL + BEARER_TOKEN</span>
+      </div>
+      <div class="how-step">
+        <div class="step-num">03</div>
+        <div class="step-title">Ask</div>
+        <p class="step-desc">Open your AI assistant and start querying Polarion in plain language. No API knowledge required.</p>
+        <span class="step-code">"List open defects in PROJECT"</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CLIENTS ─── -->
+<section id="clients">
+  <div class="section-inner">
+    <p class="section-label">Compatibility</p>
+    <h2 class="section-heading">Works with your tools</h2>
+    <p class="section-sub">One server, every client. Pick the AI assistant you already use.</p>
+
+    <div class="clients-grid">
+      <div class="client-card">
+        <div class="client-icon">🤖</div>
+        <div class="client-name">Claude Code</div>
+        <div class="client-type">CLI / Agent</div>
+        <span class="client-transport">stdio</span>
+      </div>
+      <div class="client-card">
+        <div class="client-icon">💬</div>
+        <div class="client-name">Claude Desktop</div>
+        <div class="client-type">macOS / Windows</div>
+        <span class="client-transport">stdio</span>
+      </div>
+      <div class="client-card">
+        <div class="client-icon">🔵</div>
+        <div class="client-name">GitHub Copilot</div>
+        <div class="client-type">VS Code Agent Mode</div>
+        <span class="client-transport">stdio</span>
+      </div>
+      <div class="client-card">
+        <div class="client-icon">✦</div>
+        <div class="client-name">ChatGPT</div>
+        <div class="client-type">Custom GPT</div>
+        <span class="client-transport">rest http</span>
+      </div>
+      <div class="client-card">
+        <div class="client-icon">🌐</div>
+        <div class="client-name">Claude.ai</div>
+        <div class="client-type">Web App</div>
+        <span class="client-transport">streamable http</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── INSTALL TABS ─── -->
+<section class="install-section" id="install">
+  <div class="section-inner">
+    <p class="section-label">Quick Start</p>
+    <h2 class="section-heading">Get connected</h2>
+    <p class="section-sub">Choose your AI client. Copy the config. You're done.</p>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('claude-code', this)">Claude Code</button>
+      <button class="tab-btn" onclick="switchTab('vscode', this)">VS Code Copilot</button>
+      <button class="tab-btn" onclick="switchTab('claude-desktop', this)">Claude Desktop</button>
+      <button class="tab-btn" onclick="switchTab('docker', this)">Docker</button>
+    </div>
+
+    <div id="tab-claude-code" class="tab-content active">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('claude-code')">Copy</button>
+        <pre id="code-claude-code"><span style="color:#86efac">claude mcp add</span> polarion-mcp \
+  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
+  <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">your-personal-access-token</span> \
+  -- node <span style="color:#f9a8d4">/path/to/polarion-mcp/build/index.js</span></pre>
+      </div>
+    </div>
+
+    <div id="tab-vscode" class="tab-content">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('vscode')">Copy</button>
+        <pre id="code-vscode"><span style="color:#6b7280">// .vscode/mcp.json</span>
+{
+  <span style="color:#93c5fd">"servers"</span>: {
+    <span style="color:#93c5fd">"polarion-mcp"</span>: {
+      <span style="color:#93c5fd">"type"</span>: <span style="color:#fde68a">"stdio"</span>,
+      <span style="color:#93c5fd">"command"</span>: <span style="color:#fde68a">"node"</span>,
+      <span style="color:#93c5fd">"args"</span>: [<span style="color:#fde68a">"/path/to/polarion-mcp/build/index.js"</span>],
+      <span style="color:#93c5fd">"env"</span>: {
+        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion"</span>,
+        <span style="color:#93c5fd">"BEARER_TOKEN"</span>: <span style="color:#fde68a">"your-personal-access-token"</span>
+      }
+    }
+  }
+}</pre>
+      </div>
+    </div>
+
+    <div id="tab-claude-desktop" class="tab-content">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('claude-desktop')">Copy</button>
+        <pre id="code-claude-desktop"><span style="color:#6b7280">// claude_desktop_config.json</span>
+{
+  <span style="color:#93c5fd">"mcpServers"</span>: {
+    <span style="color:#93c5fd">"polarion-mcp"</span>: {
+      <span style="color:#93c5fd">"command"</span>: <span style="color:#fde68a">"node"</span>,
+      <span style="color:#93c5fd">"args"</span>: [<span style="color:#fde68a">"/path/to/polarion-mcp/build/index.js"</span>],
+      <span style="color:#93c5fd">"env"</span>: {
+        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion"</span>,
+        <span style="color:#93c5fd">"BEARER_TOKEN"</span>: <span style="color:#fde68a">"your-personal-access-token"</span>
+      }
+    }
+  }
+}</pre>
+      </div>
+    </div>
+
+    <div id="tab-docker" class="tab-content">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('docker')">Copy</button>
+        <pre id="code-docker"><span style="color:#86efac">docker run</span> -d \
+  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
+  <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">your-personal-access-token</span> \
+  <span style="color:#93c5fd">-e</span> ENTRYPOINT=<span style="color:#fde68a">http</span> \
+  <span style="color:#93c5fd">-p</span> 3000:3000 \
+  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── ABOUT ─── -->
+<section class="about-section">
+  <div class="about-inner">
+    <div class="about-avatar">
+      <img src="https://digital.boesger.com/images/photo.webp" alt="Phillip Bösger" onerror="this.style.display='none'" />
+    </div>
+    <div class="about-text">
+      <h3>Built by Phillip Bösger</h3>
+      <p class="about-role">Polarion & AI Freelancer · Bösger Digital</p>
+      <p class="about-bio">
+        Nearly a decade of Polarion experience. I built polarion-mcp because I wanted my AI assistants to actually know what's happening in Polarion — not just talk about it.
+      </p>
+      <div class="about-links">
+        <a href="https://polarion.boesger.com" class="about-link" target="_blank">
+          📝 Polarion Blog
+        </a>
+        <a href="https://linkedin.com/in/phillip-boesger-90691215a" class="about-link" target="_blank">
+          💼 LinkedIn
+        </a>
+        <a href="https://github.com/phillipboesger" class="about-link" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CTA ─── -->
+<section class="cta-section">
+  <div class="cta-inner">
+    <h2>Ready to connect your AI to Polarion?</h2>
+    <p>Open-source, self-hosted, and ready in minutes. No vendor lock-in.</p>
+    <div class="cta-actions">
+      <a href="https://github.com/phillipboesger/polarion-mcp" class="btn-primary" target="_blank">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        View on GitHub
+      </a>
+      <a href="https://polarion.boesger.com" class="btn-ghost" target="_blank">
+        Read the Blog ↗
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <a href="https://digital.boesger.com" class="footer-brand">
+    <div class="footer-brand-logo">
+      <img src="https://digital.boesger.com/favicon.png" alt="Bösger Digital" />
+    </div>
+    Bösger Digital · Phillip Bösger
+  </a>
+  <div class="footer-links">
+    <a href="https://polarion.boesger.com" class="footer-link" target="_blank">Blog</a>
+    <a href="https://github.com/phillipboesger/polarion-mcp" class="footer-link" target="_blank">GitHub</a>
+    <a href="https://linkedin.com/in/phillip-boesger-90691215a" class="footer-link" target="_blank">LinkedIn</a>
+    <a href="https://github.com/phillipboesger/polarion-mcp/tree/main/docs" class="footer-link" target="_blank">Docs</a>
+  </div>
+  <span class="footer-copy">© 2026 Phillip Bösger</span>
+</footer>
+
+<!-- ─── SCRIPTS ─── -->
+<script>
+  // Particle canvas
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  let W, H, stars = [], animFrame;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function initStars() {
+    stars = [];
+    const count = Math.floor((W * H) / 8000);
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.2 + 0.2,
+        a: Math.random(),
+        speed: Math.random() * 0.003 + 0.001,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  function drawStars(t) {
+    ctx.clearRect(0, 0, W, H);
+    stars.forEach(s => {
+      const alpha = 0.3 + 0.5 * Math.sin(t * s.speed + s.phase);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(59,168,241,${alpha})`;
+      ctx.fill();
+    });
+  }
+
+  let last = 0;
+  function loop(t) {
+    drawStars(t);
+    animFrame = requestAnimationFrame(loop);
+  }
+
+  resize(); initStars(); loop(0);
+  window.addEventListener('resize', () => { resize(); initStars(); });
+
+  // Tab switching
+  function switchDemo(id, btn) {
+    document.querySelectorAll('.demo-panel').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.demo-tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('demo-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // Code copy
+  function copyCode(id) {
+    const el = document.getElementById('code-' + id);
+    navigator.clipboard.writeText(el.innerText);
+    event.target.textContent = '✓ Copied';
+    setTimeout(() => event.target.textContent = 'Copy', 1800);
+  }
+</script>
+
+</body>
+</html>
