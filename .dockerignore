@@ -8,11 +8,9 @@ build/
 .vscode/
 .idea/
 coverage/
+docs/
+.git/
+.github/
 *.tgz
 .npm
 .eslintcache
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
