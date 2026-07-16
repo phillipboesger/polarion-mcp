@@ -67,6 +67,7 @@ Typical HTTP workflow:
 ## Request Pacing, Retries, and dry_run
 
 - Every outgoing Polarion request is paced to roughly 3 requests/second and automatically retried with exponential backoff on `429` and `5xx` responses (up to 2 retries), matching Polarion's low burst tolerance. This is transparent — no configuration is required.
+- After a successful mutating request (`POST`/`PUT`/`PATCH`/`DELETE`), the server waits an additional ~1.5s before returning, giving Polarion a moment to finish propagating the write before any immediate follow-up call (e.g. a read-back) is sent. This is separate from the general 3 req/s pacing, which applies to reads too.
 - Every mutating tool (`POST`/`PUT`/`PATCH`/`DELETE`) accepts an optional `dry_run: true` argument. When set, the tool validates arguments, resolves the URL/auth exactly as it would for a real call, and returns a preview of the request (method, URL, headers with the `Authorization` value redacted, and body) instead of sending it to Polarion. `dry_run` on a `GET` tool is ignored and the request executes normally, since there's nothing unsafe to preview.
 
   ```jsonc
@@ -80,6 +81,31 @@ Typical HTTP workflow:
     }
   }
   ```
+
+- API error messages parse Polarion's actual JSON:API error body (`{errors: [{status, title, detail}]}`) and surface the real `detail`/`title`, instead of a truncated raw JSON dump, whenever the response is shaped that way.
+
+## Pre-write Validation (Guards)
+
+`patchWorkItem` (updating a single, existing Work Item) validates the standard
+enum fields it's given — `status`, `severity`, `priority`, `resolution` — against
+Polarion's own `getAvailableOptions` action *before* sending the write. An
+invalid value is refused locally with the list of valid options, instead of
+either failing cryptically server-side or (on field types that don't validate
+strictly) silently persisting as an unknown value. Lookups are cached
+in-memory for ~60s per (project, work item, field) to avoid extra round-trips
+on repeated edits to the same item.
+
+If the validation lookup itself can't be completed (network error, auth
+failure), the write is refused rather than let through — an unvalidated enum
+value could otherwise persist as a silent "ghost", invisible in the UI.
+
+**Not yet covered** (contributions welcome):
+- Bulk or create Work Item writes (`postWorkItems`, `patchWorkItems`,
+  `patchAllWorkItems`) — resolving valid options for a not-yet-existing item
+  needs its type, which isn't reliably available for bulk payloads without
+  deeper schema work.
+- Custom fields, categories, and relationship/link targets.
+- Any resource other than Work Items (Documents, Test Runs, Plans, ...).
 
 ## read_when
 

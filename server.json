@@ -1,0 +1,33 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.phillipboesger/polarion-mcp",
+  "description": "Model Context Protocol (MCP) server for the Polarion ALM REST API, with an optional HTTP wrapper for Custom GPTs.",
+  "repository": {
+    "url": "https://github.com/phillipboesger/polarion-mcp",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/phillipboesger/polarion-mcp",
+      "version": "latest",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "API_BASE_URL",
+          "description": "Base URL for the Polarion REST API, e.g. https://your-polarion-server.com/polarion/rest/v1",
+          "isRequired": true
+        },
+        {
+          "name": "BEARER_TOKEN",
+          "description": "Personal Access Token (PAT) for authenticating with the Polarion REST API",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
