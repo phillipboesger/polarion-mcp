@@ -27,7 +27,14 @@ import { API_BASE_URL, getBearerToken, shouldRejectUnauthorized } from "./config
 import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
-import { checkWorkItemsEnumFields, splitWorkItemId, type WorkItemEnumCheckTarget } from "./guards.js";
+import {
+  checkWorkItemsEnumFields,
+  checkWorkItemCustomFieldKeys,
+  checkWorkItemUserReferences,
+  splitWorkItemId,
+  type WorkItemEnumCheckTarget,
+  type EnumGuardResult,
+} from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
 
 // Re-exported for backward compatibility -- tests and any external code that
@@ -58,8 +65,9 @@ function buildWorkItemEnumTargets(
     const projectId = readArg(validatedArgs, 'projectId', nameMap);
     const workItemId = readArg(validatedArgs, 'workItemId', nameMap);
     const attributes = (dataItems[0] as any)?.attributes;
+    const relationships = (dataItems[0] as any)?.relationships;
     if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes || typeof attributes !== 'object') return null;
-    return [{ projectId, workItemId, attributes }];
+    return [{ projectId, workItemId, attributes, relationships }];
   }
 
   // postWorkItems: bulk create, new items -- no workItemId yet, resolve options by attributes.type.
@@ -69,9 +77,10 @@ function buildWorkItemEnumTargets(
     const targets: WorkItemEnumCheckTarget[] = [];
     for (const item of dataItems) {
       const attributes = (item as any)?.attributes;
+      const relationships = (item as any)?.relationships;
       const type = attributes?.type;
       if (attributes && typeof attributes === 'object' && typeof type === 'string') {
-        targets.push({ projectId, type, attributes });
+        targets.push({ projectId, type, attributes, relationships });
       }
     }
     return targets.length > 0 ? targets : null;
@@ -89,14 +98,44 @@ function buildWorkItemEnumTargets(
     for (const item of dataItems) {
       const id = (item as any)?.id;
       const attributes = (item as any)?.attributes;
+      const relationships = (item as any)?.relationships;
       if (typeof id !== 'string' || !attributes || typeof attributes !== 'object') continue;
       const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' ? fallbackProjectId : undefined);
-      if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes });
+      if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes, relationships });
     }
     return targets.length > 0 ? targets : null;
   }
 
   return null;
+}
+
+/**
+ * Runs all three Work Item write guards (enum fields, custom field keys,
+ * user references) over `targets` in that order, stopping at the first
+ * failure. See guards.ts's module doc for exactly what each covers.
+ */
+async function runWorkItemGuards(
+  targets: WorkItemEnumCheckTarget[],
+  requestContext: { baseUrl: string; headers: Record<string, string>; rejectUnauthorized: boolean },
+  sendOpts: SendWithRetryOpts | undefined
+): Promise<EnumGuardResult> {
+  const enumResult = await checkWorkItemsEnumFields(targets, requestContext, sendOpts);
+  if (!enumResult.ok) return enumResult;
+
+  // Custom field keys: only checkable for not-yet-existing items (postWorkItems), where
+  // the item's own `type` is known -- see checkWorkItemCustomFieldKeys's doc for why.
+  for (const target of targets) {
+    if (!target.type || target.workItemId) continue;
+    const fieldKeyResult = await checkWorkItemCustomFieldKeys(target.projectId, target.type, target.attributes, requestContext, sendOpts);
+    if (!fieldKeyResult.ok) return fieldKeyResult;
+  }
+
+  for (const target of targets) {
+    const userResult = await checkWorkItemUserReferences(target.relationships, requestContext, sendOpts);
+    if (!userResult.ok) return userResult;
+  }
+
+  return { ok: true };
 }
 
 /**
@@ -441,14 +480,16 @@ export async function executeApiTool(
       };
     }
 
-    // ===== STEP 7a: Pre-write guard (fail-closed enum validation) =====
+    // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
     // Covers patchWorkItem (single existing item), postWorkItems (bulk create),
-    // and patchWorkItems/patchAllWorkItems (bulk update). See guards.ts for
-    // exactly what's validated and what's an explicit, documented follow-up
-    // (custom fields, categories, link targets, non-Work-Item resources).
+    // and patchWorkItems/patchAllWorkItems (bulk update): enum fields, custom
+    // field keys (create only), and user references (assignee/votes/watches).
+    // See guards.ts for exactly what's validated and what's an explicit,
+    // documented follow-up (categories, module/linkedRevisions existence,
+    // non-Work-Item resources).
     const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
     if (enumTargets) {
-      const guardResult = await checkWorkItemsEnumFields(
+      const guardResult = await runWorkItemGuards(
         enumTargets,
         { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() },
         sendOpts

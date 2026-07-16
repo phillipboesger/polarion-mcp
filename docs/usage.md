@@ -110,8 +110,26 @@ If the validation lookup itself can't be completed (network error, auth
 failure), the write is refused rather than let through — an unvalidated enum
 value could otherwise persist as a silent "ghost", invisible in the UI.
 
+Two further checks run after the enum check, same fail-closed principle:
+
+- **Custom field keys** — on `postWorkItems` (create) only, every `attributes`
+  key that isn't a standard Work Item field is checked against
+  `getProjectFieldsMetadata` for the item's type, catching a typo'd custom
+  field id before it silently persists as an unknown key. Not covered on
+  update tools (`patchWorkItem` et al.), since resolving an existing item's
+  type would need an extra round-trip this doesn't perform.
+- **User references** — every user id in `relationships.assignee`/`votes`/
+  `watches`, across all 4 covered tools, is checked to actually exist via
+  `getUser`. A confirmed-missing user (404) is reported specifically; an
+  unresolvable lookup (network/auth error) fails closed like everything else.
+
 **Not yet covered** (contributions welcome):
-- Custom fields, categories, and relationship/link targets.
+- `categories` — Polarion exposes no standalone `categories` resource
+  endpoint to check existence against.
+- `module` (the owning Document) and `linkedRevisions` — checkable in
+  principle, not built out yet.
+- Custom field *values* (only *keys* are checked), and custom field keys on
+  update tools.
 - Any resource other than Work Items (Documents, Test Runs, Plans, ...).
 
 ## Rich Text as Markdown

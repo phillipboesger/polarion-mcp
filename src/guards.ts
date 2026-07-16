@@ -1,34 +1,45 @@
 /**
- * Fail-closed pre-write validation ("guards").
+ * Fail-closed pre-write validation ("guards") for Work Item writes.
  *
- * Validates the standard Polarion Work Item enum fields (`status`,
- * `severity`, `priority`, `resolution`) against Polarion's own
- * `getAvailableOptions` action before a write is sent -- so a typo'd enum
- * value is rejected locally with a clear message instead of either failing
- * cryptically server-side, or (worse) being silently accepted as an unknown
- * value on field types that don't validate strictly.
+ * Three independent checks, run in sequence by `executor.ts` (first failure
+ * blocks the write, remaining checks are skipped):
  *
- * Two lookup modes, matching the two ways `getAvailableOptions` can be
- * scoped (confirmed against the REST API User Guide's worked examples):
- * - **Instance-scoped**: an existing Work Item (`patchWorkItem`,
- *   `patchWorkItems`, `patchAllWorkItems`) -- options are resolved for that
- *   specific item via `/workitems/{workItemId}/fields/{field}/actions/getAvailableOptions`.
- * - **Type-scoped**: a not-yet-existing Work Item being created
- *   (`postWorkItems`) -- options are resolved for the given `type` via
- *   `/workitems/fields/{field}/actions/getAvailableOptions?type={type}`,
- *   since there's no instance yet to scope by.
+ * 1. **Enum fields** (`checkWorkItemEnumFields`/`checkWorkItemsEnumFields`) --
+ *    `status`/`severity`/`priority`/`resolution` against Polarion's
+ *    `getAvailableOptions` action. Two lookup modes, confirmed against the
+ *    REST API User Guide's worked examples: instance-scoped for existing
+ *    items (`patchWorkItem`, `patchWorkItems`, `patchAllWorkItems`), or
+ *    type-scoped for not-yet-existing items (`postWorkItems`).
+ * 2. **Custom field keys** (`checkWorkItemCustomFieldKeys`) -- any
+ *    `attributes` key that isn't a standard Work Item field against
+ *    `getProjectFieldsMetadata`. Scoped to `postWorkItems` (create) only --
+ *    see that function's doc for why updates aren't covered. The response
+ *    shape this reads is **not individually confirmed** (no worked guide
+ *    example for this endpoint) -- inferred from the JSON:API `{data:
+ *    [{id}]}` convention every other "actions" GET endpoint in this codebase
+ *    follows without exception; fails closed (empty result set) rather than
+ *    silently passing everything through if that assumption turns out wrong.
+ * 3. **User references** (`checkWorkItemUserReferences`) -- every user id
+ *    in `relationships.assignee`/`votes`/`watches` against `getUser`,
+ *    across all 4 covered write tools.
  *
  * Deliberately NOT covered (documented, not silently dropped -- see
  * docs/usage.md):
- * - Custom fields, categories, or link/relationship targets.
+ * - `categories` -- Polarion exposes no standalone `categories` resource
+ *   endpoint to check existence against (confirmed absent from the
+ *   generated tool set); would need a different, unconfirmed mechanism.
+ * - `module` (the owning Document) and `linkedRevisions` -- existence is
+ *   checkable in principle (`getDocument`/`getRevision` both exist), but
+ *   their JSON:API ids need extra parsing this pass didn't build out.
+ * - Custom field *values* (only *keys* are checked) and custom field keys
+ *   on update tools (`patchWorkItem` et al.).
  * - Any resource other than Work Items (Documents, Test Runs, Plans, ...).
  *
- * Fail-closed: if the availability check itself can't be completed (network
- * error, auth failure, unexpected response shape), the write is refused
- * rather than let through -- an unvalidated enum value can persist as a
- * silent "ghost" that's invisible in the UI and never errors again. For a
- * bulk write, the *first* target that fails validation blocks the entire
- * batch (Polarion's bulk endpoints are all-or-nothing per request anyway).
+ * Fail-closed: if a check itself can't be completed (network error, auth
+ * failure, unexpected response shape), the write is refused rather than
+ * let through. For a bulk write, the *first* target that fails validation
+ * blocks the entire batch (Polarion's bulk endpoints are all-or-nothing per
+ * request anyway).
  */
 
 import axios, { type AxiosRequestConfig } from 'axios';
@@ -79,6 +90,8 @@ export interface WorkItemEnumCheckTarget {
   /** Set for a not-yet-existing item -- resolves options via the type-scoped endpoint. */
   type?: string;
   attributes: Record<string, unknown>;
+  /** JSON:API relationships object, if the write includes one -- consumed by checkWorkItemUserReferences. */
+  relationships?: Record<string, unknown>;
 }
 
 async function fetchOptions(
@@ -187,6 +200,190 @@ export async function checkWorkItemsEnumFields(
     const result = await checkOneTarget(target, requestContext, sendOpts, cacheTtlMs);
     if (!result.ok) return result;
   }
+  return { ok: true };
+}
+
+// ===========================================================================
+// Custom field key validation (postWorkItems / create only)
+// ===========================================================================
+
+/** Attribute keys `openapi-mcp-generator` puts in every Work Item's `attributes` schema -- anything else is a custom field. */
+const STANDARD_WORK_ITEM_ATTRIBUTE_KEYS = new Set([
+  'type', 'title', 'status', 'severity', 'priority', 'resolution', 'description',
+  'dueDate', 'hyperlinks', 'initialEstimate', 'remainingEstimate', 'resolvedOn', 'timeSpent',
+]);
+
+interface FieldKeyCacheEntry {
+  keys: Set<string>;
+  expiresAt: number;
+}
+
+// Exported only for tests to reset/inspect between cases; not part of the public guard API.
+export const _fieldKeyCache = new Map<string, FieldKeyCacheEntry>();
+
+/**
+ * Extracts field ids from a `getFieldsMetadata` response. **Not individually
+ * confirmed** against a worked guide example (unlike `getAvailableOptions`)
+ * -- inferred from the JSON:API `{data: [{id, ...}]}` convention every other
+ * "actions" GET endpoint in this codebase follows without exception. If
+ * Polarion's real shape differs, this returns an empty set, which fails
+ * closed (see `checkWorkItemCustomFieldKeys`) rather than silently passing
+ * everything through.
+ */
+function extractFieldIds(responseData: unknown): string[] {
+  return extractOptionIds(responseData);
+}
+
+/**
+ * Validates that every non-standard key in `attributes` (i.e. every
+ * candidate custom field) is a real field for `type` in `projectId`, per
+ * `getProjectFieldsMetadata` (`resourceType=workitems&targetType={type}`).
+ * Scoped to Work Item *creation* only (`postWorkItems`) -- an *update*
+ * (`patchWorkItem` et al.) doesn't reliably know the item's type without an
+ * extra round-trip to fetch it first, which isn't done here; see
+ * docs/usage.md for this as an explicit, documented scope boundary.
+ *
+ * Fail-closed: an unresolvable metadata lookup refuses the write, same as
+ * the enum guard.
+ */
+export async function checkWorkItemCustomFieldKeys(
+  projectId: string,
+  type: string,
+  attributes: Record<string, unknown>,
+  requestContext: EnumGuardRequestContext,
+  sendOpts: SendWithRetryOpts = {},
+  cacheTtlMs = DEFAULT_CACHE_TTL_MS
+): Promise<EnumGuardResult> {
+  const candidateKeys = Object.keys(attributes).filter((k) => !STANDARD_WORK_ITEM_ATTRIBUTE_KEYS.has(k));
+  if (candidateKeys.length === 0) return { ok: true };
+
+  const cacheKey = `${requestContext.baseUrl}::${projectId}::fields::workitems::${type}`;
+  const cached = _fieldKeyCache.get(cacheKey);
+  let fieldIds: Set<string>;
+
+  if (cached && cached.expiresAt > Date.now()) {
+    fieldIds = cached.keys;
+  } else {
+    const config: AxiosRequestConfig = {
+      method: 'GET',
+      url: `${requestContext.baseUrl}/projects/${encodeURIComponent(projectId)}/actions/getFieldsMetadata`,
+      params: { resourceType: 'workitems', targetType: type },
+      headers: requestContext.headers,
+      httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+    };
+    try {
+      const response = await sendWithRetry(config, sendOpts);
+      fieldIds = new Set(extractFieldIds(response.data));
+      if (fieldIds.size === 0) {
+        return {
+          ok: false,
+          reason:
+            `Cannot verify custom field keys (${candidateKeys.join(', ')}) for a new '${type}' Work Item in ${projectId}: ` +
+            `the field metadata lookup returned no fields. Refusing the write -- an unknown key persists silently, ` +
+            `invisible to the UI. Ask the user to confirm these field ids exist for this type.`,
+        };
+      }
+      _fieldKeyCache.set(cacheKey, { keys: fieldIds, expiresAt: Date.now() + cacheTtlMs });
+    } catch (error) {
+      const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        reason:
+          `Cannot validate custom field keys for a new '${type}' Work Item in ${projectId}: ${detail}. ` +
+          `Refusing the write -- an unknown key persists silently, invisible to the UI. ` +
+          `Retry once Polarion is reachable.`,
+      };
+    }
+  }
+
+  const unknownKeys = candidateKeys.filter((k) => !fieldIds.has(k));
+  if (unknownKeys.length > 0) {
+    return {
+      ok: false,
+      reason:
+        `Unknown field key(s) ${unknownKeys.join(', ')} for a new '${type}' Work Item in ${projectId}. ` +
+        `Known custom fields: ${[...fieldIds].join(', ') || '(none)'}.`,
+    };
+  }
+
+  return { ok: true };
+}
+
+// ===========================================================================
+// Relationship target existence checks (assignee / votes / watches -> users)
+// ===========================================================================
+
+interface UserExistsCacheEntry {
+  exists: boolean;
+  expiresAt: number;
+}
+
+// Exported only for tests to reset/inspect between cases; not part of the public guard API.
+export const _userExistsCache = new Map<string, UserExistsCacheEntry>();
+
+/** Pulls `{type:"users", id}` ids out of a JSON:API relationship's `data` (single object or array). */
+function extractUserIds(relationshipData: unknown): string[] {
+  const entries = Array.isArray(relationshipData) ? relationshipData : relationshipData ? [relationshipData] : [];
+  return entries
+    .map((e) => (e && typeof e === 'object' ? (e as { id?: unknown; type?: unknown }) : null))
+    .filter((e): e is { id: string; type: string } => !!e && e.type === 'users' && typeof e.id === 'string')
+    .map((e) => e.id);
+}
+
+/**
+ * Validates that every user referenced in `relationships.assignee`/`votes`/
+ * `watches` (confirmed relationship names per the generated Work Item
+ * schema) actually exists, via `getUser`. Distinguishes a confirmed-missing
+ * user (404 -> a real, specific rejection) from an unresolvable lookup
+ * (network/auth error -> fail-closed, same reasoning as the other guards).
+ * Existence is cached (positives only -- a user that doesn't exist yet
+ * might be created later, so a miss is never cached as a permanent no).
+ */
+export async function checkWorkItemUserReferences(
+  relationships: Record<string, unknown> | undefined,
+  requestContext: EnumGuardRequestContext,
+  sendOpts: SendWithRetryOpts = {},
+  cacheTtlMs = DEFAULT_CACHE_TTL_MS
+): Promise<EnumGuardResult> {
+  if (!relationships) return { ok: true };
+
+  const userIds = new Set<string>();
+  for (const key of ['assignee', 'votes', 'watches']) {
+    const rel = (relationships as Record<string, unknown>)[key] as { data?: unknown } | undefined;
+    if (rel?.data) for (const id of extractUserIds(rel.data)) userIds.add(id);
+  }
+  if (userIds.size === 0) return { ok: true };
+
+  for (const userId of userIds) {
+    const cacheKey = `${requestContext.baseUrl}::${userId}`;
+    const cached = _userExistsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      if (!cached.exists) return { ok: false, reason: `User '${userId}' does not exist.` };
+      continue;
+    }
+
+    const config: AxiosRequestConfig = {
+      method: 'GET',
+      url: `${requestContext.baseUrl}/users/${encodeURIComponent(userId)}`,
+      headers: requestContext.headers,
+      httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+    };
+    try {
+      await sendWithRetry(config, sendOpts);
+      _userExistsCache.set(cacheKey, { exists: true, expiresAt: Date.now() + cacheTtlMs });
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        _userExistsCache.set(cacheKey, { exists: false, expiresAt: Date.now() + cacheTtlMs });
+        return { ok: false, reason: `User '${userId}' does not exist. Refusing the write.` };
+      }
+      const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        reason: `Cannot confirm User '${userId}' exists: ${detail}. Refusing the write -- an unresolvable reference persists silently. Retry once Polarion is reachable.`,
+      };
+    }
+  }
+
   return { ok: true };
 }
 

@@ -451,6 +451,77 @@ test("executeApiTool sends a postWorkItems bulk create once all new items valida
   assert.ok(postCalled)
 })
 
+test("executeApiTool refuses a postWorkItems create with an unknown custom field key", async () => {
+  _optionsCache.clear()
+  let postCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      assert.equal((config.params as any)?.targetType, "task")
+      return { data: { data: [{ id: "realCustomField" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    postCalled = true
+    throw new Error("create must never be reached once the field-key guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "postWorkItems",
+    postWorkItemsDefinition,
+    { projectId: "DEMO", requestBody: { data: [{ type: "workitems", attributes: { type: "task", title: "x", bogusCustomField: "y" } }] } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!postCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /Unknown field key\(s\) bogusCustomField/)
+  }
+})
+
+test("executeApiTool refuses a postWorkItems create when the assignee does not exist", async () => {
+  _optionsCache.clear()
+  let postCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/users/")) {
+      const cfg = { headers: {} } as any
+      throw new AxiosError("Not Found", "404", cfg, undefined, { data: {}, status: 404, statusText: "Not Found", headers: {}, config: cfg })
+    }
+    postCalled = true
+    throw new Error("create must never be reached once the user-reference guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "postWorkItems",
+    postWorkItemsDefinition,
+    {
+      projectId: "DEMO",
+      requestBody: {
+        data: [
+          {
+            type: "workitems",
+            attributes: { type: "task", title: "x" },
+            relationships: { assignee: { data: [{ type: "users", id: "ghost" }] } },
+          },
+        ],
+      },
+    },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!postCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /User 'ghost' does not exist/)
+  }
+})
+
 test("executeApiTool refuses a patchWorkItems bulk update using the composite PROJECT/WORKITEMID id", async () => {
   _optionsCache.clear()
   let patchCalled = false
