@@ -25,6 +25,51 @@ const patchWorkItemDefinition: McpToolDefinition = {
   },
 }
 
+const postWorkItemsDefinition: McpToolDefinition = {
+  name: "postWorkItems",
+  description: "Creates a list of Work Items.",
+  method: "post",
+  pathTemplate: "/projects/{projectId}/workitems",
+  executionParameters: [{ name: "projectId", in: "path" }],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: { projectId: { type: "string" }, requestBody: { type: "object" } },
+    required: ["projectId", "requestBody"],
+  },
+}
+
+const patchWorkItemsDefinition: McpToolDefinition = {
+  name: "patchWorkItems",
+  description: "Updates a list of Work Items.",
+  method: "patch",
+  pathTemplate: "/projects/{projectId}/workitems",
+  executionParameters: [{ name: "projectId", in: "path" }],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: { projectId: { type: "string" }, requestBody: { type: "object" } },
+    required: ["projectId", "requestBody"],
+  },
+}
+
+const patchAllWorkItemsDefinition: McpToolDefinition = {
+  name: "patchAllWorkItems",
+  description: "Updates a list of Work Items in the Global context.",
+  method: "patch",
+  pathTemplate: "/all/workitems",
+  executionParameters: [],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: { requestBody: { type: "object" } },
+    required: ["requestBody"],
+  },
+}
+
 function makeAxiosError(status: number): AxiosError {
   const config = { headers: {} } as any
   const response: AxiosResponse = {
@@ -325,6 +370,115 @@ test("executeApiTool skips the guard entirely for a patchWorkItem write with no 
 
   assert.ok(!getCalled, "no enum fields present -- the guard should not make any lookup call")
   assert.ok(patchCalled)
+})
+
+test("executeApiTool refuses a postWorkItems bulk create when one new item has an invalid enum value", async () => {
+  _optionsCache.clear()
+  let postCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") {
+      assert.equal((config.params as any)?.type, "defect", "should resolve options by the new item's type, not an existing instance")
+      return { data: { data: [{ id: "new" }, { id: "open" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    postCalled = true
+    throw new Error("the actual create must never be reached when the guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "postWorkItems",
+    postWorkItemsDefinition,
+    {
+      projectId: "DEMO",
+      requestBody: {
+        data: [
+          { type: "workitems", attributes: { type: "defect", title: "One", status: "new" } },
+          { type: "workitems", attributes: { type: "defect", title: "Two", status: "bogus" } },
+        ],
+      },
+    },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!postCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /'status' value 'bogus'/)
+    assert.match(message.text, /new 'defect' Work Item in DEMO/)
+  }
+})
+
+test("executeApiTool sends a postWorkItems bulk create once all new items validate", async () => {
+  _optionsCache.clear()
+  let postCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") {
+      return { data: { data: [{ id: "new" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    postCalled = true
+    return { data: {}, status: 201, statusText: "Created", headers: {}, config: {} as any }
+  }
+
+  await executeApiTool(
+    "postWorkItems",
+    postWorkItemsDefinition,
+    { projectId: "DEMO", requestBody: { data: [{ type: "workitems", attributes: { type: "defect", status: "new" } }] } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(postCalled)
+})
+
+test("executeApiTool refuses a patchWorkItems bulk update using the composite PROJECT/WORKITEMID id", async () => {
+  _optionsCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") {
+      assert.match(String(config.url), /\/workitems\/DEMO-2\//, "should resolve options for the specific item parsed out of the composite id")
+      return { data: { data: [{ id: "open" }, { id: "closed" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    patchCalled = true
+    throw new Error("must never be reached")
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItems",
+    patchWorkItemsDefinition,
+    { projectId: "DEMO", requestBody: { data: [{ type: "workitems", id: "DEMO/DEMO-2", attributes: { status: "bogus" } }] } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!patchCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /Write refused/)
+})
+
+test("executeApiTool refuses a patchAllWorkItems (global) update, parsing project from the composite id", async () => {
+  _optionsCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") {
+      assert.match(String(config.url), /\/projects\/OTHERPROJ\/workitems\/OTHERPROJ-9\//)
+      return { data: { data: [{ id: "open" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    throw new Error("must never be reached")
+  }
+
+  const result = await executeApiTool(
+    "patchAllWorkItems",
+    patchAllWorkItemsDefinition,
+    { requestBody: { data: [{ type: "workitems", id: "OTHERPROJ/OTHERPROJ-9", attributes: { status: "bogus" } }] } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /Write refused/)
 })
 
 test("regenerated tools.ts advertises dry_run on every mutating tool and no GET tool", async () => {

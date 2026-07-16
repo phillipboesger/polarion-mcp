@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
-import { checkWorkItemEnumFields, _optionsCache } from "../src/guards.js"
+import { checkWorkItemEnumFields, checkWorkItemsEnumFields, splitWorkItemId, _optionsCache } from "../src/guards.js"
 
 const requestContext = { baseUrl: "https://polarion.example.com/polarion/rest/v1", headers: {}, rejectUnauthorized: true }
 const sendOpts = { minIntervalMs: 0, initialBackoffMs: 0, postMutationDelayMs: 0 }
@@ -85,4 +85,50 @@ test("checkWorkItemEnumFields validates multiple enum fields in one call", async
 
   const bad = await checkWorkItemEnumFields("PROJ", "PROJ-8", { status: "open", severity: "minor" }, requestContext, { ...sendOpts, httpClient })
   assert.equal(bad.ok, false)
+})
+
+test("splitWorkItemId parses the composite PROJECT/WORKITEMID form", () => {
+  assert.deepEqual(splitWorkItemId("PROJ/PROJ-1"), { projectId: "PROJ", workItemId: "PROJ-1" })
+})
+
+test("splitWorkItemId falls back to fallbackProjectId when there's no separator", () => {
+  assert.deepEqual(splitWorkItemId("PROJ-1", "PROJ"), { projectId: "PROJ", workItemId: "PROJ-1" })
+  assert.equal(splitWorkItemId("PROJ-1"), null, "no fallback and no separator -- can't resolve")
+})
+
+test("checkWorkItemsEnumFields resolves a new item's options by type (postWorkItems shape)", async () => {
+  _optionsCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    assert.doesNotMatch(String(config.url), /\/workitems\/[^/]+\/fields\//, "type-scoped lookup must not include a workItemId segment")
+    assert.equal((config.params as any)?.type, "defect")
+    return optionsResponse(["new", "in_progress"])
+  }
+  const ok = await checkWorkItemsEnumFields([{ projectId: "PROJ", type: "defect", attributes: { status: "new" } }], requestContext, { ...sendOpts, httpClient })
+  assert.deepEqual(ok, { ok: true })
+})
+
+test("checkWorkItemsEnumFields validates multiple bulk targets and stops at the first failure", async () => {
+  _optionsCache.clear()
+  let calls = 0
+  const httpClient = async (_config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    calls++
+    return optionsResponse(["open", "closed"])
+  }
+  const targets = [
+    { projectId: "PROJ", workItemId: "PROJ-10", attributes: { status: "open" } },
+    { projectId: "PROJ", workItemId: "PROJ-11", attributes: { status: "bogus" } },
+    { projectId: "PROJ", workItemId: "PROJ-12", attributes: { status: "closed" } },
+  ]
+  const result = await checkWorkItemsEnumFields(targets, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.match(result.reason, /PROJ-11/)
+  assert.equal(calls, 2, "should stop after the second target fails, never checking the third")
+})
+
+test("checkWorkItemsEnumFields with an empty target list is a no-op success", async () => {
+  const httpClient = async (): Promise<AxiosResponse> => {
+    throw new Error("should not be called")
+  }
+  const result = await checkWorkItemsEnumFields([], requestContext, { ...sendOpts, httpClient })
+  assert.deepEqual(result, { ok: true })
 })

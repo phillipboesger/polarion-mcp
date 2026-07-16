@@ -27,11 +27,76 @@ import { API_BASE_URL, getBearerToken, shouldRejectUnauthorized } from "./config
 import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
-import { checkWorkItemEnumFields } from "./guards.js";
+import { checkWorkItemsEnumFields, splitWorkItemId, type WorkItemEnumCheckTarget } from "./guards.js";
 
 // Re-exported for backward compatibility -- tests and any external code that
 // imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
 export { sendWithRetry };
+
+/**
+ * Builds the enum-guard targets for a Work Item write tool, or `null` if
+ * `definition` isn't one of the (small, explicit) set of tools the guard
+ * covers. See `guards.ts` for what's validated and why.
+ */
+function buildWorkItemEnumTargets(
+  definition: McpToolDefinition,
+  validatedArgs: JsonObject,
+  nameMap: Record<string, string>,
+  requestBodyData: any
+): WorkItemEnumCheckTarget[] | null {
+  const method = definition.method.toLowerCase();
+  const dataItems: unknown[] = Array.isArray(requestBodyData?.data)
+    ? requestBodyData.data
+    : requestBodyData?.data
+      ? [requestBodyData.data]
+      : [];
+  if (dataItems.length === 0) return null;
+
+  // patchWorkItem: single existing item, projectId + workItemId are path params.
+  if (method === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems/{workItemId}') {
+    const projectId = readArg(validatedArgs, 'projectId', nameMap);
+    const workItemId = readArg(validatedArgs, 'workItemId', nameMap);
+    const attributes = (dataItems[0] as any)?.attributes;
+    if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes || typeof attributes !== 'object') return null;
+    return [{ projectId, workItemId, attributes }];
+  }
+
+  // postWorkItems: bulk create, new items -- no workItemId yet, resolve options by attributes.type.
+  if (method === 'post' && definition.pathTemplate === '/projects/{projectId}/workitems') {
+    const projectId = readArg(validatedArgs, 'projectId', nameMap);
+    if (typeof projectId !== 'string') return null;
+    const targets: WorkItemEnumCheckTarget[] = [];
+    for (const item of dataItems) {
+      const attributes = (item as any)?.attributes;
+      const type = attributes?.type;
+      if (attributes && typeof attributes === 'object' && typeof type === 'string') {
+        targets.push({ projectId, type, attributes });
+      }
+    }
+    return targets.length > 0 ? targets : null;
+  }
+
+  // patchWorkItems (project-scoped) / patchAllWorkItems (global): bulk update of existing
+  // items. Each item's `id` is the full "PROJECT/WORKITEMID" composite; fall back to the
+  // tool's own `projectId` param (project-scoped variant only) if an id has no '/' in it.
+  const isBulkPatch =
+    (method === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems') ||
+    (method === 'patch' && definition.pathTemplate === '/all/workitems');
+  if (isBulkPatch) {
+    const fallbackProjectId = readArg(validatedArgs, 'projectId', nameMap);
+    const targets: WorkItemEnumCheckTarget[] = [];
+    for (const item of dataItems) {
+      const id = (item as any)?.id;
+      const attributes = (item as any)?.attributes;
+      if (typeof id !== 'string' || !attributes || typeof attributes !== 'object') continue;
+      const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' ? fallbackProjectId : undefined);
+      if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes });
+    }
+    return targets.length > 0 ? targets : null;
+  }
+
+  return null;
+}
 
 /**
  * Execute an API tool (main entry point for API operations)
@@ -376,23 +441,19 @@ export async function executeApiTool(
     }
 
     // ===== STEP 7a: Pre-write guard (fail-closed enum validation) =====
-    // v1 scope: single Work Item updates only (patchWorkItem). See guards.ts
-    // for what's covered and what's an explicit, documented follow-up.
-    if (definition.method.toLowerCase() === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems/{workItemId}') {
-      const guardProjectId = readArg(validatedArgs, 'projectId', nameMap);
-      const guardWorkItemId = readArg(validatedArgs, 'workItemId', nameMap);
-      const attributes = requestBodyData?.data?.attributes;
-      if (typeof guardProjectId === 'string' && typeof guardWorkItemId === 'string' && attributes && typeof attributes === 'object') {
-        const guardResult = await checkWorkItemEnumFields(
-          guardProjectId,
-          guardWorkItemId,
-          attributes,
-          { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() },
-          sendOpts
-        );
-        if (!guardResult.ok) {
-          return { content: [{ type: 'text', text: `Write refused: ${guardResult.reason}` }] };
-        }
+    // Covers patchWorkItem (single existing item), postWorkItems (bulk create),
+    // and patchWorkItems/patchAllWorkItems (bulk update). See guards.ts for
+    // exactly what's validated and what's an explicit, documented follow-up
+    // (custom fields, categories, link targets, non-Work-Item resources).
+    const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
+    if (enumTargets) {
+      const guardResult = await checkWorkItemsEnumFields(
+        enumTargets,
+        { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() },
+        sendOpts
+      );
+      if (!guardResult.ok) {
+        return { content: [{ type: 'text', text: `Write refused: ${guardResult.reason}` }] };
       }
     }
 
