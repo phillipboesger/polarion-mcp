@@ -18,7 +18,7 @@
  */
 
 import { ZodError } from "zod";
-import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 import https from 'https';
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
@@ -26,63 +26,12 @@ import { readArg, formatApiError, getZodSchemaFromJsonSchema } from "./utils.js"
 import { API_BASE_URL, getBearerToken, shouldRejectUnauthorized } from "./config.js";
 import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
+import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
+import { checkWorkItemEnumFields } from "./guards.js";
 
-const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
-
-/**
- * ~3 req/s, matching Polarion's low burst tolerance observed in production.
- */
-const DEFAULT_MIN_REQUEST_INTERVAL_MS = 350;
-const DEFAULT_MAX_RETRIES = 2;
-const DEFAULT_INITIAL_BACKOFF_MS = 1000;
-let lastRequestAt = 0;
-
-async function paceRequest(minIntervalMs: number): Promise<void> {
-  const wait = minIntervalMs - (Date.now() - lastRequestAt);
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-}
-
-/**
- * Sends an HTTP request via axios (or an injected client), applying
- * process-wide request pacing and retry-with-backoff on 429/5xx responses.
- *
- * `opts` is the seam tests use to inject a fake `httpClient` and near-zero
- * `minIntervalMs`/`initialBackoffMs` so retry tests run in milliseconds. The
- * production call site (`executeApiTool`) uses all defaults.
- */
-export async function sendWithRetry(
-  config: AxiosRequestConfig,
-  opts: {
-    httpClient?: (c: AxiosRequestConfig) => Promise<AxiosResponse>;
-    maxRetries?: number;
-    initialBackoffMs?: number;
-    minIntervalMs?: number;
-  } = {},
-  attempt = 1
-): Promise<AxiosResponse> {
-  const {
-    httpClient = axios,
-    maxRetries = DEFAULT_MAX_RETRIES,
-    initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
-    minIntervalMs = DEFAULT_MIN_REQUEST_INTERVAL_MS,
-  } = opts;
-  await paceRequest(minIntervalMs);
-  lastRequestAt = Date.now();
-  try {
-    return await httpClient(config);
-  } catch (error) {
-    if (
-      axios.isAxiosError(error) &&
-      error.response &&
-      (error.response.status === 429 || error.response.status >= 500) &&
-      attempt <= maxRetries
-    ) {
-      await new Promise((r) => setTimeout(r, initialBackoffMs * 2 ** (attempt - 1)));
-      return sendWithRetry(config, opts, attempt + 1);
-    }
-    throw error;
-  }
-}
+// Re-exported for backward compatibility -- tests and any external code that
+// imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
+export { sendWithRetry };
 
 /**
  * Execute an API tool (main entry point for API operations)
@@ -98,9 +47,10 @@ export async function sendWithRetry(
  * @param definition - Complete tool definition from OpenAPI spec
  * @param toolArgs - Arguments provided by AI assistant (may use sanitized names)
  * @param allSecuritySchemes - Available authentication methods from OpenAPI spec
- * @param sendOpts - Forwarded to {@link sendWithRetry}; production call sites omit this
- *   and get the real axios client with production pacing/retry defaults. Tests use it
- *   to inject a fake httpClient and near-zero pacing/backoff.
+ * @param sendOpts - Forwarded to {@link sendWithRetry} (and to the enum guard's own
+ *   lookups); production call sites omit this and get the real axios client with
+ *   production pacing/retry defaults. Tests use it to inject a fake httpClient and
+ *   near-zero pacing/backoff/delays.
  * @returns Formatted API response or error message
  */
 export async function executeApiTool(
@@ -108,7 +58,7 @@ export async function executeApiTool(
   definition: McpToolDefinition,
   toolArgs: JsonObject,
   allSecuritySchemes: Record<string, any>,
-  sendOpts?: Parameters<typeof sendWithRetry>[1]
+  sendOpts?: SendWithRetryOpts
 ): Promise<CallToolResult> {
   // Special handling for refresh_polarion_config tool
   // This tool doesn't make an API call, it fetches and caches project configuration
@@ -423,6 +373,27 @@ export async function executeApiTool(
           }
         ],
       };
+    }
+
+    // ===== STEP 7a: Pre-write guard (fail-closed enum validation) =====
+    // v1 scope: single Work Item updates only (patchWorkItem). See guards.ts
+    // for what's covered and what's an explicit, documented follow-up.
+    if (definition.method.toLowerCase() === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems/{workItemId}') {
+      const guardProjectId = readArg(validatedArgs, 'projectId', nameMap);
+      const guardWorkItemId = readArg(validatedArgs, 'workItemId', nameMap);
+      const attributes = requestBodyData?.data?.attributes;
+      if (typeof guardProjectId === 'string' && typeof guardWorkItemId === 'string' && attributes && typeof attributes === 'object') {
+        const guardResult = await checkWorkItemEnumFields(
+          guardProjectId,
+          guardWorkItemId,
+          attributes,
+          { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() },
+          sendOpts
+        );
+        if (!guardResult.ok) {
+          return { content: [{ type: 'text', text: `Write refused: ${guardResult.reason}` }] };
+        }
+      }
     }
 
     // Log request info to stderr (doesn't affect MCP output)
