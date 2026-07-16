@@ -125,6 +125,21 @@ value read back from a response and echoed into a later write is exactly
 what Polarion sent — `value_markdown` is purely an additional, easier-to-read
 view.
 
+## Not Yet Covered
+
+Two items from the comparison against a similar Polarion MCP server remain
+open, deliberately not attempted here rather than shipped half-built:
+
+- **A model-driven eval suite** (`evals/`) — testing that an LLM actually
+  *chooses* to use `dry_run` or respects a guard's refusal in realistic
+  agent scenarios, as opposed to `tests/`'s unit/integration coverage of the
+  code paths themselves. This needs a real model in the loop (API calls,
+  cost, credentials) and is a deliberate choice to make, not something to
+  add silently as a side effect of an unrelated change.
+- **Guard coverage beyond the standard Work Item enum fields** — custom
+  fields, categories, relationship/link targets, and non-Work-Item
+  resources (Documents, Test Runs, Plans, ...) are not validated pre-write.
+
 ## read_when
 
 - Use this guide when running the server locally or configuring clients.
