@@ -28,6 +28,7 @@ import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
 import { checkWorkItemsEnumFields, splitWorkItemId, type WorkItemEnumCheckTarget } from "./guards.js";
+import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
 
 // Re-exported for backward compatibility -- tests and any external code that
 // imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
@@ -474,8 +475,12 @@ export async function executeApiTool(
     // Handle JSON responses (most common for REST APIs)
     if (contentType.includes('application/json') && typeof response.data === 'object' && response.data !== null) {
       try {
+        // Add a `value_markdown` sibling to every rich-text ({type:"text/html", value})
+        // field so the model gets readable Markdown alongside the raw HTML, without
+        // losing or altering anything in the original response.
+        const renderedData = renderRichTextFieldsAsMarkdown(response.data);
         // Pretty-print JSON with 2-space indentation
-        responseText = JSON.stringify(response.data, null, 2);
+        responseText = JSON.stringify(renderedData, null, 2);
       } catch (e) {
         responseText = "[Stringify Error]";
       }

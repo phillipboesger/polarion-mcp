@@ -267,6 +267,25 @@ test("executeApiTool ignores dry_run on GET tools and executes the request live"
   }
 })
 
+test("executeApiTool renders text/html rich-text fields as Markdown alongside the raw HTML in the response", async () => {
+  const definition: McpToolDefinition = { ...emptyDefinition, name: "get_thing", method: "get", pathTemplate: "/things/1" }
+  const httpClient = async (): Promise<AxiosResponse> => ({
+    data: { data: { type: "workitems", id: "A-1", attributes: { description: { type: "text/html", value: "<p>Hello <strong>world</strong></p>" } } } },
+    status: 200,
+    statusText: "OK",
+    headers: { "content-type": "application/json" },
+    config: {} as any,
+  })
+
+  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 })
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /"value": "<p>Hello <strong>world<\/strong><\/p>"/, "original HTML value must still be present, byte-identical")
+    assert.match(message.text, /"value_markdown": "Hello \*\*world\*\*"/)
+  }
+})
+
 test("executeApiTool refuses a patchWorkItem write with an invalid enum value, never sending the PATCH", async () => {
   _optionsCache.clear()
   let patchCalled = false

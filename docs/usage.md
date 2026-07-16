@@ -86,26 +86,44 @@ Typical HTTP workflow:
 
 ## Pre-write Validation (Guards)
 
-`patchWorkItem` (updating a single, existing Work Item) validates the standard
-enum fields it's given — `status`, `severity`, `priority`, `resolution` — against
+Work Item write tools — `patchWorkItem` (single update), `postWorkItems` (bulk
+create), `patchWorkItems` (bulk update, project-scoped), and
+`patchAllWorkItems` (bulk update, global) — validate the standard enum fields
+they're given (`status`, `severity`, `priority`, `resolution`) against
 Polarion's own `getAvailableOptions` action *before* sending the write. An
 invalid value is refused locally with the list of valid options, instead of
 either failing cryptically server-side or (on field types that don't validate
-strictly) silently persisting as an unknown value. Lookups are cached
-in-memory for ~60s per (project, work item, field) to avoid extra round-trips
-on repeated edits to the same item.
+strictly) silently persisting as an unknown value. For a bulk write, the
+first invalid item blocks the entire batch. Lookups are cached in-memory for
+~60s per (project, item-or-type, field) to avoid extra round-trips on
+repeated edits.
+
+New items (`postWorkItems`) have no existing instance to scope the lookup by,
+so options are resolved by the item's `attributes.type` instead; existing
+items (`patchWorkItem`/`patchWorkItems`/`patchAllWorkItems`) are resolved by
+their actual instance. `patchWorkItems`/`patchAllWorkItems` read the project
+straight out of each item's `"PROJECT/WORKITEMID"` id, so this works
+correctly even in the global (`patchAllWorkItems`) case with no `projectId`
+argument at all.
 
 If the validation lookup itself can't be completed (network error, auth
 failure), the write is refused rather than let through — an unvalidated enum
 value could otherwise persist as a silent "ghost", invisible in the UI.
 
 **Not yet covered** (contributions welcome):
-- Bulk or create Work Item writes (`postWorkItems`, `patchWorkItems`,
-  `patchAllWorkItems`) — resolving valid options for a not-yet-existing item
-  needs its type, which isn't reliably available for bulk payloads without
-  deeper schema work.
 - Custom fields, categories, and relationship/link targets.
 - Any resource other than Work Items (Documents, Test Runs, Plans, ...).
+
+## Rich Text as Markdown
+
+Every response field shaped like Polarion's rich-text convention
+(`{type: "text/html"|"text/plain", value: "..."}` — Work Item descriptions,
+Document `homePageContent`, comment text, ...) gets a `value_markdown`
+sibling added when `type` is `text/html`, with the HTML converted to
+Markdown. The original `value` is never modified, so nothing is lost and a
+value read back from a response and echoed into a later write is exactly
+what Polarion sent — `value_markdown` is purely an additional, easier-to-read
+view.
 
 ## read_when
 
