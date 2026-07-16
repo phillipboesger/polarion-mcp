@@ -18,7 +18,7 @@
  */
 
 import { ZodError } from "zod";
-import axios, { type AxiosRequestConfig } from "axios";
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
 import https from 'https';
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
@@ -26,6 +26,63 @@ import { readArg, formatApiError, getZodSchemaFromJsonSchema } from "./utils.js"
 import { API_BASE_URL, getBearerToken, shouldRejectUnauthorized } from "./config.js";
 import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
+
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
+/**
+ * ~3 req/s, matching Polarion's low burst tolerance observed in production.
+ */
+const DEFAULT_MIN_REQUEST_INTERVAL_MS = 350;
+const DEFAULT_MAX_RETRIES = 2;
+const DEFAULT_INITIAL_BACKOFF_MS = 1000;
+let lastRequestAt = 0;
+
+async function paceRequest(minIntervalMs: number): Promise<void> {
+  const wait = minIntervalMs - (Date.now() - lastRequestAt);
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+}
+
+/**
+ * Sends an HTTP request via axios (or an injected client), applying
+ * process-wide request pacing and retry-with-backoff on 429/5xx responses.
+ *
+ * `opts` is the seam tests use to inject a fake `httpClient` and near-zero
+ * `minIntervalMs`/`initialBackoffMs` so retry tests run in milliseconds. The
+ * production call site (`executeApiTool`) uses all defaults.
+ */
+export async function sendWithRetry(
+  config: AxiosRequestConfig,
+  opts: {
+    httpClient?: (c: AxiosRequestConfig) => Promise<AxiosResponse>;
+    maxRetries?: number;
+    initialBackoffMs?: number;
+    minIntervalMs?: number;
+  } = {},
+  attempt = 1
+): Promise<AxiosResponse> {
+  const {
+    httpClient = axios,
+    maxRetries = DEFAULT_MAX_RETRIES,
+    initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
+    minIntervalMs = DEFAULT_MIN_REQUEST_INTERVAL_MS,
+  } = opts;
+  await paceRequest(minIntervalMs);
+  lastRequestAt = Date.now();
+  try {
+    return await httpClient(config);
+  } catch (error) {
+    if (
+      axios.isAxiosError(error) &&
+      error.response &&
+      (error.response.status === 429 || error.response.status >= 500) &&
+      attempt <= maxRetries
+    ) {
+      await new Promise((r) => setTimeout(r, initialBackoffMs * 2 ** (attempt - 1)));
+      return sendWithRetry(config, opts, attempt + 1);
+    }
+    throw error;
+  }
+}
 
 /**
  * Execute an API tool (main entry point for API operations)
@@ -41,13 +98,17 @@ import { acquireOAuth2Token } from "./auth.js";
  * @param definition - Complete tool definition from OpenAPI spec
  * @param toolArgs - Arguments provided by AI assistant (may use sanitized names)
  * @param allSecuritySchemes - Available authentication methods from OpenAPI spec
+ * @param sendOpts - Forwarded to {@link sendWithRetry}; production call sites omit this
+ *   and get the real axios client with production pacing/retry defaults. Tests use it
+ *   to inject a fake httpClient and near-zero pacing/backoff.
  * @returns Formatted API response or error message
  */
 export async function executeApiTool(
   toolName: string,
   definition: McpToolDefinition,
   toolArgs: JsonObject,
-  allSecuritySchemes: Record<string, any>
+  allSecuritySchemes: Record<string, any>,
+  sendOpts?: Parameters<typeof sendWithRetry>[1]
 ): Promise<CallToolResult> {
   // Special handling for refresh_polarion_config tool
   // This tool doesn't make an API call, it fetches and caches project configuration
@@ -62,13 +123,21 @@ export async function executeApiTool(
   }
 
   try {
+    // ===== STEP 0: Strip dry_run before validation =====
+    // Always stripped, regardless of whether the regenerated schema already
+    // advertises `dry_run` — so Zod validation never rejects it during any
+    // transition period, and it never leaks into `validatedArgs` sent to Polarion.
+    const isMutating = MUTATING_METHODS.has(definition.method.toLowerCase());
+    const argsForValidation: JsonObject = (typeof toolArgs === 'object' && toolArgs !== null) ? { ...toolArgs } : {};
+    const dryRun = argsForValidation.dry_run === true;
+    delete argsForValidation.dry_run;
+
     // ===== STEP 1: Validate Arguments =====
     // Use Zod schema to ensure arguments match expected types
     let validatedArgs: JsonObject;
     try {
       const zodSchema = getZodSchemaFromJsonSchema(definition.inputSchema, toolName);
-      const argsToParse = (typeof toolArgs === 'object' && toolArgs !== null) ? toolArgs : {};
-      validatedArgs = zodSchema.parse(argsToParse);
+      validatedArgs = zodSchema.parse(argsForValidation);
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
@@ -334,13 +403,35 @@ export async function executeApiTool(
       }),
     };
 
+    // dry_run on a mutating tool: return a preview of the request that would
+    // be sent, without calling Polarion. GET tools ignore dry_run entirely
+    // and always execute live (there's nothing unsafe to preview).
+    if (dryRun && isMutating) {
+      const redactedHeaders = { ...headers };
+      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
+      const preview = {
+        method: config.method,
+        url: config.url,
+        headers: redactedHeaders,
+        body: requestBodyData,
+      };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
+          }
+        ],
+      };
+    }
+
     // Log request info to stderr (doesn't affect MCP output)
     // All console.error() calls go to stderr, which is for logging
     // MCP protocol messages go to stdout
     console.error(`[INFO] Executing tool "${toolName}": ${config.method} ${config.url}`);
 
-    // Execute the request using axios
-    const response = await axios(config);
+    // Execute the request with pacing + retry-with-backoff on 429/5xx
+    const response = await sendWithRetry(config, sendOpts);
 
     // ===== STEP 8: Format the Response =====
     let responseText = '';
