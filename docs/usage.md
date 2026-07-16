@@ -64,6 +64,23 @@ Typical HTTP workflow:
 - Use the Streamable HTTP MCP mode (`start:mcp-http`) for remote MCP clients that connect by URL, such as Claude.ai custom connectors.
 - Use the REST HTTP mode (`start:http`) for ChatGPT Custom GPT Actions, and `/openapi-gpt.json` when the consumer has operation-count limits.
 
+## Request Pacing, Retries, and dry_run
+
+- Every outgoing Polarion request is paced to roughly 3 requests/second and automatically retried with exponential backoff on `429` and `5xx` responses (up to 2 retries), matching Polarion's low burst tolerance. This is transparent — no configuration is required.
+- Every mutating tool (`POST`/`PUT`/`PATCH`/`DELETE`) accepts an optional `dry_run: true` argument. When set, the tool validates arguments, resolves the URL/auth exactly as it would for a real call, and returns a preview of the request (method, URL, headers with the `Authorization` value redacted, and body) instead of sending it to Polarion. `dry_run` on a `GET` tool is ignored and the request executes normally, since there's nothing unsafe to preview.
+
+  ```jsonc
+  // Example: preview a work item creation without touching Polarion
+  {
+    "tool": "postWorkItems",
+    "arguments": {
+      "projectId": "myproject",
+      "requestBody": { "data": [{ "type": "workitems", "attributes": { "title": "Example" } }] },
+      "dry_run": true
+    }
+  }
+  ```
+
 ## read_when
 
 - Use this guide when running the server locally or configuring clients.
