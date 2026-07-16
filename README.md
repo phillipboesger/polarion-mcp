@@ -1,8 +1,26 @@
+<div align="center">
+
 # Polarion MCP
 
-> **Product page:** [phillipboesger.github.io/polarion-mcp](https://phillipboesger.github.io/polarion-mcp/) · **Docker image:** `ghcr.io/phillipboesger/polarion-mcp:latest`
+**Connect Claude, VS Code Copilot, and ChatGPT directly to Polarion ALM.**
 
-An open-source **Model Context Protocol** server that exposes **271 Polarion REST operations** as AI-native tools — for VS Code Copilot, Claude, ChatGPT Custom GPTs, and any MCP-compatible client.
+An open-source **Model Context Protocol** server that exposes **271 Polarion REST operations** as AI-native tools.
+
+[![CI](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml)
+[![Publish Docker image](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
+[![Docker image](https://img.shields.io/badge/ghcr.io-polarion--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp)
+[![Model Context Protocol](https://img.shields.io/badge/MCP-server-6E56CF)](https://modelcontextprotocol.io)
+
+[**Product page**](https://phillipboesger.github.io/polarion-mcp/) · [**Docs**](docs/README.md) · [**Docker image**](https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp)
+
+</div>
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Polarion MCP connected to Claude, querying and updating work items live" width="850">
+</p>
 
 ---
 
@@ -61,6 +79,10 @@ docker run -d \
 ```
 
 Connect your MCP client to `http://localhost:3000/mcp` with `Authorization: Bearer your_mcp_secret`.
+
+<p align="center">
+  <img src="docs/assets/demo-cloud.gif" alt="Polarion MCP running as a hosted HTTP MCP server, connected from Claude.ai" width="850">
+</p>
 
 **stdio mode** (VS Code, Claude Desktop):
 
