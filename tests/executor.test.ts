@@ -4,6 +4,26 @@ import { AxiosError } from "axios"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
 import type { McpToolDefinition } from "../src/types.js"
 import { executeApiTool, sendWithRetry } from "../src/executor.js"
+import { _optionsCache } from "../src/guards.js"
+
+const patchWorkItemDefinition: McpToolDefinition = {
+  name: "patchWorkItem",
+  description: "Updates the specified Work Item.",
+  method: "patch",
+  pathTemplate: "/projects/{projectId}/workitems/{workItemId}",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "workItemId", in: "path" }],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string" },
+      workItemId: { type: "string" },
+      requestBody: { type: "object" },
+    },
+    required: ["projectId", "workItemId", "requestBody"],
+  },
+}
 
 function makeAxiosError(status: number): AxiosError {
   const config = { headers: {} } as any
@@ -200,6 +220,111 @@ test("executeApiTool ignores dry_run on GET tools and executes the request live"
   if (message.type === "text") {
     assert.match(message.text, /API Response/)
   }
+})
+
+test("executeApiTool refuses a patchWorkItem write with an invalid enum value, never sending the PATCH", async () => {
+  _optionsCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") {
+      return { data: { data: [{ id: "open" }, { id: "closed" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    patchCalled = true
+    throw new Error("the actual write should never be reached when the guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItem",
+    patchWorkItemDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-1", requestBody: { data: { type: "workitems", id: "DEMO/DEMO-1", attributes: { status: "bogus" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!patchCalled, "PATCH must not be sent once the guard refuses the write")
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /'status' value 'bogus'/)
+    assert.match(message.text, /open/)
+  }
+})
+
+test("executeApiTool sends a patchWorkItem write once the guard confirms a valid enum value", async () => {
+  _optionsCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") {
+      return { data: { data: [{ id: "open" }, { id: "closed" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    patchCalled = true
+    return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItem",
+    patchWorkItemDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-2", requestBody: { data: { type: "workitems", id: "DEMO/DEMO-2", attributes: { status: "closed" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(patchCalled, "PATCH should be sent once the guard confirms the value is valid")
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /API Response/)
+})
+
+test("executeApiTool fails closed (refuses the write) when the guard's own lookup errors", async () => {
+  _optionsCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") throw new Error("Polarion unreachable")
+    patchCalled = true
+    throw new Error("the actual write should never be reached when the guard's lookup fails")
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItem",
+    patchWorkItemDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-3", requestBody: { data: { type: "workitems", id: "DEMO/DEMO-3", attributes: { severity: "critical" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!patchCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /Polarion unreachable/)
+  }
+})
+
+test("executeApiTool skips the guard entirely for a patchWorkItem write with no enum fields", async () => {
+  _optionsCache.clear()
+  let getCalled = false
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") {
+      getCalled = true
+      return { data: { data: [] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    patchCalled = true
+    return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
+  }
+
+  await executeApiTool(
+    "patchWorkItem",
+    patchWorkItemDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-4", requestBody: { data: { type: "workitems", id: "DEMO/DEMO-4", attributes: { title: "Renamed" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!getCalled, "no enum fields present -- the guard should not make any lookup call")
+  assert.ok(patchCalled)
 })
 
 test("regenerated tools.ts advertises dry_run on every mutating tool and no GET tool", async () => {
