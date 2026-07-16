@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, sanitizeInputSchema } from "../src/utils.js"
+import { extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, sanitizeInputSchema } from "../src/utils.js"
 
 test("sanitizeInputSchema rewrites invalid property names and records the mapping", () => {
   const nameMap: Record<string, string> = {}
@@ -56,6 +56,36 @@ test("formatApiError renders response, network, and setup failures", () => {
   assert.match(formatApiError(responseError), /missing/)
   assert.equal(formatApiError(networkError), "API Network Error: No response received from server. (Code: ECONNRESET)")
   assert.equal(formatApiError(setupError), "API request failed.API Request Setup Error: bad config")
+})
+
+test("extractJsonApiErrorDetail joins Polarion's real {errors:[{detail}]} shape", () => {
+  assert.equal(
+    extractJsonApiErrorDetail({ errors: [{ status: "404", title: "Not Found", detail: "Work item 'X-1' not found" }] }),
+    "Work item 'X-1' not found",
+  )
+  assert.equal(
+    extractJsonApiErrorDetail({ errors: [{ status: "400", title: "Bad Request" }] }),
+    "Bad Request",
+    "falls back to title when detail is absent",
+  )
+  assert.equal(extractJsonApiErrorDetail({ data: [] }), undefined, "non-error-shaped bodies return undefined")
+  assert.equal(extractJsonApiErrorDetail(null), undefined)
+  assert.equal(extractJsonApiErrorDetail("plain string"), undefined)
+})
+
+test("formatApiError prefers the JSON:API error detail over a raw JSON dump", () => {
+  const responseError = {
+    response: {
+      status: 404,
+      statusText: "Not Found",
+      data: { errors: [{ status: "404", title: "Not Found", detail: "Work item 'X-1' not found" }] },
+    },
+    message: "request failed",
+  } as any
+
+  const message = formatApiError(responseError)
+  assert.match(message, /Detail: Work item 'X-1' not found/)
+  assert.doesNotMatch(message, /"errors":/, "should not fall back to the raw JSON dump when a JSON:API detail was found")
 })
 
 test("getZodSchemaFromJsonSchema returns a working schema for valid JSON schema", () => {

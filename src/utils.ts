@@ -155,6 +155,31 @@ export function readArg(args: Record<string, unknown>, httpParamName: string, na
  * @param error - Axios error object
  * @returns Formatted, human-readable error message
  */
+/**
+ * Extracts a human-readable detail from a JSON:API error body
+ * (`{errors: [{status, title, detail}, ...]}`), Polarion's actual error
+ * shape. Returns `undefined` if `responseData` doesn't look like one, so
+ * callers can fall back to the generic JSON dump.
+ *
+ * @param responseData - The raw `error.response.data` from axios.
+ * @returns A joined `detail`/`title` string, or `undefined`.
+ */
+export function extractJsonApiErrorDetail(responseData: unknown): string | undefined {
+  if (!responseData || typeof responseData !== 'object') return undefined;
+  const errors = (responseData as { errors?: unknown }).errors;
+  if (!Array.isArray(errors) || errors.length === 0) return undefined;
+
+  const parts = errors
+    .map((e) => {
+      if (!e || typeof e !== 'object') return '';
+      const entry = e as { detail?: unknown; title?: unknown };
+      return String(entry.detail ?? entry.title ?? '');
+    })
+    .filter((s) => s.length > 0);
+
+  return parts.length > 0 ? parts.join('; ') : undefined;
+}
+
 export function formatApiError(error: AxiosError): string {
   let message = 'API request failed.';
 
@@ -164,7 +189,13 @@ export function formatApiError(error: AxiosError): string {
     const responseData = error.response.data;
     const MAX_LEN = 200;
 
-    if (typeof responseData === 'string') {
+    const jsonApiDetail = extractJsonApiErrorDetail(responseData);
+    if (jsonApiDetail) {
+      // Polarion's actual error shape ({errors:[{status,title,detail}]}) --
+      // surface the real detail instead of a truncated raw JSON dump.
+      message += `Detail: ${jsonApiDetail.substring(0, MAX_LEN)}${jsonApiDetail.length > MAX_LEN ? '...' : ''}`;
+    }
+    else if (typeof responseData === 'string') {
       // Truncate long error messages
       message += `Response: ${responseData.substring(0, MAX_LEN)}${responseData.length > MAX_LEN ? '...' : ''}`;
     }

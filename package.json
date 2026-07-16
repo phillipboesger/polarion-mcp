@@ -61,12 +61,14 @@
     "express": "^5.2.1",
     "json-schema-to-zod": "^2.6.1",
     "pdf-parse": "^1.1.1",
+    "turndown": "^7.2.4",
     "zod": "^3.24.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/node": "^22.15.2",
+    "@types/turndown": "^5.0.6",
     "openapi-mcp-generator": "^3.3.0",
     "typescript": "^5.8.3"
   }

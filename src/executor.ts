@@ -26,6 +26,117 @@ import { readArg, formatApiError, getZodSchemaFromJsonSchema } from "./utils.js"
 import { API_BASE_URL, getBearerToken, shouldRejectUnauthorized } from "./config.js";
 import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
+import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
+import {
+  checkWorkItemsEnumFields,
+  checkWorkItemCustomFieldKeys,
+  checkWorkItemUserReferences,
+  splitWorkItemId,
+  type WorkItemEnumCheckTarget,
+  type EnumGuardResult,
+} from "./guards.js";
+import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+
+// Re-exported for backward compatibility -- tests and any external code that
+// imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
+export { sendWithRetry };
+
+/**
+ * Builds the enum-guard targets for a Work Item write tool, or `null` if
+ * `definition` isn't one of the (small, explicit) set of tools the guard
+ * covers. See `guards.ts` for what's validated and why.
+ */
+function buildWorkItemEnumTargets(
+  definition: McpToolDefinition,
+  validatedArgs: JsonObject,
+  nameMap: Record<string, string>,
+  requestBodyData: any
+): WorkItemEnumCheckTarget[] | null {
+  const method = definition.method.toLowerCase();
+  const dataItems: unknown[] = Array.isArray(requestBodyData?.data)
+    ? requestBodyData.data
+    : requestBodyData?.data
+      ? [requestBodyData.data]
+      : [];
+  if (dataItems.length === 0) return null;
+
+  // patchWorkItem: single existing item, projectId + workItemId are path params.
+  if (method === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems/{workItemId}') {
+    const projectId = readArg(validatedArgs, 'projectId', nameMap);
+    const workItemId = readArg(validatedArgs, 'workItemId', nameMap);
+    const attributes = (dataItems[0] as any)?.attributes;
+    const relationships = (dataItems[0] as any)?.relationships;
+    if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes || typeof attributes !== 'object') return null;
+    return [{ projectId, workItemId, attributes, relationships }];
+  }
+
+  // postWorkItems: bulk create, new items -- no workItemId yet, resolve options by attributes.type.
+  if (method === 'post' && definition.pathTemplate === '/projects/{projectId}/workitems') {
+    const projectId = readArg(validatedArgs, 'projectId', nameMap);
+    if (typeof projectId !== 'string') return null;
+    const targets: WorkItemEnumCheckTarget[] = [];
+    for (const item of dataItems) {
+      const attributes = (item as any)?.attributes;
+      const relationships = (item as any)?.relationships;
+      const type = attributes?.type;
+      if (attributes && typeof attributes === 'object' && typeof type === 'string') {
+        targets.push({ projectId, type, attributes, relationships });
+      }
+    }
+    return targets.length > 0 ? targets : null;
+  }
+
+  // patchWorkItems (project-scoped) / patchAllWorkItems (global): bulk update of existing
+  // items. Each item's `id` is the full "PROJECT/WORKITEMID" composite; fall back to the
+  // tool's own `projectId` param (project-scoped variant only) if an id has no '/' in it.
+  const isBulkPatch =
+    (method === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems') ||
+    (method === 'patch' && definition.pathTemplate === '/all/workitems');
+  if (isBulkPatch) {
+    const fallbackProjectId = readArg(validatedArgs, 'projectId', nameMap);
+    const targets: WorkItemEnumCheckTarget[] = [];
+    for (const item of dataItems) {
+      const id = (item as any)?.id;
+      const attributes = (item as any)?.attributes;
+      const relationships = (item as any)?.relationships;
+      if (typeof id !== 'string' || !attributes || typeof attributes !== 'object') continue;
+      const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' ? fallbackProjectId : undefined);
+      if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes, relationships });
+    }
+    return targets.length > 0 ? targets : null;
+  }
+
+  return null;
+}
+
+/**
+ * Runs all three Work Item write guards (enum fields, custom field keys,
+ * user references) over `targets` in that order, stopping at the first
+ * failure. See guards.ts's module doc for exactly what each covers.
+ */
+async function runWorkItemGuards(
+  targets: WorkItemEnumCheckTarget[],
+  requestContext: { baseUrl: string; headers: Record<string, string>; rejectUnauthorized: boolean },
+  sendOpts: SendWithRetryOpts | undefined
+): Promise<EnumGuardResult> {
+  const enumResult = await checkWorkItemsEnumFields(targets, requestContext, sendOpts);
+  if (!enumResult.ok) return enumResult;
+
+  // Custom field keys: only checkable for not-yet-existing items (postWorkItems), where
+  // the item's own `type` is known -- see checkWorkItemCustomFieldKeys's doc for why.
+  for (const target of targets) {
+    if (!target.type || target.workItemId) continue;
+    const fieldKeyResult = await checkWorkItemCustomFieldKeys(target.projectId, target.type, target.attributes, requestContext, sendOpts);
+    if (!fieldKeyResult.ok) return fieldKeyResult;
+  }
+
+  for (const target of targets) {
+    const userResult = await checkWorkItemUserReferences(target.relationships, requestContext, sendOpts);
+    if (!userResult.ok) return userResult;
+  }
+
+  return { ok: true };
+}
 
 /**
  * Execute an API tool (main entry point for API operations)
@@ -41,13 +152,18 @@ import { acquireOAuth2Token } from "./auth.js";
  * @param definition - Complete tool definition from OpenAPI spec
  * @param toolArgs - Arguments provided by AI assistant (may use sanitized names)
  * @param allSecuritySchemes - Available authentication methods from OpenAPI spec
+ * @param sendOpts - Forwarded to {@link sendWithRetry} (and to the enum guard's own
+ *   lookups); production call sites omit this and get the real axios client with
+ *   production pacing/retry defaults. Tests use it to inject a fake httpClient and
+ *   near-zero pacing/backoff/delays.
  * @returns Formatted API response or error message
  */
 export async function executeApiTool(
   toolName: string,
   definition: McpToolDefinition,
   toolArgs: JsonObject,
-  allSecuritySchemes: Record<string, any>
+  allSecuritySchemes: Record<string, any>,
+  sendOpts?: SendWithRetryOpts
 ): Promise<CallToolResult> {
   // Special handling for refresh_polarion_config tool
   // This tool doesn't make an API call, it fetches and caches project configuration
@@ -62,13 +178,21 @@ export async function executeApiTool(
   }
 
   try {
+    // ===== STEP 0: Strip dry_run before validation =====
+    // Always stripped, regardless of whether the regenerated schema already
+    // advertises `dry_run` — so Zod validation never rejects it during any
+    // transition period, and it never leaks into `validatedArgs` sent to Polarion.
+    const isMutating = MUTATING_METHODS.has(definition.method.toLowerCase());
+    const argsForValidation: JsonObject = (typeof toolArgs === 'object' && toolArgs !== null) ? { ...toolArgs } : {};
+    const dryRun = argsForValidation.dry_run === true;
+    delete argsForValidation.dry_run;
+
     // ===== STEP 1: Validate Arguments =====
     // Use Zod schema to ensure arguments match expected types
     let validatedArgs: JsonObject;
     try {
       const zodSchema = getZodSchemaFromJsonSchema(definition.inputSchema, toolName);
-      const argsToParse = (typeof toolArgs === 'object' && toolArgs !== null) ? toolArgs : {};
-      validatedArgs = zodSchema.parse(argsToParse);
+      validatedArgs = zodSchema.parse(argsForValidation);
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
@@ -334,13 +458,54 @@ export async function executeApiTool(
       }),
     };
 
+    // dry_run on a mutating tool: return a preview of the request that would
+    // be sent, without calling Polarion. GET tools ignore dry_run entirely
+    // and always execute live (there's nothing unsafe to preview).
+    if (dryRun && isMutating) {
+      const redactedHeaders = { ...headers };
+      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
+      const preview = {
+        method: config.method,
+        url: config.url,
+        headers: redactedHeaders,
+        body: requestBodyData,
+      };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
+          }
+        ],
+      };
+    }
+
+    // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
+    // Covers patchWorkItem (single existing item), postWorkItems (bulk create),
+    // and patchWorkItems/patchAllWorkItems (bulk update): enum fields, custom
+    // field keys (create only), and user references (assignee/votes/watches).
+    // See guards.ts for exactly what's validated and what's an explicit,
+    // documented follow-up (categories, module/linkedRevisions existence,
+    // non-Work-Item resources).
+    const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
+    if (enumTargets) {
+      const guardResult = await runWorkItemGuards(
+        enumTargets,
+        { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() },
+        sendOpts
+      );
+      if (!guardResult.ok) {
+        return { content: [{ type: 'text', text: `Write refused: ${guardResult.reason}` }] };
+      }
+    }
+
     // Log request info to stderr (doesn't affect MCP output)
     // All console.error() calls go to stderr, which is for logging
     // MCP protocol messages go to stdout
     console.error(`[INFO] Executing tool "${toolName}": ${config.method} ${config.url}`);
 
-    // Execute the request using axios
-    const response = await axios(config);
+    // Execute the request with pacing + retry-with-backoff on 429/5xx
+    const response = await sendWithRetry(config, sendOpts);
 
     // ===== STEP 8: Format the Response =====
     let responseText = '';
@@ -351,8 +516,12 @@ export async function executeApiTool(
     // Handle JSON responses (most common for REST APIs)
     if (contentType.includes('application/json') && typeof response.data === 'object' && response.data !== null) {
       try {
+        // Add a `value_markdown` sibling to every rich-text ({type:"text/html", value})
+        // field so the model gets readable Markdown alongside the raw HTML, without
+        // losing or altering anything in the original response.
+        const renderedData = renderRichTextFieldsAsMarkdown(response.data);
         // Pretty-print JSON with 2-space indentation
-        responseText = JSON.stringify(response.data, null, 2);
+        responseText = JSON.stringify(renderedData, null, 2);
       } catch (e) {
         responseText = "[Stringify Error]";
       }

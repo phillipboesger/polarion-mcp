@@ -64,6 +64,100 @@ Typical HTTP workflow:
 - Use the Streamable HTTP MCP mode (`start:mcp-http`) for remote MCP clients that connect by URL, such as Claude.ai custom connectors.
 - Use the REST HTTP mode (`start:http`) for ChatGPT Custom GPT Actions, and `/openapi-gpt.json` when the consumer has operation-count limits.
 
+## Request Pacing, Retries, and dry_run
+
+- Every outgoing Polarion request is paced to roughly 3 requests/second and automatically retried with exponential backoff on `429` and `5xx` responses (up to 2 retries), matching Polarion's low burst tolerance. This is transparent — no configuration is required.
+- After a successful mutating request (`POST`/`PUT`/`PATCH`/`DELETE`), the server waits an additional ~1.5s before returning, giving Polarion a moment to finish propagating the write before any immediate follow-up call (e.g. a read-back) is sent. This is separate from the general 3 req/s pacing, which applies to reads too.
+- Every mutating tool (`POST`/`PUT`/`PATCH`/`DELETE`) accepts an optional `dry_run: true` argument. When set, the tool validates arguments, resolves the URL/auth exactly as it would for a real call, and returns a preview of the request (method, URL, headers with the `Authorization` value redacted, and body) instead of sending it to Polarion. `dry_run` on a `GET` tool is ignored and the request executes normally, since there's nothing unsafe to preview.
+
+  ```jsonc
+  // Example: preview a work item creation without touching Polarion
+  {
+    "tool": "postWorkItems",
+    "arguments": {
+      "projectId": "myproject",
+      "requestBody": { "data": [{ "type": "workitems", "attributes": { "title": "Example" } }] },
+      "dry_run": true
+    }
+  }
+  ```
+
+- API error messages parse Polarion's actual JSON:API error body (`{errors: [{status, title, detail}]}`) and surface the real `detail`/`title`, instead of a truncated raw JSON dump, whenever the response is shaped that way.
+
+## Pre-write Validation (Guards)
+
+Work Item write tools — `patchWorkItem` (single update), `postWorkItems` (bulk
+create), `patchWorkItems` (bulk update, project-scoped), and
+`patchAllWorkItems` (bulk update, global) — validate the standard enum fields
+they're given (`status`, `severity`, `priority`, `resolution`) against
+Polarion's own `getAvailableOptions` action *before* sending the write. An
+invalid value is refused locally with the list of valid options, instead of
+either failing cryptically server-side or (on field types that don't validate
+strictly) silently persisting as an unknown value. For a bulk write, the
+first invalid item blocks the entire batch. Lookups are cached in-memory for
+~60s per (project, item-or-type, field) to avoid extra round-trips on
+repeated edits.
+
+New items (`postWorkItems`) have no existing instance to scope the lookup by,
+so options are resolved by the item's `attributes.type` instead; existing
+items (`patchWorkItem`/`patchWorkItems`/`patchAllWorkItems`) are resolved by
+their actual instance. `patchWorkItems`/`patchAllWorkItems` read the project
+straight out of each item's `"PROJECT/WORKITEMID"` id, so this works
+correctly even in the global (`patchAllWorkItems`) case with no `projectId`
+argument at all.
+
+If the validation lookup itself can't be completed (network error, auth
+failure), the write is refused rather than let through — an unvalidated enum
+value could otherwise persist as a silent "ghost", invisible in the UI.
+
+Two further checks run after the enum check, same fail-closed principle:
+
+- **Custom field keys** — on `postWorkItems` (create) only, every `attributes`
+  key that isn't a standard Work Item field is checked against
+  `getProjectFieldsMetadata` for the item's type, catching a typo'd custom
+  field id before it silently persists as an unknown key. Not covered on
+  update tools (`patchWorkItem` et al.), since resolving an existing item's
+  type would need an extra round-trip this doesn't perform.
+- **User references** — every user id in `relationships.assignee`/`votes`/
+  `watches`, across all 4 covered tools, is checked to actually exist via
+  `getUser`. A confirmed-missing user (404) is reported specifically; an
+  unresolvable lookup (network/auth error) fails closed like everything else.
+
+**Not yet covered** (contributions welcome):
+- `categories` — Polarion exposes no standalone `categories` resource
+  endpoint to check existence against.
+- `module` (the owning Document) and `linkedRevisions` — checkable in
+  principle, not built out yet.
+- Custom field *values* (only *keys* are checked), and custom field keys on
+  update tools.
+- Any resource other than Work Items (Documents, Test Runs, Plans, ...).
+
+## Rich Text as Markdown
+
+Every response field shaped like Polarion's rich-text convention
+(`{type: "text/html"|"text/plain", value: "..."}` — Work Item descriptions,
+Document `homePageContent`, comment text, ...) gets a `value_markdown`
+sibling added when `type` is `text/html`, with the HTML converted to
+Markdown. The original `value` is never modified, so nothing is lost and a
+value read back from a response and echoed into a later write is exactly
+what Polarion sent — `value_markdown` is purely an additional, easier-to-read
+view.
+
+## Not Yet Covered
+
+Two items from the comparison against a similar Polarion MCP server remain
+open, deliberately not attempted here rather than shipped half-built:
+
+- **A model-driven eval suite** (`evals/`) — testing that an LLM actually
+  *chooses* to use `dry_run` or respects a guard's refusal in realistic
+  agent scenarios, as opposed to `tests/`'s unit/integration coverage of the
+  code paths themselves. This needs a real model in the loop (API calls,
+  cost, credentials) and is a deliberate choice to make, not something to
+  add silently as a side effect of an unrelated change.
+- **Guard coverage beyond the standard Work Item enum fields** — custom
+  fields, categories, relationship/link targets, and non-Work-Item
+  resources (Documents, Test Runs, Plans, ...) are not validated pre-write.
+
 ## read_when
 
 - Use this guide when running the server locally or configuring clients.
