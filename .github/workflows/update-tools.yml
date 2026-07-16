@@ -43,7 +43,8 @@ jobs:
 
       - name: Report tool count
         id: count
-        run: echo "tools=$(grep -c 'name: \"' src/tools.ts)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "tools=$(grep -c 'name: "' src/tools.ts)" >> "$GITHUB_OUTPUT"
 
       - name: Open pull request if tools changed
         uses: peter-evans/create-pull-request@v7
