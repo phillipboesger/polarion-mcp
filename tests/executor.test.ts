@@ -2,6 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { AxiosError } from "axios"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
+import type FormData from "form-data"
 import type { McpToolDefinition } from "../src/types.js"
 import { executeApiTool, sendWithRetry } from "../src/executor.js"
 import { _optionsCache } from "../src/guards.js"
@@ -91,6 +92,82 @@ const emptyDefinition: McpToolDefinition = {
   pathTemplate: "/placeholder",
   executionParameters: [],
   securityRequirements: [],
+}
+
+const postWorkItemAttachmentsDefinition: McpToolDefinition = {
+  name: "postWorkItemAttachments",
+  description: "Creates one or more Work Item Attachments.",
+  method: "post",
+  pathTemplate: "/projects/{projectId}/workitems/{workItemId}/attachments",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "workItemId", in: "path" }],
+  requestBodyContentType: "multipart/form-data",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string" },
+      workItemId: { type: "string" },
+      requestBody: { type: "string" },
+    },
+    required: ["projectId", "workItemId", "requestBody"],
+  },
+}
+
+const importWordDocumentDefinition: McpToolDefinition = {
+  name: "importWordDocument",
+  description: "Imports a Word document to create a new Polarion Document.",
+  method: "post",
+  pathTemplate: "/projects/{projectId}/spaces/{spaceId}/documents/actions/importWordDocument",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "spaceId", in: "path" }],
+  requestBodyContentType: "multipart/form-data",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string" },
+      spaceId: { type: "string" },
+      requestBody: { type: "string" },
+    },
+    required: ["projectId", "spaceId", "requestBody"],
+  },
+}
+
+const patchWorkItemAttachmentDefinition: McpToolDefinition = {
+  name: "patchWorkItemAttachment",
+  description: "Updates the specified Work Item Attachment.",
+  method: "patch",
+  pathTemplate: "/projects/{projectId}/workitems/{workItemId}/attachments/{attachmentId}",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "workItemId", in: "path" }, { name: "attachmentId", in: "path" }],
+  requestBodyContentType: "multipart/form-data",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: {
+      projectId: { type: "string" },
+      workItemId: { type: "string" },
+      attachmentId: { type: "string" },
+      requestBody: { type: "string" },
+    },
+    required: ["projectId", "workItemId", "attachmentId", "requestBody"],
+  },
+}
+
+const updateAvatarDefinition: McpToolDefinition = {
+  name: "updateAvatar",
+  description: "Updates the specified User Avatar.",
+  method: "post",
+  pathTemplate: "/users/{userId}/actions/updateAvatar",
+  executionParameters: [{ name: "userId", in: "path" }],
+  requestBodyContentType: "multipart/form-data",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: {
+      userId: { type: "string" },
+      requestBody: { type: "string" },
+    },
+    required: ["userId"],
+  },
 }
 
 test("executeApiTool reports missing bearer token for refresh_polarion_config", async () => {
@@ -586,4 +663,201 @@ test("regenerated tools.ts advertises dry_run on every mutating tool and no GET 
 
   const getWithDryRun = gets.find((t) => t.inputSchema?.properties?.dry_run)
   assert.equal(getWithDryRun, undefined, `GET tools should not advertise dry_run (found on ${getWithDryRun && (getWithDryRun as any).name})`)
+})
+
+
+test("executeApiTool sends a real multipart/form-data body (with boundary) for postWorkItemAttachments, not a raw JSON string", async () => {
+  let capturedConfig: AxiosRequestConfig | undefined
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    capturedConfig = config
+    return { data: {}, status: 201, statusText: "Created", headers: {}, config: {} as any }
+  }
+
+  const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+  const requestBody = JSON.stringify({
+    resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "test.png", title: "Test attachment" } }] },
+    files: [pngBase64],
+  })
+
+  const result = await executeApiTool(
+    "postWorkItemAttachments",
+    postWorkItemAttachmentsDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-1", requestBody },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(capturedConfig, "expected the HTTP client to be invoked")
+  const contentType = String((capturedConfig!.headers as Record<string, string>)["content-type"])
+  assert.match(contentType, /^multipart\/form-data; boundary=/, "Content-Type must include a real boundary")
+
+  const form = capturedConfig!.data as FormData
+  assert.equal(typeof (form as any).getBuffer, "function", "the body must be a real FormData instance, not a JSON string")
+  const buffer = form.getBuffer()
+  const raw = buffer.toString("latin1")
+  assert.match(raw, /name="resource"/)
+  assert.match(raw, /Content-Type: application\/json/)
+  assert.match(raw, /workitem_attachments/)
+  assert.match(raw, /name="files"/)
+  assert.match(raw, /filename="file-0"/)
+
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /API Response \(Status: 201\)/)
+})
+
+test("executeApiTool builds multipart parts for the 'file' + 'parameters' shape used by importWordDocument", async () => {
+  let capturedConfig: AxiosRequestConfig | undefined
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    capturedConfig = config
+    return { data: {}, status: 200, statusText: "OK", headers: {}, config: {} as any }
+  }
+
+  const docxBase64 = Buffer.from("fake docx bytes").toString("base64")
+  const requestBody = JSON.stringify({
+    file: docxBase64,
+    parameters: { documentName: "MyDoc", title: "My Doc", documentType: "generic" },
+  })
+
+  await executeApiTool(
+    "importWordDocument",
+    importWordDocumentDefinition,
+    { projectId: "DEMO", spaceId: "_default", requestBody },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(capturedConfig, "expected the HTTP client to be invoked")
+  const form = capturedConfig!.data as FormData
+  const raw = form.getBuffer().toString("latin1")
+  assert.match(raw, /name="file"/)
+  assert.match(raw, /filename="file"/)
+  assert.match(raw, /name="parameters"/)
+  assert.match(raw, /documentName/)
+  assert.match(raw, /MyDoc/)
+})
+
+test("executeApiTool rejects a non-JSON requestBody for a multipart tool without calling the network", async () => {
+  const httpClient = async (): Promise<AxiosResponse> => {
+    throw new Error("network should never be called for an unparseable multipart requestBody")
+  }
+
+  const result = await executeApiTool(
+    "postWorkItemAttachments",
+    postWorkItemAttachmentsDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-1", requestBody: "not json" },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /requestBody for a multipart\/form-data tool must be a JSON string/)
+})
+
+test("executeApiTool dry_run on a multipart tool previews field names and byte lengths, never the raw base64 or a live call", async () => {
+  const httpClient = async (): Promise<AxiosResponse> => {
+    throw new Error("network should never be called during a dry run")
+  }
+
+  const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+  const requestBody = JSON.stringify({
+    resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "test.png" } }] },
+    files: [pngBase64],
+  })
+
+  const result = await executeApiTool(
+    "postWorkItemAttachments",
+    postWorkItemAttachmentsDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-1", requestBody, dry_run: true },
+    {},
+    { httpClient, minIntervalMs: 0 }
+  )
+
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /binary, \d+ bytes/)
+    assert.doesNotMatch(message.text, new RegExp(pngBase64.replace(/[+/=]/g, "\\$&")))
+  }
+})
+
+
+test("executeApiTool decodes the 'content' field (patch*Attachment replace-content shape) as binary, not raw base64 text", async () => {
+  let capturedConfig: AxiosRequestConfig | undefined
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    capturedConfig = config
+    return { data: {}, status: 200, statusText: "OK", headers: {}, config: {} as any }
+  }
+
+  const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+  const requestBody = JSON.stringify({
+    resource: { data: { type: "workitem_attachments", id: "att-1", attributes: { fileName: "test.png" } } },
+    content: pngBase64,
+  })
+
+  await executeApiTool(
+    "patchWorkItemAttachment",
+    patchWorkItemAttachmentDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-1", attachmentId: "att-1", requestBody },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(capturedConfig, "expected the HTTP client to be invoked")
+  const form = capturedConfig!.data as FormData
+  const raw = form.getBuffer().toString("latin1")
+  assert.match(raw, /name="content"/)
+  assert.match(raw, /filename="content"/)
+  // The decoded PNG signature bytes must appear as raw binary, not as the base64 text.
+  assert.ok(raw.includes(Buffer.from(pngBase64, "base64").toString("latin1")), "expected decoded binary bytes in the body")
+  assert.ok(!raw.includes(pngBase64), "the raw base64 string must not appear verbatim -- it must be decoded")
+})
+
+test("executeApiTool decodes a bare 'content' field (updateAvatar shape, no resource part) as binary", async () => {
+  let capturedConfig: AxiosRequestConfig | undefined
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    capturedConfig = config
+    return { data: {}, status: 200, statusText: "OK", headers: {}, config: {} as any }
+  }
+
+  const pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+  const requestBody = JSON.stringify({ content: pngBase64 })
+
+  await executeApiTool(
+    "updateAvatar",
+    updateAvatarDefinition,
+    { userId: "jdoe", requestBody },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(capturedConfig, "expected the HTTP client to be invoked")
+  const form = capturedConfig!.data as FormData
+  const raw = form.getBuffer().toString("latin1")
+  assert.match(raw, /name="content"/)
+  assert.ok(!raw.includes(pngBase64), "the raw base64 string must not appear verbatim -- it must be decoded")
+})
+
+test("executeApiTool rejects a non-string entry inside requestBody.files instead of silently dropping it", async () => {
+  const httpClient = async () => {
+    throw new Error("network should never be called when a files[] entry is malformed")
+  }
+
+  const requestBody = JSON.stringify({
+    resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "test.png" } }] },
+    files: [12345],
+  })
+
+  const result = await executeApiTool(
+    "postWorkItemAttachments",
+    postWorkItemAttachmentsDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-1", requestBody },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /requestBody\.files\[0\] must be a base64-encoded string/)
 })
