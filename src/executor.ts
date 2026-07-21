@@ -19,6 +19,7 @@
 
 import { ZodError } from "zod";
 import axios, { type AxiosRequestConfig } from "axios";
+import FormData from "form-data";
 import https from 'https';
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
@@ -136,6 +137,96 @@ async function runWorkItemGuards(
   }
 
   return { ok: true };
+}
+
+/**
+ * Polarion's multipart/form-data endpoints (attachments, icons, avatar,
+ * Word/Excel import) each expect a different set of form field names, but the
+ * OpenAPI generator collapses them all into a single JSON-string `requestBody`
+ * param (see docs/openapi-and-generation.md), documented per-tool in plain
+ * English (e.g. "Attachment metadata and file data", "'file' ... and
+ * 'parameters'"). This parses that JSON and maps its top-level keys onto real
+ * multipart fields using the field names Polarion's spec actually uses (verified
+ * against the official OpenAPI spec's per-operation `multipart/form-data` schemas):
+ * - "resource"/"parameters": JSON object metadata -> a JSON part.
+ * - "files": an array of base64-encoded file contents -> one binary part per entry
+ *   (all `post*Attachments`/`postGlobalIcons`/`postProjectIcons` bulk-create tools).
+ * - "file"/"content": a single base64-encoded file content -> one binary part
+ *   ("file" for `importWordDocument`/`importExcelTestResults`; "content" for every
+ *   `patch*Attachment` replace-content tool and `updateAvatar`).
+ * - anything else: strings pass through as plain fields, objects/arrays as JSON parts.
+ */
+function buildMultipartFormData(requestBody: unknown): FormData {
+  let parsed: unknown = requestBody;
+  if (typeof requestBody === 'string') {
+    try {
+      parsed = JSON.parse(requestBody);
+    } catch {
+      throw new Error(
+        'requestBody for a multipart/form-data tool must be a JSON string, e.g. ' +
+        '\'{"resource":{"data":[{"type":"...","attributes":{"fileName":"..."}}]},"files":["<base64>"]}\''
+      );
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('requestBody for a multipart/form-data tool must decode to a JSON object of form field names');
+  }
+
+  const form = new FormData();
+  for (const [key, value] of Object.entries(parsed as JsonObject)) {
+    if (value === undefined || value === null) continue;
+
+    if ((key === 'resource' || key === 'parameters') && typeof value === 'object') {
+      form.append(key, JSON.stringify(value), { contentType: 'application/json' });
+    } else if (key === 'files' && Array.isArray(value)) {
+      value.forEach((item, index) => {
+        if (typeof item !== 'string') {
+          throw new Error(`requestBody.files[${index}] must be a base64-encoded string, got ${typeof item}`);
+        }
+        form.append('files', Buffer.from(item, 'base64'), { filename: `file-${index}` });
+      });
+    } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
+      form.append(key, Buffer.from(value, 'base64'), { filename: key });
+    } else if (typeof value === 'string') {
+      form.append(key, value);
+    } else {
+      form.append(key, JSON.stringify(value), { contentType: 'application/json' });
+    }
+  }
+  return form;
+}
+
+/**
+ * Stand-in for the dry_run preview when the real request body is a FormData
+ * stream (JSON.stringify on it yields `{}`, hiding everything useful). Mirrors
+ * the fields buildMultipartFormData() would send, but replaces base64 file
+ * payloads with their decoded byte length so previews stay short and never
+ * echo raw binary data back to the caller.
+ */
+function summarizeMultipartForPreview(requestBody: unknown): unknown {
+  let parsed: unknown = requestBody;
+  if (typeof requestBody === 'string') {
+    try {
+      parsed = JSON.parse(requestBody);
+    } catch {
+      return requestBody;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return parsed;
+
+  const summary: JsonObject = {};
+  for (const [key, value] of Object.entries(parsed as JsonObject)) {
+    if (key === 'files' && Array.isArray(value)) {
+      summary[key] = value.map((item) =>
+        typeof item === 'string' ? `<binary, ${Buffer.from(item, 'base64').length} bytes>` : item
+      );
+    } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
+      summary[key] = `<binary, ${Buffer.from(value, 'base64').length} bytes>`;
+    } else {
+      summary[key] = value;
+    }
+  }
+  return summary;
 }
 
 /**
@@ -276,9 +367,22 @@ export async function executeApiTool(
 
     // ===== STEP 4: Handle Request Body =====
     const requestBody = readArg(validatedArgs, 'requestBody', nameMap);
+    let dryRunBodyPreview: unknown;
     if (definition.requestBodyContentType && typeof requestBody !== 'undefined') {
-      requestBodyData = requestBody;
-      headers['content-type'] = definition.requestBodyContentType;
+      if (definition.requestBodyContentType === 'multipart/form-data') {
+        // Build a real multipart body with a boundary instead of sending the raw
+        // JSON string with a bare "multipart/form-data" Content-Type (see #5) --
+        // Polarion's parser can't make sense of that and rejects it with a
+        // content-less 400 before any JSON:API validation runs.
+        const form = buildMultipartFormData(requestBody);
+        requestBodyData = form;
+        Object.assign(headers, form.getHeaders());
+        dryRunBodyPreview = summarizeMultipartForPreview(requestBody);
+      } else {
+        requestBodyData = requestBody;
+        headers['content-type'] = definition.requestBodyContentType;
+        dryRunBodyPreview = requestBodyData;
+      }
     }
 
     // ===== STEP 5: Apply Security/Authentication =====
@@ -468,7 +572,7 @@ export async function executeApiTool(
         method: config.method,
         url: config.url,
         headers: redactedHeaders,
-        body: requestBodyData,
+        body: dryRunBodyPreview,
       };
       return {
         content: [

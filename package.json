@@ -59,6 +59,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",
+    "form-data": "^4.0.0",
     "json-schema-to-zod": "^2.6.1",
     "pdf-parse": "^1.1.1",
     "turndown": "^7.2.4",
