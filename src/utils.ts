@@ -223,6 +223,55 @@ export function formatApiError(error: AxiosError): string {
 }
 
 /**
+ * Recursively marks every nested object schema (everything below the tool's
+ * own top-level argument object) as allowing additional properties, so
+ * `json-schema-to-zod` emits `.catchall(z.any())` instead of a plain
+ * `z.object({...})` for them.
+ *
+ * Why this exists: none of the generated tool schemas in `tools.ts` ever
+ * declare `additionalProperties: false` -- Polarion's OpenAPI spec collapses
+ * per-project dynamic data (most importantly Work Item custom fields, which
+ * differ per project/type and can't be known at spec-generation time) into
+ * plain objects with only the OOTB fields listed. Zod's default "strip"
+ * behavior for `z.object()` silently deletes any key not in that list during
+ * `.parse()`, so a custom field set on `attributes` (and similar dynamic
+ * data on Plans/Documents/etc.) never survives argument validation to reach
+ * Polarion -- even though the REST API itself accepts it fine.
+ *
+ * The tool's own top-level params (e.g. `projectId`, `workItemId`) are left
+ * alone (depth 0 is skipped): Zod's default is "strip", not "reject", so an
+ * unknown top-level key is silently dropped either way, not rejected --
+ * leaving depth 0 alone just avoids also silently forwarding a misspelled
+ * top-level argument as if catchall(z.any()) had validated it.
+ */
+function makeNestedObjectsPermissive(schema: any, depth = 0): any {
+  if (schema === null || typeof schema !== 'object') return schema;
+  if (Array.isArray(schema)) return schema.map((s) => makeNestedObjectsPermissive(s, depth));
+
+  const copy: any = { ...schema };
+  const types = Array.isArray(copy.type) ? copy.type : [copy.type];
+  const isObjectNode = types.includes('object') || (copy.type === undefined && copy.properties);
+  if (depth > 0 && isObjectNode && copy.additionalProperties === undefined) {
+    copy.additionalProperties = true;
+  }
+  if (copy.properties && typeof copy.properties === 'object') {
+    const nextProps: Record<string, any> = {};
+    for (const [key, value] of Object.entries(copy.properties)) {
+      nextProps[key] = makeNestedObjectsPermissive(value, depth + 1);
+    }
+    copy.properties = nextProps;
+  }
+  if (copy.items) copy.items = makeNestedObjectsPermissive(copy.items, depth + 1);
+  // anyOf/oneOf/allOf branches describe alternatives for *this* node, not a
+  // level below it -- recurse at the same depth so a (currently nonexistent)
+  // root-level combinator wouldn't make the top-level tool args permissive.
+  for (const key of ['anyOf', 'oneOf', 'allOf']) {
+    if (Array.isArray(copy[key])) copy[key] = copy[key].map((s: any) => makeNestedObjectsPermissive(s, depth));
+  }
+  return copy;
+}
+
+/**
  * Converts a JSON Schema to a Zod schema for runtime validation
  *
  * This function is critical for ensuring type safety at runtime:
@@ -255,8 +304,10 @@ export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z
   }
 
   try {
-    // Convert JSON Schema to Zod schema code
-    const zodSchemaString = jsonSchemaToZod(jsonSchema);
+    // Convert JSON Schema to Zod schema code -- nested objects (everything
+    // under e.g. requestBody) are made permissive first so dynamic data like
+    // Work Item customFields survives validation instead of being stripped.
+    const zodSchemaString = jsonSchemaToZod(makeNestedObjectsPermissive(jsonSchema));
 
     // Evaluate the code to create actual schema
     // This is safe because we control the input

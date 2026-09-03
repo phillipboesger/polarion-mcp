@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, sanitizeInputSchema } from "../src/utils.js"
+import { toolDefinitionMap } from "../src/tools.js"
 
 test("sanitizeInputSchema rewrites invalid property names and records the mapping", () => {
   const nameMap: Record<string, string> = {}
@@ -110,4 +111,105 @@ test("getZodSchemaFromJsonSchema falls back to a passthrough object for invalid 
   const parsed = schema.parse({ anything: "goes" }) as Record<string, string>
 
   assert.equal(parsed.anything, "goes")
+})
+
+test("getZodSchemaFromJsonSchema keeps unknown nested keys like a Work Item custom field (GH feedback: custom fields never reach Polarion)", () => {
+  // Polarion represents a Work Item custom field as a flat extra key directly
+  // on `attributes`, alongside the OOTB ones (see guards.ts's
+  // STANDARD_WORK_ITEM_ATTRIBUTE_KEYS / checkWorkItemCustomFieldKeys) -- there
+  // is no separate "customFields" wrapper in the real REST schema.
+  const schema = getZodSchemaFromJsonSchema(
+    {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        workItemId: { type: "string" },
+        requestBody: {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              properties: {
+                type: { type: "string" },
+                attributes: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      required: ["projectId", "workItemId", "requestBody"],
+    },
+    "patchWorkItem",
+  )
+
+  const parsed = schema.parse({
+    projectId: "myproject",
+    workItemId: "WI-1",
+    requestBody: {
+      data: {
+        type: "workitems",
+        attributes: {
+          title: "Updated title",
+          myCustomField: "some value",
+        },
+      },
+    },
+  }) as any
+
+  assert.equal(parsed.requestBody.data.attributes.title, "Updated title")
+  assert.equal(parsed.requestBody.data.attributes.myCustomField, "some value")
+})
+
+test("getZodSchemaFromJsonSchema still silently drops an unknown top-level (tool) argument, same as before the nested-passthrough fix", () => {
+  const schema = getZodSchemaFromJsonSchema(
+    {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+      },
+      required: ["projectId"],
+    },
+    "someTool",
+  )
+
+  const parsed = schema.parse({ projectId: "p1", typoedParam: "oops" }) as Record<string, unknown>
+  assert.equal("typoedParam" in parsed, false, "top-level unknown keys are dropped, not forwarded as if validated -- unlike nested ones")
+})
+
+test("getZodSchemaFromJsonSchema keeps a custom field through the real generated patchWorkItem/postWorkItems/patchWorkItems/patchAllWorkItems schemas (data[] array included)", () => {
+  for (const toolName of ["patchWorkItem", "postWorkItems", "patchWorkItems", "patchAllWorkItems"]) {
+    const definition = toolDefinitionMap.get(toolName)
+    assert.ok(definition, `tools.ts must still define ${toolName}`)
+    const schema = getZodSchemaFromJsonSchema(definition!.inputSchema, toolName)
+
+    // postWorkItems requires attributes.type (the Work Item type, e.g. "task") in addition
+    // to data.type ("workitems", the JSON:API resource type) -- harmless on the other tools.
+    const oneItem = { type: "workitems", attributes: { type: "task", title: "Doc update", myCustomField: "released" } }
+    const args =
+      toolName === "patchWorkItem"
+        ? { projectId: "DEMO", workItemId: "DEMO-1", requestBody: { data: oneItem } }
+        : { projectId: "DEMO", requestBody: { data: [oneItem] } }
+
+    const parsed = schema.parse(args) as any
+    const parsedAttributes = toolName === "patchWorkItem" ? parsed.requestBody.data.attributes : parsed.requestBody.data[0].attributes
+    assert.equal(parsedAttributes.title, "Doc update", `${toolName}: OOTB field must still go through`)
+    assert.equal(parsedAttributes.myCustomField, "released", `${toolName}: custom field must survive validation`)
+  }
+})
+
+test("getZodSchemaFromJsonSchema keeps unknown keys on a nullable-object node (type: ['object','null']), e.g. executeJob's requestBody.params", () => {
+  const definition = toolDefinitionMap.get("executeJob")
+  assert.ok(definition, "tools.ts must still define executeJob")
+  const schema = getZodSchemaFromJsonSchema(definition!.inputSchema, "executeJob")
+
+  const parsed = schema.parse({
+    requestBody: { jobId: "jobs.cleanup", params: { myJobParam: "x" } },
+  }) as any
+
+  assert.equal(parsed.requestBody.params.myJobParam, "x", "a custom job param must survive on a type:['object','null'] node")
 })

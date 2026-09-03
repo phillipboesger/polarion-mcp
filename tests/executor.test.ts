@@ -417,6 +417,65 @@ test("executeApiTool sends a patchWorkItem write once the guard confirms a valid
   if (message.type === "text") assert.match(message.text, /API Response/)
 })
 
+test("executeApiTool preserves a Work Item custom field through validation (GH feedback: custom fields never reach Polarion)", async () => {
+  _optionsCache.clear()
+  // Mirrors the real generated patchWorkItem schema in src/tools.ts, where
+  // `attributes` only lists the OOTB fields (title/status/severity/...) --
+  // Polarion custom fields are additional, undeclared keys on the same
+  // object. Before the getZodSchemaFromJsonSchema passthrough fix, Zod's
+  // default "strip unknown keys" behavior silently dropped them here.
+  const patchWorkItemWithRestrictiveAttributesSchema: McpToolDefinition = {
+    ...patchWorkItemDefinition,
+    inputSchema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        workItemId: { type: "string" },
+        requestBody: {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              properties: {
+                type: { type: "string" },
+                id: { type: "string" },
+                attributes: {
+                  type: "object",
+                  properties: { title: { type: "string" }, status: { type: "string" } },
+                },
+              },
+            },
+          },
+        },
+      },
+      required: ["projectId", "workItemId", "requestBody"],
+    },
+  }
+
+  let sentBody: any
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    sentBody = config.data
+    return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
+  }
+
+  await executeApiTool(
+    "patchWorkItem",
+    patchWorkItemWithRestrictiveAttributesSchema,
+    {
+      projectId: "DEMO",
+      workItemId: "DEMO-4",
+      requestBody: {
+        data: { type: "workitems", id: "DEMO/DEMO-4", attributes: { title: "Doc update", myCustomField: "released" } },
+      },
+    },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.equal(sentBody.data.attributes.title, "Doc update", "the OOTB field still goes through")
+  assert.equal(sentBody.data.attributes.myCustomField, "released", "the custom field must reach the actual PATCH body")
+})
+
 test("executeApiTool fails closed (refuses the write) when the guard's own lookup errors", async () => {
   _optionsCache.clear()
   let patchCalled = false
