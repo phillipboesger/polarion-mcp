@@ -4,8 +4,9 @@ import { AxiosError } from "axios"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
 import type FormData from "form-data"
 import type { McpToolDefinition } from "../src/types.js"
-import { executeApiTool, sendWithRetry } from "../src/executor.js"
-import { _optionsCache } from "../src/guards.js"
+import { executeApiTool, sendWithRetry, CUSTOM_FIELD_TOOL_SPECS } from "../src/executor.js"
+import { _optionsCache, _fieldKeyCache } from "../src/guards.js"
+import { toolDefinitionMap } from "../src/tools.js"
 
 const patchWorkItemDefinition: McpToolDefinition = {
   name: "patchWorkItem",
@@ -68,6 +69,66 @@ const patchAllWorkItemsDefinition: McpToolDefinition = {
     type: "object",
     properties: { requestBody: { type: "object" } },
     required: ["requestBody"],
+  },
+}
+
+const postDocumentsDefinition: McpToolDefinition = {
+  name: "postDocuments",
+  description: "Creates a list of Documents.",
+  method: "post",
+  pathTemplate: "/projects/{projectId}/spaces/{spaceId}/documents",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "spaceId", in: "path" }],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: { projectId: { type: "string" }, spaceId: { type: "string" }, requestBody: { type: "object" } },
+    required: ["projectId", "spaceId", "requestBody"],
+  },
+}
+
+const patchPlanDefinition: McpToolDefinition = {
+  name: "patchPlan",
+  description: "Updates the specified Plan.",
+  method: "patch",
+  pathTemplate: "/projects/{projectId}/plans/{planId}",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "planId", in: "path" }],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: { projectId: { type: "string" }, planId: { type: "string" }, requestBody: { type: "object" } },
+    required: ["projectId", "planId", "requestBody"],
+  },
+}
+
+const patchDocumentDefinition: McpToolDefinition = {
+  name: "patchDocument",
+  description: "Updates the specified Document.",
+  method: "patch",
+  pathTemplate: "/projects/{projectId}/spaces/{spaceId}/documents/{documentName}",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "spaceId", in: "path" }, { name: "documentName", in: "path" }],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: { projectId: { type: "string" }, spaceId: { type: "string" }, documentName: { type: "string" }, requestBody: { type: "object" } },
+    required: ["projectId", "spaceId", "documentName", "requestBody"],
+  },
+}
+
+const patchTestRecordsDefinition: McpToolDefinition = {
+  name: "patchTestRecords",
+  description: "Updates a list of Test Records.",
+  method: "patch",
+  pathTemplate: "/projects/{projectId}/testruns/{testRunId}/testrecords",
+  executionParameters: [{ name: "projectId", in: "path" }, { name: "testRunId", in: "path" }],
+  requestBodyContentType: "application/json",
+  securityRequirements: [],
+  inputSchema: {
+    type: "object",
+    properties: { projectId: { type: "string" }, testRunId: { type: "string" }, requestBody: { type: "object" } },
+    required: ["projectId", "testRunId", "requestBody"],
   },
 }
 
@@ -419,6 +480,7 @@ test("executeApiTool sends a patchWorkItem write once the guard confirms a valid
 
 test("executeApiTool preserves a Work Item custom field through validation (GH feedback: custom fields never reach Polarion)", async () => {
   _optionsCache.clear()
+  _fieldKeyCache.clear()
   // Mirrors the real generated patchWorkItem schema in src/tools.ts, where
   // `attributes` only lists the OOTB fields (title/status/severity/...) --
   // Polarion custom fields are additional, undeclared keys on the same
@@ -454,6 +516,16 @@ test("executeApiTool preserves a Work Item custom field through validation (GH f
 
   let sentBody: any
   const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    // The update-mode custom-field-key guard issues an instance-scoped
+    // getFieldsMetadata GET before the real PATCH -- must resolve
+    // myCustomField as a real field or the guard refuses the write and
+    // the PATCH below is never reached.
+    if (String(config.url).includes("/actions/getFieldsMetadata")) {
+      return {
+        data: { data: { attributes: { title: { label: "Title" }, myCustomField: { label: "My Custom Field", type: { kind: "string" } } } } },
+        status: 200, statusText: "OK", headers: {}, config: {} as any,
+      }
+    }
     sentBody = config.data
     return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
   }
@@ -589,6 +661,7 @@ test("executeApiTool sends a postWorkItems bulk create once all new items valida
 
 test("executeApiTool refuses a postWorkItems create with an unknown custom field key", async () => {
   _optionsCache.clear()
+  _fieldKeyCache.clear()
   let postCalled = false
   const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
     const url = String(config.url)
@@ -616,6 +689,285 @@ test("executeApiTool refuses a postWorkItems create with an unknown custom field
   if (message.type === "text") {
     assert.match(message.text, /Write refused/)
     assert.match(message.text, /Unknown field key\(s\) bogusCustomField/)
+  }
+})
+
+test("executeApiTool refuses a patchWorkItem UPDATE with an unknown custom field key, via the instance-scoped lookup -- this session's new coverage (previously updates were never checked at all)", async () => {
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      assert.equal(url, "https://polarion.example.com/polarion/rest/v1/projects/DEMO/workitems/DEMO-1/actions/getFieldsMetadata")
+      assert.equal(config.params, undefined, "instance-scoped lookup takes no resourceType/targetType params")
+      return { data: { data: { attributes: { realCustomField: { label: "Real Custom Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    patchCalled = true
+    throw new Error("patch must never be reached once the field-key guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItem",
+    patchWorkItemDefinition,
+    { projectId: "DEMO", workItemId: "DEMO-1", requestBody: { data: { type: "workitems", id: "DEMO/DEMO-1", attributes: { bogusCustomField: "y" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!patchCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /Unknown field key\(s\) bogusCustomField/)
+  }
+})
+
+test("executeApiTool accepts a postDocuments create with a real registered custom field, refuses a bogus one -- new resource-type coverage (Document, typed)", async () => {
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  const httpClientAccept = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      assert.equal((config.params as any)?.resourceType, "documents")
+      assert.equal((config.params as any)?.targetType, "generic")
+      return { data: { data: { attributes: { docCustomField: { label: "Doc Custom Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    return { data: {}, status: 201, statusText: "Created", headers: {}, config: {} as any }
+  }
+  const acceptResult = await executeApiTool(
+    "postDocuments",
+    postDocumentsDefinition,
+    { projectId: "DEMO", spaceId: "_default", requestBody: { data: [{ type: "documents", attributes: { type: "generic", title: "x", docCustomField: "y" } }] } },
+    {},
+    { httpClient: httpClientAccept, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+  const acceptMessage = acceptResult.content[0]
+  assert.equal(acceptMessage.type, "text")
+  if (acceptMessage.type === "text") assert.match(acceptMessage.text, /API Response \(Status: 201\)/)
+
+  _optionsCache.clear()
+  let postCalled = false
+  const httpClientRefuse = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      return { data: { data: { attributes: {} } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    postCalled = true
+    throw new Error("create must never be reached once the field-key guard refuses")
+  }
+  const refuseResult = await executeApiTool(
+    "postDocuments",
+    postDocumentsDefinition,
+    { projectId: "DEMO", spaceId: "_default", requestBody: { data: [{ type: "documents", attributes: { type: "generic", title: "x", bogusDocField: "y" } }] } },
+    {},
+    { httpClient: httpClientRefuse, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+  assert.ok(!postCalled)
+  const refuseMessage = refuseResult.content[0]
+  assert.equal(refuseMessage.type, "text")
+  if (refuseMessage.type === "text") {
+    assert.match(refuseMessage.text, /Write refused/)
+    assert.match(refuseMessage.text, /Unknown field key\(s\) bogusDocField/)
+  }
+})
+
+test("executeApiTool accepts a patchPlan UPDATE with a real registered custom field -- new resource-type coverage (Plan, typeless)", async () => {
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      assert.equal(url, "https://polarion.example.com/polarion/rest/v1/projects/DEMO/plans/MyPlan/actions/getFieldsMetadata")
+      return { data: { data: { attributes: { planCustomField: { label: "Plan Custom Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
+  }
+  const result = await executeApiTool(
+    "patchPlan",
+    patchPlanDefinition,
+    { projectId: "DEMO", planId: "MyPlan", requestBody: { data: { type: "plans", attributes: { name: "x", planCustomField: "y" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /API Response \(Status: 204\)/)
+})
+
+test("executeApiTool refuses a patchWorkItems BULK update when one item has an unknown custom field key, resolving each item's own instance-scoped lookup from its composite id", async () => {
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      if (url.includes("/workitems/DEMO-1/")) {
+        return { data: { data: { attributes: { realField: { label: "Real Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+      }
+      if (url.includes("/workitems/DEMO-2/")) {
+        return { data: { data: { attributes: { someOtherField: { label: "Some Other Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+      }
+      throw new Error(`unexpected getFieldsMetadata lookup: ${url}`)
+    }
+    patchCalled = true
+    throw new Error("bulk patch must never be reached once the field-key guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItems",
+    patchWorkItemsDefinition,
+    {
+      projectId: "DEMO",
+      requestBody: {
+        data: [
+          { type: "workitems", id: "DEMO/DEMO-1", attributes: { realField: "ok" } },
+          { type: "workitems", id: "DEMO/DEMO-2", attributes: { bogusField: "y" } },
+        ],
+      },
+    },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!patchCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /Unknown field key\(s\) bogusField/)
+    assert.match(message.text, /DEMO\/DEMO-2/)
+  }
+})
+
+test("executeApiTool refuses a patchWorkItems BULK update item whose composite id can't be resolved at all, rather than silently skipping validation for it", async () => {
+  // Regression for a review finding: a bare id with no fallback projectId
+  // (patchAllWorkItems has none in its own path) used to be silently
+  // skipped by the custom-field-key guard, even though it still got full
+  // enum + user-reference validation -- an inconsistency between guards on
+  // the exact same item. Now it must refuse instead.
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.url).includes("/actions/getFieldsMetadata")) {
+      throw new Error("must never look up field metadata for an unresolvable id -- it should fail closed before any network call")
+    }
+    patchCalled = true
+    throw new Error("bulk patch must never be reached once the field-key guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "patchAllWorkItems",
+    patchAllWorkItemsDefinition,
+    { requestBody: { data: [{ type: "workitems", id: "no-slash-and-no-fallback-projectid", attributes: { someCustomField: "y" } }] } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!patchCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /Cannot resolve/)
+  }
+})
+
+test("executeApiTool accepts a patchWorkItems BULK update item with a bare id (no slash), falling back to the tool's own projectId -- same fallback the enum guard already uses", async () => {
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      assert.equal(url, "https://polarion.example.com/polarion/rest/v1/projects/DEMO/workitems/DEMO-1/actions/getFieldsMetadata")
+      return { data: { data: { attributes: { realField: { label: "Real Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItems",
+    patchWorkItemsDefinition,
+    { projectId: "DEMO", requestBody: { data: [{ type: "workitems", id: "DEMO-1", attributes: { realField: "ok" } }] } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /API Response \(Status: 204\)/)
+})
+
+test("executeApiTool accepts a patchDocument UPDATE with a real registered custom field -- new resource-type coverage (Document update, 3-segment instance path)", async () => {
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      assert.equal(url, "https://polarion.example.com/polarion/rest/v1/projects/DEMO/spaces/_default/documents/MyDoc/actions/getFieldsMetadata")
+      return { data: { data: { attributes: { docCustomField: { label: "Doc Custom Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
+  }
+  const result = await executeApiTool(
+    "patchDocument",
+    patchDocumentDefinition,
+    { projectId: "DEMO", spaceId: "_default", documentName: "MyDoc", requestBody: { data: { type: "documents", attributes: { title: "x", docCustomField: "y" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /API Response \(Status: 204\)/)
+})
+
+test("executeApiTool refuses a patchTestRecords BULK update with an unknown custom field key, resolving the 5-segment composite id (project/testRun/testCaseProject/testCase/iteration) -- the single most error-prone table entry", async () => {
+  _optionsCache.clear()
+  _fieldKeyCache.clear()
+  let patchCalled = false
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("/actions/getFieldsMetadata")) {
+      assert.equal(url, "https://polarion.example.com/polarion/rest/v1/projects/A/testruns/B/testrecords/C/D/0/actions/getFieldsMetadata")
+      return { data: { data: { attributes: { comment: { label: "Comment" } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    }
+    patchCalled = true
+    throw new Error("bulk patch must never be reached once the field-key guard refuses")
+  }
+
+  const result = await executeApiTool(
+    "patchTestRecords",
+    patchTestRecordsDefinition,
+    {
+      projectId: "A",
+      testRunId: "B",
+      requestBody: { data: [{ type: "testrecords", id: "A/B/C/D/0", attributes: { bogusTestRecordField: "y" } }] },
+    },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
+  )
+
+  assert.ok(!patchCalled)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /Write refused/)
+    assert.match(message.text, /Unknown field key\(s\) bogusTestRecordField/)
+  }
+})
+
+test("CUSTOM_FIELD_TOOL_SPECS: every entry resolves to a real generated tool with a matching method and pathTemplate -- guards against src/tools.ts regeneration silently disabling custom-field-key protection for a tool", () => {
+  for (const spec of CUSTOM_FIELD_TOOL_SPECS) {
+    const matches = [...toolDefinitionMap.values()].filter(
+      (def) => def.method.toLowerCase() === spec.method && def.pathTemplate === spec.pathTemplate
+    )
+    assert.equal(
+      matches.length,
+      1,
+      `expected exactly one generated tool for ${spec.method.toUpperCase()} ${spec.pathTemplate} (resourceType=${spec.resourceType}, mode=${spec.mode}), found ${matches.length}`
+    )
   }
 })
 

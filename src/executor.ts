@@ -30,10 +30,11 @@ import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
 import {
   checkWorkItemsEnumFields,
-  checkWorkItemCustomFieldKeys,
+  checkResourceCustomFieldKeys,
   checkWorkItemUserReferences,
   splitWorkItemId,
   type WorkItemEnumCheckTarget,
+  type CustomFieldKeyCheckTarget,
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
@@ -111,32 +112,200 @@ function buildWorkItemEnumTargets(
 }
 
 /**
- * Runs all three Work Item write guards (enum fields, custom field keys,
- * user references) over `targets` in that order, stopping at the first
- * failure. See guards.ts's module doc for exactly what each covers.
+ * Runs the Work Item-specific user-reference guard over `targets`, stopping
+ * at the first failure. The enum-field guard (`checkWorkItemsEnumFields`) is
+ * called directly at the STEP 7a call site instead of through a wrapper.
+ * The custom-field-key guard sits BETWEEN these two steps in the actual
+ * write flow but is resource-type-generic, not Work-Item-specific, so it's
+ * built and run separately via
+ * {@link buildCustomFieldKeyTargets}/`checkResourceCustomFieldKeys` -- that
+ * split is what lets it also cover Documents, Plans, Collections, Test
+ * Runs, and Test Records.
  */
-async function runWorkItemGuards(
+async function runWorkItemUserReferenceGuard(
   targets: WorkItemEnumCheckTarget[],
   requestContext: { baseUrl: string; headers: Record<string, string>; rejectUnauthorized: boolean },
   sendOpts: SendWithRetryOpts | undefined
 ): Promise<EnumGuardResult> {
-  const enumResult = await checkWorkItemsEnumFields(targets, requestContext, sendOpts);
-  if (!enumResult.ok) return enumResult;
-
-  // Custom field keys: only checkable for not-yet-existing items (postWorkItems), where
-  // the item's own `type` is known -- see checkWorkItemCustomFieldKeys's doc for why.
-  for (const target of targets) {
-    if (!target.type || target.workItemId) continue;
-    const fieldKeyResult = await checkWorkItemCustomFieldKeys(target.projectId, target.type, target.attributes, requestContext, sendOpts);
-    if (!fieldKeyResult.ok) return fieldKeyResult;
-  }
-
   for (const target of targets) {
     const userResult = await checkWorkItemUserReferences(target.relationships, requestContext, sendOpts);
     if (!userResult.ok) return userResult;
   }
-
   return { ok: true };
+}
+
+/** Human-readable resource-type label for custom-field-key guard error messages. */
+const CUSTOM_FIELD_RESOURCE_LABELS: Record<string, string> = {
+  workitems: 'Work Item',
+  documents: 'Document',
+  plans: 'Plan',
+  collections: 'Collection',
+  testruns: 'Test Run',
+  testrecords: 'Test Record',
+};
+
+/**
+ * One entry per custom-field-capable write tool: which resource type it
+ * writes, and how to validate its custom field keys.
+ * - `create`: bulk create (`data` is always an array for every `post*`
+ *   tool here) -- validated project- and type-scoped, per item.
+ * - `update-single`: one existing instance -- validated instance-scoped,
+ *   using the tool's own already-resolved `urlPath` (no id-parsing needed).
+ * - `update-bulk`: many existing instances by composite id in the body --
+ *   validated instance-scoped per item, using `bulkInstancePath` to turn
+ *   the item's own `"a/b/..."` id into the same instance path shape
+ *   `update-single` would have used for that one item. `bulkIdSegments` is
+ *   the expected split length; an id that doesn't match sets
+ *   `unresolvedReason` on that item's target instead of skipping it, so an
+ *   item with a candidate custom field but an unparsable id still fails
+ *   closed rather than silently going unchecked.
+ */
+interface CustomFieldToolSpec {
+  method: string;
+  pathTemplate: string;
+  resourceType: string;
+  mode: 'create' | 'update-single' | 'update-bulk';
+  /** Whether this resource type has a subtype concept (`attributes.type`, e.g. Work Item/Document/Test Run). False for Plan/Collection/Test Record -- their create lookup omits targetType, and `attributes.type` (if a custom field happened to be named that) is never misread as a subtype. */
+  typed: boolean;
+  bulkIdSegments?: number;
+  bulkInstancePath?: (segments: string[]) => string;
+}
+
+const CUSTOM_FIELD_TOOL_SPECS: CustomFieldToolSpec[] = [
+  { method: 'post', pathTemplate: '/projects/{projectId}/workitems', resourceType: 'workitems', mode: 'create', typed: true },
+  { method: 'patch', pathTemplate: '/projects/{projectId}/workitems/{workItemId}', resourceType: 'workitems', mode: 'update-single', typed: true },
+  {
+    method: 'patch', pathTemplate: '/projects/{projectId}/workitems', resourceType: 'workitems', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
+    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/workitems/${encodeURIComponent(s[1])}`,
+  },
+  {
+    method: 'patch', pathTemplate: '/all/workitems', resourceType: 'workitems', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
+    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/workitems/${encodeURIComponent(s[1])}`,
+  },
+  { method: 'post', pathTemplate: '/projects/{projectId}/spaces/{spaceId}/documents', resourceType: 'documents', mode: 'create', typed: true },
+  { method: 'patch', pathTemplate: '/projects/{projectId}/spaces/{spaceId}/documents/{documentName}', resourceType: 'documents', mode: 'update-single', typed: true },
+  { method: 'post', pathTemplate: '/projects/{projectId}/plans', resourceType: 'plans', mode: 'create', typed: false },
+  { method: 'patch', pathTemplate: '/projects/{projectId}/plans/{planId}', resourceType: 'plans', mode: 'update-single', typed: false },
+  { method: 'post', pathTemplate: '/projects/{projectId}/collections', resourceType: 'collections', mode: 'create', typed: false },
+  { method: 'patch', pathTemplate: '/projects/{projectId}/collections/{collectionId}', resourceType: 'collections', mode: 'update-single', typed: false },
+  { method: 'post', pathTemplate: '/projects/{projectId}/testruns', resourceType: 'testruns', mode: 'create', typed: true },
+  { method: 'patch', pathTemplate: '/projects/{projectId}/testruns/{testRunId}', resourceType: 'testruns', mode: 'update-single', typed: true },
+  {
+    method: 'patch', pathTemplate: '/projects/{projectId}/testruns', resourceType: 'testruns', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
+    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/testruns/${encodeURIComponent(s[1])}`,
+  },
+  { method: 'post', pathTemplate: '/projects/{projectId}/testruns/{testRunId}/testrecords', resourceType: 'testrecords', mode: 'create', typed: false },
+  {
+    method: 'patch', pathTemplate: '/projects/{projectId}/testruns/{testRunId}/testrecords/{testCaseProjectId}/{testCaseId}/{iteration}',
+    resourceType: 'testrecords', mode: 'update-single', typed: false,
+  },
+  {
+    method: 'patch', pathTemplate: '/projects/{projectId}/testruns/{testRunId}/testrecords', resourceType: 'testrecords', mode: 'update-bulk', typed: false, bulkIdSegments: 5,
+    bulkInstancePath: (s) =>
+      `/projects/${encodeURIComponent(s[0])}/testruns/${encodeURIComponent(s[1])}/testrecords/${encodeURIComponent(s[2])}/${encodeURIComponent(s[3])}/${encodeURIComponent(s[4])}`,
+  },
+];
+
+// Exported so a test can assert every entry resolves to a real generated tool
+// with a matching method/pathTemplate -- src/tools.ts is regenerated from
+// Polarion's OpenAPI spec (npm run regenerate), and a future spec change to
+// any of these paths would otherwise silently disable custom-field-key
+// protection for that tool with an all-green test suite.
+export { CUSTOM_FIELD_TOOL_SPECS };
+
+/**
+ * Builds the custom-field-key guard targets for a write tool, or `null` if
+ * `definition` isn't one of the tools {@link CUSTOM_FIELD_TOOL_SPECS} covers.
+ * `urlPath` is the tool's already-resolved request path (path params
+ * substituted, computed earlier in STEP 3) -- reused directly as the
+ * instance path for `update-single` tools, so no separate id-parsing is
+ * needed for the single-item case.
+ */
+function buildCustomFieldKeyTargets(
+  definition: McpToolDefinition,
+  validatedArgs: JsonObject,
+  nameMap: Record<string, string>,
+  requestBodyData: any,
+  urlPath: string
+): CustomFieldKeyCheckTarget[] | null {
+  const method = definition.method.toLowerCase();
+  const spec = CUSTOM_FIELD_TOOL_SPECS.find((s) => s.method === method && s.pathTemplate === definition.pathTemplate);
+  if (!spec) return null;
+
+  const dataItems: unknown[] = Array.isArray(requestBodyData?.data)
+    ? requestBodyData.data
+    : requestBodyData?.data
+      ? [requestBodyData.data]
+      : [];
+  if (dataItems.length === 0) return null;
+
+  const label = CUSTOM_FIELD_RESOURCE_LABELS[spec.resourceType] ?? spec.resourceType;
+
+  if (spec.mode === 'create') {
+    const projectId = readArg(validatedArgs, 'projectId', nameMap);
+    if (typeof projectId !== 'string') return null;
+    const targets: CustomFieldKeyCheckTarget[] = [];
+    for (const item of dataItems) {
+      const attributes = (item as any)?.attributes;
+      if (!attributes || typeof attributes !== 'object') continue;
+      const type = spec.typed && typeof attributes.type === 'string' ? attributes.type : undefined;
+      targets.push({
+        resourceType: spec.resourceType,
+        projectId,
+        type,
+        attributes,
+        scopeLabel: type ? `a new '${type}' ${label} in ${projectId}` : `a new ${label} in ${projectId}`,
+      });
+    }
+    return targets.length > 0 ? targets : null;
+  }
+
+  if (spec.mode === 'update-single') {
+    const attributes = (dataItems[0] as any)?.attributes;
+    if (!attributes || typeof attributes !== 'object') return null;
+    return [{
+      resourceType: spec.resourceType,
+      attributes,
+      instancePath: urlPath,
+      scopeLabel: `${label} '${urlPath}'`,
+    }];
+  }
+
+  // update-bulk: resolve each item's own instance path from its composite id.
+  // Work Items get the same "PROJECT/WORKITEMID (or bare id, falling back to
+  // the tool's own projectId)" handling as the enum guard (splitWorkItemId),
+  // so the two guards agree on which items are resolvable instead of one
+  // silently covering an item the other doesn't. An id that still can't be
+  // resolved sets `unresolvedReason` instead of being skipped -- the target
+  // is still built (unless attributes itself is unusable), so the guard
+  // fails closed rather than silently omitting that item's validation.
+  const bulkFallbackProjectId = spec.resourceType === 'workitems' ? readArg(validatedArgs, 'projectId', nameMap) : undefined;
+  const targets: CustomFieldKeyCheckTarget[] = [];
+  for (const item of dataItems) {
+    const id = (item as any)?.id;
+    const attributes = (item as any)?.attributes;
+    if (typeof id !== 'string' || !attributes || typeof attributes !== 'object') continue;
+
+    let instancePath: string | undefined;
+    if (spec.resourceType === 'workitems') {
+      const split = splitWorkItemId(id, typeof bulkFallbackProjectId === 'string' ? bulkFallbackProjectId : undefined);
+      if (split) instancePath = `/projects/${encodeURIComponent(split.projectId)}/workitems/${encodeURIComponent(split.workItemId)}`;
+    } else {
+      const segments = id.split('/');
+      if (segments.length === spec.bulkIdSegments) instancePath = spec.bulkInstancePath!(segments);
+    }
+
+    targets.push({
+      resourceType: spec.resourceType,
+      attributes,
+      instancePath,
+      unresolvedReason: instancePath
+        ? undefined
+        : `Cannot resolve ${label} '${id}' to validate its custom field keys -- unexpected id format. Refusing the write rather than silently skipping validation for this item.`,
+      scopeLabel: `${label} '${id}'`,
+    });
+  }
+  return targets.length > 0 ? targets : null;
 }
 
 /**
@@ -585,21 +754,39 @@ export async function executeApiTool(
     }
 
     // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
-    // Covers patchWorkItem (single existing item), postWorkItems (bulk create),
-    // and patchWorkItems/patchAllWorkItems (bulk update): enum fields, custom
-    // field keys (create only), and user references (assignee/votes/watches).
+    // Three independent checks, in this order (first failure blocks the write):
+    // 1. Enum fields -- Work Item write tools only (patchWorkItem, postWorkItems,
+    //    patchWorkItems, patchAllWorkItems).
+    // 2. Custom field keys -- every custom-field-capable resource type's create
+    //    AND update tools (Work Items, Documents, Plans, Collections, Test Runs,
+    //    Test Records).
+    // 3. User references (assignee/votes/watches) -- Work Item write tools only.
     // See guards.ts for exactly what's validated and what's an explicit,
-    // documented follow-up (categories, module/linkedRevisions existence,
-    // non-Work-Item resources).
+    // documented follow-up (categories, module/linkedRevisions existence).
+    const guardRequestContext = { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() };
+
     const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
     if (enumTargets) {
-      const guardResult = await runWorkItemGuards(
-        enumTargets,
-        { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() },
-        sendOpts
-      );
-      if (!guardResult.ok) {
-        return { content: [{ type: 'text', text: `Write refused: ${guardResult.reason}` }] };
+      const enumResult = await checkWorkItemsEnumFields(enumTargets, guardRequestContext, sendOpts);
+      if (!enumResult.ok) {
+        return { content: [{ type: 'text', text: `Write refused: ${enumResult.reason}` }] };
+      }
+    }
+
+    const customFieldKeyTargets = buildCustomFieldKeyTargets(definition, validatedArgs, nameMap, requestBodyData, urlPath);
+    if (customFieldKeyTargets) {
+      for (const target of customFieldKeyTargets) {
+        const fieldKeyResult = await checkResourceCustomFieldKeys(target, guardRequestContext, sendOpts);
+        if (!fieldKeyResult.ok) {
+          return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }] };
+        }
+      }
+    }
+
+    if (enumTargets) {
+      const userResult = await runWorkItemUserReferenceGuard(enumTargets, guardRequestContext, sendOpts);
+      if (!userResult.ok) {
+        return { content: [{ type: 'text', text: `Write refused: ${userResult.reason}` }] };
       }
     }
 

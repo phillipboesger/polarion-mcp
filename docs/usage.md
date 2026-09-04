@@ -112,15 +112,26 @@ value could otherwise persist as a silent "ghost", invisible in the UI.
 
 Two further checks run after the enum check, same fail-closed principle:
 
-- **Custom field keys** — on `postWorkItems` (create) only, every `attributes`
-  key that isn't a standard Work Item field is checked against
-  `getProjectFieldsMetadata` for the item's type, catching a typo'd custom
-  field id before it silently persists as an unknown key. Not covered on
-  update tools (`patchWorkItem` et al.), since resolving an existing item's
-  type would need an extra round-trip this doesn't perform.
+- **Custom field keys** — covers every custom-field-capable resource type
+  (Work Items, Documents, Plans, Collections, Test Runs, Test Records), on
+  BOTH create and update. Any `attributes` key that isn't a standard field
+  for that resource is checked against Polarion's `getFieldsMetadata`
+  action, catching a typo'd custom field id before it silently persists as
+  an unknown key (Polarion's own REST API accepts and echoes back an
+  unregistered attribute key with no error — it just isn't a real,
+  registered field, so it won't survive reindexing/export/search). Create
+  uses the project- and type-scoped lookup (by the new item's
+  `attributes.type`, or type-less for Plans/Collections/Test Records, which
+  have no subtype concept); update uses the *instance*-scoped lookup
+  against the existing item's own resolved path, which needs no type at
+  all — that's what makes update coverage possible without an extra
+  "fetch the item first to learn its type" round-trip. Bulk update tools
+  (`patchWorkItems`, `patchAllWorkItems`, `patchTestRuns`,
+  `patchTestRecords`) resolve each item's own instance path from its
+  composite id in the request body.
 - **User references** — every user id in `relationships.assignee`/`votes`/
-  `watches`, across all 4 covered tools, is checked to actually exist via
-  `getUser`. A confirmed-missing user (404) is reported specifically; an
+  `watches`, across the 4 Work Item write tools, is checked to actually exist
+  via `getUser`. A confirmed-missing user (404) is reported specifically; an
   unresolvable lookup (network/auth error) fails closed like everything else.
 
 **Not yet covered** (contributions welcome):
@@ -128,9 +139,9 @@ Two further checks run after the enum check, same fail-closed principle:
   endpoint to check existence against.
 - `module` (the owning Document) and `linkedRevisions` — checkable in
   principle, not built out yet.
-- Custom field *values* (only *keys* are checked), and custom field keys on
-  update tools.
-- Any resource other than Work Items (Documents, Test Runs, Plans, ...).
+- Custom field *values* (only *keys* are checked).
+- User references (`assignee`/`votes`/`watches`) are Work Item-specific; not
+  extended to other resource types' relationships.
 
 ## Rich Text as Markdown
 

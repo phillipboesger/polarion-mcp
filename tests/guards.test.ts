@@ -5,13 +5,14 @@ import type { AxiosRequestConfig, AxiosResponse } from "axios"
 import {
   checkWorkItemEnumFields,
   checkWorkItemsEnumFields,
-  checkWorkItemCustomFieldKeys,
+  checkResourceCustomFieldKeys,
   checkWorkItemUserReferences,
   splitWorkItemId,
   _optionsCache,
   _fieldKeyCache,
   _userExistsCache,
 } from "../src/guards.js"
+import type { CustomFieldKeyCheckTarget } from "../src/guards.js"
 
 const requestContext = { baseUrl: "https://polarion.example.com/polarion/rest/v1", headers: {}, rejectUnauthorized: true }
 const sendOpts = { minIntervalMs: 0, initialBackoffMs: 0, postMutationDelayMs: 0 }
@@ -144,7 +145,7 @@ test("checkWorkItemsEnumFields with an empty target list is a no-op success", as
 })
 
 // ---------------------------------------------------------------------------
-// checkWorkItemCustomFieldKeys
+// checkResourceCustomFieldKeys
 // ---------------------------------------------------------------------------
 
 // Real shape (confirmed live against a stock Polarion 2606 instance):
@@ -155,29 +156,34 @@ function fieldsMetadataResponse(ids: string[]): AxiosResponse {
   return { data: { data: { attributes } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
 }
 
-test("checkWorkItemCustomFieldKeys skips validation when every attribute key is standard", async () => {
+/** A create-mode (project- and type-scoped) Work Item target, for terseness across tests. */
+function wiCreateTarget(attributes: Record<string, unknown>, type = "task"): CustomFieldKeyCheckTarget {
+  return { resourceType: "workitems", projectId: "PROJ", type, attributes, scopeLabel: `a new '${type}' Work Item in PROJ` }
+}
+
+test("checkResourceCustomFieldKeys skips validation when every attribute key is standard", async () => {
   const httpClient = async (): Promise<AxiosResponse> => {
     throw new Error("should not be called -- no custom keys present")
   }
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { title: "hi", status: "open" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ title: "hi", status: "open" }), requestContext, { ...sendOpts, httpClient })
   assert.deepEqual(result, { ok: true })
 })
 
-test("checkWorkItemCustomFieldKeys accepts a custom key present in the fetched metadata", async () => {
+test("checkResourceCustomFieldKeys accepts a custom key present in the fetched metadata (create, type-scoped lookup)", async () => {
   _fieldKeyCache.clear()
   const httpClient = async (config: AxiosRequestConfig) => {
     assert.equal((config.params as any)?.resourceType, "workitems")
     assert.equal((config.params as any)?.targetType, "task")
     return fieldsMetadataResponse(["myCustomField", "anotherField"])
   }
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { title: "hi", myCustomField: "value" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ title: "hi", myCustomField: "value" }), requestContext, { ...sendOpts, httpClient })
   assert.deepEqual(result, { ok: true })
 })
 
-test("checkWorkItemCustomFieldKeys rejects an unknown custom key, listing the known ones", async () => {
+test("checkResourceCustomFieldKeys rejects an unknown custom key, listing the known ones", async () => {
   _fieldKeyCache.clear()
   const httpClient = async (): Promise<AxiosResponse> => fieldsMetadataResponse(["realField"])
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { bogusField: "x" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ bogusField: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
   if (!result.ok) {
     assert.match(result.reason, /Unknown field key\(s\) bogusField/)
@@ -185,7 +191,7 @@ test("checkWorkItemCustomFieldKeys rejects an unknown custom key, listing the kn
   }
 })
 
-test("checkWorkItemCustomFieldKeys's rejection message lists only real custom fields, not OOTB ones like title/status", async () => {
+test("checkResourceCustomFieldKeys's rejection message lists only real custom fields, not OOTB ones like title/status", async () => {
   _fieldKeyCache.clear()
   const liveResponseData = {
     data: {
@@ -199,7 +205,7 @@ test("checkWorkItemCustomFieldKeys's rejection message lists only real custom fi
   }
   const httpClient = async (): Promise<AxiosResponse> =>
     ({ data: liveResponseData, status: 200, statusText: "OK", headers: {}, config: {} as any })
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { bogusField: "x" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ bogusField: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
   if (!result.ok) {
     assert.match(result.reason, /Known custom fields: myCustomField/)
@@ -208,52 +214,52 @@ test("checkWorkItemCustomFieldKeys's rejection message lists only real custom fi
   }
 })
 
-test("checkWorkItemCustomFieldKeys fails closed when the metadata lookup errors", async () => {
+test("checkResourceCustomFieldKeys fails closed when the metadata lookup errors", async () => {
   _fieldKeyCache.clear()
   const httpClient = async (): Promise<AxiosResponse> => {
     throw new Error("network unreachable")
   }
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { customKey: "x" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
   if (!result.ok) assert.match(result.reason, /network unreachable/)
 })
 
-test("checkWorkItemCustomFieldKeys fails closed when the metadata response is empty (can't verify anything)", async () => {
+test("checkResourceCustomFieldKeys fails closed when the metadata response is empty (can't verify anything)", async () => {
   _fieldKeyCache.clear()
   const httpClient = async (): Promise<AxiosResponse> => fieldsMetadataResponse([])
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { customKey: "x" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
 })
 
-test("checkWorkItemCustomFieldKeys fails closed on the OLD, wrong getAvailableOptions-style list shape ({data:[{id}]}), not just the real object shape", async () => {
+test("checkResourceCustomFieldKeys fails closed on the OLD, wrong getAvailableOptions-style list shape ({data:[{id}]}), not just the real object shape", async () => {
   _fieldKeyCache.clear()
   const httpClient = async (): Promise<AxiosResponse> =>
     ({ data: { data: [{ id: "realField" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { customKey: "x" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false, "the list shape must not be silently accepted as if it were the real object-map shape")
 })
 
-test("checkWorkItemCustomFieldKeys fails closed when attributes is missing or null in the response", async () => {
+test("checkResourceCustomFieldKeys fails closed when attributes is missing or null in the response", async () => {
   _fieldKeyCache.clear()
   const httpClient = async (): Promise<AxiosResponse> =>
     ({ data: { data: { attributes: null } }, status: 200, statusText: "OK", headers: {}, config: {} as any })
-  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { customKey: "x" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
 })
 
-test("checkWorkItemCustomFieldKeys caches the field list per (project, type)", async () => {
+test("checkResourceCustomFieldKeys caches the field list per (project, resourceType, type)", async () => {
   _fieldKeyCache.clear()
   let calls = 0
   const httpClient = async (): Promise<AxiosResponse> => {
     calls++
     return fieldsMetadataResponse(["fieldA"])
   }
-  await checkWorkItemCustomFieldKeys("PROJ", "task", { fieldA: "1" }, requestContext, { ...sendOpts, httpClient })
-  await checkWorkItemCustomFieldKeys("PROJ", "task", { fieldA: "2" }, requestContext, { ...sendOpts, httpClient })
-  assert.equal(calls, 1, "second call for the same (project, type) should reuse the cache")
+  await checkResourceCustomFieldKeys(wiCreateTarget({ fieldA: "1" }), requestContext, { ...sendOpts, httpClient })
+  await checkResourceCustomFieldKeys(wiCreateTarget({ fieldA: "2" }), requestContext, { ...sendOpts, httpClient })
+  assert.equal(calls, 1, "second call for the same (project, resourceType, type) should reuse the cache")
 })
 
-test("checkWorkItemCustomFieldKeys accepts a real registered custom field against the ACTUAL live Polarion getFieldsMetadata response shape", async () => {
+test("checkResourceCustomFieldKeys accepts a real registered custom field against the ACTUAL live Polarion getFieldsMetadata response shape (Work Item create)", async () => {
   // Captured live from a stock Polarion 2606 instance -- an object keyed by
   // field id under `attributes`, not a JSON:API {data:[{id}]} list. Before
   // the extractFieldIds fix, this exact response made the guard treat every
@@ -276,7 +282,98 @@ test("checkWorkItemCustomFieldKeys accepts a real registered custom field agains
   const httpClient = async (): Promise<AxiosResponse> =>
     ({ data: liveResponseData, status: 200, statusText: "OK", headers: {}, config: {} as any })
 
-  const result = await checkWorkItemCustomFieldKeys("drivepilot", "task", { title: "hi", myCustomField: "value" }, requestContext, { ...sendOpts, httpClient })
+  const result = await checkResourceCustomFieldKeys(
+    { resourceType: "workitems", projectId: "drivepilot", type: "task", attributes: { title: "hi", myCustomField: "value" }, scopeLabel: "a new 'task' Work Item in drivepilot" },
+    requestContext,
+    { ...sendOpts, httpClient }
+  )
+  assert.deepEqual(result, { ok: true })
+})
+
+// -- update (instance-scoped) lookup mode: this is the new coverage this session added. --
+
+test("checkResourceCustomFieldKeys accepts a custom key on UPDATE via the instance-scoped lookup (no type needed at all)", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    assert.equal(String(config.url), "https://polarion.example.com/polarion/rest/v1/projects/PROJ/workitems/PROJ-1/actions/getFieldsMetadata")
+    assert.equal(config.params, undefined, "instance-scoped lookup needs no resourceType/targetType params")
+    return fieldsMetadataResponse(["myCustomField"])
+  }
+  const target: CustomFieldKeyCheckTarget = {
+    resourceType: "workitems",
+    instancePath: "/projects/PROJ/workitems/PROJ-1",
+    attributes: { title: "hi", myCustomField: "value" },
+    scopeLabel: "Work Item '/projects/PROJ/workitems/PROJ-1'",
+  }
+  const result = await checkResourceCustomFieldKeys(target, requestContext, { ...sendOpts, httpClient })
+  assert.deepEqual(result, { ok: true })
+})
+
+test("checkResourceCustomFieldKeys rejects an unknown key on UPDATE via the instance-scoped lookup", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (): Promise<AxiosResponse> => fieldsMetadataResponse(["realField"])
+  const target: CustomFieldKeyCheckTarget = {
+    resourceType: "workitems",
+    instancePath: "/projects/PROJ/workitems/PROJ-1",
+    attributes: { bogusField: "x" },
+    scopeLabel: "Work Item '/projects/PROJ/workitems/PROJ-1'",
+  }
+  const result = await checkResourceCustomFieldKeys(target, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.match(result.reason, /Unknown field key\(s\) bogusField/)
+})
+
+// -- non-Work-Item resource types: this session's extension. Cover one typed resource
+// (Document, has an attributes.type concept) and one typeless one (Plan, no type at all). --
+
+test("checkResourceCustomFieldKeys works for a Document create (typed resource, project- and type-scoped)", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    assert.equal((config.params as any)?.resourceType, "documents")
+    assert.equal((config.params as any)?.targetType, "generic")
+    return fieldsMetadataResponse(["docCustomField"])
+  }
+  const target: CustomFieldKeyCheckTarget = {
+    resourceType: "documents",
+    projectId: "PROJ",
+    type: "generic",
+    attributes: { title: "hi", docCustomField: "value" },
+    scopeLabel: "a new 'generic' Document in PROJ",
+  }
+  const result = await checkResourceCustomFieldKeys(target, requestContext, { ...sendOpts, httpClient })
+  assert.deepEqual(result, { ok: true })
+})
+
+test("checkResourceCustomFieldKeys works for a Plan create (typeless resource -- targetType omitted as '~')", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    assert.equal((config.params as any)?.resourceType, "plans")
+    assert.equal((config.params as any)?.targetType, "~", "a typeless resource's create lookup still needs a targetType param -- '~' means none")
+    return fieldsMetadataResponse(["planCustomField"])
+  }
+  const target: CustomFieldKeyCheckTarget = {
+    resourceType: "plans",
+    projectId: "PROJ",
+    attributes: { name: "hi", planCustomField: "value" },
+    scopeLabel: "a new Plan in PROJ",
+  }
+  const result = await checkResourceCustomFieldKeys(target, requestContext, { ...sendOpts, httpClient })
+  assert.deepEqual(result, { ok: true })
+})
+
+test("checkResourceCustomFieldKeys works for a Plan UPDATE (typeless resource, instance-scoped -- same mechanism as Work Item update)", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    assert.equal(String(config.url), "https://polarion.example.com/polarion/rest/v1/projects/PROJ/plans/MyPlan/actions/getFieldsMetadata")
+    return fieldsMetadataResponse(["planCustomField"])
+  }
+  const target: CustomFieldKeyCheckTarget = {
+    resourceType: "plans",
+    instancePath: "/projects/PROJ/plans/MyPlan",
+    attributes: { name: "hi", planCustomField: "value" },
+    scopeLabel: "Plan '/projects/PROJ/plans/MyPlan'",
+  }
+  const result = await checkResourceCustomFieldKeys(target, requestContext, { ...sendOpts, httpClient })
   assert.deepEqual(result, { ok: true })
 })
 

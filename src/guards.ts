@@ -10,16 +10,22 @@
  *    REST API User Guide's worked examples: instance-scoped for existing
  *    items (`patchWorkItem`, `patchWorkItems`, `patchAllWorkItems`), or
  *    type-scoped for not-yet-existing items (`postWorkItems`).
- * 2. **Custom field keys** (`checkWorkItemCustomFieldKeys`) -- any
- *    `attributes` key that isn't a standard Work Item field against
- *    `getProjectFieldsMetadata`. Scoped to `postWorkItems` (create) only --
- *    see that function's doc for why updates aren't covered. The response
- *    shape is confirmed live against a stock Polarion 2606 instance: a
- *    single object keyed by field id (`{data: {attributes: {fieldId:
- *    {...}}}}`), NOT the `{data: [{id, ...}]}` JSON:API list shape
- *    `getAvailableOptions` uses -- Polarion's own "actions" endpoints don't
- *    share one response convention. Fails closed (empty result set) if a
- *    lookup can't be completed at all, rather than silently passing
+ * 2. **Custom field keys** (`checkResourceCustomFieldKeys`) -- any
+ *    `attributes` key that isn't a standard field against Polarion's
+ *    `getFieldsMetadata` action. Covers every custom-field-capable resource
+ *    type (Work Items, Documents, Plans, Collections, Test Runs, Test
+ *    Records), on BOTH create and update: create uses the project- and
+ *    type-scoped lookup (`getProjectFieldsMetadata`); update uses the
+ *    instance-scoped lookup (`getFieldsMetadataFor<Type>`, e.g.
+ *    `getFieldsMetadataForWorkItem`) against the item's own resolved path,
+ *    which needs no type at all -- this is what makes update coverage
+ *    possible without first fetching the item to learn its type. The
+ *    response shape is confirmed live against a stock Polarion 2606
+ *    instance: a single object keyed by field id (`{data: {attributes:
+ *    {fieldId: {...}}}}`), NOT the `{data: [{id, ...}]}` JSON:API list
+ *    shape `getAvailableOptions` uses -- Polarion's own "actions" endpoints
+ *    don't share one response convention. Fails closed (empty result set)
+ *    if a lookup can't be completed at all, rather than silently passing
  *    everything through.
  * 3. **User references** (`checkWorkItemUserReferences`) -- every user id
  *    in `relationships.assignee`/`votes`/`watches` against `getUser`,
@@ -33,9 +39,7 @@
  * - `module` (the owning Document) and `linkedRevisions` -- existence is
  *   checkable in principle (`getDocument`/`getRevision` both exist), but
  *   their JSON:API ids need extra parsing this pass didn't build out.
- * - Custom field *values* (only *keys* are checked) and custom field keys
- *   on update tools (`patchWorkItem` et al.).
- * - Any resource other than Work Items (Documents, Test Runs, Plans, ...).
+ * - Custom field *values* (only *keys* are checked).
  *
  * Fail-closed: if a check itself can't be completed (network error, auth
  * failure, unexpected response shape), the write is refused rather than
@@ -206,14 +210,39 @@ export async function checkWorkItemsEnumFields(
 }
 
 // ===========================================================================
-// Custom field key validation (postWorkItems / create only)
+// Custom field key validation (all custom-field-capable resource types,
+// create AND update)
 // ===========================================================================
 
-/** Attribute keys `openapi-mcp-generator` puts in every Work Item's `attributes` schema -- anything else is a custom field. */
-const STANDARD_WORK_ITEM_ATTRIBUTE_KEYS = new Set([
-  'type', 'title', 'status', 'severity', 'priority', 'resolution', 'description',
-  'dueDate', 'hyperlinks', 'initialEstimate', 'remainingEstimate', 'resolvedOn', 'timeSpent',
-]);
+/**
+ * Attribute keys `openapi-mcp-generator` puts in every generated tool schema
+ * for a resource type (union of its create + update tool schemas) -- any
+ * other `attributes` key is a candidate custom field. Extracted
+ * programmatically from `src/tools.ts`'s generated `inputSchema`s
+ * (2026-09-04), not hand-maintained by eye.
+ */
+const STANDARD_ATTRIBUTE_KEYS: Record<string, Set<string>> = {
+  workitems: new Set([
+    'type', 'title', 'status', 'severity', 'priority', 'resolution', 'description',
+    'dueDate', 'hyperlinks', 'initialEstimate', 'remainingEstimate', 'resolvedOn', 'timeSpent',
+  ]),
+  documents: new Set([
+    'autoSuspect', 'homePageContent', 'moduleName', 'outlineNumbering', 'renderingLayouts',
+    'status', 'structureLinkRole', 'title', 'type', 'usesOutlineNumbering',
+  ]),
+  plans: new Set([
+    'allowedTypes', 'calculationType', 'capacity', 'color', 'defaultEstimate', 'description',
+    'dueDate', 'estimationField', 'finishedOn', 'homePageContent', 'id', 'isTemplate', 'name',
+    'previousTimeSpent', 'prioritizationField', 'sortOrder', 'startDate', 'startedOn', 'status',
+    'useReportFromTemplate',
+  ]),
+  collections: new Set(['description', 'id', 'name']),
+  testruns: new Set([
+    'finishedOn', 'groupId', 'homePageContent', 'id', 'idPrefix', 'isTemplate', 'keepInHistory',
+    'query', 'selectTestCasesBy', 'status', 'title', 'type', 'useReportFromTemplate',
+  ]),
+  testrecords: new Set(['comment', 'duration', 'executed', 'result', 'testCaseRevision']),
+};
 
 interface FieldKeyCacheEntry {
   keys: Set<string>;
@@ -244,42 +273,88 @@ function extractFieldIds(responseData: unknown): string[] {
 }
 
 /**
- * Validates that every non-standard key in `attributes` (i.e. every
- * candidate custom field) is a real field for `type` in `projectId`, per
- * `getProjectFieldsMetadata` (`resourceType=workitems&targetType={type}`).
- * Scoped to Work Item *creation* only (`postWorkItems`) -- an *update*
- * (`patchWorkItem` et al.) doesn't reliably know the item's type without an
- * extra round-trip to fetch it first, which isn't done here; see
- * docs/usage.md for this as an explicit, documented scope boundary.
+ * One resource instance (update) or prospective instance (create) to
+ * validate custom field keys for. Exactly one of `instancePath` (update) or
+ * `projectId` (create) must be set -- see {@link checkResourceCustomFieldKeys}.
+ */
+export interface CustomFieldKeyCheckTarget {
+  /** Polarion's own `resourceType` id for `getFieldsMetadata` -- a key of {@link STANDARD_ATTRIBUTE_KEYS}. */
+  resourceType: string;
+  attributes: Record<string, unknown>;
+  /** Human-readable label for error messages, e.g. "Document 'p/_default/MyDoc'" or "a new 'task' Work Item in p". */
+  scopeLabel: string;
+  /** Create only: the target project. Resolves fields via the project- and type-scoped lookup. */
+  projectId?: string;
+  /** Create only: the item's subtype, if its resource type has one (Work Item/Document/Test Run). Omit for a typeless resource (Plan/Collection/Test Record) -- the lookup then covers the type-less field set. */
+  type?: string;
+  /** Update only: the already-resolved REST path to the existing instance (e.g. `/projects/p/workitems/WI-1`). Resolves fields via the instance-scoped lookup, so an update never needs to learn the item's type first. */
+  instancePath?: string;
+  /**
+   * Set instead of `instancePath`/`projectId` when the target's identity
+   * couldn't be resolved at all (e.g. a bulk-update item whose composite
+   * `id` doesn't match the expected format) -- refuses the write
+   * immediately with this reason, without attempting a lookup, rather than
+   * silently skipping validation for that item.
+   */
+  unresolvedReason?: string;
+}
+
+/**
+ * Validates that every non-standard key in a target's `attributes` (i.e.
+ * every candidate custom field) is a real field for that resource, per
+ * Polarion's `getFieldsMetadata` action -- project- and type-scoped for a
+ * create (`target.projectId`/`target.type`), instance-scoped for an update
+ * (`target.instancePath`). The instance-scoped lookup only needs the
+ * item's own id, not its type, which is what lets update coverage exist at
+ * all without an extra "fetch the item first to learn its type" round-trip.
  *
  * Fail-closed: an unresolvable metadata lookup refuses the write, same as
  * the enum guard.
  */
-export async function checkWorkItemCustomFieldKeys(
-  projectId: string,
-  type: string,
-  attributes: Record<string, unknown>,
+export async function checkResourceCustomFieldKeys(
+  target: CustomFieldKeyCheckTarget,
   requestContext: EnumGuardRequestContext,
   sendOpts: SendWithRetryOpts = {},
   cacheTtlMs = DEFAULT_CACHE_TTL_MS
 ): Promise<EnumGuardResult> {
-  const candidateKeys = Object.keys(attributes).filter((k) => !STANDARD_WORK_ITEM_ATTRIBUTE_KEYS.has(k));
+  const standardKeys = STANDARD_ATTRIBUTE_KEYS[target.resourceType];
+  if (!standardKeys) {
+    // Only reachable if a caller passes a resourceType outside the fixed,
+    // internally-controlled set in STANDARD_ATTRIBUTE_KEYS -- fail loud
+    // rather than silently treating every attribute as a candidate custom
+    // field (or worse, none).
+    return { ok: false, reason: `Internal error: unknown resourceType '${target.resourceType}' for ${target.scopeLabel}.` };
+  }
+  const candidateKeys = Object.keys(target.attributes).filter((k) => !standardKeys.has(k));
   if (candidateKeys.length === 0) return { ok: true };
 
-  const cacheKey = `${requestContext.baseUrl}::${projectId}::fields::workitems::${type}`;
+  if (target.unresolvedReason) {
+    return { ok: false, reason: target.unresolvedReason };
+  }
+
+  const cacheKey = target.instancePath
+    ? `${requestContext.baseUrl}::instance::${target.instancePath}`
+    : `${requestContext.baseUrl}::${target.projectId}::fields::${target.resourceType}::${target.type ?? '~'}`;
   const cached = _fieldKeyCache.get(cacheKey);
   let fieldIds: Set<string>;
 
   if (cached && cached.expiresAt > Date.now()) {
     fieldIds = cached.keys;
   } else {
-    const config: AxiosRequestConfig = {
-      method: 'GET',
-      url: `${requestContext.baseUrl}/projects/${encodeURIComponent(projectId)}/actions/getFieldsMetadata`,
-      params: { resourceType: 'workitems', targetType: type },
-      headers: requestContext.headers,
-      httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
-    };
+    const config: AxiosRequestConfig = target.instancePath
+      ? {
+          method: 'GET',
+          url: `${requestContext.baseUrl}${target.instancePath}/actions/getFieldsMetadata`,
+          headers: requestContext.headers,
+          httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+        }
+      : {
+          method: 'GET',
+          url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId!)}/actions/getFieldsMetadata`,
+          params: { resourceType: target.resourceType, targetType: target.type ?? '~' },
+          headers: requestContext.headers,
+          httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+        };
     try {
       const response = await sendWithRetry(config, sendOpts);
       fieldIds = new Set(extractFieldIds(response.data));
@@ -287,7 +362,7 @@ export async function checkWorkItemCustomFieldKeys(
         return {
           ok: false,
           reason:
-            `Cannot verify custom field keys (${candidateKeys.join(', ')}) for a new '${type}' Work Item in ${projectId}: ` +
+            `Cannot verify custom field keys (${candidateKeys.join(', ')}) for ${target.scopeLabel}: ` +
             `the field metadata lookup returned no fields. Refusing the write -- an unknown key persists silently, ` +
             `invisible to the UI. Ask the user to confirm these field ids exist for this type.`,
         };
@@ -298,7 +373,7 @@ export async function checkWorkItemCustomFieldKeys(
       return {
         ok: false,
         reason:
-          `Cannot validate custom field keys for a new '${type}' Work Item in ${projectId}: ${detail}. ` +
+          `Cannot validate custom field keys for ${target.scopeLabel}: ${detail}. ` +
           `Refusing the write -- an unknown key persists silently, invisible to the UI. ` +
           `Retry once Polarion is reachable.`,
       };
@@ -310,11 +385,11 @@ export async function checkWorkItemCustomFieldKeys(
     // fieldIds includes every field getFieldsMetadata returns -- OOTB fields
     // (title, status, ...) as well as custom ones -- so filter back down to
     // non-standard keys before presenting them as "custom fields".
-    const knownCustomFields = [...fieldIds].filter((k) => !STANDARD_WORK_ITEM_ATTRIBUTE_KEYS.has(k));
+    const knownCustomFields = [...fieldIds].filter((k) => !standardKeys.has(k));
     return {
       ok: false,
       reason:
-        `Unknown field key(s) ${unknownKeys.join(', ')} for a new '${type}' Work Item in ${projectId}. ` +
+        `Unknown field key(s) ${unknownKeys.join(', ')} for ${target.scopeLabel}. ` +
         `Known custom fields: ${knownCustomFields.join(', ') || '(none)'}.`,
     };
   }
