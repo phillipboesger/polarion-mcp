@@ -143,6 +143,30 @@ value read back from a response and echoed into a later write is exactly
 what Polarion sent — `value_markdown` is purely an additional, easier-to-read
 view.
 
+## Embedding an Attachment Inline in Rich Text
+
+To make an uploaded attachment appear inline as an image inside a Work Item's
+`description` or a comment's `text` (not just as a linked attachment at the
+bottom), reference it with Polarion's internal `workitemimg:` scheme rather
+than a plain URL:
+
+1. Upload the image via `postWorkItemAttachments`. The response's `data[].id`
+   is a composite like `"myproject/MYPROJ-1/1-screenshot.png"`.
+2. Take the **last path segment** of that id — `1-screenshot.png` — as the
+   `<attachment-basename>`.
+3. Write `<img src="workitemimg:<attachment-basename>" width="..."
+   height="..."/>` into the `description`/comment `text` HTML via
+   `patchWorkItem`/`postComments` (`type: "text/html"`).
+
+Polarion's renderer resolves this into a working, session-authenticated URL
+on load. Live-verified rendering correctly in both a Work Item description
+and a comment.
+
+Do **not** reference the attachment's own REST content URL
+(`.../attachments/{id}/content`) as the `<img src>` — that endpoint requires
+Bearer auth, which a plain `<img>` tag cannot send, so it never loads for
+someone viewing the item in the normal web UI.
+
 ## Not Yet Covered
 
 Two items from the comparison against a similar Polarion MCP server remain
