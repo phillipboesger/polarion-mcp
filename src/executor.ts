@@ -148,13 +148,44 @@ async function runWorkItemGuards(
  * 'parameters'"). This parses that JSON and maps its top-level keys onto real
  * multipart fields using the field names Polarion's spec actually uses (verified
  * against the official OpenAPI spec's per-operation `multipart/form-data` schemas):
- * - "resource"/"parameters": JSON object metadata -> a JSON part.
+ * - "resource": JSON object metadata -> a JSON-stringified part, deliberately
+ *   sent WITHOUT an explicit Content-Type -- Polarion's server-side
+ *   `ResourceContentProcessor` (the handler behind `postWorkItemAttachments` and
+ *   every other `post*Attachments`/`postGlobalIcons`/`postProjectIcons` bulk-create
+ *   tool, plus every `patch*Attachment` replace-content tool, all of which use a
+ *   "resource" part) reads it via Jersey's `FormDataBodyPart.getValue()`, which
+ *   throws `IllegalStateException: Media type is not text/plain.` for any part
+ *   whose Content-Type isn't `text/plain` -- confirmed live against a stock
+ *   Polarion 2606 instance (server log: `ResourceContentProcessor.lambda$0` ->
+ *   `FormDataBodyPart.getValue()`; live-retested the same request with the
+ *   Content-Type omitted and got a real `201 Created`). Leaving the
+ *   `contentType` option unset makes the `form-data` package omit the
+ *   Content-Type header on that part entirely (not send `text/plain`
+ *   explicitly); per RFC 2046 §5.1 (and Jersey's own `BodyPart` default), a
+ *   part with no Content-Type is treated as `text/plain` by the receiver,
+ *   which is what `getValue()` requires. NOT independently confirmed for
+ *   `importExcelTestResults` (also uses a "resource" part, but on a different
+ *   controller family -- test runs, not attachments) -- grouped here rather
+ *   than kept a special case since it shares the exact same field name and
+ *   JSON-metadata shape as every attachment/icon tool above.
+ * - "parameters": JSON object metadata for `importWordDocument` only -- kept
+ *   with an explicit `application/json` Content-Type (unchanged from before
+ *   this fix). Deliberately NOT merged with "resource" above: it's read by a
+ *   different controller (document import, not `ResourceContentProcessor`)
+ *   that could plausibly bind it as a typed DTO via a JSON `MessageBodyReader`
+ *   rather than `getValue()`, which would need `application/json` to resolve
+ *   -- i.e. the opposite fix. Not live-tested either way; left as-is rather
+ *   than guessed at.
  * - "files": an array of base64-encoded file contents -> one binary part per entry
  *   (all `post*Attachments`/`postGlobalIcons`/`postProjectIcons` bulk-create tools).
  * - "file"/"content": a single base64-encoded file content -> one binary part
  *   ("file" for `importWordDocument`/`importExcelTestResults`; "content" for every
  *   `patch*Attachment` replace-content tool and `updateAvatar`).
- * - anything else: strings pass through as plain fields, objects/arrays as JSON parts.
+ * - anything else: strings pass through as plain fields; objects/arrays as
+ *   JSON-stringified parts with an explicit `application/json` Content-Type
+ *   (kept as before -- no currently-known multipart tool's field-name shape
+ *   reaches this branch, so it's left unverified/unchanged rather than
+ *   guessed at).
  */
 function buildMultipartFormData(requestBody: unknown): FormData {
   let parsed: unknown = requestBody;
@@ -176,7 +207,9 @@ function buildMultipartFormData(requestBody: unknown): FormData {
   for (const [key, value] of Object.entries(parsed as JsonObject)) {
     if (value === undefined || value === null) continue;
 
-    if ((key === 'resource' || key === 'parameters') && typeof value === 'object') {
+    if (key === 'resource' && typeof value === 'object') {
+      form.append(key, JSON.stringify(value));
+    } else if (key === 'parameters' && typeof value === 'object') {
       form.append(key, JSON.stringify(value), { contentType: 'application/json' });
     } else if (key === 'files' && Array.isArray(value)) {
       value.forEach((item, index) => {
@@ -190,6 +223,9 @@ function buildMultipartFormData(requestBody: unknown): FormData {
     } else if (typeof value === 'string') {
       form.append(key, value);
     } else {
+      // No currently-known multipart tool hits this branch (see the field-name
+      // list above) -- kept conservative/unchanged (explicit JSON content-type)
+      // since it's unverified, unlike "resource"/"parameters" below.
       form.append(key, JSON.stringify(value), { contentType: 'application/json' });
     }
   }

@@ -696,7 +696,18 @@ test("executeApiTool sends a real multipart/form-data body (with boundary) for p
   const buffer = form.getBuffer()
   const raw = buffer.toString("latin1")
   assert.match(raw, /name="resource"/)
-  assert.match(raw, /Content-Type: application\/json/)
+  // Deliberately NOT "Content-Type: application/json" -- Polarion's server-side
+  // ResourceContentProcessor reads this part via Jersey's FormDataBodyPart.getValue(),
+  // which throws "IllegalStateException: Media type is not text/plain." for any part
+  // whose Content-Type isn't text/plain (confirmed live against a stock Polarion 2606
+  // instance: a well-formed multipart request with this header always 500s server-side).
+  // Leaving it unset makes `form-data` omit the Content-Type header entirely;
+  // the server then treats the untyped part as text/plain, which it requires.
+  assert.match(
+    raw,
+    /Content-Disposition: form-data; name="resource"\r\n\r\n\{/,
+    "the resource part must carry no Content-Type header at all -- Polarion's server rejects application/json with a 500"
+  )
   assert.match(raw, /workitem_attachments/)
   assert.match(raw, /name="files"/)
   assert.match(raw, /filename="file-0"/)
@@ -733,6 +744,10 @@ test("executeApiTool builds multipart parts for the 'file' + 'parameters' shape 
   assert.match(raw, /name="file"/)
   assert.match(raw, /filename="file"/)
   assert.match(raw, /name="parameters"/)
+  // Deliberately left unchanged (application/json) -- importWordDocument uses a
+  // different controller than the attachment/icon tools, not live-verified to
+  // need the same Content-Type-omission fix. See buildMultipartFormData's JSDoc.
+  assert.match(raw, /name="parameters"\r\nContent-Type: application\/json/)
   assert.match(raw, /documentName/)
   assert.match(raw, /MyDoc/)
 })
