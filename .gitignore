@@ -65,3 +65,6 @@ web_modules/
 .DS_Store
 Thumbs.db
 *py
+
+# Playwright MCP browser-automation scratch output (can contain live tokens/secrets)
+.playwright-mcp/

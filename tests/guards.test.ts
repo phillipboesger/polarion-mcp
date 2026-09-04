@@ -147,8 +147,12 @@ test("checkWorkItemsEnumFields with an empty target list is a no-op success", as
 // checkWorkItemCustomFieldKeys
 // ---------------------------------------------------------------------------
 
+// Real shape (confirmed live against a stock Polarion 2606 instance):
+// {data: {attributes: {fieldId: {label, type}, ...}}} -- an object keyed by
+// field id, NOT a JSON:API list of {id, ...} entries.
 function fieldsMetadataResponse(ids: string[]): AxiosResponse {
-  return { data: { data: ids.map((id) => ({ id })) }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+  const attributes = Object.fromEntries(ids.map((id) => [id, { label: id, type: { kind: "string" } }]))
+  return { data: { data: { attributes } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
 }
 
 test("checkWorkItemCustomFieldKeys skips validation when every attribute key is standard", async () => {
@@ -181,6 +185,29 @@ test("checkWorkItemCustomFieldKeys rejects an unknown custom key, listing the kn
   }
 })
 
+test("checkWorkItemCustomFieldKeys's rejection message lists only real custom fields, not OOTB ones like title/status", async () => {
+  _fieldKeyCache.clear()
+  const liveResponseData = {
+    data: {
+      attributes: {
+        type: { label: "Type" },
+        title: { label: "Title" },
+        status: { label: "Status" },
+        myCustomField: { label: "My Custom Field", type: { kind: "string" } },
+      },
+    },
+  }
+  const httpClient = async (): Promise<AxiosResponse> =>
+    ({ data: liveResponseData, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { bogusField: "x" }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+  if (!result.ok) {
+    assert.match(result.reason, /Known custom fields: myCustomField/)
+    assert.doesNotMatch(result.reason, /\btitle\b/, "OOTB fields must not be listed as if they were custom fields")
+    assert.doesNotMatch(result.reason, /\bstatus\b/)
+  }
+})
+
 test("checkWorkItemCustomFieldKeys fails closed when the metadata lookup errors", async () => {
   _fieldKeyCache.clear()
   const httpClient = async (): Promise<AxiosResponse> => {
@@ -198,6 +225,22 @@ test("checkWorkItemCustomFieldKeys fails closed when the metadata response is em
   assert.equal(result.ok, false)
 })
 
+test("checkWorkItemCustomFieldKeys fails closed on the OLD, wrong getAvailableOptions-style list shape ({data:[{id}]}), not just the real object shape", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (): Promise<AxiosResponse> =>
+    ({ data: { data: [{ id: "realField" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { customKey: "x" }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false, "the list shape must not be silently accepted as if it were the real object-map shape")
+})
+
+test("checkWorkItemCustomFieldKeys fails closed when attributes is missing or null in the response", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (): Promise<AxiosResponse> =>
+    ({ data: { data: { attributes: null } }, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkWorkItemCustomFieldKeys("PROJ", "task", { customKey: "x" }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+})
+
 test("checkWorkItemCustomFieldKeys caches the field list per (project, type)", async () => {
   _fieldKeyCache.clear()
   let calls = 0
@@ -208,6 +251,33 @@ test("checkWorkItemCustomFieldKeys caches the field list per (project, type)", a
   await checkWorkItemCustomFieldKeys("PROJ", "task", { fieldA: "1" }, requestContext, { ...sendOpts, httpClient })
   await checkWorkItemCustomFieldKeys("PROJ", "task", { fieldA: "2" }, requestContext, { ...sendOpts, httpClient })
   assert.equal(calls, 1, "second call for the same (project, type) should reuse the cache")
+})
+
+test("checkWorkItemCustomFieldKeys accepts a real registered custom field against the ACTUAL live Polarion getFieldsMetadata response shape", async () => {
+  // Captured live from a stock Polarion 2606 instance -- an object keyed by
+  // field id under `attributes`, not a JSON:API {data:[{id}]} list. Before
+  // the extractFieldIds fix, this exact response made the guard treat every
+  // field as unknown and refuse ANY custom field on Work Item creation, even
+  // a real, correctly-configured one.
+  _fieldKeyCache.clear()
+  const liveResponseData = {
+    links: { self: "http://localhost/polarion/rest/v1/projects/drivepilot/actions/getFieldsMetadata?resourceType=workitems&targetType=task" },
+    data: {
+      attributes: {
+        type: { label: "Type", required: true, type: { kind: "enumeration", enumName: "work-item-type" } },
+        severity: { label: "Severity", required: true, type: { kind: "enumeration", enumName: "severity" } },
+        myCustomField: { label: "My Custom Field", type: { kind: "string" } },
+        title: { label: "Title", type: { kind: "string" } },
+        status: { label: "Status", required: true, type: { kind: "enumeration", enumName: "status" } },
+      },
+      relationships: {},
+    },
+  }
+  const httpClient = async (): Promise<AxiosResponse> =>
+    ({ data: liveResponseData, status: 200, statusText: "OK", headers: {}, config: {} as any })
+
+  const result = await checkWorkItemCustomFieldKeys("drivepilot", "task", { title: "hi", myCustomField: "value" }, requestContext, { ...sendOpts, httpClient })
+  assert.deepEqual(result, { ok: true })
 })
 
 // ---------------------------------------------------------------------------

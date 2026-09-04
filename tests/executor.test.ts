@@ -594,7 +594,9 @@ test("executeApiTool refuses a postWorkItems create with an unknown custom field
     const url = String(config.url)
     if (url.includes("/actions/getFieldsMetadata")) {
       assert.equal((config.params as any)?.targetType, "task")
-      return { data: { data: [{ id: "realCustomField" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+      // Real shape (confirmed live against a stock Polarion 2606 instance):
+      // {data: {attributes: {fieldId: {...}}}}, not a JSON:API {data:[{id}]} list.
+      return { data: { data: { attributes: { realCustomField: { label: "Real Custom Field", type: { kind: "string" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
     }
     postCalled = true
     throw new Error("create must never be reached once the field-key guard refuses")

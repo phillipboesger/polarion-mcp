@@ -14,11 +14,13 @@
  *    `attributes` key that isn't a standard Work Item field against
  *    `getProjectFieldsMetadata`. Scoped to `postWorkItems` (create) only --
  *    see that function's doc for why updates aren't covered. The response
- *    shape this reads is **not individually confirmed** (no worked guide
- *    example for this endpoint) -- inferred from the JSON:API `{data:
- *    [{id}]}` convention every other "actions" GET endpoint in this codebase
- *    follows without exception; fails closed (empty result set) rather than
- *    silently passing everything through if that assumption turns out wrong.
+ *    shape is confirmed live against a stock Polarion 2606 instance: a
+ *    single object keyed by field id (`{data: {attributes: {fieldId:
+ *    {...}}}}`), NOT the `{data: [{id, ...}]}` JSON:API list shape
+ *    `getAvailableOptions` uses -- Polarion's own "actions" endpoints don't
+ *    share one response convention. Fails closed (empty result set) if a
+ *    lookup can't be completed at all, rather than silently passing
+ *    everything through.
  * 3. **User references** (`checkWorkItemUserReferences`) -- every user id
  *    in `relationships.assignee`/`votes`/`watches` against `getUser`,
  *    across all 4 covered write tools.
@@ -222,16 +224,23 @@ interface FieldKeyCacheEntry {
 export const _fieldKeyCache = new Map<string, FieldKeyCacheEntry>();
 
 /**
- * Extracts field ids from a `getFieldsMetadata` response. **Not individually
- * confirmed** against a worked guide example (unlike `getAvailableOptions`)
- * -- inferred from the JSON:API `{data: [{id, ...}]}` convention every other
- * "actions" GET endpoint in this codebase follows without exception. If
- * Polarion's real shape differs, this returns an empty set, which fails
- * closed (see `checkWorkItemCustomFieldKeys`) rather than silently passing
- * everything through.
+ * Extracts field ids from a `getFieldsMetadata` response. Confirmed live
+ * against a stock Polarion 2606 instance: unlike `getAvailableOptions`
+ * (`{data: [{id, ...}]}`, a JSON:API list), `getFieldsMetadata` returns a
+ * single object whose `attributes` is a map keyed by field id --
+ * `{data: {attributes: {title: {...}, myCustomField: {...}, ...}}}`. Field
+ * ids are the map's own keys, not an `id` property on each entry.
+ *
+ * Was previously delegating to `extractOptionIds` (list shape) -- always
+ * returned `[]` for this object shape, failing closed on every custom field.
  */
 function extractFieldIds(responseData: unknown): string[] {
-  return extractOptionIds(responseData);
+  if (!responseData || typeof responseData !== 'object') return [];
+  const data = (responseData as { data?: unknown }).data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  const attributes = (data as { attributes?: unknown }).attributes;
+  if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) return [];
+  return Object.keys(attributes);
 }
 
 /**
@@ -298,11 +307,15 @@ export async function checkWorkItemCustomFieldKeys(
 
   const unknownKeys = candidateKeys.filter((k) => !fieldIds.has(k));
   if (unknownKeys.length > 0) {
+    // fieldIds includes every field getFieldsMetadata returns -- OOTB fields
+    // (title, status, ...) as well as custom ones -- so filter back down to
+    // non-standard keys before presenting them as "custom fields".
+    const knownCustomFields = [...fieldIds].filter((k) => !STANDARD_WORK_ITEM_ATTRIBUTE_KEYS.has(k));
     return {
       ok: false,
       reason:
         `Unknown field key(s) ${unknownKeys.join(', ')} for a new '${type}' Work Item in ${projectId}. ` +
-        `Known custom fields: ${[...fieldIds].join(', ') || '(none)'}.`,
+        `Known custom fields: ${knownCustomFields.join(', ') || '(none)'}.`,
     };
   }
 
