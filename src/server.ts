@@ -65,6 +65,7 @@ export function createPolarionServer(): Server {
         name: def.name,
         description: def.description,
         inputSchema: sanitizedSchema,
+        ...(def.annotations ? { annotations: def.annotations } : {}),
       };
     });
     return { tools: toolsForClient };

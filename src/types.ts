@@ -48,6 +48,26 @@ export type JsonObject = Record<string, any>;
 export type NameMap = Record<string, string>;
 
 /**
+ * MCP tool behavioral hints, per the Model Context Protocol spec's
+ * `ToolAnnotations`. These are structured signals for MCP clients (and
+ * quality scanners) about side effects, so they don't have to be inferred
+ * from free-text descriptions alone.
+ *
+ * - readOnlyHint: tool does not modify Polarion state (GET operations)
+ * - destructiveHint: tool may delete/irreversibly remove data
+ * - idempotentHint: calling the tool repeatedly with the same arguments
+ *   has no additional effect beyond the first call
+ * - openWorldHint: tool interacts with an external system (always true
+ *   here — every tool calls the Polarion REST API)
+ */
+export interface McpToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
+/**
  * Interface for MCP Tool Definition
  *
  * Defines the complete structure of an API tool that can be invoked via MCP.
@@ -62,6 +82,7 @@ export type NameMap = Record<string, string>;
  * - executionParameters: List of parameters and where they go (path, query, header)
  * - requestBodyContentType: MIME type for request body (if applicable)
  * - securityRequirements: Authentication methods required for this operation
+ * - annotations: Behavioral hints (read-only, destructive, idempotent, open-world)
  * - nameMap: Mapping from sanitized parameter names to original names
  */
 export interface McpToolDefinition {
@@ -73,6 +94,7 @@ export interface McpToolDefinition {
   executionParameters: { name: string, in: string }[];
   requestBodyContentType?: string;
   securityRequirements: any[];
+  annotations?: McpToolAnnotations;
   nameMap?: NameMap; // Mapping from sanitized keys to original keys
 }
 

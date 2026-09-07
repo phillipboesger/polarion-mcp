@@ -20,7 +20,9 @@ touched by regeneration.
 1. `download-spec` — fetch the OpenAPI JSON into `openapi.json` (gitignored).
 2. `fix-sparse-fields` — simplify the `sparseFields` schema for MCP-friendly `fields` input.
 3. `generate-mcp` — run `openapi-mcp-generator` into `.gen/` (gitignored); never into the repo tree.
-4. `generate-tools` — `scripts/generate-tools.mjs` extracts only `toolDefinitionMap` + `securitySchemes` from `.gen/src/index.ts` and writes `src/tools.ts`.
+4. `generate-tools` — chains two steps into `src/tools.ts`:
+   - `scripts/generate-tools.mjs` extracts only `toolDefinitionMap` + `securitySchemes` from `.gen/src/index.ts`, injecting `dry_run` (mutating tools) and MCP `annotations` (`readOnlyHint`/`destructiveHint`/`idempotentHint`/`openWorldHint`, derived from the HTTP method) into every tool.
+   - `scripts/enrich-tool-metadata.mjs` then adds a "Scope: ..." sentence + named alternative to tool description pairs that share a resource at two scopes (e.g. `getAllWorkItems` vs. `getWorkItems`, `getGlobalEnumeration` vs. `getProjectEnumeration`), so an AI agent picking between near-duplicate tool names gets an explicit answer. Both steps are idempotent — safe to rerun directly against `src/tools.ts` (see `scripts/lib/entry-utils.mjs` for the shared text-editing helpers).
 5. `build` + `test` — compile and run the suite so a broken regeneration fails loudly.
 
 Because step 4 extracts only the two data structures, the hand-written modular

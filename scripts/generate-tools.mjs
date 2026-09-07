@@ -19,80 +19,22 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { findMatchingClose, splitTopLevelArrayEntries, annotationsForMethod } from './lib/entry-utils.mjs';
 
 const inputPath = process.argv[2] || '.gen/src/index.ts';
 const outputPath = process.argv[3] || 'src/tools.ts';
 
-/**
- * Returns the index just past the bracket/brace that opens at `openIndex`,
- * matching depth while ignoring brackets inside string literals.
- *
- * @param {string} src - Source text.
- * @param {number} openIndex - Index of the opening `[` or `{`.
- * @returns {number} Index immediately after the matching closing bracket.
- */
-function findMatchingClose(src, openIndex) {
-  const open = src[openIndex];
-  const close = open === '[' ? ']' : '}';
-  let depth = 0;
-  let quote = null; // ', ", or `
-  for (let i = openIndex; i < src.length; i++) {
-    const c = src[i];
-    if (quote) {
-      if (c === '\\') { i++; continue; }      // skip escaped char
-      if (c === quote) quote = null;
-      continue;
-    }
-    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-    if (c === open) depth++;
-    else if (c === close) {
-      depth--;
-      if (depth === 0) return i + 1;
-    }
-  }
-  throw new Error(`Unbalanced ${open} starting at index ${openIndex}`);
-}
-
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
-
-/**
- * Splits a `[...]`-wrapped array literal's text into its top-level element
- * substrings (without the outer brackets), honoring nested brackets/braces
- * and quoted strings so commas inside them aren't mistaken for separators.
- *
- * @param {string} arrayText - Text starting with `[` and ending with `]`.
- * @returns {string[]} One string per top-level array element.
- */
-function splitTopLevelArrayEntries(arrayText) {
-  const inner = arrayText.slice(1, -1);
-  const entries = [];
-  let depth = 0;
-  let quote = null;
-  let start = 0;
-  for (let i = 0; i < inner.length; i++) {
-    const c = inner[i];
-    if (quote) {
-      if (c === '\\') { i++; continue; }
-      if (c === quote) quote = null;
-      continue;
-    }
-    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-    if (c === '[' || c === '{') depth++;
-    else if (c === ']' || c === '}') depth--;
-    else if (c === ',' && depth === 0) {
-      entries.push(inner.slice(start, i));
-      start = i + 1;
-    }
-  }
-  const last = inner.slice(start);
-  if (last.trim()) entries.push(last);
-  return entries;
-}
 
 /**
  * Injects a `dry_run` boolean property into a tool's `inputSchema.properties`
  * for mutating HTTP methods (post/put/patch/delete), so it survives
  * regeneration instead of only existing as a hand-edit on `src/tools.ts`.
+ *
+ * Also injects an `annotations` object (readOnlyHint/destructiveHint/
+ * idempotentHint/openWorldHint) derived from the HTTP method on every tool,
+ * so MCP clients (and quality scanners like Glama's TDQS) get structured
+ * behavioral hints instead of having to infer them from the description.
  *
  * @param {string} mapArrayText - The raw `[...]` text of `toolDefinitionMap`'s entries.
  * @returns {{ text: string, mutatingCount: number }} The (possibly modified) array text and how many tools got `dry_run`.
@@ -101,15 +43,23 @@ function injectDryRunIntoMap(mapArrayText) {
   let mutatingCount = 0;
   const entries = splitTopLevelArrayEntries(mapArrayText).map((entry) => {
     const methodMatch = /method:\s*"([^"]+)"/.exec(entry);
-    if (!methodMatch || !MUTATING_METHODS.has(methodMatch[1].toLowerCase())) return entry;
+    const method = methodMatch ? methodMatch[1].toLowerCase() : null;
 
-    const inputSchemaAnchor = /inputSchema:\s*/.exec(entry);
-    if (!inputSchemaAnchor) return entry;
-    const braceStart = entry.indexOf('{', inputSchemaAnchor.index);
-    if (braceStart === -1) return entry;
-    const braceEnd = findMatchingClose(entry, braceStart);
+    let updated = entry;
+    if (method) {
+      const annotations = JSON.stringify(annotationsForMethod(method));
+      updated = updated.replace(/method:\s*"[^"]+",/, (m) => `${m}\n    annotations: ${annotations},`);
+    }
 
-    const schema = JSON.parse(entry.slice(braceStart, braceEnd));
+    if (!method || !MUTATING_METHODS.has(method)) return updated;
+
+    const inputSchemaAnchor = /inputSchema:\s*/.exec(updated);
+    if (!inputSchemaAnchor) return updated;
+    const braceStart = updated.indexOf('{', inputSchemaAnchor.index);
+    if (braceStart === -1) return updated;
+    const braceEnd = findMatchingClose(updated, braceStart);
+
+    const schema = JSON.parse(updated.slice(braceStart, braceEnd));
     if (!schema.properties || typeof schema.properties !== 'object') schema.properties = {};
     schema.properties.dry_run = {
       type: 'boolean',
@@ -117,7 +67,7 @@ function injectDryRunIntoMap(mapArrayText) {
     };
 
     mutatingCount++;
-    return entry.slice(0, braceStart) + JSON.stringify(schema) + entry.slice(braceEnd);
+    return updated.slice(0, braceStart) + JSON.stringify(schema) + updated.slice(braceEnd);
   });
   return { text: `[${entries.join(',')}]`, mutatingCount };
 }

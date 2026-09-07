@@ -46,7 +46,7 @@
     "download-spec": "curl -fsSL ${BEARER_TOKEN:+-H \"Authorization: Bearer ${BEARER_TOKEN}\"} \"${SPEC_URL:-https://testdrive.polarion.com/polarion/sdk/doc/rest/polarionrest.json}\" -o openapi.json",
     "fix-sparse-fields": "node scripts/fix-sparse-fields.cjs",
     "generate-mcp": "rm -rf .gen && openapi-mcp-generator --input ./openapi.json --output ./.gen --force --transport stdio",
-    "generate-tools": "node scripts/generate-tools.mjs .gen/src/index.ts src/tools.ts",
+    "generate-tools": "node scripts/generate-tools.mjs .gen/src/index.ts src/tools.ts && node scripts/enrich-tool-metadata.mjs",
     "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run generate-tools && npm run build && npm test",
     "update": "npm run regenerate"
   },
