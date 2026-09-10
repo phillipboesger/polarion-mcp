@@ -129,7 +129,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getGlobalEnumerations", {
     name: "getGlobalEnumerations",
-    description: `Returns a list of Enumerations from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectEnumerations\` instead.`,
+    description: `Returns a list of Enumerations from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectEnumerations\` instead. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getGlobalEnumeration\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -151,7 +151,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getGlobalEnumeration", {
     name: "getGlobalEnumeration",
-    description: `Returns the specified Enumeration from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectEnumeration\` instead.`,
+    description: `Returns the specified Enumeration from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectEnumeration\` instead. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getGlobalEnumerations\` instead.`,
     inputSchema: {"type":"object","properties":{"enumContext":{"type":"string","description":"The Enumeration context. (Allowed values are '~', 'plans', 'testing' and 'documents'. Use '~' for Work Item or general enumerations.)"},"enumName":{"type":"string","description":"The Enumeration Name."},"targetType":{"type":"string","description":"The Enumeration target type. (Use '~' when there is no specific type for the enumeration.)"},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["enumContext","enumName","targetType"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -184,7 +184,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDefaultIcons", {
     name: "getDefaultIcons",
-    description: `Returns a list of Icons from the default context.`,
+    description: `Returns a list of Icons from the default context. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getDefaultIcon\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -195,7 +195,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDefaultIcon", {
     name: "getDefaultIcon",
-    description: `Returns the specified Icon from the default context.`,
+    description: `Returns the specified Icon from the default context. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getDefaultIcons\` instead.`,
     inputSchema: {"type":"object","properties":{"iconId":{"type":"string","description":"The Icon ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["iconId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -206,7 +206,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getGlobalIcons", {
     name: "getGlobalIcons",
-    description: `Returns a list of Icons from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectIcons\` instead.`,
+    description: `Returns a list of Icons from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectIcons\` instead. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getGlobalIcon\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -228,7 +228,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getGlobalIcon", {
     name: "getGlobalIcon",
-    description: `Returns the specified Icon from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectIcon\` instead.`,
+    description: `Returns the specified Icon from the Global context. Scope: spans every project (no project filter). To act on a single project, use \`getProjectIcon\` instead. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getGlobalIcons\` instead.`,
     inputSchema: {"type":"object","properties":{"iconId":{"type":"string","description":"The Icon ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["iconId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -239,7 +239,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getJobs", {
     name: "getJobs",
-    description: `Returns the list of Jobs.`,
+    description: `Returns the list of Jobs. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getJob\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"projectId":{"type":"string","description":"The Project ID."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -250,7 +250,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getJob", {
     name: "getJob",
-    description: `Returns the specified Job.`,
+    description: `Returns the specified Job. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getJobs\` instead.`,
     inputSchema: {"type":"object","properties":{"jobId":{"type":"string","description":"The Job ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["jobId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -316,7 +316,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getLicenseAssignments", {
     name: "getLicenseAssignments",
-    description: `Returns a list of License Assignments. (Not supported by cloud-based Polarion X.)`,
+    description: `Returns a list of License Assignments. (Not supported by cloud-based Polarion X.). Cardinality: targets the full collection or a batch. For a single item by ID, use \`getLicenseAssignmentsForUser\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"activeOnly":{"type":"boolean","description":"If set to true, only active (with status LOGGED_IN or EXPIRING) License Assignments will be returned, otherwise all the License Assignments will be returned."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -327,7 +327,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchLicenseAssignments", {
     name: "patchLicenseAssignments",
-    description: `Updates the License Assignments of multiple users. (Not supported by cloud-based Polarion X.)`,
+    description: `Updates the License Assignments of multiple users. (Not supported by cloud-based Polarion X.). Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchLicenseAssignment\` instead.`,
     inputSchema: {"type":"object","properties":{"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["license_assignments"],"type":"string"},"id":{"type":"string"},"relationships":{"properties":{"addOnSlots":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["license_slots"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"baseSlot":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["license_slots"],"type":"string"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The User(s) License Assignment body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -338,7 +338,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getLicenseAssignmentsForUser", {
     name: "getLicenseAssignmentsForUser",
-    description: `Returns the specified License Assignment. (Not supported by cloud-based Polarion X.)`,
+    description: `Returns the specified License Assignment. (Not supported by cloud-based Polarion X.). Cardinality: targets a single item by ID. For the full collection or a batch, use \`getLicenseAssignments\` instead.`,
     inputSchema: {"type":"object","properties":{"userId":{"type":"string"},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["userId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -349,7 +349,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchLicenseAssignment", {
     name: "patchLicenseAssignment",
-    description: `Updates a user's License Assignment. (Not supported by cloud-based Polarion X.)`,
+    description: `Updates a user's License Assignment. (Not supported by cloud-based Polarion X.). Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchLicenseAssignments\` instead.`,
     inputSchema: {"type":"object","properties":{"userId":{"type":"string","description":"The User ID."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["license_assignments"],"type":"string"},"id":{"type":"string"},"relationships":{"properties":{"addOnSlots":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["license_slots"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"baseSlot":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["license_slots"],"type":"string"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object","description":"The User License Assignment body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["userId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -360,7 +360,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getLicenseSlots", {
     name: "getLicenseSlots",
-    description: `Returns information on the available License Slots. (Not supported by cloud-based Polarion X.)`,
+    description: `Returns information on the available License Slots. (Not supported by cloud-based Polarion X.). Cardinality: targets the full collection or a batch. For a single item by ID, use \`getLicenseSlot\` instead.`,
     inputSchema: {"type":"object","properties":{"typeId":{"type":"string"},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["typeId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -393,7 +393,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getLicenseSlot", {
     name: "getLicenseSlot",
-    description: `Returns the specified License Slot. (Not supported by cloud-based Polarion X.)`,
+    description: `Returns the specified License Slot. (Not supported by cloud-based Polarion X.). Cardinality: targets a single item by ID. For the full collection or a batch, use \`getLicenseSlots\` instead.`,
     inputSchema: {"type":"object","properties":{"typeId":{"type":"string"},"model":{"type":"string"},"group":{"type":"string"},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["typeId","model","group"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -448,7 +448,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProjects", {
     name: "getProjects",
-    description: `Returns a list of Projects.`,
+    description: `Returns a list of Projects. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getProject\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."},"revision":{"type":"string","description":"The revision ID."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -459,7 +459,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProject", {
     name: "getProject",
-    description: `Returns the specified Project.`,
+    description: `Returns the specified Project. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getProjects\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -525,7 +525,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getCollections", {
     name: "getCollections",
-    description: `Returns a list of Collections.`,
+    description: `Returns a list of Collections. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getCollection\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -547,7 +547,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteCollections", {
     name: "deleteCollections",
-    description: `Deletes a list of Collections.`,
+    description: `Deletes a list of Collections. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteCollection\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["collections"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Collection(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -558,7 +558,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getCollection", {
     name: "getCollection",
-    description: `Returns the specified Collection.`,
+    description: `Returns the specified Collection. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getCollections\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"collectionId":{"type":"string","description":"The Collection ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","collectionId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -569,7 +569,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteCollection", {
     name: "deleteCollection",
-    description: `Deletes the specified Collection.`,
+    description: `Deletes the specified Collection. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteCollections\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"collectionId":{"type":"string","description":"The Collection ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","collectionId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -745,7 +745,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProjectEnumerations", {
     name: "getProjectEnumerations",
-    description: `Returns a list of Enumerations from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalEnumerations\` instead.`,
+    description: `Returns a list of Enumerations from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalEnumerations\` instead. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getProjectEnumeration\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -767,7 +767,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProjectEnumeration", {
     name: "getProjectEnumeration",
-    description: `Returns the specified Enumeration from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalEnumeration\` instead.`,
+    description: `Returns the specified Enumeration from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalEnumeration\` instead. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getProjectEnumerations\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"enumContext":{"type":"string","description":"The Enumeration context. (Allowed values are '~', 'plans', 'testing' and 'documents'. Use '~' for Work Item or general enumerations.)"},"enumName":{"type":"string","description":"The Enumeration Name."},"targetType":{"type":"string","description":"The Enumeration target type. (Use '~' when there is no specific type for the enumeration.)"},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["projectId","enumContext","enumName","targetType"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -800,7 +800,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProjectIcons", {
     name: "getProjectIcons",
-    description: `Returns a list of Icons from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalIcons\` instead.`,
+    description: `Returns a list of Icons from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalIcons\` instead. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getProjectIcon\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -822,7 +822,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProjectIcon", {
     name: "getProjectIcon",
-    description: `Returns the specified Icon from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalIcon\` instead.`,
+    description: `Returns the specified Icon from the Project context. Scope: one project (requires a project ID). To act across all projects, use \`getGlobalIcon\` instead. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getProjectIcons\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"iconId":{"type":"string","description":"The Icon ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["projectId","iconId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -844,7 +844,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getPlans", {
     name: "getPlans",
-    description: `Returns a list of Plans.`,
+    description: `Returns a list of Plans. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getPlan\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."},"revision":{"type":"string","description":"The revision ID."},"templates":{"type":"boolean","description":"If set to true, only templates will be returned, otherwise only actual instances will be returned."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -866,7 +866,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deletePlans", {
     name: "deletePlans",
-    description: `Deletes a list of Plans.`,
+    description: `Deletes a list of Plans. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deletePlan\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["plans"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Plan(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -877,7 +877,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getPlan", {
     name: "getPlan",
-    description: `Returns the specified Plan.`,
+    description: `Returns the specified Plan. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getPlans\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"planId":{"type":"string","description":"The Plan ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","planId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -888,7 +888,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deletePlan", {
     name: "deletePlan",
-    description: `Deletes the specified Plan.`,
+    description: `Deletes the specified Plan. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deletePlans\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"planId":{"type":"string","description":"The Plan ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","planId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -965,7 +965,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getSpaceDocuments", {
     name: "getSpaceDocuments",
-    description: `Returns a list of Documents from a given Project Space.`,
+    description: `Returns a list of Documents from a given Project Space. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getDocument\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."}},"required":["projectId","spaceId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -987,7 +987,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDocument", {
     name: "getDocument",
-    description: `Returns the specified Document.`,
+    description: `Returns the specified Document. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getSpaceDocuments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"documentName":{"type":"string","description":"The Document name."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","documentName"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1064,7 +1064,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDocumentAttachments", {
     name: "getDocumentAttachments",
-    description: `Returns a list of Document Attachments.`,
+    description: `Returns a list of Document Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getDocumentAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"documentName":{"type":"string","description":"The Document name."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","documentName"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1086,7 +1086,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDocumentAttachment", {
     name: "getDocumentAttachment",
-    description: `Returns the specified Document Attachment.`,
+    description: `Returns the specified Document Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getDocumentAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"documentName":{"type":"string","description":"The Document name."},"attachmentId":{"type":"string","description":"The Attachment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","documentName","attachmentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1119,7 +1119,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDocumentComments", {
     name: "getDocumentComments",
-    description: `Returns a list of Document Comments.`,
+    description: `Returns a list of Document Comments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getDocumentComment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"documentName":{"type":"string","description":"The Document name."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","documentName"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1141,7 +1141,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDocumentComment", {
     name: "getDocumentComment",
-    description: `Returns the specified Document Comment.`,
+    description: `Returns the specified Document Comment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getDocumentComments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"documentName":{"type":"string","description":"The Document name."},"commentId":{"type":"string","description":"The Comment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","documentName","commentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1185,7 +1185,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDocumentParts", {
     name: "getDocumentParts",
-    description: `Returns a list of Document Parts.`,
+    description: `Returns a list of Document Parts. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getDocumentPart\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"documentName":{"type":"string","description":"The Document name."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","documentName"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1218,7 +1218,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getDocumentPart", {
     name: "getDocumentPart",
-    description: `Returns the specified Document Part.`,
+    description: `Returns the specified Document Part. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getDocumentParts\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"documentName":{"type":"string","description":"The Document name."},"partId":{"type":"string","description":"The Document Part ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","documentName","partId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1262,7 +1262,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getSpacePages", {
     name: "getSpacePages",
-    description: `Returns a list of Pages from a given Project Space.`,
+    description: `Returns a list of Pages from a given Project Space. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getPage\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."}},"required":["projectId","spaceId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1284,7 +1284,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getPage", {
     name: "getPage",
-    description: `Returns the specified Page.`,
+    description: `Returns the specified Page. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getSpacePages\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"pageName":{"type":"string","description":"The Page name."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","pageName"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1317,7 +1317,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getPageAttachments", {
     name: "getPageAttachments",
-    description: `Returns a list of Page Attachments.`,
+    description: `Returns a list of Page Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getPageAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"pageName":{"type":"string","description":"The Page name."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","pageName"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1339,7 +1339,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getPageAttachment", {
     name: "getPageAttachment",
-    description: `Returns the specified Page Attachment.`,
+    description: `Returns the specified Page Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getPageAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"pageName":{"type":"string","description":"The Page name."},"attachmentId":{"type":"string","description":"The Attachment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","pageName","attachmentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1383,7 +1383,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getPageComments", {
     name: "getPageComments",
-    description: `Returns a list of Page Comments.`,
+    description: `Returns a list of Page Comments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getPageComment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"pageName":{"type":"string","description":"The Page name."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","pageName"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1405,7 +1405,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getPageComment", {
     name: "getPageComment",
-    description: `Returns the specified Page Comment.`,
+    description: `Returns the specified Page Comment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getPageComments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"spaceId":{"type":"string","description":"The Space ID. (Use '_default' without quotes to address the default Space.)"},"pageName":{"type":"string","description":"The Page name."},"commentId":{"type":"string","description":"The Comment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","spaceId","pageName","commentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1471,7 +1471,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProjectTestParameterDefinitions", {
     name: "getProjectTestParameterDefinitions",
-    description: `Returns a list of Test Parameter Definitions for the specified Project.`,
+    description: `Returns a list of Test Parameter Definitions for the specified Project. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getProjectTestParameterDefinition\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1493,7 +1493,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteProjectTestParameterDefinitions", {
     name: "deleteProjectTestParameterDefinitions",
-    description: `Deletes a list of Test Parameter Definitions for the specified Project.`,
+    description: `Deletes a list of Test Parameter Definitions for the specified Project. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteProjectTestParameterDefinition\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testparameter_definitions"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Parameter Definition(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1504,7 +1504,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getProjectTestParameterDefinition", {
     name: "getProjectTestParameterDefinition",
-    description: `Returns the specified Test Parameter Definition for the specified Project.`,
+    description: `Returns the specified Test Parameter Definition for the specified Project. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getProjectTestParameterDefinitions\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testParamId":{"type":"string","description":"The Test Parameter."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["projectId","testParamId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1515,7 +1515,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteProjectTestParameterDefinition", {
     name: "deleteProjectTestParameterDefinition",
-    description: `Deletes the specified Test Parameter Definition for the specified Project.`,
+    description: `Deletes the specified Test Parameter Definition for the specified Project. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteProjectTestParameterDefinitions\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testParamId":{"type":"string","description":"The Test Parameter."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testParamId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1526,7 +1526,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRuns", {
     name: "getTestRuns",
-    description: `Returns a list of Test Runs.`,
+    description: `Returns a list of Test Runs. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRun\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."},"revision":{"type":"string","description":"The revision ID."},"templates":{"type":"boolean","description":"If set to true, only templates will be returned, otherwise only actual instances will be returned."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1548,7 +1548,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRuns", {
     name: "deleteTestRuns",
-    description: `Deletes a list of Test Runs.`,
+    description: `Deletes a list of Test Runs. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteTestRun\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testruns"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Run(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1559,7 +1559,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestRuns", {
     name: "patchTestRuns",
-    description: `Updates a list of Test Runs.`,
+    description: `Updates a list of Test Runs. Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchTestRun\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testruns"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"finishedOn":{"format":"date-time","type":"string"},"groupId":{"type":"string"},"homePageContent":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"idPrefix":{"type":"string"},"keepInHistory":{"type":"boolean"},"query":{"type":"string"},"selectTestCasesBy":{"enum":["manualSelection","staticQueryResult","dynamicQueryResult","staticLiveDoc","dynamicLiveDoc","automatedProcess"],"type":"string"},"status":{"type":"string"},"title":{"type":"string"},"type":{"type":"string"},"useReportFromTemplate":{"type":"boolean"}},"type":"object"},"relationships":{"properties":{"document":{"properties":{"data":{"properties":{"id":{"type":"string"},"revision":{"type":"string"},"type":{"enum":["documents"],"type":"string"}},"type":"object"}},"type":"object"},"projectSpan":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["projects"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"summaryDefect":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["workitems"],"type":"string"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Run(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -1570,7 +1570,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRun", {
     name: "getTestRun",
-    description: `Returns the specified Test Run.`,
+    description: `Returns the specified Test Run. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRuns\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1581,7 +1581,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRun", {
     name: "deleteTestRun",
-    description: `Deletes the specified Test Run.`,
+    description: `Deletes the specified Test Run. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteTestRuns\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1592,7 +1592,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestRun", {
     name: "patchTestRun",
-    description: `Updates the specified Test Run.`,
+    description: `Updates the specified Test Run. Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchTestRuns\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["testruns"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"finishedOn":{"format":"date-time","type":"string"},"groupId":{"type":"string"},"homePageContent":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"idPrefix":{"type":"string"},"keepInHistory":{"type":"boolean"},"query":{"type":"string"},"selectTestCasesBy":{"enum":["manualSelection","staticQueryResult","dynamicQueryResult","staticLiveDoc","dynamicLiveDoc","automatedProcess"],"type":"string"},"status":{"type":"string"},"title":{"type":"string"},"type":{"type":"string"},"useReportFromTemplate":{"type":"boolean"}},"type":"object"},"relationships":{"properties":{"document":{"properties":{"data":{"properties":{"id":{"type":"string"},"revision":{"type":"string"},"type":{"enum":["documents"],"type":"string"}},"type":"object"}},"type":"object"},"projectSpan":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["projects"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"summaryDefect":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["workitems"],"type":"string"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object","description":"The Test Run(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -1658,7 +1658,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunAttachments", {
     name: "getTestRunAttachments",
-    description: `Returns a list of Test Run Attachments.`,
+    description: `Returns a list of Test Run Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRunAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string"},"testRunId":{"type":"string"},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1680,7 +1680,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRunAttachments", {
     name: "deleteTestRunAttachments",
-    description: `Deletes a list of Test Run Attachments.`,
+    description: `Deletes a list of Test Run Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteTestRunAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testrun_attachments"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Run Attachment(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1691,7 +1691,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunAttachment", {
     name: "getTestRunAttachment",
-    description: `Returns the specified Test Run Attachment.`,
+    description: `Returns the specified Test Run Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRunAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"attachmentId":{"type":"string","description":"The Attachment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","attachmentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1702,7 +1702,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRunAttachment", {
     name: "deleteTestRunAttachment",
-    description: `Deletes the specified Test Run Attachment.`,
+    description: `Deletes the specified Test Run Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteTestRunAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"attachmentId":{"type":"string","description":"The Attachment ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","attachmentId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1735,7 +1735,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunComments", {
     name: "getTestRunComments",
-    description: `Returns a list of Test Run Comments.`,
+    description: `Returns a list of Test Run Comments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRunComment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1757,7 +1757,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestRunComments", {
     name: "patchTestRunComments",
-    description: `Updates a list of Test Run Comments.`,
+    description: `Updates a list of Test Run Comments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchTestRunComment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testrun_comments"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"resolved":{"type":"boolean"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The Comment body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -1768,7 +1768,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunComment", {
     name: "getTestRunComment",
-    description: `Returns the specified Test Run Comment.`,
+    description: `Returns the specified Test Run Comment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRunComments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"commentId":{"type":"string","description":"The Comment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","commentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1779,7 +1779,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestRunComment", {
     name: "patchTestRunComment",
-    description: `Updates the specified Test Run Comment.`,
+    description: `Updates the specified Test Run Comment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchTestRunComments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"commentId":{"type":"string","description":"The Comment ID."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["testrun_comments"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"resolved":{"type":"boolean"}},"type":"object"}},"type":"object"}},"type":"object","description":"The Comment body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","commentId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -1790,7 +1790,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunTestParameterDefinitions", {
     name: "getTestRunTestParameterDefinitions",
-    description: `Returns a list of Test Parameter Definitions for the specified Test Run.`,
+    description: `Returns a list of Test Parameter Definitions for the specified Test Run. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRunTestParameterDefinition\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1812,7 +1812,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunTestParameterDefinition", {
     name: "getTestRunTestParameterDefinition",
-    description: `Returns the specified Test Parameter Definition for the specified Test Run.`,
+    description: `Returns the specified Test Parameter Definition for the specified Test Run. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRunTestParameterDefinitions\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testParamId":{"type":"string","description":"The Test Parameter."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testParamId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1834,7 +1834,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunTestParameters", {
     name: "getTestRunTestParameters",
-    description: `Returns a list of Test Parameters for the specified Test Run.`,
+    description: `Returns a list of Test Parameters for the specified Test Run. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRunTestParameter\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1856,7 +1856,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRunTestParameters", {
     name: "deleteTestRunTestParameters",
-    description: `Deletes a list of Test Parameters for the specified Test Run.`,
+    description: `Deletes a list of Test Parameters for the specified Test Run. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteTestRunTestParameter\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testparameters"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Parameter(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1867,7 +1867,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRunTestParameter", {
     name: "getTestRunTestParameter",
-    description: `Returns the specified Test Parameter for the specified Test Run.`,
+    description: `Returns the specified Test Parameter for the specified Test Run. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRunTestParameters\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testParamId":{"type":"string","description":"The Test Parameter."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testParamId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1878,7 +1878,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRunTestParameter", {
     name: "deleteTestRunTestParameter",
-    description: `Deletes the specified Test Parameter for the specified Test Run.`,
+    description: `Deletes the specified Test Parameter for the specified Test Run. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteTestRunTestParameters\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testParamId":{"type":"string","description":"The Test Parameter."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testParamId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1889,7 +1889,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRecords", {
     name: "getTestRecords",
-    description: `Returns a list of Test Records.`,
+    description: `Returns a list of Test Records. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRecord\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."},"testCaseProjectId":{"type":"string","description":"testCaseProjectId"},"testCaseId":{"type":"string","description":"testCaseId"},"testResultId":{"type":"string","description":"testResultId"}},"required":["projectId","testRunId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1911,7 +1911,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestRecords", {
     name: "patchTestRecords",
-    description: `Updates a list of Test Records.`,
+    description: `Updates a list of Test Records. Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchTestRecord\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testrecords"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"comment":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"duration":{"type":"number"},"executed":{"format":"date-time","type":"string"},"result":{"type":"string"},"testCaseRevision":{"type":"string"}},"type":"object"},"relationships":{"properties":{"defect":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["workitems"],"type":"string"}},"type":"object"}},"type":"object"},"executedBy":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Record(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -1922,7 +1922,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRecord", {
     name: "getTestRecord",
-    description: `Returns the specified Test Record.`,
+    description: `Returns the specified Test Record. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRecords\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1944,7 +1944,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestRecord", {
     name: "patchTestRecord",
-    description: `Updates the specified Test Record.`,
+    description: `Updates the specified Test Record. Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchTestRecords\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["testrecords"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"comment":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"duration":{"type":"number"},"executed":{"format":"date-time","type":"string"},"result":{"type":"string"},"testCaseRevision":{"type":"string"}},"type":"object"},"relationships":{"properties":{"defect":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["workitems"],"type":"string"}},"type":"object"}},"type":"object"},"executedBy":{"properties":{"data":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object","description":"The Test Record(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -1966,7 +1966,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRecordAttachments", {
     name: "getTestRecordAttachments",
-    description: `Returns a list of Test Record Attachments.`,
+    description: `Returns a list of Test Record Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRecordAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -1988,7 +1988,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRecordAttachments", {
     name: "deleteTestRecordAttachments",
-    description: `Deletes a list of Test Record Attachments.`,
+    description: `Deletes a list of Test Record Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteTestRecordAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["testrecord_attachments"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Record Attachment(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -1999,7 +1999,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRecordAttachment", {
     name: "getTestRecordAttachment",
-    description: `Returns the specified Test Record Attachment.`,
+    description: `Returns the specified Test Record Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRecordAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"attachmentId":{"type":"string","description":"The Attachment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","attachmentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2010,7 +2010,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestRecordAttachment", {
     name: "deleteTestRecordAttachment",
-    description: `Deletes the specified Test Record Attachment.`,
+    description: `Deletes the specified Test Record Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteTestRecordAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"attachmentId":{"type":"string","description":"The Attachment ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","attachmentId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2043,7 +2043,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRecordTestParameters", {
     name: "getTestRecordTestParameters",
-    description: `Returns a list of Test Parameters for the specified Test Record.`,
+    description: `Returns a list of Test Parameters for the specified Test Record. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestRecordTestParameter\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2065,7 +2065,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestRecordTestParameter", {
     name: "getTestRecordTestParameter",
-    description: `Returns the specified Test Parameter for the specified Test Record.`,
+    description: `Returns the specified Test Parameter for the specified Test Record. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestRecordTestParameters\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"testParamId":{"type":"string","description":"The Test Parameter."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","testParamId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2087,7 +2087,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestStepResults", {
     name: "getTestStepResults",
-    description: `Returns a list of Test Step Results.`,
+    description: `Returns a list of Test Step Results. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestStepResult\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2109,7 +2109,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestStepResults", {
     name: "patchTestStepResults",
-    description: `Updates a list of Test Step Results.`,
+    description: `Updates a list of Test Step Results. Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchTestStepResult\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["teststep_results"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"comment":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"result":{"type":"string"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Step(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2120,7 +2120,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestStepResult", {
     name: "getTestStepResult",
-    description: `Returns the specified Test Step Result.`,
+    description: `Returns the specified Test Step Result. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestStepResults\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"testStepIndex":{"type":"string","description":"The Test Step index."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","testStepIndex"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2131,7 +2131,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestStepResult", {
     name: "patchTestStepResult",
-    description: `Updates the specified Test Step Result.`,
+    description: `Updates the specified Test Step Result. Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchTestStepResults\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"testStepIndex":{"type":"string","description":"The Test Step index."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["teststep_results"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"comment":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"result":{"type":"string"}},"type":"object"}},"type":"object"}},"type":"object","description":"The Test Step(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","testStepIndex","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2142,7 +2142,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestStepResultAttachments", {
     name: "getTestStepResultAttachments",
-    description: `Returns a list of Attachments for the specified Test Step Result.`,
+    description: `Returns a list of Attachments for the specified Test Step Result. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestStepResultAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"testStepIndex":{"type":"string","description":"The Test Step index."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","testStepIndex"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2164,7 +2164,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestStepResultAttachments", {
     name: "deleteTestStepResultAttachments",
-    description: `Deletes a list of Test Step Result Attachments.`,
+    description: `Deletes a list of Test Step Result Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteTestStepResultAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"testStepIndex":{"type":"string","description":"The Test Step index."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["teststepresult_attachments"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Step Result Attachment(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","testStepIndex","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2175,7 +2175,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestStepResultAttachment", {
     name: "getTestStepResultAttachment",
-    description: `Returns the specified Test Step Result Attachment for the specified Test Record.`,
+    description: `Returns the specified Test Step Result Attachment for the specified Test Record. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestStepResultAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"testStepIndex":{"type":"string","description":"The Test Step index."},"attachmentId":{"type":"string","description":"The Attachment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","testStepIndex","attachmentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2186,7 +2186,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestStepResultAttachment", {
     name: "deleteTestStepResultAttachment",
-    description: `Deletes the specified Test Step Result Attachment.`,
+    description: `Deletes the specified Test Step Result Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteTestStepResultAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"testRunId":{"type":"string","description":"The Test Run ID."},"testCaseProjectId":{"type":"string","description":"The Testcase Project ID."},"testCaseId":{"type":"string","description":"The Testcase ID."},"iteration":{"type":"string","description":"The Iteration Number."},"testStepIndex":{"type":"string","description":"The Test Step index."},"attachmentId":{"type":"string","description":"The Attachment ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","testRunId","testCaseProjectId","testCaseId","iteration","testStepIndex","attachmentId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2219,7 +2219,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItems", {
     name: "getWorkItems",
-    description: `Returns a list of Work Items. Scope: one project (requires a project ID). To act across all projects, use \`getAllWorkItems\` instead.`,
+    description: `Returns a list of Work Items. Scope: one project (requires a project ID). To act across all projects, use \`getAllWorkItems\` instead. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getWorkItem\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2252,7 +2252,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchWorkItems", {
     name: "patchWorkItems",
-    description: `Updates a list of Work Items. Scope: one project (requires a project ID). To act across all projects, use \`patchAllWorkItems\` instead.`,
+    description: `Updates a list of Work Items. Scope: one project (requires a project ID). To act across all projects, use \`patchAllWorkItems\` instead. Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchWorkItem\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workflowAction":{"type":"string","description":"The Workflow Action."},"changeTypeTo":{"type":"string","description":"The Type the Workitem to change to."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["workitems"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"description":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"dueDate":{"format":"date","type":"string"},"hyperlinks":{"items":{"properties":{"role":{"type":"string"},"title":{"type":"string"},"uri":{"type":"string"}},"type":"object"},"type":"array"},"initialEstimate":{"type":"string"},"priority":{"type":"string"},"remainingEstimate":{"type":"string"},"resolution":{"type":"string"},"resolvedOn":{"format":"date-time","type":"string"},"severity":{"type":"string"},"status":{"type":"string"},"timeSpent":{"type":"string"},"title":{"type":"string"}},"type":"object"},"relationships":{"properties":{"assignee":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"categories":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["categories"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"linkedRevisions":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["revisions"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"votes":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"watches":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The Work Item(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2263,7 +2263,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItem", {
     name: "getWorkItem",
-    description: `Returns the specified Work Item.`,
+    description: `Returns the specified Work Item. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getWorkItems\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2274,7 +2274,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchWorkItem", {
     name: "patchWorkItem",
-    description: `Updates the specified Work Item.`,
+    description: `Updates the specified Work Item. Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchWorkItems\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"workflowAction":{"type":"string","description":"The Workflow Action."},"changeTypeTo":{"type":"string","description":"The Type the Workitem to change to."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["workitems"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"description":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"dueDate":{"format":"date","type":"string"},"hyperlinks":{"items":{"properties":{"role":{"type":"string"},"title":{"type":"string"},"uri":{"type":"string"}},"type":"object"},"type":"array"},"initialEstimate":{"type":"string"},"priority":{"type":"string"},"remainingEstimate":{"type":"string"},"resolution":{"type":"string"},"resolvedOn":{"format":"date-time","type":"string"},"severity":{"type":"string"},"status":{"type":"string"},"timeSpent":{"type":"string"},"title":{"type":"string"}},"type":"object"},"relationships":{"properties":{"assignee":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"categories":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["categories"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"linkedRevisions":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["revisions"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"votes":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"},"watches":{"properties":{"data":{"items":{"properties":{"id":{"type":"string"},"type":{"enum":["users"],"type":"string"}},"type":"object"},"type":"array"}},"type":"object"}},"type":"object"}},"type":"object"}},"type":"object","description":"The Work Item body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2329,7 +2329,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItemApprovals", {
     name: "getWorkItemApprovals",
-    description: `Returns a list of instances.`,
+    description: `Returns a list of instances. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getWorkItemApproval\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2351,7 +2351,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteApprovals", {
     name: "deleteApprovals",
-    description: `Deletes a list of Work Item Approvals.`,
+    description: `Deletes a list of Work Item Approvals. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteApproval\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["workitem_approvals"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Workitem Approval(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2362,7 +2362,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchWorkItemApprovals", {
     name: "patchWorkItemApprovals",
-    description: `Updates a list of instances.`,
+    description: `Updates a list of instances. Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchWorkItemApproval\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["workitem_approvals"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"status":{"enum":["waiting","approved","disapproved"],"type":"string"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Run(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2373,7 +2373,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItemApproval", {
     name: "getWorkItemApproval",
-    description: `Returns the specified instance.`,
+    description: `Returns the specified instance. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getWorkItemApprovals\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"userId":{"type":"string","description":"The User ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","userId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2384,7 +2384,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteApproval", {
     name: "deleteApproval",
-    description: `Deletes the specified Work Item Approval.`,
+    description: `Deletes the specified Work Item Approval. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteApprovals\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"userId":{"type":"string","description":"The User ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","userId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2395,7 +2395,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchWorkItemApproval", {
     name: "patchWorkItemApproval",
-    description: `Updates the specified instance.`,
+    description: `Updates the specified instance. Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchWorkItemApprovals\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"userId":{"type":"string","description":"The User ID."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["workitem_approvals"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"status":{"enum":["waiting","approved","disapproved"],"type":"string"}},"type":"object"}},"type":"object"}},"type":"object","description":"The Test Run(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","userId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2406,7 +2406,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItemAttachments", {
     name: "getWorkItemAttachments",
-    description: `Returns a list of  Work Item Attachments.`,
+    description: `Returns a list of  Work Item Attachments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getWorkItemAttachment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string"},"workItemId":{"type":"string"},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2428,7 +2428,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItemAttachment", {
     name: "getWorkItemAttachment",
-    description: `Returns the specified Work Item Attachment.`,
+    description: `Returns the specified Work Item Attachment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getWorkItemAttachments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"attachmentId":{"type":"string","description":"The Attachment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","attachmentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2494,7 +2494,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getComments", {
     name: "getComments",
-    description: `Returns a list of Work Item Comments.`,
+    description: `Returns a list of Work Item Comments. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getComment\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2516,7 +2516,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getComment", {
     name: "getComment",
-    description: `Returns the specified Work Item Comment.`,
+    description: `Returns the specified Work Item Comment. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getComments\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"commentId":{"type":"string","description":"The Comment ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","commentId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2538,7 +2538,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getExternallyLinkedWorkItems", {
     name: "getExternallyLinkedWorkItems",
-    description: `Returns the external links to other Work Items. (The same as the corresponding Java API method.)`,
+    description: `Returns the external links to other Work Items. (The same as the corresponding Java API method.). Cardinality: targets the full collection or a batch. For a single item by ID, use \`getExternallyLinkedWorkItem\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2560,7 +2560,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteExternallyLinkedWorkItems", {
     name: "deleteExternallyLinkedWorkItems",
-    description: `Deletes a list of Externally Linked Work Items.`,
+    description: `Deletes a list of Externally Linked Work Items. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteExternallyLinkedWorkItem\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["externallylinkedworkitems"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Work Item(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2571,7 +2571,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getExternallyLinkedWorkItem", {
     name: "getExternallyLinkedWorkItem",
-    description: `Returns the external links to other Work Items. (The same as the corresponding Java API method.)`,
+    description: `Returns the external links to other Work Items. (The same as the corresponding Java API method.). Cardinality: targets a single item by ID. For the full collection or a batch, use \`getExternallyLinkedWorkItems\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"roleId":{"type":"string","description":"The Role ID."},"hostname":{"type":"string","description":"The Target Hostname."},"targetProjectId":{"type":"string","description":"The Target Project ID."},"linkedWorkItemId":{"type":"string","description":"The Linked Work Item ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","roleId","hostname","targetProjectId","linkedWorkItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2582,7 +2582,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteExternallyLinkedWorkItem", {
     name: "deleteExternallyLinkedWorkItem",
-    description: `Deletes the specified Externally Linked Work Item.`,
+    description: `Deletes the specified Externally Linked Work Item. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteExternallyLinkedWorkItems\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"roleId":{"type":"string","description":"The Role ID."},"hostname":{"type":"string","description":"The Target Hostname."},"targetProjectId":{"type":"string","description":"The Target Project ID."},"linkedWorkItemId":{"type":"string","description":"The Linked Work Item ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","roleId","hostname","targetProjectId","linkedWorkItemId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2593,7 +2593,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getFeatureSelections", {
     name: "getFeatureSelections",
-    description: `Returns a list of Feature Selections.`,
+    description: `Returns a list of Feature Selections. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getFeatureSelection\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2604,7 +2604,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getFeatureSelection", {
     name: "getFeatureSelection",
-    description: `Returns the specified Feature Selection.`,
+    description: `Returns the specified Feature Selection. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getFeatureSelections\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"selectionTypeId":{"type":"string","description":"The Selection Type ID."},"targetProjectId":{"type":"string","description":"The Target Project ID."},"targetWorkItemId":{"type":"string","description":"The Target Work Item ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","selectionTypeId","targetProjectId","targetWorkItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2670,7 +2670,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getLinkedWorkItems", {
     name: "getLinkedWorkItems",
-    description: `Returns the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks.`,
+    description: `Returns the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getLinkedWorkItem\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2692,7 +2692,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteLinkedWorkItems", {
     name: "deleteLinkedWorkItems",
-    description: `Deletes the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks.`,
+    description: `Deletes the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteLinkedWorkItem\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["linkedworkitems"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Linked Work Item(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2703,7 +2703,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getLinkedWorkItem", {
     name: "getLinkedWorkItem",
-    description: `Returns the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks.`,
+    description: `Returns the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getLinkedWorkItems\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"roleId":{"type":"string","description":"The Role ID."},"targetProjectId":{"type":"string","description":"The Target Project ID."},"linkedWorkItemId":{"type":"string","description":"The Linked Work Item ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","roleId","targetProjectId","linkedWorkItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2714,7 +2714,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteLinkedWorkItem", {
     name: "deleteLinkedWorkItem",
-    description: `Deletes the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks.`,
+    description: `Deletes the direct outgoing links to other Work Items. (The same as the corresponding Java API method.)  Does not pertain to external links or backlinks. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteLinkedWorkItems\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"roleId":{"type":"string","description":"The Role ID."},"targetProjectId":{"type":"string","description":"The Target Project ID."},"linkedWorkItemId":{"type":"string","description":"The Linked Work Item ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","roleId","targetProjectId","linkedWorkItemId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2780,7 +2780,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItemTestParameterDefinitions", {
     name: "getWorkItemTestParameterDefinitions",
-    description: `Returns a list of Test Parameter Definitions for the specified Work Item.`,
+    description: `Returns a list of Test Parameter Definitions for the specified Work Item. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getWorkItemTestParameterDefinition\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2791,7 +2791,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkItemTestParameterDefinition", {
     name: "getWorkItemTestParameterDefinition",
-    description: `Returns the specified Test Parameter Definition for the specified Work Item.`,
+    description: `Returns the specified Test Parameter Definition for the specified Work Item. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getWorkItemTestParameterDefinitions\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"testParamId":{"type":"string","description":"The Test Parameter."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","testParamId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2802,7 +2802,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestSteps", {
     name: "getTestSteps",
-    description: `Returns a list of Test Steps.`,
+    description: `Returns a list of Test Steps. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getTestStep\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2824,7 +2824,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestSteps", {
     name: "deleteTestSteps",
-    description: `Deletes a list of Test Steps.`,
+    description: `Deletes a list of Test Steps. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteTestStep\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["teststeps"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Step(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2835,7 +2835,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestSteps", {
     name: "patchTestSteps",
-    description: `Updates a list of Test Steps.`,
+    description: `Updates a list of Test Steps. Cardinality: targets the full collection or a batch. For a single item by ID, use \`patchTestStep\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["teststeps"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"keys":{"items":{"type":"string"},"type":"array"},"values":{"items":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object"}},"type":"object"},"type":"array"}},"type":"object","description":"The Test Step(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2846,7 +2846,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getTestStep", {
     name: "getTestStep",
-    description: `Returns the specified Test Step.`,
+    description: `Returns the specified Test Step. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getTestSteps\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"testStepIndex":{"type":"string","description":"The Test Step index."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","testStepIndex"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2857,7 +2857,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteTestStep", {
     name: "deleteTestStep",
-    description: `Deletes the specified Test Step.`,
+    description: `Deletes the specified Test Step. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteTestSteps\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"testStepIndex":{"type":"string","description":"The Test Step index."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","testStepIndex"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2868,7 +2868,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["patchTestStep", {
     name: "patchTestStep",
-    description: `Updates the specified Test Step.`,
+    description: `Updates the specified Test Step. Cardinality: targets a single item by ID. For the full collection or a batch, use \`patchTestSteps\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"testStepIndex":{"type":"string","description":"The Test Step index."},"requestBody":{"properties":{"data":{"properties":{"type":{"enum":["teststeps"],"type":"string"},"id":{"type":"string"},"attributes":{"properties":{"keys":{"items":{"type":"string"},"type":"array"},"values":{"items":{"properties":{"type":{"enum":["text/html","text/plain"],"type":"string"},"value":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object"}},"type":"object"}},"type":"object","description":"The Test Step(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","testStepIndex","requestBody"]},
     method: "patch",
     annotations: {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true},
@@ -2879,7 +2879,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkRecords", {
     name: "getWorkRecords",
-    description: `Returns a list of instances.`,
+    description: `Returns a list of instances. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getWorkRecord\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2901,7 +2901,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteWorkRecords", {
     name: "deleteWorkRecords",
-    description: `Deletes a list of Work Records.`,
+    description: `Deletes a list of Work Records. Cardinality: targets the full collection or a batch. For a single item by ID, use \`deleteWorkRecord\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"requestBody":{"properties":{"data":{"items":{"properties":{"type":{"enum":["workrecords"],"type":"string"},"id":{"type":"string"}},"type":"object"},"type":"array"}},"type":"object","description":"The Work Record(s) body."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","requestBody"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2912,7 +2912,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getWorkRecord", {
     name: "getWorkRecord",
-    description: `Returns the specified instance.`,
+    description: `Returns the specified instance. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getWorkRecords\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"workRecordId":{"type":"string","description":"The Work Record ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["projectId","workItemId","workRecordId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -2923,7 +2923,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["deleteWorkRecord", {
     name: "deleteWorkRecord",
-    description: `Deletes the specified Work Record.`,
+    description: `Deletes the specified Work Record. Cardinality: targets a single item by ID. For the full collection or a batch, use \`deleteWorkRecords\` instead.`,
     inputSchema: {"type":"object","properties":{"projectId":{"type":"string","description":"The Project ID."},"workItemId":{"type":"string","description":"The Work Item ID."},"workRecordId":{"type":"string","description":"The Work Record ID."},"dry_run":{"type":"boolean","description":"If true, validate and return the request that would be sent without calling Polarion."}},"required":["projectId","workItemId","workRecordId"]},
     method: "delete",
     annotations: {"readOnlyHint":false,"destructiveHint":true,"idempotentHint":true,"openWorldHint":true},
@@ -2989,7 +2989,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getRevisions", {
     name: "getRevisions",
-    description: `Returns a list of instances.`,
+    description: `Returns a list of instances. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getRevision\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -3000,7 +3000,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getRevision", {
     name: "getRevision",
-    description: `Returns the specified instance.`,
+    description: `Returns the specified instance. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getRevisions\` instead.`,
     inputSchema: {"type":"object","properties":{"repositoryName":{"type":"string","description":"The Repository Name."},"revision":{"type":"string","description":"The revision ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."}},"required":["repositoryName","revision"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -3055,7 +3055,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getUsers", {
     name: "getUsers",
-    description: `Returns a list of Users.`,
+    description: `Returns a list of Users. Cardinality: targets the full collection or a batch. For a single item by ID, use \`getUser\` instead.`,
     inputSchema: {"type":"object","properties":{"page[size]":{"type":"number","format":"int32","description":"Limit the number of entities returned in a single response. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"page[number]":{"type":"number","format":"int32","description":"Specify the page number to be returned. Counting starts from 1. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"query":{"type":"string","description":"The query string."},"sort":{"type":"string","description":"The sort string."},"revision":{"type":"string","description":"The revision ID."}}},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},
@@ -3077,7 +3077,7 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map([
   }],
   ["getUser", {
     name: "getUser",
-    description: `Returns the specified User.`,
+    description: `Returns the specified User. Cardinality: targets a single item by ID. For the full collection or a batch, use \`getUsers\` instead.`,
     inputSchema: {"type":"object","properties":{"userId":{"type":"string","description":"The User ID."},"fields":{"type":"object","additionalProperties":{"type":"string","description":"Comma-separated list of fields to include for this resource type"},"description":"Filter returned resource fields. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"include":{"type":"string","description":"Include related entities. See <a href=\"https://docs.sw.siemens.com/en-US/doc/230235217/PL20250606201928474.polarion_help_sc.xid2134849/xid2134871\" target=\"_blank\">REST API User Guide</a> for details."},"revision":{"type":"string","description":"The revision ID."}},"required":["userId"]},
     method: "get",
     annotations: {"readOnlyHint":true,"openWorldHint":true},

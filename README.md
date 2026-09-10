@@ -4,7 +4,7 @@
 
 **Connect Claude, VS Code Copilot, and ChatGPT directly to Polarion ALM.**
 
-An open-source **Model Context Protocol** server that exposes **271 Polarion REST operations** as AI-native tools.
+An open-source **Model Context Protocol** server that exposes **284 Polarion REST operations** as AI-native tools.
 
 [![CI](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml)
 [![Publish Docker image](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml)
@@ -109,7 +109,7 @@ See `docs/examples.http` for ready-to-run HTTP requests and `docs/client-example
 
 ## Available Tools
 
-271 tools are generated from the Polarion OpenAPI spec. A few representative examples:
+284 tools are generated from the Polarion OpenAPI spec. A few representative examples:
 
 | Tool | Description |
 |---|---|
@@ -186,7 +186,7 @@ const page1 = await client.callTool({
 src/
   config.ts           — API base URL, token, and resource URL constants
   server.ts           — shared MCP server factory (transport-agnostic)
-  tools.ts            — generated MCP tool definitions (271 tools)
+  tools.ts            — generated MCP tool definitions (284 tools)
   executor.ts         — tool call dispatcher
   mcp-http-server.ts  — Streamable HTTP MCP transport (remote clients)
   http-server.ts      — plain REST wrapper for ChatGPT Custom GPT Actions
