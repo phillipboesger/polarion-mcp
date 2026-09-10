@@ -424,6 +424,130 @@ test("executeApiTool renders text/html rich-text fields as Markdown alongside th
   }
 })
 
+test("executeApiTool includes structuredContent matching the JSON body when the tool declares an outputSchema (MCP spec requirement)", async () => {
+  const definition: McpToolDefinition = {
+    ...emptyDefinition,
+    name: "get_thing",
+    method: "get",
+    pathTemplate: "/things/1",
+    outputSchema: { type: "object", properties: { data: { type: "object" } } },
+  }
+  const body = { data: { type: "things", id: "1", attributes: { name: "Example" } } }
+  const httpClient = async (): Promise<AxiosResponse> => ({
+    data: body,
+    status: 200,
+    statusText: "OK",
+    headers: { "content-type": "application/json" },
+    config: {} as any,
+  })
+
+  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 })
+  assert.deepEqual(result.structuredContent, body)
+})
+
+test("executeApiTool omits structuredContent when the tool has no outputSchema, even for a JSON response", async () => {
+  const definition: McpToolDefinition = { ...emptyDefinition, name: "get_thing", method: "get", pathTemplate: "/things/1" }
+  const httpClient = async (): Promise<AxiosResponse> => ({
+    data: { data: { type: "things", id: "1" } },
+    status: 200,
+    statusText: "OK",
+    headers: { "content-type": "application/json" },
+    config: {} as any,
+  })
+
+  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 })
+  assert.equal(result.structuredContent, undefined)
+})
+
+test("executeApiTool marks a successful call as isError when the tool declares outputSchema but the response has no usable JSON body (e.g. empty/204)", async () => {
+  const definition: McpToolDefinition = {
+    ...emptyDefinition,
+    name: "get_thing",
+    method: "get",
+    pathTemplate: "/things/1",
+    outputSchema: { type: "object", properties: {} },
+  }
+  const httpClient = async (): Promise<AxiosResponse> => ({
+    data: undefined,
+    status: 204,
+    statusText: "No Content",
+    headers: {},
+    config: {} as any,
+  })
+
+  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 })
+  assert.equal(result.isError, true)
+  assert.equal(result.structuredContent, undefined)
+})
+
+test("executeApiTool marks a Zod argument-validation failure as isError (MCP spec: structuredContent's MUST is scoped to non-error results)", async () => {
+  const definition: McpToolDefinition = {
+    ...emptyDefinition,
+    name: "get_thing",
+    method: "get",
+    pathTemplate: "/things/{id}",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+    executionParameters: [{ name: "id", in: "path" }],
+    outputSchema: { type: "object", properties: {} },
+  }
+
+  const result = await executeApiTool("get_thing", definition, {}, {})
+  assert.equal(result.isError, true)
+  assert.equal(result.structuredContent, undefined)
+})
+
+test("executeApiTool marks a pre-write guard refusal as isError", async () => {
+  _optionsCache.clear()
+  const definition: McpToolDefinition = { ...patchWorkItemDefinition, outputSchema: { type: "object", properties: {} } }
+  // getAvailableOptions lookup errors -> the enum guard fails closed (refuses the write).
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    if (String(config.method).toLowerCase() === "get") throw new Error("Polarion unreachable")
+    throw new Error("the actual write should never be reached when the guard's lookup fails")
+  }
+
+  const result = await executeApiTool(
+    "patchWorkItem",
+    definition,
+    { projectId: "DEMO", workItemId: "DEMO-1", requestBody: { data: { type: "workitems", id: "DEMO/DEMO-1", attributes: { severity: "critical" } } } },
+    {},
+    { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 },
+  )
+  assert.equal(result.isError, true)
+  assert.match((result.content[0] as { type: "text", text: string }).text, /Write refused/)
+})
+
+test("executeApiTool marks a dry_run preview as isError when the tool declares outputSchema (preview can never conform to it), but not otherwise", async () => {
+  const baseDefinition: McpToolDefinition = {
+    ...emptyDefinition,
+    name: "create_thing",
+    method: "post",
+    pathTemplate: "/things",
+    inputSchema: { type: "object", properties: { requestBody: { type: "object" } } },
+    requestBodyContentType: "application/json",
+  }
+  const httpClient = async (): Promise<AxiosResponse> => {
+    throw new Error("network should never be called during a dry run")
+  }
+
+  const withSchema = await executeApiTool(
+    "create_thing",
+    { ...baseDefinition, outputSchema: { type: "object", properties: {} } },
+    { requestBody: {}, dry_run: true },
+    {},
+    { httpClient, minIntervalMs: 0 },
+  )
+  assert.equal(withSchema.isError, true)
+
+  const withoutSchema = await executeApiTool(
+    "create_thing",
+    baseDefinition,
+    { requestBody: {}, dry_run: true },
+    {},
+    { httpClient, minIntervalMs: 0 },
+  )
+  assert.equal(withoutSchema.isError, undefined)
+})
+
 test("executeApiTool refuses a patchWorkItem write with an invalid enum value, never sending the PATCH", async () => {
   _optionsCache.clear()
   let patchCalled = false

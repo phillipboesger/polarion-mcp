@@ -493,10 +493,10 @@ export async function executeApiTool(
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
         const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${e.path.join('.')} (${e.code}): ${e.message}`).join(', ')}`;
-        return { content: [{ type: 'text', text: validationErrorMessage }] };
+        return { content: [{ type: 'text', text: validationErrorMessage }], isError: true };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return { content: [{ type: 'text', text: `Internal error during validation setup: ${errorMessage}` }] };
+        return { content: [{ type: 'text', text: `Internal error during validation setup: ${errorMessage}` }], isError: true };
       }
     }
 
@@ -786,6 +786,16 @@ export async function executeApiTool(
             text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
           }
         ],
+        // MCP clients built on the official SDK throw if a tool that declares an
+        // outputSchema returns a non-error result without structuredContent (see
+        // Client.callTool in @modelcontextprotocol/sdk). The preview payload here
+        // is a request preview, not the tool's real output, so it can never
+        // conform to that schema -- isError is the spec-sanctioned way to signal
+        // "no structured output was produced" without violating the tool's
+        // declared contract. Only applied when it's actually required, so the
+        // (far more common) dry_run call on a tool with no outputSchema keeps its
+        // existing non-error preview behavior.
+        ...(definition.outputSchema ? { isError: true } : {}),
       };
     }
 
@@ -805,7 +815,7 @@ export async function executeApiTool(
     if (enumTargets) {
       const enumResult = await checkWorkItemsEnumFields(enumTargets, guardRequestContext, sendOpts);
       if (!enumResult.ok) {
-        return { content: [{ type: 'text', text: `Write refused: ${enumResult.reason}` }] };
+        return { content: [{ type: 'text', text: `Write refused: ${enumResult.reason}` }], isError: true };
       }
     }
 
@@ -814,7 +824,7 @@ export async function executeApiTool(
       for (const target of customFieldKeyTargets) {
         const fieldKeyResult = await checkResourceCustomFieldKeys(target, guardRequestContext, sendOpts);
         if (!fieldKeyResult.ok) {
-          return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }] };
+          return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }], isError: true };
         }
       }
     }
@@ -822,7 +832,7 @@ export async function executeApiTool(
     if (enumTargets) {
       const userResult = await runWorkItemUserReferenceGuard(enumTargets, guardRequestContext, sendOpts);
       if (!userResult.ok) {
-        return { content: [{ type: 'text', text: `Write refused: ${userResult.reason}` }] };
+        return { content: [{ type: 'text', text: `Write refused: ${userResult.reason}` }], isError: true };
       }
     }
 
@@ -836,6 +846,12 @@ export async function executeApiTool(
 
     // ===== STEP 8: Format the Response =====
     let responseText = '';
+    // Populated alongside `responseText` for JSON bodies, and only surfaced in the
+    // result (STEP 9) when this tool declared an `outputSchema` -- the MCP spec
+    // requires `structuredContent` to accompany a result whenever the tool's
+    // definition carries one, so schema-validating clients can consume it directly
+    // instead of having to parse it back out of the text block.
+    let structuredContent: JsonObject | undefined;
     // Axios header values are loosely typed (string | number | AxiosHeaders | ...),
     // so coerce to string before normalizing.
     const contentType = String(response.headers['content-type'] ?? '').toLowerCase();
@@ -849,6 +865,9 @@ export async function executeApiTool(
         const renderedData = renderRichTextFieldsAsMarkdown(response.data);
         // Pretty-print JSON with 2-space indentation
         responseText = JSON.stringify(renderedData, null, 2);
+        // Safe: this branch already checked `response.data` is a non-null object,
+        // and renderRichTextFieldsAsMarkdown preserves the top-level shape.
+        structuredContent = renderedData as JsonObject;
       } catch (e) {
         responseText = "[Stringify Error]";
       }
@@ -867,6 +886,12 @@ export async function executeApiTool(
     }
 
     // ===== STEP 9: Return Formatted Response =====
+    // If this tool declared an outputSchema but the actual response didn't come back
+    // as a JSON object (empty/204, non-JSON content-type, a stringify failure, or any
+    // other shape the branches above fall through to), there's no structuredContent
+    // to honestly offer. Per the same MCP client enforcement described above, mark
+    // that as isError instead of returning a non-error result the schema can't cover.
+    const outputSchemaUnfulfilled = Boolean(definition.outputSchema) && structuredContent === undefined;
     return {
       content: [
         {
@@ -874,6 +899,8 @@ export async function executeApiTool(
           text: `API Response (Status: ${response.status}):\n${responseText}`
         }
       ],
+      ...(definition.outputSchema && structuredContent !== undefined ? { structuredContent } : {}),
+      ...(outputSchemaUnfulfilled ? { isError: true } : {}),
     };
 
   } catch (error: unknown) {
@@ -898,6 +925,6 @@ export async function executeApiTool(
     console.error(`[ERROR] Error during execution of tool '${toolName}':`, errorMessage);
 
     // Return error message to AI assistant
-    return { content: [{ type: "text", text: errorMessage }] };
+    return { content: [{ type: "text", text: errorMessage }], isError: true };
   }
 }

@@ -66,6 +66,7 @@ export function createPolarionServer(): Server {
         description: def.description,
         inputSchema: sanitizedSchema,
         ...(def.annotations ? { annotations: def.annotations } : {}),
+        ...(def.outputSchema ? { outputSchema: def.outputSchema } : {}),
       };
     });
     return { tools: toolsForClient };

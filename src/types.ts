@@ -83,6 +83,9 @@ export interface McpToolAnnotations {
  * - requestBodyContentType: MIME type for request body (if applicable)
  * - securityRequirements: Authentication methods required for this operation
  * - annotations: Behavioral hints (read-only, destructive, idempotent, open-world)
+ * - outputSchema: JSON Schema for the tool's success response body, derived from the
+ *   Polarion OpenAPI spec's response definition (absent for operations with no JSON
+ *   body, e.g. most `204 No Content` deletes)
  * - nameMap: Mapping from sanitized parameter names to original names
  */
 export interface McpToolDefinition {
@@ -95,6 +98,7 @@ export interface McpToolDefinition {
   requestBodyContentType?: string;
   securityRequirements: any[];
   annotations?: McpToolAnnotations;
+  outputSchema?: any;
   nameMap?: NameMap; // Mapping from sanitized keys to original keys
 }
 
