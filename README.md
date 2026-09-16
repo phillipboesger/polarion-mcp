@@ -71,14 +71,24 @@ The image is published automatically to GitHub Container Registry on every push 
 ```bash
 docker run -d \
   -e API_BASE_URL=https://your-polarion.com/polarion/rest/v1 \
-  -e BEARER_TOKEN=your_polarion_pat \
-  -e MCP_HTTP_TOKEN=your_mcp_secret \
   -p 3000:3000 \
   --name polarion-mcp \
   ghcr.io/phillipboesger/polarion-mcp:latest
 ```
 
-Connect your MCP client to `http://localhost:3000/mcp` with `Authorization: Bearer your_mcp_secret`.
+The HTTP deployment holds **no credentials**. Two ways for a client to
+authenticate, both ending at the user's own Polarion Personal Access Token:
+
+- **Send the PAT yourself** — `Authorization: Bearer <your Polarion PAT>` on
+  `http://localhost:3000/mcp`. Right for curl and hand-configured clients.
+- **Log in** — set `MCP_PUBLIC_URL` to the server's public HTTPS URL and an
+  unauthenticated request answers with an OAuth challenge, so a client such as
+  a Claude.ai connector opens a page where the user pastes their PAT. The token
+  is checked against Polarion, kept in the server's memory for the session, and
+  never handed to the client or written to disk.
+
+Either way the Polarion REST calls of a request run with that user's own token,
+so everyone acts under their own Polarion account and permissions.
 
 <p align="center">
   <img src="docs/assets/demo-cloud.gif" alt="Polarion MCP running as a hosted HTTP MCP server, connected from Claude.ai" width="850">
@@ -93,6 +103,11 @@ docker run --rm -i \
   ghcr.io/phillipboesger/polarion-mcp:latest \
   node build/index.js
 ```
+
+To run it on the Polarion server itself, behind that server's own Apache
+(no Docker), follow [docs/deployment.md](docs/deployment.md) — it carries the
+systemd unit and the exact `ProxyPass` block, including the OAuth paths that
+are easy to forget.
 
 ### Local development
 
@@ -133,13 +148,14 @@ The full list is generated from `src/tools.ts` via `npm run generate-tools`.
 ```bash
 # Required
 API_BASE_URL=https://your-polarion.com/polarion/rest/v1
-BEARER_TOKEN=your_polarion_personal_access_token
 
-# Required for HTTP MCP transport
-MCP_HTTP_TOKEN=your_mcp_bearer_token   # clients must send this to /mcp
+# Required for stdio mode only — in HTTP mode each client sends its own PAT
+BEARER_TOKEN=your_polarion_personal_access_token
 
 # Optional
 MCP_HTTP_PORT=3000                     # port for MCP HTTP server (default 3000)
+MCP_HTTP_HOST=127.0.0.1                # bind address (default 0.0.0.0); use loopback behind a TLS proxy
+MCP_PUBLIC_URL=https://mcp.example.com # public HTTPS base URL; enables the OAuth login page
 MCP_ALLOWED_HOSTS=your-host.com        # DNS-rebinding protection (comma-separated)
 NODE_TLS_REJECT_UNAUTHORIZED=0         # disable SSL verification for self-signed certs
 ```
@@ -207,8 +223,8 @@ src/
 
 ## Security
 
-- **Token Validation** — MCP HTTP server refuses to start without `MCP_HTTP_TOKEN`; every `/mcp` request must supply it as a Bearer token
-- **Credential isolation** — Polarion credentials (`API_BASE_URL`, `BEARER_TOKEN`) stay server-side and are never exposed to MCP clients
+- **No stored credentials in HTTP mode** — the server keeps no Polarion token; every `/mcp` request must carry the caller's own Polarion PAT as a Bearer token, and Polarion authorizes each call under that user
+- **Serve it over TLS** — the PAT travels in the request header; terminate TLS in front of the server and bind the plaintext port to loopback (`MCP_HTTP_HOST=127.0.0.1`)
 - **DNS-rebinding protection** — optional `MCP_ALLOWED_HOSTS` allow-list validates the `Host` header on every request
 - **No Secrets in Logs** — tokens are automatically removed from all log output and error messages
 

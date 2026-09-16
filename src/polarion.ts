@@ -29,6 +29,7 @@ import type { CallToolResult, Resource } from "@modelcontextprotocol/sdk/types.j
 import {
   API_BASE_URL,
   getBearerToken,
+  callerCacheScope,
   shouldRejectUnauthorized,
   POLARION_RESOURCES,
   LOCAL_SDK_FILES,
@@ -62,6 +63,20 @@ const SDK_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), '..',
  * - Improves response time significantly
  */
 const projectConfigCache = new Map<string, ProjectConfig>();
+
+/**
+ * Cache key for a project config.
+ *
+ * The caller's identity is part of the key: this config was fetched with one
+ * user's Polarion token and reflects what Polarion granted *that* user, so it
+ * must never be served to a different caller.
+ *
+ * @param projectId - Polarion project id.
+ * @returns The cache key for the current caller and project.
+ */
+function configCacheKey(projectId: string): string {
+  return `${callerCacheScope()}::${projectId}`;
+}
 
 /**
  * Refreshes and caches Polarion project configuration
@@ -183,7 +198,7 @@ export async function refreshPolarionConfig(args: { projectId: string }): Promis
     };
 
     // Cache the configuration
-    projectConfigCache.set(projectId, config);
+    projectConfigCache.set(configCacheKey(projectId), config);
 
     return {
       content: [{
@@ -481,8 +496,13 @@ export function listPolarionResources(): Resource[] {
     }
   ];
 
-  // Add dynamic project config resources if any are cached
-  for (const [projectId, config] of projectConfigCache.entries()) {
+  // Add dynamic project config resources the *current caller* has cached.
+  // Another user's cached projects must not even be listed: the project ids
+  // alone would disclose what that user can see in Polarion.
+  const ownPrefix = `${callerCacheScope()}::`;
+  for (const key of projectConfigCache.keys()) {
+    if (!key.startsWith(ownPrefix)) continue;
+    const projectId = key.slice(ownPrefix.length);
     resources.push({
       uri: `polarion://config/${projectId}`,
       name: `${projectId} - Project Configuration`,
@@ -607,7 +627,7 @@ export async function readPolarionResource(uri: string) {
   // Handle project configuration resources
   if (uri.startsWith("polarion://config/")) {
     const projectId = uri.replace("polarion://config/", "");
-    const config = projectConfigCache.get(projectId);
+    const config = projectConfigCache.get(configCacheKey(projectId));
 
     if (config) {
       return {
@@ -703,7 +723,7 @@ export function getPolarionPrompt(name: string, args?: Record<string, unknown>) 
     }
 
     // Try to get cached config or provide generic guidance
-    const config = projectConfigCache.get(projectId);
+    const config = projectConfigCache.get(configCacheKey(projectId));
     const configInfo = config ? `
 
 ## Project Configuration for ${projectId}:

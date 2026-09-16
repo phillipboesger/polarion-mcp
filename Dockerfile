@@ -4,11 +4,11 @@
 #
 # Required env vars at runtime:
 #   API_BASE_URL    — e.g. https://your-polarion.com/polarion/rest/v1
-#   BEARER_TOKEN    — Polarion Personal Access Token
-#   MCP_HTTP_TOKEN  — Bearer token clients must send to /mcp
+#   (no credentials: each client sends its own Polarion PAT as the Bearer token of /mcp)
 #
 # Optional:
 #   MCP_HTTP_PORT               (default 3000)
+#   MCP_HTTP_HOST               bind address (default 0.0.0.0; use 127.0.0.1 behind a TLS proxy)
 #   MCP_ALLOWED_HOSTS           comma-separated allow-list for DNS-rebinding protection
 #   NODE_TLS_REJECT_UNAUTHORIZED=0  disable SSL verification for self-signed certs
 

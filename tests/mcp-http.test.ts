@@ -4,7 +4,9 @@ import type { AddressInfo } from "node:net"
 
 import { createMcpHttpApp } from "../src/mcp-http-server.js"
 
-const TOKEN = "test-bearer-token"
+// Any value is accepted at the transport: it is the caller's Polarion PAT,
+// validated by Polarion on the upstream call, not by this server.
+const TOKEN = "pat-of-the-calling-user"
 
 const INIT_BODY = {
   jsonrpc: "2.0",
@@ -28,7 +30,7 @@ const MCP_HEADERS: Record<string, string> = {
  * teardown helpers.
  */
 async function startApp() {
-  const { app, closeAllSessions } = createMcpHttpApp({ token: TOKEN })
+  const { app, closeAllSessions } = createMcpHttpApp()
   const server = app.listen(0)
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const { port } = server.address() as AddressInfo

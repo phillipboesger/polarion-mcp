@@ -52,6 +52,7 @@ import axios, { type AxiosRequestConfig } from 'axios';
 import https from 'https';
 import { sendWithRetry, type SendWithRetryOpts } from './httpClient.js';
 import { formatApiError } from './utils.js';
+import { callerCacheScope } from './config.js';
 
 const STANDARD_WORK_ITEM_ENUM_FIELDS = ['status', 'severity', 'priority', 'resolution'] as const;
 
@@ -108,7 +109,7 @@ async function fetchOptions(
   cacheTtlMs: number
 ): Promise<{ options: Set<string> } | { error: string }> {
   const scope = target.workItemId ? `${target.projectId}/${target.workItemId}` : `${target.projectId}::type=${target.type}`;
-  const cacheKey = `${requestContext.baseUrl}::${scope}::${field}`;
+  const cacheKey = `${callerCacheScope()}::${requestContext.baseUrl}::${scope}::${field}`;
   const cached = _optionsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return { options: cached.options };
@@ -333,8 +334,8 @@ export async function checkResourceCustomFieldKeys(
   }
 
   const cacheKey = target.instancePath
-    ? `${requestContext.baseUrl}::instance::${target.instancePath}`
-    : `${requestContext.baseUrl}::${target.projectId}::fields::${target.resourceType}::${target.type ?? '~'}`;
+    ? `${callerCacheScope()}::${requestContext.baseUrl}::instance::${target.instancePath}`
+    : `${callerCacheScope()}::${requestContext.baseUrl}::${target.projectId}::fields::${target.resourceType}::${target.type ?? "~"}`;
   const cached = _fieldKeyCache.get(cacheKey);
   let fieldIds: Set<string>;
 
@@ -443,7 +444,7 @@ export async function checkWorkItemUserReferences(
   if (userIds.size === 0) return { ok: true };
 
   for (const userId of userIds) {
-    const cacheKey = `${requestContext.baseUrl}::${userId}`;
+    const cacheKey = `${callerCacheScope()}::${requestContext.baseUrl}::${userId}`;
     const cached = _userExistsCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       if (!cached.exists) return { ok: false, reason: `User '${userId}' does not exist.` };

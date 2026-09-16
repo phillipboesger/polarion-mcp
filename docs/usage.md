@@ -26,10 +26,12 @@ Typical MCP workflow:
 
 - Start with `npm run start:mcp-http`.
 - This serves the real MCP Streamable HTTP transport (not the REST wrapper below), so remote MCP clients such as Claude.ai custom connectors can use it.
-- `MCP_HTTP_TOKEN` must be set or the server exits on startup; every `/mcp` request requires `Authorization: Bearer <MCP_HTTP_TOKEN>`.
+- The server stores no credentials: every `/mcp` request must send the caller's own Polarion Personal Access Token as `Authorization: Bearer <pat>`, and that token authenticates the Polarion REST calls of that request. A request without a Bearer token gets 401; an invalid token is rejected by Polarion.
+- With `MCP_PUBLIC_URL` set, that 401 also carries `WWW-Authenticate` with this server's protected-resource metadata, so an MCP client that cannot be handed a token by hand starts the OAuth login instead: it registers itself, the user pastes their Polarion PAT on `/authorize`, and the client receives an opaque access token. The PAT stays in the server's memory (gone on restart) and is never sent to the client.
 - Endpoints:
   - GET /health (no auth)
-  - POST/GET/DELETE /mcp (Streamable HTTP MCP transport; Bearer auth required)
+  - POST/GET/DELETE /mcp (Streamable HTTP MCP transport; caller's Polarion PAT, or an access token from the login)
+  - /authorize, /token, /register, /revoke, /polarion-login and the `/.well-known/oauth-*` metadata (only with MCP_PUBLIC_URL set)
 - Sessions are stateful: the client receives an `mcp-session-id` on initialize and echoes it on later requests.
 - Optionally set `MCP_ALLOWED_HOSTS` to enable DNS-rebinding protection for public deployments.
 

@@ -13,6 +13,7 @@ import {
   _userExistsCache,
 } from "../src/guards.js"
 import type { CustomFieldKeyCheckTarget } from "../src/guards.js"
+import { requestBearerToken } from "../src/config.js"
 
 const requestContext = { baseUrl: "https://polarion.example.com/polarion/rest/v1", headers: {}, rejectUnauthorized: true }
 const sendOpts = { minIntervalMs: 0, initialBackoffMs: 0, postMutationDelayMs: 0 }
@@ -429,4 +430,22 @@ test("checkWorkItemUserReferences fails closed on a non-404 lookup error", async
     assert.match(result.reason, /Cannot confirm/)
     assert.match(result.reason, /network unreachable/)
   }
+})
+
+test("the options cache is not shared between two callers, so one user's authorized options never answer another user's write", async () => {
+  _optionsCache.clear()
+  const seenTokens: string[] = []
+  const httpClient = async (): Promise<AxiosResponse> => {
+    seenTokens.push(requestBearerToken.getStore() ?? "none")
+    return optionsResponse(["accepted"])
+  }
+
+  await requestBearerToken.run("pat-of-alice", async () => {
+    await checkWorkItemEnumFields("PROJ", "PROJ-9", { resolution: "accepted" }, requestContext, { ...sendOpts, httpClient }, 60_000)
+  })
+  await requestBearerToken.run("pat-of-bob", async () => {
+    await checkWorkItemEnumFields("PROJ", "PROJ-9", { resolution: "accepted" }, requestContext, { ...sendOpts, httpClient }, 60_000)
+  })
+
+  assert.deepEqual(seenTokens, ["pat-of-alice", "pat-of-bob"], "Bob's write must be validated against Polarion with Bob's own token, not served from Alice's cached entry")
 })

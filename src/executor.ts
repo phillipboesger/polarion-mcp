@@ -24,7 +24,7 @@ import https from 'https';
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, formatApiError, getZodSchemaFromJsonSchema } from "./utils.js";
-import { API_BASE_URL, getBearerToken, shouldRejectUnauthorized } from "./config.js";
+import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
@@ -610,9 +610,9 @@ export async function executeApiTool(
         // HTTP security (Basic or Bearer authentication)
         if (scheme.type === 'http') {
           if (scheme.scheme?.toLowerCase() === 'bearer') {
-            // Bearer Token: Check for scheme-specific token first, then generic
-            // Env vars: BEARER_TOKEN_SCHEMENAME or BEARER_TOKEN
-            return !!(process.env[`BEARER_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`] || getBearerToken());
+            // Bearer Token: the current request's token, else the env fallbacks
+            // BEARER_TOKEN_SCHEMENAME or BEARER_TOKEN
+            return !!getBearerTokenForScheme(schemeName);
           }
           else if (scheme.scheme?.toLowerCase() === 'basic') {
             // Basic Auth: Requires both username and password
@@ -681,7 +681,7 @@ export async function executeApiTool(
         else if (scheme?.type === 'http') {
           if (scheme.scheme?.toLowerCase() === 'bearer') {
             // Check for scheme-specific token first, then fall back to generic BEARER_TOKEN
-            const token = process.env[`BEARER_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`] || getBearerToken();
+            const token = getBearerTokenForScheme(schemeName);
             if (token) {
               headers['authorization'] = `Bearer ${token}`;
               console.error(`[INFO] Applied Bearer token for '${schemeName}'`);
