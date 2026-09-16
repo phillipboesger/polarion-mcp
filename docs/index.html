@@ -1165,8 +1165,8 @@
       <div class="feature-card">
         <div class="feature-icon">🔒</div>
         <div class="feature-title">Secure by Design</div>
-        <p class="feature-desc">Personal Access Tokens stored in .env, gitignored by default. Separate API keys per transport. TLS support with cert bypass only for internal servers.</p>
-        <span class="feature-tag">pat · env · tls</span>
+        <p class="feature-desc">Your Polarion Personal Access Token stays yours — in a gitignored .env for stdio, sent per-request for HTTP, or entered once through an OAuth login that keeps it in server memory only, never on disk or handed to the client.</p>
+        <span class="feature-tag">pat · oauth · tls</span>
       </div>
 
       <div class="feature-card">
@@ -1264,6 +1264,7 @@
       <button class="tab-btn" onclick="switchTab('vscode', this)">VS Code Copilot</button>
       <button class="tab-btn" onclick="switchTab('claude-desktop', this)">Claude Desktop</button>
       <button class="tab-btn" onclick="switchTab('docker', this)">Docker</button>
+      <button class="tab-btn" onclick="switchTab('oauth', this)">Claude.ai (OAuth)</button>
     </div>
 
     <div id="tab-claude-code" class="tab-content active">
@@ -1321,10 +1322,22 @@
         <pre id="code-docker"><span style="color:#86efac">docker run</span> -d \
   <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
   <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">your-personal-access-token</span> \
-  <span style="color:#93c5fd">-e</span> MCP_HTTP_TOKEN=<span style="color:#fde68a">your-mcp-secret</span> \
   <span style="color:#93c5fd">-p</span> 3000:3000 \
   <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span></pre>
       </div>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">Single-user HTTP deployment: every request runs as this one Polarion account. For per-user auth, send <code>Authorization: Bearer &lt;PAT&gt;</code> per request instead — drop <code>BEARER_TOKEN</code> — or use the OAuth login tab.</p>
+    </div>
+
+    <div id="tab-oauth" class="tab-content">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('oauth', this)">Copy</button>
+        <pre id="code-oauth"><span style="color:#86efac">docker run</span> -d \
+  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
+  <span style="color:#93c5fd">-e</span> MCP_PUBLIC_URL=<span style="color:#fde68a">https://mcp.yourdomain.com</span> \
+  <span style="color:#93c5fd">-p</span> 3000:3000 \
+  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span></pre>
+      </div>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">No <code>BEARER_TOKEN</code> needed — setting <code>MCP_PUBLIC_URL</code> turns on an OAuth login flow. Point Claude.ai's connector setup at <code>https://mcp.yourdomain.com/mcp</code>; each user is redirected to a page where they paste their own Polarion PAT once. The token is checked against Polarion, held in server memory for that session only, and never written to disk or sent to the client. Behind a reverse proxy, see <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/deployment.md" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;">docs/deployment.md</a> for the exact <code>ProxyPass</code> block, including the OAuth metadata paths.</p>
     </div>
   </div>
 </section>
