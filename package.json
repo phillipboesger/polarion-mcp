@@ -1,6 +1,6 @@
 {
   "name": "polarion-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Model Context Protocol (MCP) server for the Polarion ALM REST API, with an optional HTTP wrapper for Custom GPTs.",
   "type": "module",
   "license": "MIT",
