@@ -22,6 +22,22 @@
  *    (one item, by ID) vs. `deleteCollections` (a batch, no ID). This is a
  *    different axis from "Scope:" (breadth of query) and can co-occur with
  *    it on the same tool.
+ * 4. Rich, concrete descriptions (see `PARAM_DESCRIPTIONS` in
+ *    `lib/entry-utils.mjs`) for the ~23 parameter names whose *original*
+ *    OpenAPI text is uniform boilerplate across every tool that has them
+ *    (`projectId`, `fields`, `query`, pagination, etc.), replacing that
+ *    boilerplate with concrete format/constraint guidance. Deliberately
+ *    excludes a couple of names (see the dictionary's own comment) whose
+ *    original text carries tool-specific nuance a generic replacement
+ *    would lose.
+ * 5. An "Effect:" sentence on non-GET tools, truthfully derived from the
+ *    tool's method + annotations + two structural signals (irreversible /
+ *    idempotent / creates a duplicate / triggers a server-side action) —
+ *    see `effectNoteForAnnotations` in `lib/entry-utils.mjs` for why method
+ *    + annotations alone aren't safe enough to assert idempotency or
+ *    "creates a duplicate" from.
+ * 6. A "Tip:" sentence on every tool that accepts `dry_run`, pointing an
+ *    agent at it before a mutating call.
  *
  * Usage: node scripts/enrich-tool-metadata.mjs [path/to/tools.ts]
  */
@@ -31,6 +47,10 @@ import {
   extractToolDefinitionMapArray,
   splitTopLevelArrayEntries,
   annotationsForMethod,
+  withInputSchema,
+  hasSchemaProperty,
+  PARAM_DESCRIPTIONS,
+  effectNoteForAnnotations,
 } from './lib/entry-utils.mjs';
 
 const filePath = process.argv[2] || 'src/tools.ts';
@@ -138,6 +158,64 @@ function injectAnnotations(entry) {
 
 const SCOPE_MARKER = 'Scope:';
 const CARDINALITY_MARKER = 'Cardinality:';
+const EFFECT_MARKER = 'Effect:';
+const TIP_MARKER = 'Tip:';
+
+/**
+ * Replaces parameter descriptions with the rich text from
+ * `PARAM_DESCRIPTIONS` wherever the name matches and the current
+ * description doesn't already equal it — an exact-match guard, so this is
+ * idempotent without needing to guess at "already good enough" heuristics
+ * (a length threshold would wrongly treat the original OpenAPI boilerplate
+ * as already-enriched, since several of its descriptions embed a long doc
+ * URL and are already >100 chars despite adding no real semantics).
+ *
+ * A missing/malformed `inputSchema` (the `ok: false` case from
+ * `withInputSchema`) is reported back via `failed` rather than silently
+ * treated as "nothing to enrich" -- on a codebase where every real tool
+ * entry always has an `inputSchema`, that case means the text-scanning
+ * assumptions broke, and the caller folds it into the same loud-fail
+ * safety net as the Scope:/Cardinality: note skips below.
+ *
+ * @param {string} entry - Raw object-literal text of one tool definition.
+ * @returns {{ entry: string, count: number, failed: boolean }} The (possibly modified) entry, how many properties were enriched, and whether the schema was unreadable.
+ */
+function enrichParameterDescriptions(entry) {
+  let count = 0;
+  const { entry: updated, ok } = withInputSchema(entry, (schema) => {
+    if (!schema.properties || typeof schema.properties !== 'object') return null;
+    let changed = false;
+    for (const [name, def] of Object.entries(schema.properties)) {
+      const rich = PARAM_DESCRIPTIONS[name];
+      if (!rich || !def || typeof def !== 'object') continue;
+      if (def.description === rich) continue;
+      def.description = rich;
+      changed = true;
+      count++;
+    }
+    return changed ? schema : null;
+  });
+  return { entry: updated, count, failed: !ok };
+}
+
+/**
+ * Reads a tool entry's already-injected `annotations: {...}` field.
+ * Annotations are always a flat object (see `annotationsForMethod`), so a
+ * non-greedy regex is safe here unlike the nested `inputSchema`/`description`
+ * fields, which need brace/quote-aware scanning.
+ *
+ * @param {string} entry - Raw object-literal text of one tool definition.
+ * @returns {Record<string, boolean>} Parsed annotations, or `{}` if absent/malformed.
+ */
+function getAnnotationsField(entry) {
+  const match = /annotations:\s*(\{[^}]*\})/.exec(entry);
+  if (!match) return {};
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Finds a `description: \`...\`` field's content boundaries in a raw entry,
@@ -281,6 +359,52 @@ for (const [collection, items] of itemsByCollection) {
   else if (entries[idx] !== before) cardinalityNoteCount++;
 }
 
+let paramEnrichedCount = 0;
+let paramEnrichedSchemaFailed = 0;
+entries = entries.map((entry) => {
+  const { entry: updated, count, failed } = enrichParameterDescriptions(entry);
+  paramEnrichedCount += count;
+  if (failed) paramEnrichedSchemaFailed++;
+  return updated;
+});
+
+let effectNoteCount = 0;
+let effectNoteSkipped = 0;
+entries = entries.map((entry, i) => {
+  const { has: hasWorkflowAction, ok: workflowActionOk } = hasSchemaProperty(entry, 'workflowAction');
+  if (!workflowActionOk) effectNoteSkipped++; // unreadable inputSchema -- can't safely reason about this tool's effect
+  const note = effectNoteForAnnotations(methods[i], getAnnotationsField(entry), {
+    pathTemplate: pathTemplates[i],
+    hasWorkflowAction,
+  });
+  if (!note) return entry;
+  const before = entry;
+  const result = appendNote(entry, EFFECT_MARKER, note);
+  if (result.skipped) effectNoteSkipped++;
+  else if (result.entry !== before) effectNoteCount++;
+  return result.entry;
+});
+
+let dryRunTipCount = 0;
+let dryRunTipSkipped = 0;
+entries = entries.map((entry) => {
+  const { has: hasDryRun, ok } = hasSchemaProperty(entry, 'dry_run');
+  if (!ok) {
+    dryRunTipSkipped++; // unreadable inputSchema -- can't safely tell if this tool has dry_run
+    return entry;
+  }
+  if (!hasDryRun) return entry;
+  const before = entry;
+  const result = appendNote(
+    entry,
+    TIP_MARKER,
+    'Tip: set \\`dry_run: true\\` first to preview the exact request Polarion would receive, without changing anything. On tools with a typed output schema, this preview is returned as an error-flagged result since it is not real tool output -- read the text content regardless of that flag.',
+  );
+  if (result.skipped) dryRunTipSkipped++;
+  else if (result.entry !== before) dryRunTipCount++;
+  return result.entry;
+});
+
 const newMapArrayText = `[${entries.join(',')}]`;
 const out = src.slice(0, start) + newMapArrayText + src.slice(end);
 writeFileSync(filePath, out, 'utf8');
@@ -291,10 +415,14 @@ console.log(`  scope-pair siblings found: ${scopePairs.length}`);
 console.log(`  scope notes added: ${scopeNoteCount}${scopeNoteSkipped ? ` (${scopeNoteSkipped} SKIPPED -- unexpected description shape)` : ''}`);
 console.log(`  cardinality-pair siblings found: ${cardinalityPairs.length}`);
 console.log(`  cardinality notes added: ${cardinalityNoteCount}${cardinalityNoteSkipped ? ` (${cardinalityNoteSkipped} SKIPPED -- unexpected description shape)` : ''}`);
+console.log(`  parameter descriptions enriched: ${paramEnrichedCount}${paramEnrichedSchemaFailed ? ` (${paramEnrichedSchemaFailed} SKIPPED -- unreadable inputSchema)` : ''}`);
+console.log(`  effect notes added: ${effectNoteCount}${effectNoteSkipped ? ` (${effectNoteSkipped} SKIPPED -- unexpected description shape or unreadable inputSchema)` : ''}`);
+console.log(`  dry_run tips added: ${dryRunTipCount}${dryRunTipSkipped ? ` (${dryRunTipSkipped} SKIPPED -- unexpected description shape or unreadable inputSchema)` : ''}`);
 
-if (scopeNoteSkipped > 0 || cardinalityNoteSkipped > 0) {
+const totalSkipped = scopeNoteSkipped + cardinalityNoteSkipped + paramEnrichedSchemaFailed + effectNoteSkipped + dryRunTipSkipped;
+if (totalSkipped > 0) {
   throw new Error(
-    `${scopeNoteSkipped + cardinalityNoteSkipped} note(s) were skipped due to an unexpected description shape -- ` +
+    `${totalSkipped} note(s) were skipped due to an unexpected description shape -- ` +
     'investigate before trusting this regeneration (see findDescriptionBounds in this file).',
   );
 }
