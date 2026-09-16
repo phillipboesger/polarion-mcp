@@ -114,7 +114,7 @@ are easy to forget.
 ```bash
 npm install
 cp .env.example .env
-# edit .env — set API_BASE_URL, BEARER_TOKEN, MCP_HTTP_TOKEN
+# edit .env — set API_BASE_URL; BEARER_TOKEN is only needed for stdio mode
 npm run dev:http      # starts MCP HTTP transport on :3000
 ```
 

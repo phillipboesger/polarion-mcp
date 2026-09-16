@@ -69,9 +69,11 @@ jobs:
           # Install only production dependencies — no dev tools, no build step.
           npm ci --omit=dev --ignore-scripts
 
-          export MCP_HTTP_TOKEN="ci-verify-token"
+          # The server holds no credentials in HTTP mode; this stands in for a
+          # client's own Polarion PAT, which the server forwards verbatim and
+          # never validates itself (Polarion does, on the upstream call).
+          export CALLER_PAT="ci-verify-pat"
           export API_BASE_URL="https://polarion.example.com/polarion/rest/v1"
-          export BEARER_TOKEN="dummy"
           export MCP_HTTP_PORT="3010"
 
           node build/mcp-http-server.js & SRV=$!
@@ -90,7 +92,7 @@ jobs:
           test "${code}" = "401" || { echo "::error::expected 401 without token, got ${code}"; exit 1; }
 
           body="$(curl -s -D headers.txt -X POST http://localhost:3010/mcp \
-            -H "authorization: Bearer ${MCP_HTTP_TOKEN}" \
+            -H "authorization: Bearer ${CALLER_PAT}" \
             -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
             -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}')"
           echo "${body}" | grep -q '"serverInfo"' || { echo "::error::initialize failed: ${body}"; exit 1; }
