@@ -1241,6 +1241,7 @@
         <div class="client-name">ChatGPT</div>
         <div class="client-type">Custom GPT</div>
         <span class="client-transport">rest http</span>
+        <span class="client-transport" style="margin-left:4px;background:rgba(255,255,255,0.05);color:var(--text-dim);">no oauth</span>
       </div>
       <div class="client-card">
         <div class="client-icon client-icon--claude">
@@ -1249,6 +1250,7 @@
         <div class="client-name">Claude.ai</div>
         <div class="client-type">Web App</div>
         <span class="client-transport">streamable http</span>
+        <span class="client-transport" style="margin-left:4px;">oauth or pat</span>
       </div>
     </div>
   </div>
@@ -1363,6 +1365,7 @@
   node build/http-server.js</pre>
       </div>
       <p style="color:#9ca3af;font-size:14px;margin-top:12px;">This is the plain REST wrapper (not MCP) built for ChatGPT Custom GPT Actions. In the GPT editor, add an action and import the schema from <code>https://your-host:3000/openapi-gpt.json</code> (a 30-tool subset that fits ChatGPT's operation-count limit — use <code>/openapi.json</code> for the full 284 if your consumer allows it), then set the action's auth to API key / Bearer using <code>HTTP_API_KEY</code>.</p>
+      <p style="color:#9ca3af;font-size:14px;margin-top:8px;"><strong style="color:#e5e7eb;">No OAuth here</strong> — this wrapper only supports the static <code>HTTP_API_KEY</code> above, shared by every caller. ChatGPT's own Action editor offers an OAuth auth type, but this server doesn't implement an authorization endpoint for it; per-user login is only available on the Streamable HTTP MCP transport (see the Claude.ai tabs).</p>
     </div>
 
     <div id="tab-claude-http" class="tab-content">

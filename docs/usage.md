@@ -40,6 +40,7 @@ Typical MCP workflow:
 - Start the REST wrapper with `npm run start:http`.
 - HTTP_API_KEY must be set or the server exits on startup.
 - This is a plain REST surface (not MCP) intended for ChatGPT Custom GPT Actions.
+- No OAuth support here: every caller shares the one static `HTTP_API_KEY`. ChatGPT's Action editor offers an OAuth auth type, but this server has no authorization endpoint for it. Per-user OAuth login is only available on the Streamable HTTP MCP transport above (for Claude.ai and other MCP clients), via `MCP_PUBLIC_URL`.
 - Endpoints:
   - GET /health
   - GET /api/tools
