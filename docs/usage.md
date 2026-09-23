@@ -27,11 +27,12 @@ Typical MCP workflow:
 - Start with `npm run start:mcp-http`.
 - This serves the real MCP Streamable HTTP transport (not the REST wrapper below), so remote MCP clients such as Claude.ai custom connectors can use it.
 - The server stores no credentials: every `/mcp` request must send the caller's own Polarion Personal Access Token as `Authorization: Bearer <pat>`, and that token authenticates the Polarion REST calls of that request. A request without a Bearer token gets 401; an invalid token is rejected by Polarion.
-- With `MCP_PUBLIC_URL` set, that 401 also carries `WWW-Authenticate` with this server's protected-resource metadata, so an MCP client that cannot be handed a token by hand starts the OAuth login instead: it registers itself, the user pastes their Polarion PAT on `/authorize`, and the client receives an opaque access token. The PAT stays in the server's memory (gone on restart) and is never sent to the client.
+- With `MCP_PUBLIC_URL` set, that 401 also carries `WWW-Authenticate` with this server's protected-resource metadata, so an MCP client that cannot be handed a token by hand starts the OAuth login instead: it registers itself, the user pastes their Polarion PAT on `/authorize`, and the client receives an access token and a refresh token. Both carry the PAT encrypted under `MCP_TOKEN_SECRET`, so the server stores nothing and the client cannot read the PAT. A login survives restarts (as long as `MCP_TOKEN_SECRET` stays the same) and lasts until Polarion stops accepting the PAT: the access token lasts 1 h, and each silent refresh re-checks the PAT with Polarion. An expired or forged token gets `401` with `error="invalid_token"`, which makes the client refresh or log in again.
 - Endpoints:
   - GET /health (no auth)
   - POST/GET/DELETE /mcp (Streamable HTTP MCP transport; caller's Polarion PAT, or an access token from the login)
-  - /authorize, /token, /register, /revoke, /polarion-login and the `/.well-known/oauth-*` metadata (only with MCP_PUBLIC_URL set)
+  - /authorize, /token, /register, /polarion-login and the `/.well-known/oauth-*` metadata (only with MCP_PUBLIC_URL set)
+  - /gpt/authorize, /gpt/token, /api/tools, /api/tools/:toolName, /openapi.json, /openapi-gpt.json (Custom GPT OAuth, only with GPT_CLIENT_ID and GPT_CLIENT_SECRET also set)
 - Sessions are stateful: the client receives an `mcp-session-id` on initialize and echoes it on later requests.
 - Optionally set `MCP_ALLOWED_HOSTS` to enable DNS-rebinding protection for public deployments.
 
@@ -40,7 +41,7 @@ Typical MCP workflow:
 - Start the REST wrapper with `npm run start:http`.
 - HTTP_API_KEY must be set or the server exits on startup.
 - This is a plain REST surface (not MCP) intended for ChatGPT Custom GPT Actions.
-- No OAuth support here: every caller shares the one static `HTTP_API_KEY`. ChatGPT's Action editor offers an OAuth auth type, but this server has no authorization endpoint for it. Per-user OAuth login is only available on the Streamable HTTP MCP transport above (for Claude.ai and other MCP clients), via `MCP_PUBLIC_URL`.
+- No OAuth support here: every caller shares the one static `HTTP_API_KEY`. For per-user OAuth from a Custom GPT, use the Streamable HTTP MCP server above with `MCP_PUBLIC_URL`, `GPT_CLIENT_ID` and `GPT_CLIENT_SECRET` set: it serves the same REST tool routes, with each user logged in under their own PAT.
 - Endpoints:
   - GET /health
   - GET /api/tools

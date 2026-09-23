@@ -1,20 +1,22 @@
 /**
  * OAuth authorization server for the Streamable HTTP MCP transport.
  *
- * MCP clients that cannot be handed a token by hand — Claude.ai connectors,
- * above all — expect to be sent through an OAuth login when a request is
- * unauthenticated. This module is that login: it registers clients (DCR),
- * shows a page where the user pastes their own Polarion Personal Access Token,
- * checks that token against Polarion, and only then issues an access token for
- * this MCP server.
+ * MCP clients that cannot be handed a token by hand — Claude.ai and ChatGPT
+ * connectors, above all — expect to be sent through an OAuth login when a
+ * request is unauthenticated. This module is that login: it registers clients
+ * (DCR), shows a page where the user pastes their own Polarion Personal Access
+ * Token, checks that token against Polarion, and only then issues tokens for
+ * this MCP server. A second, PKCE-less flow serves ChatGPT Custom GPT Actions,
+ * which authenticate as one preconfigured confidential client.
  *
- * The access token this server hands out is a random opaque string; the PAT
- * behind it is held in memory, never written to disk and never sent to the
- * client. A restart drops every session, so the next request re-runs the login.
- * That is deliberate: no user's Polarion credential outlives the process.
+ * Client ids, access tokens and refresh tokens are sealed (see `sealed.ts`):
+ * the PAT travels inside them encrypted, so the server stores nothing and a
+ * login survives restarts. It lasts as long as Polarion accepts the PAT — every
+ * refresh re-checks it. Only the short-lived pieces (an open login page, an
+ * unredeemed authorization code) live in memory.
  */
 
-import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import https from 'node:https';
 import axios from 'axios';
 import type { Response } from 'express';
@@ -22,8 +24,10 @@ import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/serv
 import type { AuthorizationParams, OAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/provider.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
+import { InvalidGrantError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
+import { Sealer, safeEqual } from './sealed.js';
 
 /** Scope advertised by this server; the PAT itself carries the real permissions. */
 export const POLARION_SCOPE = 'polarion';
@@ -31,8 +35,11 @@ export const POLARION_SCOPE = 'polarion';
 /** Path of the form target that receives the pasted Polarion token. */
 export const LOGIN_PATH = '/polarion-login';
 
-/** How long an issued access token stays valid. */
-const ACCESS_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
+/**
+ * How long an issued access token stays valid. Short, because a refresh is
+ * silent and is where a revoked PAT is noticed.
+ */
+const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 /** How long the user has to complete the login page before the code dies. */
 const PENDING_LOGIN_TTL_MS = 10 * 60 * 1000;
@@ -40,11 +47,28 @@ const PENDING_LOGIN_TTL_MS = 10 * 60 * 1000;
 /** How long an authorization code may be exchanged for a token. */
 const AUTHORIZATION_CODE_TTL_MS = 60 * 1000;
 
+/**
+ * Most login pages open at once. Opening one needs no credentials, so without
+ * a cap a flood of authorize requests would grow memory for 10 minutes.
+ */
+const MAX_PENDING_LOGINS = 10_000;
+
+/**
+ * Result of asking Polarion about a PAT: accepted, rejected, or no answer
+ * (network error, Polarion down) — the last must not end a login.
+ */
+export type TokenValidator = (token: string) => Promise<boolean | 'unavailable'>;
+
+/** Which token endpoint may redeem a code: the PKCE one, or the Custom GPT one. */
+type Flow = 'mcp' | 'gpt';
+
 interface PendingLogin {
+  flow: Flow;
   clientId: string;
+  clientName: string;
   redirectUri: string;
   state?: string;
-  codeChallenge: string;
+  codeChallenge?: string;
   scopes: string[];
   resource?: string;
   expiresAt: number;
@@ -54,22 +78,36 @@ interface AuthorizationCode extends PendingLogin {
   polarionToken: string;
 }
 
-interface IssuedToken {
-  clientId: string;
-  polarionToken: string;
-  scopes: string[];
-  resource?: string;
-  expiresAt: number;
+/** Sealed inside a refresh token. */
+interface RefreshPayload {
+  /** Client id the token was issued to. */
+  c: string;
+  /** The user's Polarion PAT. */
+  p: string;
+  /** Scopes. */
+  s: string[];
+  /** RFC 8707 resource. */
+  r?: string;
 }
+
+/** Sealed inside an access token. */
+interface AccessPayload extends RefreshPayload {
+  /** Expiry, epoch milliseconds. */
+  e: number;
+}
+
+/** Client metadata sealed into a DCR client id. */
+type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secret' | 'client_secret_expires_at'>;
 
 /**
  * Checks a Polarion Personal Access Token by making the cheapest authenticated
  * call the REST API offers: asking for a single project.
  *
- * @param token - The token the user pasted.
- * @returns True if Polarion accepted the token.
+ * @param token - The token to check.
+ * @returns True if Polarion accepted it, false if Polarion rejected it, or
+ *   'unavailable' if Polarion gave no usable answer.
  */
-export async function validatePolarionToken(token: string): Promise<boolean> {
+export async function validatePolarionToken(token: string): Promise<boolean | 'unavailable'> {
   try {
     const response = await axios.get(`${API_BASE_URL}/projects`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -78,55 +116,58 @@ export async function validatePolarionToken(token: string): Promise<boolean> {
       timeout: 15_000,
       validateStatus: () => true,
     });
-    return response.status >= 200 && response.status < 300;
+    if (response.status >= 200 && response.status < 300) return true;
+    if (response.status === 401 || response.status === 403) return false;
+    return 'unavailable';
   } catch {
-    return false;
+    return 'unavailable';
   }
 }
 
 /**
- * Compares two secrets without leaking their contents through timing.
+ * Registry of the MCP clients that registered themselves via DCR.
  *
- * @param a - First value.
- * @param b - Second value.
- * @returns True if both strings are identical.
+ * Stores nothing: the client id is the sealed registration, and a
+ * confidential client's secret is derived from its id. ChatGPT registers once
+ * per connection and never again, so a registration must outlive restarts.
  */
-function safeEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
-}
-
-/**
- * In-memory registry of the MCP clients that registered themselves via DCR.
- *
- * Registrations are as short-lived as the tokens: a restart makes clients
- * register again, which every MCP client does on its own.
- */
-class InMemoryClientsStore implements OAuthRegisteredClientsStore {
-  private readonly clients = new Map<string, OAuthClientInformationFull>();
+class SealedClientsStore implements OAuthRegisteredClientsStore {
+  constructor(private readonly sealer: Sealer) {}
 
   /**
    * @param clientId - The client id handed out at registration.
-   * @returns The registered client, or undefined if this server never saw it.
+   * @returns The registered client, or undefined if this server never issued it.
    */
   getClient(clientId: string): OAuthClientInformationFull | undefined {
-    return this.clients.get(clientId);
+    const client = this.sealer.open<SealedClient>('c', clientId);
+    return client ? this.withCredentials(client, clientId) : undefined;
   }
 
   /**
    * @param client - Client metadata sent by the MCP client.
-   * @returns The stored registration, including the generated client id.
+   * @returns The registration, including the generated client id.
    */
   registerClient(client: Omit<OAuthClientInformationFull, 'client_id' | 'client_id_issued_at'>): OAuthClientInformationFull {
-    const registered: OAuthClientInformationFull = {
-      ...client,
-      client_id: randomUUID(),
+    const metadata: SealedClient = {
+      redirect_uris: client.redirect_uris,
+      client_name: client.client_name,
+      token_endpoint_auth_method: client.token_endpoint_auth_method,
+      grant_types: client.grant_types,
+      response_types: client.response_types,
+      scope: client.scope,
       client_id_issued_at: Math.floor(Date.now() / 1000),
     };
-    this.clients.set(registered.client_id, registered);
-    return registered;
+    return this.withCredentials(metadata, this.sealer.seal('c', metadata));
+  }
+
+  /**
+   * @param client - Sealed registration metadata.
+   * @param clientId - Its sealed id.
+   * @returns The full client, with a derived secret unless it is a public client.
+   */
+  private withCredentials(client: SealedClient, clientId: string): OAuthClientInformationFull {
+    if (client.token_endpoint_auth_method === 'none') return { ...client, client_id: clientId };
+    return { ...client, client_id: clientId, client_secret: this.sealer.derive(clientId), client_secret_expires_at: 0 };
   }
 }
 
@@ -268,7 +309,7 @@ export function renderLoginPage(loginId: string, polarionUrl: string, clientName
       <a href="${escapeHtml(polarionUrl)}" target="_blank" rel="noreferrer">${escapeHtml(polarionUrl)}</a>.</p>
     <button type="submit">Connect</button>
   </form>
-  <footer>Your token stays in this server's memory for this session only. It is never stored on disk and never sent to ${escapeHtml(clientName)}. Everything you do runs under your own Polarion account and permissions.</footer>
+  <footer>This server never stores your token. ${escapeHtml(clientName)} only receives it encrypted, in a form only this server can read, so you stay connected until the token expires or you revoke it in Polarion. Everything you do runs under your own Polarion account and permissions.</footer>
 </main>
 </body>
 </html>`;
@@ -277,24 +318,28 @@ export function renderLoginPage(loginId: string, polarionUrl: string, clientName
 /**
  * OAuth provider that authenticates a user by the Polarion token they paste.
  *
- * The pieces it keeps in memory are all short-lived: pending logins (the open
- * login page), authorization codes (seconds), and issued tokens (hours).
+ * In memory it keeps only what lasts minutes: open login pages and unredeemed
+ * authorization codes. Registrations and tokens are sealed and held by the
+ * client. There is no revocation endpoint — a sealed token cannot be recalled;
+ * revoking the PAT in Polarion ends the login at the next refresh.
  */
 export class PolarionOAuthProvider implements OAuthServerProvider {
-  private readonly clients = new InMemoryClientsStore();
+  private readonly clients: SealedClientsStore;
   private readonly pendingLogins = new Map<string, PendingLogin>();
   private readonly codes = new Map<string, AuthorizationCode>();
-  private readonly tokens = new Map<string, IssuedToken>();
-  private readonly refreshTokens = new Map<string, IssuedToken>();
 
   /**
    * @param polarionUrl - Polarion base URL shown on the login page.
+   * @param sealer - Seals client ids and tokens.
    * @param validateToken - Token check; injectable so tests need no Polarion.
    */
   constructor(
     private readonly polarionUrl: string,
-    private readonly validateToken: (token: string) => Promise<boolean> = validatePolarionToken
-  ) {}
+    private readonly sealer: Sealer,
+    private readonly validateToken: TokenValidator = validatePolarionToken
+  ) {
+    this.clients = new SealedClientsStore(sealer);
+  }
 
   /** @returns The registry of dynamically registered MCP clients. */
   get clientsStore(): OAuthRegisteredClientsStore {
@@ -302,26 +347,57 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
   }
 
   /**
-   * Starts the login: shows the page instead of redirecting to another server.
+   * Starts the MCP (PKCE) login: shows the page instead of redirecting to
+   * another server.
    *
    * @param client - The MCP client asking for authorization.
    * @param params - Redirect URI, PKCE challenge, state and scopes.
    * @param res - Response to render the login page into.
    */
   async authorize(client: OAuthClientInformationFull, params: AuthorizationParams, res: Response): Promise<void> {
+    this.beginLogin(
+      {
+        flow: 'mcp',
+        clientId: client.client_id,
+        clientName: client.client_name ?? 'This MCP client',
+        redirectUri: params.redirectUri,
+        state: params.state,
+        codeChallenge: params.codeChallenge,
+        scopes: params.scopes ?? [POLARION_SCOPE],
+        resource: params.resource?.href,
+      },
+      res
+    );
+  }
+
+  /**
+   * Starts the Custom GPT login. The caller has already checked the client and
+   * redirect URI; this flow has no PKCE, so its code is only redeemable at the
+   * GPT token endpoint, which requires the client secret.
+   *
+   * @param clientId - The preconfigured Custom GPT client id.
+   * @param redirectUri - The GPT's verified OAuth callback.
+   * @param state - State to echo back to ChatGPT.
+   * @param res - Response to render the login page into.
+   */
+  authorizeGpt(clientId: string, redirectUri: string, state: string, res: Response): void {
+    this.beginLogin({ flow: 'gpt', clientId, clientName: 'ChatGPT', redirectUri, state, scopes: [POLARION_SCOPE] }, res);
+  }
+
+  /**
+   * @param login - The login being started, without its expiry.
+   * @param res - Response to render the login page into.
+   */
+  private beginLogin(login: Omit<PendingLogin, 'expiresAt'>, res: Response): void {
     this.sweep();
+    if (this.pendingLogins.size >= MAX_PENDING_LOGINS) {
+      // Maps iterate in insertion order: drop the oldest open login.
+      this.pendingLogins.delete(this.pendingLogins.keys().next().value as string);
+    }
     const loginId = randomBytes(24).toString('base64url');
-    this.pendingLogins.set(loginId, {
-      clientId: client.client_id,
-      redirectUri: params.redirectUri,
-      state: params.state,
-      codeChallenge: params.codeChallenge,
-      scopes: params.scopes ?? [POLARION_SCOPE],
-      resource: params.resource?.href,
-      expiresAt: Date.now() + PENDING_LOGIN_TTL_MS,
-    });
+    this.pendingLogins.set(loginId, { ...login, expiresAt: Date.now() + PENDING_LOGIN_TTL_MS });
     res.set('Cache-Control', 'no-store');
-    res.send(renderLoginPage(loginId, this.polarionUrl, client.client_name ?? 'This MCP client'));
+    res.send(renderLoginPage(loginId, this.polarionUrl, login.clientName));
   }
 
   /**
@@ -341,14 +417,19 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
       this.pendingLogins.delete(loginId);
       return { ok: false, reason: 'This login has expired. Start again from your MCP client.' };
     }
+    const retry = { loginId, clientName: pending.clientName };
     if (!polarionToken.trim()) {
-      return { ok: false, reason: 'Enter your Polarion Personal Access Token.', pending: { loginId, clientName: this.clientName(pending.clientId) } };
+      return { ok: false, reason: 'Enter your Polarion Personal Access Token.', pending: retry };
     }
-    if (!(await this.validateToken(polarionToken.trim()))) {
+    const check = await this.validateToken(polarionToken.trim());
+    if (check === 'unavailable') {
+      return { ok: false, reason: 'Polarion could not be reached to check the token. Try again in a moment.', pending: retry };
+    }
+    if (!check) {
       return {
         ok: false,
         reason: 'Polarion did not accept that token. Check that you copied it completely and that it has not expired.',
-        pending: { loginId, clientName: this.clientName(pending.clientId) },
+        pending: retry,
       };
     }
 
@@ -363,28 +444,20 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
   }
 
   /**
-   * @param clientId - A registered client id.
-   * @returns The client's display name, or a neutral fallback.
-   */
-  private clientName(clientId: string): string {
-    return this.clients.getClient(clientId)?.client_name ?? 'This MCP client';
-  }
-
-  /**
    * @param client - The client exchanging the code.
    * @param authorizationCode - The code issued after a successful login.
    * @returns The PKCE challenge recorded when the login began.
    */
   async challengeForAuthorizationCode(client: OAuthClientInformationFull, authorizationCode: string): Promise<string> {
     const entry = this.codes.get(authorizationCode);
-    if (!entry || entry.expiresAt < Date.now() || entry.clientId !== client.client_id) {
-      throw new Error('Invalid authorization code');
+    if (!entry || entry.flow !== 'mcp' || !entry.codeChallenge || entry.expiresAt < Date.now() || entry.clientId !== client.client_id) {
+      throw new InvalidGrantError('Invalid authorization code');
     }
     return entry.codeChallenge;
   }
 
   /**
-   * Exchanges a one-time authorization code for tokens.
+   * Exchanges a one-time MCP (PKCE) authorization code for tokens.
    *
    * @param client - The client presenting the code.
    * @param authorizationCode - The code to redeem.
@@ -398,56 +471,97 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     _codeVerifier?: string,
     redirectUri?: string
   ): Promise<OAuthTokens> {
-    const entry = this.codes.get(authorizationCode);
-    this.codes.delete(authorizationCode);
-    if (!entry || entry.expiresAt < Date.now() || entry.clientId !== client.client_id) {
-      throw new Error('Invalid authorization code');
-    }
+    const entry = this.redeem(authorizationCode, 'mcp', client.client_id);
     if (redirectUri !== undefined && !safeEqual(redirectUri, entry.redirectUri)) {
-      throw new Error('Redirect URI does not match the authorization request');
+      throw new InvalidGrantError('Redirect URI does not match the authorization request');
     }
-    return this.issue(entry.clientId, entry.polarionToken, entry.scopes, entry.resource);
+    return this.issue(entry);
   }
 
   /**
-   * Exchanges a refresh token for a new access token.
+   * Exchanges a one-time Custom GPT authorization code for tokens. The caller
+   * has already authenticated the client with its secret.
+   *
+   * @param clientId - The authenticated Custom GPT client id.
+   * @param authorizationCode - The code to redeem.
+   * @param redirectUri - Must equal the callback the login was started with.
+   * @returns The issued access and refresh tokens.
+   */
+  exchangeGptCode(clientId: string, authorizationCode: string, redirectUri: string): OAuthTokens {
+    const entry = this.redeem(authorizationCode, 'gpt', clientId);
+    if (!safeEqual(redirectUri, entry.redirectUri)) {
+      throw new InvalidGrantError('Redirect URI does not match the authorization request');
+    }
+    return this.issue(entry);
+  }
+
+  /**
+   * Consumes a code; it is gone whether or not the exchange succeeds.
+   *
+   * @param authorizationCode - The code to redeem.
+   * @param flow - The flow whose token endpoint is redeeming it.
+   * @param clientId - The client presenting it.
+   * @returns The login the code stands for.
+   */
+  private redeem(authorizationCode: string, flow: Flow, clientId: string): AuthorizationCode {
+    const entry = this.codes.get(authorizationCode);
+    this.codes.delete(authorizationCode);
+    if (!entry || entry.flow !== flow || entry.expiresAt < Date.now() || entry.clientId !== clientId) {
+      throw new InvalidGrantError('Invalid authorization code');
+    }
+    return entry;
+  }
+
+  /**
+   * Exchanges a refresh token for new tokens (MCP token endpoint).
    *
    * @param client - The client presenting the refresh token.
    * @param refreshToken - The refresh token to redeem.
-   * @param scopes - Optional narrowed scopes; ignored, this server has one.
    * @returns A fresh pair of tokens.
    */
-  async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string, scopes?: string[]): Promise<OAuthTokens> {
-    const entry = this.refreshTokens.get(refreshToken);
-    this.refreshTokens.delete(refreshToken);
-    if (!entry || entry.clientId !== client.client_id) {
-      throw new Error('Invalid refresh token');
-    }
-    return this.issue(entry.clientId, entry.polarionToken, scopes?.length ? scopes : entry.scopes, entry.resource);
+  async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string): Promise<OAuthTokens> {
+    return this.refresh(client.client_id, refreshToken);
   }
 
   /**
-   * Mints an access/refresh token pair bound to one Polarion token.
+   * Renews a login. Re-checks the PAT with Polarion, so a revoked or expired
+   * PAT ends the login here — that, not a timer, is what bounds it.
    *
-   * @param clientId - Client the tokens belong to.
-   * @param polarionToken - The user's Polarion PAT.
-   * @param scopes - Scopes to record on the token.
-   * @param resource - RFC 8707 resource the token is valid for.
+   * @param clientId - The authenticated client presenting the refresh token.
+   * @param refreshToken - The refresh token to redeem.
+   * @returns A fresh pair of tokens, with the scopes of the original login;
+   *   a scope sent with the refresh request is ignored.
+   */
+  async refresh(clientId: string, refreshToken: string): Promise<OAuthTokens> {
+    const entry = this.sealer.open<RefreshPayload>('r', refreshToken);
+    if (!entry || entry.c !== clientId) {
+      throw new InvalidGrantError('Invalid refresh token');
+    }
+    const check = await this.validateToken(entry.p);
+    if (check === 'unavailable') {
+      // Not invalid_grant: that would make the client drop the login for good.
+      throw new ServerError('Polarion could not be reached to renew the login; try again later');
+    }
+    if (!check) {
+      throw new InvalidGrantError('Polarion no longer accepts the token behind this login');
+    }
+    return this.issue({ clientId, polarionToken: entry.p, scopes: entry.s, resource: entry.r });
+  }
+
+  /**
+   * Mints a sealed access/refresh token pair bound to one Polarion token.
+   *
+   * @param login - Client, PAT, scopes and resource the tokens stand for.
    * @returns The OAuth token response.
    */
-  private issue(clientId: string, polarionToken: string, scopes: string[], resource?: string): OAuthTokens {
-    this.sweep();
-    const accessToken = randomBytes(32).toString('base64url');
-    const refreshToken = randomBytes(32).toString('base64url');
-    const record: IssuedToken = { clientId, polarionToken, scopes, resource, expiresAt: Date.now() + ACCESS_TOKEN_TTL_MS };
-    this.tokens.set(accessToken, record);
-    this.refreshTokens.set(refreshToken, record);
+  private issue(login: { clientId: string; polarionToken: string; scopes: string[]; resource?: string }): OAuthTokens {
+    const refresh: RefreshPayload = { c: login.clientId, p: login.polarionToken, s: login.scopes, r: login.resource };
     return {
-      access_token: accessToken,
+      access_token: this.sealer.seal('a', { ...refresh, e: Date.now() + ACCESS_TOKEN_TTL_MS } satisfies AccessPayload),
       token_type: 'Bearer',
       expires_in: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
-      scope: scopes.join(' '),
-      refresh_token: refreshToken,
+      scope: login.scopes.join(' '),
+      refresh_token: this.sealer.seal('r', refresh),
     };
   }
 
@@ -458,54 +572,41 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @returns Auth info; the Polarion PAT rides along in `extra`.
    */
   async verifyAccessToken(token: string): Promise<AuthInfo> {
-    const record = this.tokens.get(token);
-    if (!record || record.expiresAt < Date.now()) {
-      this.tokens.delete(token);
-      throw new Error('Invalid or expired access token');
-    }
+    const entry = this.openAccessToken(token);
+    if (!entry) throw new InvalidTokenError('Invalid or expired access token');
     return {
       token,
-      clientId: record.clientId,
-      scopes: record.scopes,
-      expiresAt: Math.floor(record.expiresAt / 1000),
-      ...(record.resource ? { resource: new URL(record.resource) } : {}),
-      extra: { polarionToken: record.polarionToken },
+      clientId: entry.c,
+      scopes: entry.s,
+      expiresAt: Math.floor(entry.e / 1000),
+      ...(entry.r ? { resource: new URL(entry.r) } : {}),
+      extra: { polarionToken: entry.p },
     };
   }
 
   /**
    * Looks up the Polarion token behind an access token, without throwing.
    *
-   * @param token - A bearer value that may or may not be one of ours.
-   * @returns The Polarion PAT, or undefined if this is not an issued token.
+   * @param token - A sealed access token.
+   * @returns The Polarion PAT, or undefined if the token is invalid or expired.
    */
   polarionTokenFor(token: string): string | undefined {
-    const record = this.tokens.get(token);
-    if (!record) return undefined;
-    if (record.expiresAt < Date.now()) {
-      this.tokens.delete(token);
-      return undefined;
-    }
-    return record.polarionToken;
+    return this.openAccessToken(token)?.p;
   }
 
   /**
-   * Revokes an issued access or refresh token.
-   *
-   * @param _client - The client asking for revocation.
-   * @param request - Carries the token to revoke.
+   * @param token - A sealed access token.
+   * @returns Its payload if it is genuine and unexpired.
    */
-  async revokeToken(_client: OAuthClientInformationFull, request: { token: string }): Promise<void> {
-    this.tokens.delete(request.token);
-    this.refreshTokens.delete(request.token);
+  private openAccessToken(token: string): AccessPayload | undefined {
+    const entry = this.sealer.open<AccessPayload>('a', token);
+    return entry && entry.e > Date.now() ? entry : undefined;
   }
 
-  /** Drops everything that has expired, so memory tracks live sessions only. */
+  /** Drops expired logins and codes, so memory tracks live logins only. */
   private sweep(): void {
     const now = Date.now();
     for (const [key, entry] of this.pendingLogins) if (entry.expiresAt < now) this.pendingLogins.delete(key);
     for (const [key, entry] of this.codes) if (entry.expiresAt < now) this.codes.delete(key);
-    for (const [key, entry] of this.tokens) if (entry.expiresAt < now) this.tokens.delete(key);
-    for (const [key, entry] of this.refreshTokens) if (entry.expiresAt < now) this.refreshTokens.delete(key);
   }
 }
