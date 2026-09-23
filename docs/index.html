@@ -1188,7 +1188,7 @@
       <div class="feature-card">
         <div class="feature-icon">🔒</div>
         <div class="feature-title">Secure by Design</div>
-        <p class="feature-desc">Your Polarion Personal Access Token stays yours — in a gitignored .env for stdio, sent per-request for HTTP, or entered once through an OAuth login that keeps it in server memory only, never on disk or handed to the client.</p>
+        <p class="feature-desc">Your Polarion Personal Access Token stays yours — in a gitignored .env for stdio, sent per-request for HTTP, or entered once through an OAuth login: the server stores nothing and the client only ever holds it encrypted, unreadable to anyone but the server.</p>
         <span class="feature-tag">pat · oauth · tls</span>
       </div>
 
@@ -1239,9 +1239,9 @@
           <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
         </div>
         <div class="client-name">ChatGPT</div>
-        <div class="client-type">Custom GPT</div>
-        <span class="client-transport">rest http</span>
-        <span class="client-transport" style="margin-left:4px;background:rgba(255,255,255,0.05);color:var(--text-dim);">no oauth</span>
+        <div class="client-type">Connector &amp; Custom GPT</div>
+        <span class="client-transport">streamable http</span>
+        <span class="client-transport" style="margin-left:4px;">oauth</span>
       </div>
       <div class="client-card">
         <div class="client-icon client-icon--claude">
@@ -1275,7 +1275,7 @@
         <div class="step-num">02</div>
         <div class="step-title">Configure</div>
         <p class="step-desc">Add your Polarion URL and Personal Access Token. Point your AI client to the server.</p>
-        <span class="step-code">API_BASE_URL + BEARER_TOKEN</span>
+        <span class="step-code">API_BASE_URL + your PAT</span>
       </div>
       <div class="how-step">
         <div class="step-num">03</div>
@@ -1298,35 +1298,39 @@
       <button class="tab-btn active" onclick="switchTab('claude-code', this)">Claude Code</button>
       <button class="tab-btn" onclick="switchTab('vscode', this)">VS Code Copilot</button>
       <button class="tab-btn" onclick="switchTab('claude-desktop', this)">Claude Desktop</button>
-      <button class="tab-btn" onclick="switchTab('chatgpt', this)">ChatGPT (Custom GPT)</button>
-      <button class="tab-btn" onclick="switchTab('claude-http', this)">Claude.ai (HTTP)</button>
-      <button class="tab-btn" onclick="switchTab('oauth', this)">Claude.ai (OAuth)</button>
-      <button class="tab-btn" onclick="switchTab('docker', this)">Docker</button>
+      <button class="tab-btn" onclick="switchTab('oauth', this)">Claude.ai / ChatGPT (OAuth)</button>
+      <button class="tab-btn" onclick="switchTab('gpt-oauth', this)">Custom GPT (OAuth)</button>
+      <button class="tab-btn" onclick="switchTab('claude-http', this)">HTTP + PAT header</button>
+      <button class="tab-btn" onclick="switchTab('chatgpt', this)">Custom GPT (API key)</button>
     </div>
 
     <div id="tab-claude-code" class="tab-content active">
       <div class="code-block">
         <button class="code-copy" onclick="copyCode('claude-code', this)">Copy</button>
         <pre id="code-claude-code"><span style="color:#86efac">claude mcp add</span> polarion-mcp \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
+  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
   <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">your-personal-access-token</span> \
   -- node <span style="color:#f9a8d4">/path/to/polarion-mcp/build/index.js</span></pre>
       </div>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">Local stdio: Claude Code starts the server itself, nothing listens on the network. <code>API_BASE_URL</code> always ends in <code>/polarion/rest/v1</code>. Create the token in Polarion under <em>My Account &rsaquo; Personal Access Tokens</em>.</p>
     </div>
 
     <div id="tab-vscode" class="tab-content">
       <div class="code-block">
         <button class="code-copy" onclick="copyCode('vscode', this)">Copy</button>
-        <pre id="code-vscode"><span style="color:#6b7280">// .vscode/mcp.json</span>
+        <pre id="code-vscode"><span style="color:#6b7280">// .vscode/mcp.json (VS Code asks for the token and stores it securely)</span>
 {
+  <span style="color:#93c5fd">"inputs"</span>: [
+    { <span style="color:#93c5fd">"type"</span>: <span style="color:#fde68a">"promptString"</span>, <span style="color:#93c5fd">"id"</span>: <span style="color:#fde68a">"polarion-pat"</span>, <span style="color:#93c5fd">"description"</span>: <span style="color:#fde68a">"Polarion PAT"</span>, <span style="color:#93c5fd">"password"</span>: true }
+  ],
   <span style="color:#93c5fd">"servers"</span>: {
     <span style="color:#93c5fd">"polarion-mcp"</span>: {
       <span style="color:#93c5fd">"type"</span>: <span style="color:#fde68a">"stdio"</span>,
       <span style="color:#93c5fd">"command"</span>: <span style="color:#fde68a">"node"</span>,
       <span style="color:#93c5fd">"args"</span>: [<span style="color:#fde68a">"/path/to/polarion-mcp/build/index.js"</span>],
       <span style="color:#93c5fd">"env"</span>: {
-        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion"</span>,
-        <span style="color:#93c5fd">"BEARER_TOKEN"</span>: <span style="color:#fde68a">"your-personal-access-token"</span>
+        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion/rest/v1"</span>,
+        <span style="color:#93c5fd">"BEARER_TOKEN"</span>: <span style="color:#fde68a">"${input:polarion-pat}"</span>
       }
     }
   }
@@ -1337,74 +1341,88 @@
     <div id="tab-claude-desktop" class="tab-content">
       <div class="code-block">
         <button class="code-copy" onclick="copyCode('claude-desktop', this)">Copy</button>
-        <pre id="code-claude-desktop"><span style="color:#6b7280">// claude_desktop_config.json</span>
+        <pre id="code-claude-desktop"><span style="color:#6b7280">// claude_desktop_config.json, then restart Claude Desktop</span>
 {
   <span style="color:#93c5fd">"mcpServers"</span>: {
     <span style="color:#93c5fd">"polarion-mcp"</span>: {
       <span style="color:#93c5fd">"command"</span>: <span style="color:#fde68a">"node"</span>,
       <span style="color:#93c5fd">"args"</span>: [<span style="color:#fde68a">"/path/to/polarion-mcp/build/index.js"</span>],
       <span style="color:#93c5fd">"env"</span>: {
-        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion"</span>,
+        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion/rest/v1"</span>,
         <span style="color:#93c5fd">"BEARER_TOKEN"</span>: <span style="color:#fde68a">"your-personal-access-token"</span>
       }
     }
   }
 }</pre>
       </div>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">No local Node? Use <code>"command": "docker"</code> with <code>"args": ["run", "--rm", "-i", "-e", "API_BASE_URL", "-e", "BEARER_TOKEN", "ghcr.io/phillipboesger/polarion-mcp:latest", "node", "build/index.js"]</code>.</p>
+    </div>
+
+    <div id="tab-oauth" class="tab-content">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('oauth', this)">Copy</button>
+        <pre id="code-oauth"><span style="color:#86efac">docker run</span> -d --name polarion-mcp \
+  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
+  <span style="color:#93c5fd">-e</span> MCP_PUBLIC_URL=<span style="color:#fde68a">https://mcp.yourdomain.com</span> \
+  <span style="color:#93c5fd">-e</span> MCP_TOKEN_SECRET=<span style="color:#fde68a">$(openssl rand -base64 48)</span> \
+  <span style="color:#93c5fd">-e</span> MCP_ALLOWED_HOSTS=<span style="color:#fde68a">mcp.yourdomain.com</span> \
+  <span style="color:#93c5fd">-p</span> 127.0.0.1:3000:3000 \
+  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span>
+
+<span style="color:#6b7280"># connector URL for Claude.ai and ChatGPT</span>
+<span style="color:#93c5fd">URL</span>:  <span style="color:#fde68a">https://mcp.yourdomain.com/mcp</span></pre>
+      </div>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">For clients that cannot send a custom header. Put the server behind TLS on a host reachable from the internet (Claude.ai and ChatGPT connect from their cloud, not from your network). <strong style="color:#e5e7eb;">Claude.ai:</strong> <em>Settings &rsaquo; Connectors &rsaquo; Add custom connector</em>, paste the URL, leave client ID and secret empty. <strong style="color:#e5e7eb;">ChatGPT:</strong> turn on <em>Developer mode</em> under <em>Settings &rsaquo; Security and login</em>, add a connector with the URL and OAuth. On first use each user pastes their own Polarion PAT on a login page.</p>
+      <p style="color:#9ca3af;font-size:14px;margin-top:8px;">The server stores no token: the client receives it encrypted under <code>MCP_TOKEN_SECRET</code>, which only the server can read. Access renews silently every hour and each renewal re-checks the PAT with Polarion, so a login lasts until the PAT is revoked or expires, and survives server restarts. Keep <code>MCP_TOKEN_SECRET</code> fixed; changing it logs everyone out. Reverse-proxy paths: <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/deployment.md" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;">docs/deployment.md</a>.</p>
+    </div>
+
+    <div id="tab-gpt-oauth" class="tab-content">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('gpt-oauth', this)">Copy</button>
+        <pre id="code-gpt-oauth"><span style="color:#6b7280"># the OAuth server from the previous tab, plus a client for the GPT</span>
+<span style="color:#93c5fd">-e</span> GPT_CLIENT_ID=<span style="color:#fde68a">polarion-gpt</span> \
+<span style="color:#93c5fd">-e</span> GPT_CLIENT_SECRET=<span style="color:#fde68a">$(openssl rand -hex 32)</span>
+
+<span style="color:#6b7280"># GPT editor: Actions › Import from URL</span>
+<span style="color:#fde68a">https://mcp.yourdomain.com/openapi-gpt.json</span>
+
+<span style="color:#6b7280"># Authentication › OAuth</span>
+<span style="color:#93c5fd">Client ID</span>:          <span style="color:#fde68a">polarion-gpt</span>
+<span style="color:#93c5fd">Client Secret</span>:      <span style="color:#fde68a">the GPT_CLIENT_SECRET value</span>
+<span style="color:#93c5fd">Authorization URL</span>:  <span style="color:#fde68a">https://mcp.yourdomain.com/gpt/authorize</span>
+<span style="color:#93c5fd">Token URL</span>:          <span style="color:#fde68a">https://mcp.yourdomain.com/gpt/token</span>
+<span style="color:#93c5fd">Scope</span>:              <span style="color:#fde68a">polarion</span></pre>
+      </div>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">Each GPT user signs in once with their own Polarion PAT and then works under their own Polarion account; the login lasts as long as that PAT is valid. Either token exchange method (POST or Basic) works. Only ChatGPT's own <code>/aip/&lt;gpt-id&gt;/oauth/callback</code> addresses are accepted, so nothing needs allowlisting.</p>
+    </div>
+
+    <div id="tab-claude-http" class="tab-content">
+      <div class="code-block">
+        <button class="code-copy" onclick="copyCode('claude-http', this)">Copy</button>
+        <pre id="code-claude-http"><span style="color:#86efac">docker run</span> -d --name polarion-mcp \
+  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
+  <span style="color:#93c5fd">-p</span> 127.0.0.1:3000:3000 \
+  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span>
+
+<span style="color:#6b7280"># Claude Code, behind your TLS proxy</span>
+<span style="color:#86efac">claude mcp add</span> <span style="color:#93c5fd">--transport</span> http polarion <span style="color:#fde68a">https://mcp.yourdomain.com/mcp</span> \
+  <span style="color:#93c5fd">--header</span> <span style="color:#fde68a">"Authorization: Bearer &lt;your-polarion-pat&gt;"</span></pre>
+      </div>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">One shared server that holds no credentials; each client sends its own Polarion PAT as a header, and Polarion authorizes every call under that user. For Claude Code, VS Code Copilot (<code>"type": "http"</code> with <code>"headers"</code>), curl and scripts. Claude.ai and ChatGPT connectors cannot set a header: use the OAuth tab instead.</p>
     </div>
 
     <div id="tab-chatgpt" class="tab-content">
       <div class="code-block">
         <button class="code-copy" onclick="copyCode('chatgpt', this)">Copy</button>
         <pre id="code-chatgpt"><span style="color:#86efac">docker run</span> -d \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
-  <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">your-personal-access-token</span> \
-  <span style="color:#93c5fd">-e</span> HTTP_API_KEY=<span style="color:#fde68a">your-gpt-action-key</span> \
-  <span style="color:#93c5fd">-p</span> 3000:3000 \
+  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
+  <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">service-account-pat</span> \
+  <span style="color:#93c5fd">-e</span> HTTP_API_KEY=<span style="color:#fde68a">$(openssl rand -hex 32)</span> \
+  <span style="color:#93c5fd">-p</span> 127.0.0.1:3000:3000 \
   <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span> \
   node build/http-server.js</pre>
       </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">This is the plain REST wrapper (not MCP) built for ChatGPT Custom GPT Actions. In the GPT editor, add an action and import the schema from <code>https://your-host:3000/openapi-gpt.json</code> (a 30-tool subset that fits ChatGPT's operation-count limit — use <code>/openapi.json</code> for the full 284 if your consumer allows it), then set the action's auth to API key / Bearer using <code>HTTP_API_KEY</code>.</p>
-      <p style="color:#9ca3af;font-size:14px;margin-top:8px;"><strong style="color:#e5e7eb;">No OAuth here</strong> — this wrapper only supports the static <code>HTTP_API_KEY</code> above, shared by every caller. ChatGPT's own Action editor offers an OAuth auth type, but this server doesn't implement an authorization endpoint for it; per-user login is only available on the Streamable HTTP MCP transport (see the Claude.ai tabs).</p>
-    </div>
-
-    <div id="tab-claude-http" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('claude-http', this)">Copy</button>
-        <pre id="code-claude-http"><span style="color:#86efac">docker run</span> -d \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
-  <span style="color:#93c5fd">-p</span> 3000:3000 \
-  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span>
-
-<span style="color:#6b7280"># connector URL, header on every request</span>
-<span style="color:#93c5fd">URL</span>:     <span style="color:#fde68a">https://your-host:3000/mcp</span>
-<span style="color:#93c5fd">Header</span>:  <span style="color:#fde68a">Authorization: Bearer &lt;your-polarion-pat&gt;</span></pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">The server holds no credentials in this mode — every <code>/mcp</code> request must carry the caller's own Polarion PAT as a Bearer token, and Polarion authorizes the call under that user. Use this when your client (Claude.ai custom connector, curl, or another Streamable HTTP MCP client) lets you set a static header. If it can't, use the OAuth login tab instead so each user pastes their own PAT through a login page.</p>
-    </div>
-
-    <div id="tab-docker" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('docker', this)">Copy</button>
-        <pre id="code-docker"><span style="color:#86efac">docker run</span> -d \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
-  <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">your-personal-access-token</span> \
-  <span style="color:#93c5fd">-p</span> 3000:3000 \
-  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span></pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">Single-user HTTP deployment: every request runs as this one Polarion account. For per-user auth, use the Claude.ai (HTTP) or ChatGPT tabs instead — drop <code>BEARER_TOKEN</code> and send each caller's own token.</p>
-    </div>
-
-    <div id="tab-oauth" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('oauth', this)">Copy</button>
-        <pre id="code-oauth"><span style="color:#86efac">docker run</span> -d \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion</span> \
-  <span style="color:#93c5fd">-e</span> MCP_PUBLIC_URL=<span style="color:#fde68a">https://mcp.yourdomain.com</span> \
-  <span style="color:#93c5fd">-p</span> 3000:3000 \
-  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span></pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">No <code>BEARER_TOKEN</code> needed — setting <code>MCP_PUBLIC_URL</code> turns on an OAuth login flow. Point Claude.ai's connector setup at <code>https://mcp.yourdomain.com/mcp</code>; each user is redirected to a page where they paste their own Polarion PAT once. The token is checked against Polarion, held in server memory for that session only, and never written to disk or sent to the client. Behind a reverse proxy, see <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/deployment.md" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;">docs/deployment.md</a> for the exact <code>ProxyPass</code> block, including the OAuth metadata paths.</p>
+      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">A plain REST wrapper for Custom GPT Actions with one shared key: every GPT user acts as the same Polarion account. In the GPT editor import <code>https://your-host/openapi-gpt.json</code> (a 30-tool subset that fits ChatGPT's limit) and set authentication to API key, type Bearer, with the <code>HTTP_API_KEY</code> value. For per-user logins use the Custom GPT (OAuth) tab.</p>
     </div>
   </div>
 </section>

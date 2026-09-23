@@ -71,6 +71,8 @@ User=polarion-mcp
 WorkingDirectory=/opt/polarion-mcp/app
 Environment=API_BASE_URL=https://polarion.example.com/polarion/rest/v1
 Environment=MCP_PUBLIC_URL=https://polarion.example.com
+# Keeps logins valid across restarts; readable by root only.
+EnvironmentFile=/etc/polarion-mcp/secrets.env
 Environment=MCP_HTTP_HOST=127.0.0.1
 Environment=MCP_HTTP_PORT=3000
 Environment=MCP_ALLOWED_HOSTS=polarion.example.com
@@ -85,6 +87,10 @@ ProtectHome=true
 [Install]
 WantedBy=multi-user.target
 ```
+
+`/etc/polarion-mcp/secrets.env` (`chmod 600`, owned by root) holds
+`MCP_TOKEN_SECRET=<openssl rand -base64 48>`, and for Custom GPT OAuth also
+`GPT_CLIENT_ID=...` and `GPT_CLIENT_SECRET=...`.
 
 ```bash
 systemctl daemon-reload && systemctl enable --now polarion-mcp
@@ -114,14 +120,22 @@ ProxyPass /token http://127.0.0.1:3000/token timeout=600
 ProxyPassReverse /token http://127.0.0.1:3000/token
 ProxyPass /register http://127.0.0.1:3000/register timeout=600
 ProxyPassReverse /register http://127.0.0.1:3000/register
-ProxyPass /revoke http://127.0.0.1:3000/revoke timeout=600
-ProxyPassReverse /revoke http://127.0.0.1:3000/revoke
 ProxyPass /polarion-login http://127.0.0.1:3000/polarion-login timeout=600
 ProxyPassReverse /polarion-login http://127.0.0.1:3000/polarion-login
 ProxyPass /.well-known/oauth-authorization-server http://127.0.0.1:3000/.well-known/oauth-authorization-server timeout=600
 ProxyPassReverse /.well-known/oauth-authorization-server http://127.0.0.1:3000/.well-known/oauth-authorization-server
 ProxyPass /.well-known/oauth-protected-resource http://127.0.0.1:3000/.well-known/oauth-protected-resource timeout=600
 ProxyPassReverse /.well-known/oauth-protected-resource http://127.0.0.1:3000/.well-known/oauth-protected-resource
+
+# Only needed for Custom GPT OAuth (GPT_CLIENT_ID set).
+ProxyPass /gpt/ http://127.0.0.1:3000/gpt/ timeout=600
+ProxyPassReverse /gpt/ http://127.0.0.1:3000/gpt/
+ProxyPass /api/tools http://127.0.0.1:3000/api/tools timeout=600
+ProxyPassReverse /api/tools http://127.0.0.1:3000/api/tools
+ProxyPass /openapi-gpt.json http://127.0.0.1:3000/openapi-gpt.json
+ProxyPassReverse /openapi-gpt.json http://127.0.0.1:3000/openapi-gpt.json
+ProxyPass /openapi.json http://127.0.0.1:3000/openapi.json
+ProxyPassReverse /openapi.json http://127.0.0.1:3000/openapi.json
 ```
 
 `ProxyPreserveHost On` passes the public host name through, which is what

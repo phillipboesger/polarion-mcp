@@ -13,6 +13,8 @@
 - HTTP_API_KEY: Required for the REST HTTP wrapper (ChatGPT Custom GPT) authentication.
 - MCP_HTTP_PORT: Optional port for the MCP HTTP server (falls back to HTTP_PORT, then 3000).
 - MCP_PUBLIC_URL: Public HTTPS base URL of the deployment. Setting it enables the OAuth login flow (client registration, authorization, token endpoints, and the page where a user pastes their Polarion PAT), which is how clients that cannot be handed a token by hand — Claude.ai connectors — authenticate. Unset, the server only accepts a Polarion PAT sent directly as the Bearer token.
+- MCP_TOKEN_SECRET: Secret (at least 32 characters) that encrypts the tokens the OAuth login hands out; they carry the user's PAT, so the server stores nothing. Keep it stable and identical on every instance: a login then lasts until Polarion stops accepting the PAT, across restarts. Unset, a random secret is used and every login ends on restart. Changing it logs everyone out.
+- GPT_CLIENT_ID / GPT_CLIENT_SECRET: Enable per-user OAuth for ChatGPT Custom GPT Actions on the Streamable HTTP MCP server (needs MCP_PUBLIC_URL). Enter the same values in the GPT editor; endpoints are `/gpt/authorize` and `/gpt/token`.
 - MCP_HTTP_HOST: Optional bind address for the MCP HTTP server (default 0.0.0.0). Set it to 127.0.0.1 when a TLS reverse proxy sits in front, so the plaintext port that carries client PATs is not reachable from outside.
 - MCP_ALLOWED_HOSTS: Optional comma-separated Host allow-list; setting it enables DNS-rebinding protection for the MCP HTTP server.
 - LOG_LEVEL: Reserved for logging configuration (informational only).
@@ -20,7 +22,7 @@
 ## Minimal Configuration by Mode
 
 - MCP stdio mode requires API_BASE_URL and BEARER_TOKEN.
-- Streamable HTTP MCP mode (Claude.ai) requires only API_BASE_URL, and optionally MCP_HTTP_PORT / MCP_HTTP_HOST / MCP_ALLOWED_HOSTS. Each client authenticates with its own Polarion PAT as the Bearer token of every `/mcp` request.
+- Streamable HTTP MCP mode (Claude.ai, ChatGPT) requires only API_BASE_URL, and optionally MCP_HTTP_PORT / MCP_HTTP_HOST / MCP_ALLOWED_HOSTS. Each client authenticates with its own Polarion PAT as the Bearer token of every `/mcp` request. For the OAuth login add MCP_PUBLIC_URL and MCP_TOKEN_SECRET; for Custom GPT OAuth also GPT_CLIENT_ID and GPT_CLIENT_SECRET.
 - REST HTTP mode (ChatGPT) requires API_BASE_URL, BEARER_TOKEN, HTTP_API_KEY, and optionally HTTP_PORT.
 
 ## Token Storage Guidance
