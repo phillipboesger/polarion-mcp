@@ -38,6 +38,10 @@
  *    "creates a duplicate" from.
  * 6. A "Tip:" sentence on every tool that accepts `dry_run`, pointing an
  *    agent at it before a mutating call.
+ * 7. A hand-written lead description (see `TOOL_GUIDANCE` in
+ *    `lib/tool-guidance.mjs`) replacing the generated OpenAPI summary on
+ *    tools where that summary is too generic to pick the tool by, keeping
+ *    every generated note above appended after it.
  *
  * Usage: node scripts/enrich-tool-metadata.mjs [path/to/tools.ts]
  */
@@ -52,6 +56,7 @@ import {
   PARAM_DESCRIPTIONS,
   effectNoteForAnnotations,
 } from './lib/entry-utils.mjs';
+import { TOOL_GUIDANCE } from './lib/tool-guidance.mjs';
 
 const filePath = process.argv[2] || 'src/tools.ts';
 
@@ -265,6 +270,31 @@ function appendNote(entry, marker, note) {
   return { entry: updated, skipped: false };
 }
 
+/**
+ * Replaces a tool description's lead -- the text before the first generated
+ * note marker -- with `lead`, keeping the notes that follow it. Rewriting the
+ * same lead again is a no-op, so this is idempotent.
+ *
+ * @param {string} entry - Raw object-literal text of one tool definition.
+ * @param {string} lead - Plain (unescaped) replacement lead text.
+ * @returns {{ entry: string, skipped: boolean }} The (possibly modified) entry, and whether it was skipped due to an unexpected description shape.
+ */
+function replaceLead(entry, lead) {
+  const bounds = findDescriptionBounds(entry);
+  if (!bounds) return { entry, skipped: true };
+  const { contentStart, contentEnd } = bounds;
+  const text = entry.slice(contentStart, contentEnd);
+  const markerAt = [SCOPE_MARKER, CARDINALITY_MARKER, EFFECT_MARKER, TIP_MARKER]
+    .map((marker) => text.indexOf(` ${marker}`))
+    .filter((i) => i >= 0);
+  const leadEnd = markerAt.length ? Math.min(...markerAt) : text.length;
+  // The description is a template literal in tools.ts: escape the characters
+  // that would end it or start an interpolation.
+  const escaped = lead.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  const updated = entry.slice(0, contentStart) + escaped + text.slice(leadEnd) + entry.slice(contentEnd);
+  return { entry: updated, skipped: false };
+}
+
 function appendScopeNote(entry, note) {
   return appendNote(entry, SCOPE_MARKER, note);
 }
@@ -279,6 +309,21 @@ let entries = splitTopLevelArrayEntries(mapArrayText);
 
 const names = entries.map((e) => getField(e, 'name'));
 const scopePairs = findScopePairs(names);
+
+const unknownGuidance = Object.keys(TOOL_GUIDANCE).filter((name) => !names.includes(name));
+if (unknownGuidance.length) {
+  throw new Error(`TOOL_GUIDANCE names tools that no longer exist: ${unknownGuidance.join(', ')}`);
+}
+let leadCount = 0;
+let leadSkipped = 0;
+entries = entries.map((entry, i) => {
+  const lead = TOOL_GUIDANCE[names[i]];
+  if (!lead) return entry;
+  const result = replaceLead(entry, lead);
+  if (result.skipped) leadSkipped++;
+  else if (result.entry !== entry) leadCount++;
+  return result.entry;
+});
 
 let annotationCount = 0;
 entries = entries.map((entry) => {
@@ -417,9 +462,10 @@ console.log(`  cardinality-pair siblings found: ${cardinalityPairs.length}`);
 console.log(`  cardinality notes added: ${cardinalityNoteCount}${cardinalityNoteSkipped ? ` (${cardinalityNoteSkipped} SKIPPED -- unexpected description shape)` : ''}`);
 console.log(`  parameter descriptions enriched: ${paramEnrichedCount}${paramEnrichedSchemaFailed ? ` (${paramEnrichedSchemaFailed} SKIPPED -- unreadable inputSchema)` : ''}`);
 console.log(`  effect notes added: ${effectNoteCount}${effectNoteSkipped ? ` (${effectNoteSkipped} SKIPPED -- unexpected description shape or unreadable inputSchema)` : ''}`);
+console.log(`  curated lead descriptions applied: ${leadCount}${leadSkipped ? ` (${leadSkipped} SKIPPED -- unexpected description shape)` : ''}`);
 console.log(`  dry_run tips added: ${dryRunTipCount}${dryRunTipSkipped ? ` (${dryRunTipSkipped} SKIPPED -- unexpected description shape or unreadable inputSchema)` : ''}`);
 
-const totalSkipped = scopeNoteSkipped + cardinalityNoteSkipped + paramEnrichedSchemaFailed + effectNoteSkipped + dryRunTipSkipped;
+const totalSkipped = leadSkipped + scopeNoteSkipped + cardinalityNoteSkipped + paramEnrichedSchemaFailed + effectNoteSkipped + dryRunTipSkipped;
 if (totalSkipped > 0) {
   throw new Error(
     `${totalSkipped} note(s) were skipped due to an unexpected description shape -- ` +
