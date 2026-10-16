@@ -19,7 +19,7 @@ An open-source **Model Context Protocol** server that exposes **284 Polarion RES
 </div>
 
 <p align="center">
-  <img src="docs/assets/demo.gif" alt="Polarion MCP connected to Claude, querying and updating work items live" width="850">
+  <img src="docs/assets/demo.gif" alt="GitHub Copilot in VS Code asks polarion-mcp for open defects and gets real Polarion work items back" width="850">
 </p>
 
 ---
