@@ -1034,6 +1034,24 @@ html { scroll-padding-top: 90px; }
   .nav-cta { padding: 8px 10px; margin-left: 6px; }
   .nav-cta .cta-text { display: none; }
 }
+
+/* ─── AUDIT FIXES ─── */
+.tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab-btn { white-space: nowrap; }
+.paths { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 36px; }
+.path-card { text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); transition: border-color .2s, background .2s, transform .2s; }
+.path-card:hover { transform: translateY(-2px); border-color: var(--border-acc); }
+.path-card.is-active { border-color: var(--accent); background: var(--accent-dim); }
+.path-k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warm); }
+.path-card strong { font-size: 15px; color: #fff; }
+.path-d { font-size: 13px; line-height: 1.5; color: var(--text-sub); }
+.path-card em { margin-top: auto; padding-top: 6px; font-style: normal; font-family: var(--mono); font-size: 11.5px; color: var(--accent); }
+.paths + .tabs { margin-top: 28px; }
+@media (max-width: 980px) { .paths { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .paths { grid-template-columns: 1fr; } }
+
+.cta-inner h2 { line-height: 1.08; text-wrap: balance; }
   </style>
 </head>
 <body>
@@ -1284,6 +1302,7 @@ html { scroll-padding-top: 90px; }
         <div class="client-name">Claude Code</div>
         <div class="client-type">CLI / Agent</div>
         <span class="client-transport">stdio</span>
+        <span class="client-transport" style="margin-left:4px;">http</span>
       </div>
       <div class="client-card">
         <div class="client-icon client-icon--claude">
@@ -1292,6 +1311,7 @@ html { scroll-padding-top: 90px; }
         <div class="client-name">Claude Desktop</div>
         <div class="client-type">macOS / Windows</div>
         <span class="client-transport">stdio</span>
+        <span class="client-transport" style="margin-left:4px;">oauth</span>
       </div>
       <div class="client-card">
         <div class="client-icon client-icon--copilot">
@@ -1300,6 +1320,7 @@ html { scroll-padding-top: 90px; }
         <div class="client-name">GitHub Copilot</div>
         <div class="client-type">VS Code Agent Mode</div>
         <span class="client-transport">stdio</span>
+        <span class="client-transport" style="margin-left:4px;">http</span>
       </div>
       <div class="client-card">
         <div class="client-icon client-icon--openai">
@@ -1317,7 +1338,7 @@ html { scroll-padding-top: 90px; }
         <div class="client-name">Claude.ai</div>
         <div class="client-type">Web App</div>
         <span class="client-transport">streamable http</span>
-        <span class="client-transport" style="margin-left:4px;">oauth or pat</span>
+        <span class="client-transport" style="margin-left:4px;">oauth</span>
       </div>
     </div>
   </div>
@@ -1359,7 +1380,34 @@ html { scroll-padding-top: 90px; }
   <div class="section-inner">
     <p class="section-label">Quick Start</p>
     <h2 class="section-heading">Get connected</h2>
-    <p class="section-sub">Choose your AI client. Copy the config. You're done.</p>
+    <p class="section-sub">Every AI client has its own way in. Pick where you work, then copy the config for your client.</p>
+
+    <div class="paths" role="list">
+      <button type="button" class="path-card is-active" data-path="local" data-tab="claude-code">
+        <span class="path-k">On your machine</span>
+        <strong>Claude Code · VS Code · Claude Desktop</strong>
+        <span class="path-d">No server to run. The client starts polarion-mcp locally with your PAT.</span>
+        <em>stdio + PAT</em>
+      </button>
+      <button type="button" class="path-card" data-path="oauth" data-tab="oauth">
+        <span class="path-k">In the browser or on your phone</span>
+        <strong>Claude.ai · Claude mobile · ChatGPT</strong>
+        <span class="path-d">These connect from the vendor's cloud, so they need a hosted server reachable from the internet. Each user signs in once with their own PAT.</span>
+        <em>HTTP + OAuth login</em>
+      </button>
+      <button type="button" class="path-card" data-path="gpt" data-tab="gpt-oauth">
+        <span class="path-k">Inside a Custom GPT</span>
+        <strong>ChatGPT Custom GPT Actions</strong>
+        <span class="path-d">Per-user OAuth login, or one shared API key for the whole GPT.</span>
+        <em>GPT Actions</em>
+      </button>
+      <button type="button" class="path-card" data-path="http" data-tab="claude-http">
+        <span class="path-k">Shared team server</span>
+        <strong>Scripts, curl, Claude Code, VS Code</strong>
+        <span class="path-d">One server without credentials. Every client sends its own PAT as a header.</span>
+        <em>HTTP + PAT header</em>
+      </button>
+    </div>
 
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('claude-code', this)">Claude Code</button>
@@ -1504,7 +1552,7 @@ html { scroll-padding-top: 90px; }
       <h3>Built by Phillip Bösger</h3>
       <p class="about-role">Polarion & AI Freelancer · Bösger Digital</p>
       <p class="about-bio">
-        Nearly a decade of Polarion experience. I built polarion-mcp because I wanted my AI assistants to actually know what's happening in Polarion — not just talk about it.
+        8 years of Polarion, from Siemens enterprise to startup. I built polarion-mcp because I wanted my AI assistants to actually know what's happening in Polarion — not just talk about it.
       </p>
       <div class="about-links">
         <a href="https://polarion.boesger.com" class="about-link" target="_blank" rel="noopener noreferrer">
@@ -1611,12 +1659,20 @@ html { scroll-padding-top: 90px; }
     btn.classList.add('active');
   }
 
+  var TAB_PATH = { 'claude-code': 'local', 'vscode': 'local', 'claude-desktop': 'local', 'oauth': 'oauth', 'gpt-oauth': 'gpt', 'chatgpt': 'gpt', 'claude-http': 'http' };
   function switchTab(id, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + id).classList.add('active');
     btn.classList.add('active');
+    document.querySelectorAll('.path-card').forEach(c => c.classList.toggle('is-active', c.dataset.path === TAB_PATH[id]));
   }
+  document.querySelectorAll('.path-card').forEach(function (card) {
+    card.addEventListener('click', function () {
+      var btn = document.querySelector('.tab-btn[onclick*="\'' + card.dataset.tab + '\'"]');
+      if (btn) { switchTab(card.dataset.tab, btn); btn.scrollIntoView({ block: 'nearest', inline: 'center' }); }
+    });
+  });
 
   // Code copy
   function copyCode(id, btn) {
