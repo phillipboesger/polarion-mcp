@@ -231,6 +231,9 @@ export function formatApiError(error: AxiosError): string {
     else {
       message += 'No response body received.';
     }
+  } else if (/maxContentLength/.test(error.message)) {
+    // A download over the size cap: axios aborts it without a response.
+    message = `File too large to return inline. Download it from Polarion directly${error.config?.url ? `: ${error.config.url}` : '.'}`;
   } else if (error.request) {
     // Request was made but no response received
     message = 'API Network Error: No response received from server.';

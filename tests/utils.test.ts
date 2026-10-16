@@ -240,3 +240,11 @@ test("formatApiError keeps up to 2000 characters of JSON:API detail", () => {
   })
   assert.ok(formatApiError(error).includes(detail))
 })
+
+test("formatApiError reports a download over the size cap as too large, not as a network error", () => {
+  const error = new AxiosError("maxContentLength size of 20971521 exceeded", "ERR_BAD_RESPONSE", { url: "https://p/polarion/rest/v1/x/content" } as any, {})
+  const message = formatApiError(error)
+  assert.match(message, /too large/)
+  assert.match(message, /x\/content/)
+  assert.doesNotMatch(message, /Network Error/)
+})

@@ -114,3 +114,23 @@ test("one caller opening sessions in a loop only loses its own oldest ones, neve
     await app.stop()
   }
 })
+
+test("an open SSE stream keeps its session alive past the idle limit; it expires after the stream closes", async () => {
+  const app = await startApp({ sessionIdleMs: 400 })
+  try {
+    const sid = await app.init("pat-alice")
+    await fetch(`${app.base}/mcp`, { method: "POST", headers: { ...HEADERS, authorization: "Bearer pat-alice", "mcp-session-id": sid }, body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) })
+    const abort = new AbortController()
+    const stream = await fetch(`${app.base}/mcp`, {
+      method: "GET", signal: abort.signal, headers: { accept: "text/event-stream", authorization: "Bearer pat-alice", "mcp-session-id": sid },
+    })
+    assert.equal(stream.status, 200)
+    await new Promise((r) => setTimeout(r, 900))
+    assert.equal((await app.list("pat-alice", sid)).status, 200, "the stream counts as activity")
+    abort.abort()
+    await new Promise((r) => setTimeout(r, 900))
+    assert.equal((await app.list("pat-alice", sid)).status, 404, "idle after the stream closed")
+  } finally {
+    await app.stop()
+  }
+})
