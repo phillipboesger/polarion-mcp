@@ -12,17 +12,17 @@
  *
  * Facts here come from the Polarion OpenAPI spec (response content types,
  * 202 + `jobs` responses, request body schemas) and from how `executor.ts`
- * reads responses: it never sets an axios `responseType`, so an
- * `application/octet-stream` body reaches the agent as UTF-8-decoded text.
+ * reads responses: file downloads are fetched as bytes and returned as
+ * image, text or embedded-resource content (see `src/binary.ts`).
  *
  * @type {Record<string, string>}
  */
 
-const TEXT_BODY_CAVEAT =
-  'The file body is returned as UTF-8 text: plain-text files (TXT, CSV, XML, JSON, HTML) are readable, but binary files (images, PDF, Office) arrive garbled.';
+const DOWNLOAD_NOTE =
+  'Images (PNG, JPEG, GIF, WebP) come back as image content, UTF-8 text files as text, and any other file (PDF, Office, ZIP) as an embedded base64 resource; files over 20 MB are refused.';
 
 function attachmentContent(owner, metadataTool, listTool) {
-  return `Downloads the raw file content of one ${owner} attachment. ${TEXT_BODY_CAVEAT} Use this only when you need the file's bytes; for its metadata (fileName, contentType, size, author) call \`${metadataTool}\`, and to discover attachment IDs call \`${listTool}\`.`;
+  return `Downloads the raw file content of one ${owner} attachment. ${DOWNLOAD_NOTE} Use this only when you need the file's bytes; for its metadata (fileName, contentType, size, author) call \`${metadataTool}\`, and to discover attachment IDs call \`${listTool}\`.`;
 }
 
 function fieldsMetadata(owner, extra = '') {
@@ -80,9 +80,9 @@ export const TOOL_GUIDANCE = {
   getTestRecordAttachmentContent: attachmentContent('Test Record', 'getTestRecordAttachment', 'getTestRecordAttachments'),
   getTestStepResultAttachmentContent: attachmentContent('Test Step Result', 'getTestStepResultAttachment', 'getTestStepResultAttachments'),
   getJobResultFileContent:
-    `Downloads one result file produced by a finished asynchronous job (e.g. the spreadsheet from getExportExcelTests). ${TEXT_BODY_CAVEAT} Call it only after \`getJob\` reports the job as finished; the job resource lists the available file names. For the job's log instead of its output, use \`getJobLogContent\`.`,
+    `Downloads one result file produced by a finished asynchronous job (e.g. the spreadsheet from getExportExcelTests). ${DOWNLOAD_NOTE} Call it only after \`getJob\` reports the job as finished; the job resource lists the available file names. For the job's log instead of its output, use \`getJobLogContent\`.`,
   getAvatar:
-    `Downloads the avatar image of one user. ${TEXT_BODY_CAVEAT} Since avatars are images, this is rarely useful to an agent; for a user's name, email, and other profile data use \`getUser\`, and to replace the image use \`updateAvatar\`.`,
+    `Downloads the avatar image of one user. ${DOWNLOAD_NOTE} Since avatars are images, this is rarely useful to an agent; for a user's name, email, and other profile data use \`getUser\`, and to replace the image use \`updateAvatar\`.`,
 
   // --- Attachment writes ---------------------------------------------------
   patchWorkItemAttachment: attachmentPatch('Work Item', 'postWorkItemAttachments', 'getWorkItemAttachmentContent'),

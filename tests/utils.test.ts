@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { AxiosError } from "axios"
 import { extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, sanitizeInputSchema } from "../src/utils.js"
 import { toolDefinitionMap } from "../src/tools.js"
 
@@ -212,4 +213,30 @@ test("getZodSchemaFromJsonSchema keeps unknown keys on a nullable-object node (t
   }) as any
 
   assert.equal(parsed.requestBody.params.myJobParam, "x", "a custom job param must survive on a type:['object','null'] node")
+})
+
+test("extractJsonApiErrorDetail names the failing part of the request", () => {
+  assert.equal(
+    extractJsonApiErrorDetail({ errors: [
+      { detail: "Unknown field 'foo'", source: { pointer: "/data/1/attributes/foo" } },
+      { title: "Bad value", source: { parameter: "page[size]" } },
+    ] }),
+    "Unknown field 'foo' (at /data/1/attributes/foo); Bad value (at page[size])",
+  )
+})
+
+test("formatApiError decodes an error body that arrived as bytes (file downloads)", () => {
+  const body = Buffer.from(JSON.stringify({ errors: [{ status: "404", detail: "Attachment not found" }] }))
+  const error = new AxiosError("fail", "ERR_BAD_REQUEST", undefined, undefined, {
+    status: 404, statusText: "Not Found", headers: {}, config: {} as any, data: body,
+  })
+  assert.match(formatApiError(error), /Detail: Attachment not found/)
+})
+
+test("formatApiError keeps up to 2000 characters of JSON:API detail", () => {
+  const detail = "x".repeat(1500)
+  const error = new AxiosError("fail", "ERR_BAD_REQUEST", undefined, undefined, {
+    status: 400, statusText: "Bad Request", headers: {}, config: {} as any, data: { errors: [{ detail }] },
+  })
+  assert.ok(formatApiError(error).includes(detail))
 })

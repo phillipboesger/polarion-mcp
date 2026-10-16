@@ -162,9 +162,12 @@ export function readArg(args: Record<string, unknown>, httpParamName: string, na
  * callers can fall back to the generic JSON dump.
  *
  * @param responseData - The raw `error.response.data` from axios.
- * @returns A joined `detail`/`title` string, or `undefined`.
+ * @returns A joined `detail`/`title` string, each with the request part it
+ *   points at (`source.pointer`/`parameter`) so a bulk write shows which
+ *   item failed; or `undefined`.
  */
 export function extractJsonApiErrorDetail(responseData: unknown): string | undefined {
+  responseData = decodeBufferBody(responseData);
   if (!responseData || typeof responseData !== 'object') return undefined;
   const errors = (responseData as { errors?: unknown }).errors;
   if (!Array.isArray(errors) || errors.length === 0) return undefined;
@@ -172,12 +175,28 @@ export function extractJsonApiErrorDetail(responseData: unknown): string | undef
   const parts = errors
     .map((e) => {
       if (!e || typeof e !== 'object') return '';
-      const entry = e as { detail?: unknown; title?: unknown };
-      return String(entry.detail ?? entry.title ?? '');
+      const entry = e as { detail?: unknown; title?: unknown; source?: { pointer?: unknown; parameter?: unknown } };
+      const text = String(entry.detail ?? entry.title ?? '');
+      const at = entry.source?.pointer ?? entry.source?.parameter;
+      return text && at ? `${text} (at ${String(at)})` : text;
     })
     .filter((s) => s.length > 0);
 
   return parts.length > 0 ? parts.join('; ') : undefined;
+}
+
+/**
+ * @param data - A response body; bytes when the request asked for raw bytes.
+ * @returns The body as parsed JSON or text if it was bytes, else unchanged.
+ */
+function decodeBufferBody(data: unknown): unknown {
+  if (!Buffer.isBuffer(data) && !(data instanceof ArrayBuffer)) return data;
+  const text = Buffer.from(data as Buffer).toString('utf8');
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 export function formatApiError(error: AxiosError): string {
@@ -186,14 +205,16 @@ export function formatApiError(error: AxiosError): string {
   if (error.response) {
     // Server responded with an error status
     message = `API Error: Status ${error.response.status} (${error.response.statusText || 'Status text not available'}). `;
-    const responseData = error.response.data;
+    const responseData = decodeBufferBody(error.response.data);
+    // Long enough for every error of a bulk write; a raw body is cut shorter.
+    const MAX_DETAIL_LEN = 2000;
     const MAX_LEN = 200;
 
     const jsonApiDetail = extractJsonApiErrorDetail(responseData);
     if (jsonApiDetail) {
       // Polarion's actual error shape ({errors:[{status,title,detail}]}) --
       // surface the real detail instead of a truncated raw JSON dump.
-      message += `Detail: ${jsonApiDetail.substring(0, MAX_LEN)}${jsonApiDetail.length > MAX_LEN ? '...' : ''}`;
+      message += `Detail: ${jsonApiDetail.substring(0, MAX_DETAIL_LEN)}${jsonApiDetail.length > MAX_DETAIL_LEN ? '...' : ''}`;
     }
     else if (typeof responseData === 'string') {
       // Truncate long error messages

@@ -38,6 +38,7 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+import { isDownloadTool, downloadResult } from "./binary.js";
 
 /**
  * Sanitized -> original argument names per tool (e.g. "page_size_" -> "page[size]").
@@ -529,7 +530,8 @@ export async function executeApiTool(
     // ===== STEP 2: Prepare Request Components =====
     let urlPath = definition.pathTemplate; // e.g., "/projects/{projectId}/workitems/{workItemId}"
     const queryParams: Record<string, any> = {}; // e.g., { "page[size]": 10 }
-    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    const download = isDownloadTool(definition);
+    const headers: Record<string, string> = { 'Accept': download ? '*/*' : 'application/json' };
     let requestBodyData: any = undefined;
 
     // ===== STEP 3: Apply Parameters to Request =====
@@ -784,6 +786,7 @@ export async function executeApiTool(
       params: queryParams, // Query string parameters
       headers: headers, // HTTP headers (including auth)
       ...(requestBodyData !== undefined && { data: requestBodyData }), // Request body (if applicable)
+      ...(download ? { responseType: 'arraybuffer' as const } : {}),
       httpsAgent: new https.Agent({
         rejectUnauthorized: shouldRejectUnauthorized()
       }),
@@ -865,6 +868,11 @@ export async function executeApiTool(
 
     // Execute the request with pacing + retry-with-backoff on 429/5xx
     const response = await sendWithRetry(config, sendOpts);
+
+    if (download) {
+      const fileName = String(readArg(validatedArgs, 'attachmentId', nameMap) ?? readArg(validatedArgs, 'filename', nameMap) ?? '');
+      return downloadResult(response.data, String(response.headers['content-type'] ?? ''), requestUrl, fileName);
+    }
 
     // ===== STEP 8: Format the Response =====
     let responseText = '';
