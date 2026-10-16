@@ -5,8 +5,6 @@
  * - Server identification (name and version)
  * - API endpoint configuration
  * - Authentication settings
- * - Documentation resource URLs
- * - Local SDK file references
  *
  * Environment Variables:
  * - API_BASE_URL: Base URL for the Polarion REST API (must point at your own instance)
@@ -131,65 +129,3 @@ export function getPolarionBaseUrl(): string {
   // Remove /rest/v1 from the end of API_BASE_URL
   return API_BASE_URL.replace(/\/rest\/v1\/?$/, '');
 }
-
-/**
- * Polarion SDK and Documentation Resources
- *
- * This object contains URLs to various Polarion documentation resources.
- * These are used by the resource handlers to provide documentation to AI assistants.
- *
- * Resource Categories:
- * - SDK_*: Software Development Kit documentation for extending Polarion
- * - DB_*: Database schema and table references
- * - REST_*: REST API guides and specifications
- * - WORK_ITEM_*: Work item configuration and field references
- * - WORKFLOW_*: Workflow scripting and automation
- * - VELOCITY_*: Wiki page customization with Velocity templates
- *
- * Note: Some URLs point to demo/testdrive instances, others to official Siemens docs
- */
-export const POLARION_RESOURCES = {
-  // SDK Documentation
-  SDK_INDEX: "https://almdemo.polarion.com/polarion/sdk/index.html",
-  SDK_JAVADOC: "https://almdemo.polarion.com/polarion/sdk/doc/javadoc/index.html",
-  SDK_RENDERING: "https://almdemo.polarion.com/polarion/sdk/doc/javadoc-rendering/index.html",
-  SDK_SCRIPTING: "https://almdemo.polarion.com/polarion/sdk/doc/scripting-api/index.html",
-  SDK_REST_DOCS: "https://testdrive.polarion.com/polarion/sdk/doc/rest/index.html",
-  SDK_REST_SPEC: "https://testdrive.polarion.com/polarion/sdk/doc/rest/polarionrest.json",
-
-  // Siemens Documentation
-  REST_USER_GUIDE: "https://docs.sw.siemens.com/en-US/doc/230235217/PL20230412292748000.polarion_help_sc.xid2134849/xid2134871",
-  WORK_ITEM_FIELDS: "https://docs.plm.automation.siemens.com/content/polarion/19.1/help/en_US/user_and_administration_help/reference/user_reference/work_items/work_item_and_index_fields.html",
-  CUSTOM_FIELD_TYPES: "https://docs.sw.siemens.com/en-US/doc/230235217/PL20190701144002440.xid1465510/xid1554316",
-  WORKFLOW_FUNCTIONS: "https://docs.plm.automation.siemens.com/content/polarion/19.1/help/en_US/user_and_administration_help/reference/administration_reference/scripted_workflow_functions_and_conditions.html",
-  VELOCITY_VARIABLES: "https://docs.plm.automation.siemens.com/content/polarion/19.1/help/en_US/user_and_administration_help/reference/administration_reference/velocity_variables_for_active_wiki_pages.html",
-
-  // PDFs and Guides
-  SCRIPTING_GUIDE: "https://testdrive.polarion.com/polarion/sdk/doc/scripting_guide_and_examples.pdf",
-  SDK_GUIDE: "https://testdrive.polarion.com/polarion/sdk/doc/sdk.pdf",
-  WIDGET_SDK: "https://testdrive.polarion.com/polarion/sdk/doc/widget-sdk.pdf",
-  RT_SDK: "https://testdrive.polarion.com/polarion/sdk/doc/rt-sdk.pdf",
-
-  // Database
-  DB_TABLES: "https://testdrive.polarion.com/polarion/sdk/doc/database/TablesReferenceIndex.html",
-  WORKITEM_SCHEMA: "https://testdrive.polarion.com/polarion/sdk/doc/database/WorkItemDBSchema.pdf"
-};
-
-/**
- * Local SDK Files (stored in sdk/ directory for offline access)
- *
- * These files are cached locally to provide:
- * - Faster access (no network requests)
- * - Offline availability
- * - Reduced load on Polarion servers
- *
- * Note: These large PDF files are managed by Git LFS (Large File Storage)
- * to avoid bloating the repository size.
- */
-export const LOCAL_SDK_FILES = {
-  ADMIN_USER_HELP: "Administrator and User Help.pdf",
-  DEPLOYMENT_GUIDE: "Deployment and Maintenance Guide.pdf",
-  FEATURE_MATRIX: "Polarion_2506_Feature Matrix.pdf",
-  REST_API_GUIDE: "REST API User Guide for Polarion.pdf",
-  SCRIPTING_GUIDE_LOCAL: "scripting_guide_and_examples.pdf"
-};

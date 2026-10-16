@@ -25,7 +25,7 @@ import {
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { sanitizeInputSchema } from './utils.js';
-import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt } from './polarion.js';
+import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes } from './tools.js';
 import { enabledTools, omitOutputSchema } from './tool-filter.js';
 import { executeApiTool } from './executor.js';
@@ -48,6 +48,7 @@ export function createPolarionServer(): Server {
         resources: {},  // Documentation and configuration files
         prompts: {},    // Pre-configured task templates
       },
+      instructions: SERVER_INSTRUCTIONS,
     },
   );
 

@@ -25,7 +25,6 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
-import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
 import {
@@ -489,18 +488,6 @@ export async function executeApiTool(
   allSecuritySchemes: Record<string, any>,
   sendOpts?: SendWithRetryOpts
 ): Promise<CallToolResult> {
-  // Special handling for refresh_polarion_config tool
-  // This tool doesn't make an API call, it fetches and caches project configuration
-  if (toolName === "refresh_polarion_config") {
-    return await refreshPolarionConfig(toolArgs as { projectId: string });
-  }
-
-  // Special handling for get_sdk_documentation tool
-  // This tool serves SDK PDF files from the local sdk/ directory
-  if (toolName === "get_sdk_documentation") {
-    return await getSdkDocumentation(toolArgs as { documentId?: string });
-  }
-
   try {
     // ===== STEP 0: Strip dry_run before validation =====
     // Always stripped, regardless of whether the regenerated schema already

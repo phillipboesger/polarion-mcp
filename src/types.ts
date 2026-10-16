@@ -101,36 +101,6 @@ export interface McpToolDefinition {
 }
 
 /**
- * Project configuration interface
- *
- * Represents cached configuration for a Polarion project.
- * This configuration helps validate work items and understand project structure.
- *
- * Properties:
- * - projectId: Unique identifier for the project
- * - workItemTypes: Available work item types (e.g., "task", "bug", "requirement")
- * - customFields: Custom fields for each work item type with their configuration
- * - workflows: Workflow definitions (states, transitions, permissions)
- * - enumerations: Enumeration values (statuses, priorities, severities, etc.)
- * - lastUpdated: ISO timestamp of when this configuration was last refreshed
- *
- * Usage:
- * This data is fetched from Polarion and cached in memory for fast access.
- * AI assistants can use it to:
- * - Validate work item data before creation
- * - Show available options for enumeration fields
- * - Understand custom field requirements
- */
-export interface ProjectConfig {
-  projectId: string;
-  workItemTypes: string[];
-  customFields: Record<string, Array<{ id: string, type: string, values?: string[] }>>;
-  workflows: Record<string, any>;
-  enumerations: Record<string, Array<{ id: string, name: string }>>;
-  lastUpdated: string;
-}
-
-/**
  * Token cache entry type
  *
  * Represents a cached OAuth2 access token with its expiration time.

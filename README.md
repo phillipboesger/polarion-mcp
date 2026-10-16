@@ -496,14 +496,14 @@ const page1 = await client.callTool({
 
 ```
 src/
-  config.ts           — API base URL, token, and resource URL constants
+  config.ts           — API base URL, token and per-request token context
   server.ts           — shared MCP server factory (transport-agnostic)
   tools.ts            — generated MCP tool definitions (284 tools)
   executor.ts         — tool call dispatcher
   mcp-http-server.ts  — Streamable HTTP MCP transport (remote clients)
   http-server.ts      — plain REST wrapper for ChatGPT Custom GPT Actions
   index.ts            — stdio entry point (local MCP clients)
-  polarion.ts         — resource and prompt handlers
+  polarion.ts         — server instructions, guide resources and prompts
   auth.ts             — authentication helpers
   utils.ts            — shared utilities
 ```
