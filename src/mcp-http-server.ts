@@ -264,6 +264,17 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   });
 
   /**
+   * Answers a request for a session this process does not know, e.g. one from
+   * before a restart. The MCP spec requires 404 here: it is the only status
+   * that makes a client drop the session id and initialize a new one.
+   *
+   * @param res - Outgoing response.
+   */
+  const sessionNotFound = (res: Response): void => {
+    res.status(404).json(jsonRpcError('Session not found'));
+  };
+
+  /**
    * Handles MCP requests on an existing session (GET for the SSE stream, DELETE
    * to terminate the session).
    *
@@ -273,8 +284,12 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    */
   const handleSessionRequest = async (req: Request, res: Response): Promise<void> => {
     const sessionId = req.header('mcp-session-id');
-    if (!sessionId || !transports[sessionId]) {
-      res.status(400).json(jsonRpcError('Invalid or missing session ID'));
+    if (!sessionId) {
+      res.status(400).json(jsonRpcError('Missing session ID'));
+      return;
+    }
+    if (!transports[sessionId]) {
+      sessionNotFound(res);
       return;
     }
     await transports[sessionId].handleRequest(req, res);
@@ -306,6 +321,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
 
       const server = createPolarionServer();
       await server.connect(transport);
+    } else if (sessionId) {
+      sessionNotFound(res);
+      return;
     } else {
       res.status(400).json(jsonRpcError('Bad Request: no valid session ID provided'));
       return;
