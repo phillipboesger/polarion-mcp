@@ -79,3 +79,52 @@ test("binary download: a file over the size cap is refused with a clear error", 
   assert.equal(result.isError, true)
   assert.match((result.content[0] as any).text, /too large/i)
 })
+
+/** A fake Polarion where only user "alice" exists and status has the options draft/open. */
+function polarion(c: AxiosRequestConfig): Partial<AxiosResponse> {
+  const url = String(c.url)
+  if (/\/users\/alice$/.test(url)) return { data: { data: { type: "users", id: "alice" } } }
+  if (/\/users\//.test(url)) throw Object.assign(new Error("404"), { isAxiosError: true, response: { status: 404, statusText: "Not Found", headers: {}, data: {} } })
+  if (/availableoptions|getAvailableOptions|actions\/getAvailable/i.test(url)) return { data: { data: [{ id: "draft" }, { id: "open" }] } }
+  return { status: 204, headers: {}, data: "" }
+}
+
+test("guards: a relationships-only patch still has its assignee checked", async () => {
+  const { result, requests } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "W-1",
+    requestBody: { data: { type: "workitems", id: "P/W-1", relationships: { assignee: { data: [{ type: "users", id: "ghostuser" }] } } } },
+  }, polarion)
+  assert.equal(result.isError, true, JSON.stringify(result.content))
+  assert.match((result.content[0] as any).text, /ghostuser/)
+  assert.ok(!requests.some((r) => String(r.method).toUpperCase() === "PATCH"), "the write must not be sent")
+})
+
+test("guards: dry_run runs the guards too, so a preview never shows a write the real call refuses", async () => {
+  const { result, requests } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "W-1", dry_run: true,
+    requestBody: { data: { type: "workitems", id: "P/W-1", relationships: { assignee: { data: [{ type: "users", id: "ghostuser" }] } } } },
+  }, polarion)
+  assert.match((result.content[0] as any).text, /Write refused/)
+  assert.ok(!requests.some((r) => String(r.method).toUpperCase() === "PATCH"))
+})
+
+test("guards: dry_run of a valid write still returns the preview without writing", async () => {
+  const { result, requests } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "W-1", dry_run: true,
+    requestBody: { data: { type: "workitems", id: "P/W-1", relationships: { assignee: { data: [{ type: "users", id: "alice" }] } } } },
+  }, polarion)
+  assert.match((result.content[0] as any).text, /Dry run/)
+  assert.ok(!requests.some((r) => String(r.method).toUpperCase() === "PATCH"))
+})
+
+test("an empty path parameter is refused instead of silently hitting the list or bulk endpoint", async () => {
+  for (const [tool, args] of [
+    ["getWorkItem", { projectId: "P", workItemId: "" }],
+    ["deleteWorkItemAttachment", { projectId: "P", workItemId: "W-1", attachmentId: " " }],
+  ] as const) {
+    const { result, requests } = await run(tool, args)
+    assert.equal(result.isError, true, tool)
+    assert.match((result.content[0] as any).text, /must not be empty/, tool)
+    assert.equal(requests.length, 0, tool)
+  }
+})

@@ -82,7 +82,7 @@ export function createPolarionServer(): Server {
     const toolDefinition = enabledTools.get(toolName);
     if (!toolDefinition) {
       console.error(`[ERROR] Unknown tool requested: ${toolName}`);
-      return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }] };
+      return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
     }
     return await executeApiTool(toolName, toolDefinition, toolArgs ?? {}, securitySchemes);
   });

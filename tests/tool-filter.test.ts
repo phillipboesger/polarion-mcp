@@ -73,6 +73,7 @@ test("over MCP a filtered tool is neither listed nor callable, and output schema
       body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "deleteWorkItems", arguments: { projectId: "p" } } }),
     })).text())
     assert.match(call.result.content[0].text, /Unknown tool/)
+    assert.equal(call.result.isError, true)
   } finally {
     await closeAllSessions()
     server.close()

@@ -39,6 +39,7 @@ import {
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
 import { isDownloadTool, downloadResult } from "./binary.js";
+import { omitOutputSchema } from "./tool-filter.js";
 
 /**
  * Sanitized -> original argument names per tool (e.g. "page_size_" -> "page[size]").
@@ -65,6 +66,16 @@ export { sendWithRetry };
  * `definition` isn't one of the (small, explicit) set of tools the guard
  * covers. See `guards.ts` for what's validated and why.
  */
+/**
+ * @param item - One JSON:API resource object from a write body.
+ * @returns Its attributes; an empty object when it only writes relationships
+ *   (so user references are still checked); null when it writes neither.
+ */
+function writtenAttributes(item: any): Record<string, unknown> | null {
+  if (item?.attributes && typeof item.attributes === 'object') return item.attributes;
+  return item?.relationships && typeof item.relationships === 'object' ? {} : null;
+}
+
 function buildWorkItemEnumTargets(
   definition: McpToolDefinition,
   validatedArgs: JsonObject,
@@ -83,9 +94,9 @@ function buildWorkItemEnumTargets(
   if (method === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems/{workItemId}') {
     const projectId = readArg(validatedArgs, 'projectId', nameMap);
     const workItemId = readArg(validatedArgs, 'workItemId', nameMap);
-    const attributes = (dataItems[0] as any)?.attributes;
+    const attributes = writtenAttributes(dataItems[0]);
     const relationships = (dataItems[0] as any)?.relationships;
-    if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes || typeof attributes !== 'object') return null;
+    if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes) return null;
     return [{ projectId, workItemId, attributes, relationships }];
   }
 
@@ -116,9 +127,9 @@ function buildWorkItemEnumTargets(
     const targets: WorkItemEnumCheckTarget[] = [];
     for (const item of dataItems) {
       const id = (item as any)?.id;
-      const attributes = (item as any)?.attributes;
+      const attributes = writtenAttributes(item);
       const relationships = (item as any)?.relationships;
-      if (typeof id !== 'string' || !attributes || typeof attributes !== 'object') continue;
+      if (typeof id !== 'string' || !attributes) continue;
       const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' ? fallbackProjectId : undefined);
       if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes, relationships });
     }
@@ -554,12 +565,17 @@ export async function executeApiTool(
         }
 
         // Skip invalid revision values (HEAD, empty string, etc.)
-        if (param.name === 'revision' && (value === '' || value === 'HEAD' || value === 'head')) {
+        if (param.in === 'query' && param.name === 'revision' && (value === '' || value === 'HEAD' || value === 'head')) {
           console.error(`[WARN] Skipping invalid revision value: '${value}'`);
           return;
         }
 
         if (param.in === 'path') {
+          // An empty segment would silently address another endpoint
+          // (getWorkItem with workItemId "" is the list call).
+          if (String(value).trim() === '') {
+            throw new Error(`Path parameter '${param.name}' must not be empty`);
+          }
           // Path parameters: Replace placeholder in URL
           // Example: "/projects/{projectId}" -> "/projects/myproject"
           urlPath = urlPath.replace(`{${param.name}}`, encodeURIComponent(String(value)));
@@ -793,38 +809,6 @@ export async function executeApiTool(
       }),
     };
 
-    // dry_run on a mutating tool: return a preview of the request that would
-    // be sent, without calling Polarion. GET tools ignore dry_run entirely
-    // and always execute live (there's nothing unsafe to preview).
-    if (dryRun && isMutating) {
-      const redactedHeaders = { ...headers };
-      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
-      const preview = {
-        method: config.method,
-        url: config.url,
-        headers: redactedHeaders,
-        body: dryRunBodyPreview,
-      };
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
-          }
-        ],
-        // MCP clients built on the official SDK throw if a tool that declares an
-        // outputSchema returns a non-error result without structuredContent (see
-        // Client.callTool in @modelcontextprotocol/sdk). The preview payload here
-        // is a request preview, not the tool's real output, so it can never
-        // conform to that schema -- isError is the spec-sanctioned way to signal
-        // "no structured output was produced" without violating the tool's
-        // declared contract. Only applied when it's actually required, so the
-        // (far more common) dry_run call on a tool with no outputSchema keeps its
-        // existing non-error preview behavior.
-        ...(definition.outputSchema ? { isError: true } : {}),
-      };
-    }
-
     // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
     // Three independent checks, in this order (first failure blocks the write):
     // 1. Enum fields -- Work Item write tools only (patchWorkItem, postWorkItems,
@@ -860,6 +844,39 @@ export async function executeApiTool(
       if (!userResult.ok) {
         return { content: [{ type: 'text', text: `Write refused: ${userResult.reason}` }], isError: true };
       }
+    }
+
+    // dry_run on a mutating tool: return a preview of the request that would
+    // be sent, without writing to Polarion. Runs after the guards, so a
+    // preview never shows a write the real call would refuse. GET tools
+    // ignore dry_run entirely and always execute live (nothing unsafe to preview).
+    if (dryRun && isMutating) {
+      const redactedHeaders = { ...headers };
+      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
+      const preview = {
+        method: config.method,
+        url: config.url,
+        headers: redactedHeaders,
+        body: dryRunBodyPreview,
+      };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
+          }
+        ],
+        // MCP clients built on the official SDK throw if a tool that declares an
+        // outputSchema returns a non-error result without structuredContent (see
+        // Client.callTool in @modelcontextprotocol/sdk). The preview payload here
+        // is a request preview, not the tool's real output, so it can never
+        // conform to that schema -- isError is the spec-sanctioned way to signal
+        // "no structured output was produced" without violating the tool's
+        // declared contract. Only applied when it's actually required, so the
+        // (far more common) dry_run call on a tool with no outputSchema keeps its
+        // existing non-error preview behavior.
+        ...(definition.outputSchema && !omitOutputSchema ? { isError: true } : {}),
+      };
     }
 
     // Log request info to stderr (doesn't affect MCP output)
@@ -922,7 +939,8 @@ export async function executeApiTool(
     // other shape the branches above fall through to), there's no structuredContent
     // to honestly offer. Per the same MCP client enforcement described above, mark
     // that as isError instead of returning a non-error result the schema can't cover.
-    const outputSchemaUnfulfilled = Boolean(definition.outputSchema) && structuredContent === undefined;
+    // With MCP_OMIT_OUTPUT_SCHEMA the client never saw a schema, so nothing to violate.
+    const outputSchemaUnfulfilled = Boolean(definition.outputSchema) && !omitOutputSchema && structuredContent === undefined;
     return {
       content: [
         {
