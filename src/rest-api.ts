@@ -172,11 +172,6 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
         });
       }
 
-      // Sanitize the input schema and build name mapping
-      const nameMap = {};
-      sanitizeInputSchema(toolDefinition.inputSchema, nameMap);
-      toolDefinition.nameMap = nameMap;
-
       // Execute the tool
       const result = await executeApiTool(toolName, toolDefinition, toolArgs, securitySchemes);
 

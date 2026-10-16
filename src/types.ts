@@ -86,7 +86,6 @@ export interface McpToolAnnotations {
  * - outputSchema: JSON Schema for the tool's success response body, derived from the
  *   Polarion OpenAPI spec's response definition (absent for operations with no JSON
  *   body, e.g. most `204 No Content` deletes)
- * - nameMap: Mapping from sanitized parameter names to original names
  */
 export interface McpToolDefinition {
   name: string;
@@ -99,7 +98,6 @@ export interface McpToolDefinition {
   securityRequirements: any[];
   annotations?: McpToolAnnotations;
   outputSchema?: any;
-  nameMap?: NameMap; // Mapping from sanitized keys to original keys
 }
 
 /**

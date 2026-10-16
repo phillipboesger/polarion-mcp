@@ -23,7 +23,7 @@ import FormData from "form-data";
 import https from 'https';
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, formatApiError, getZodSchemaFromJsonSchema } from "./utils.js";
+import { readArg, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
@@ -38,6 +38,22 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+
+/**
+ * Sanitized -> original argument names per tool (e.g. "page_size_" -> "page[size]").
+ * tools/list advertises the sanitized names, so they are what clients send.
+ */
+const nameMapCache = new WeakMap<McpToolDefinition, Record<string, string>>();
+
+function nameMapFor(definition: McpToolDefinition): Record<string, string> {
+  let nameMap = nameMapCache.get(definition);
+  if (!nameMap) {
+    nameMap = {};
+    sanitizeInputSchema(definition.inputSchema, nameMap);
+    nameMapCache.set(definition, nameMap);
+  }
+  return nameMap;
+}
 
 // Re-exported for backward compatibility -- tests and any external code that
 // imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
@@ -483,6 +499,16 @@ export async function executeApiTool(
     const dryRun = argsForValidation.dry_run === true;
     delete argsForValidation.dry_run;
 
+    // Validation runs against the original schema, whose keys are the
+    // original names; a sanitized name would otherwise be stripped by Zod.
+    const nameMap = nameMapFor(definition);
+    for (const [safe, original] of Object.entries(nameMap)) {
+      if (safe in argsForValidation && !(original in argsForValidation)) {
+        argsForValidation[original] = argsForValidation[safe];
+        delete argsForValidation[safe];
+      }
+    }
+
     // ===== STEP 1: Validate Arguments =====
     // Use Zod schema to ensure arguments match expected types
     let validatedArgs: JsonObject;
@@ -505,10 +531,6 @@ export async function executeApiTool(
     const queryParams: Record<string, any> = {}; // e.g., { "page[size]": 10 }
     const headers: Record<string, string> = { 'Accept': 'application/json' };
     let requestBodyData: any = undefined;
-
-    // Get the name map for this tool (maps sanitized keys back to original keys)
-    // This allows us to convert "page_size_" back to "page[size]"
-    const nameMap = definition.nameMap || {};
 
     // ===== STEP 3: Apply Parameters to Request =====
     // Process each parameter according to its type:

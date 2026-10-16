@@ -54,14 +54,12 @@ export function createPolarionServer(): Server {
   /**
    * Handler: List Available Tools.
    *
-   * Sanitizes each tool's input schema so property names are MCP-safe and
-   * records the sanitized -> original name mapping used later during execution.
+   * Sanitizes each tool's input schema so property names are MCP-safe; the
+   * executor maps the sanitized names back to the originals.
    */
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const toolsForClient = Array.from(enabledTools.values()).map(def => {
-      const nameMap = {};
-      const sanitizedSchema = sanitizeInputSchema(def.inputSchema, nameMap);
-      def.nameMap = nameMap;
+      const sanitizedSchema = sanitizeInputSchema(def.inputSchema);
       return {
         name: def.name,
         description: def.description,
