@@ -26,7 +26,8 @@ import {
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { sanitizeInputSchema } from './utils.js';
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt } from './polarion.js';
-import { toolDefinitionMap, securitySchemes } from './tools.js';
+import { securitySchemes } from './tools.js';
+import { enabledTools, omitOutputSchema } from './tool-filter.js';
 import { executeApiTool } from './executor.js';
 
 /**
@@ -57,7 +58,7 @@ export function createPolarionServer(): Server {
    * records the sanitized -> original name mapping used later during execution.
    */
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const toolsForClient = Array.from(toolDefinitionMap.values()).map(def => {
+    const toolsForClient = Array.from(enabledTools.values()).map(def => {
       const nameMap = {};
       const sanitizedSchema = sanitizeInputSchema(def.inputSchema, nameMap);
       def.nameMap = nameMap;
@@ -66,7 +67,7 @@ export function createPolarionServer(): Server {
         description: def.description,
         inputSchema: sanitizedSchema,
         ...(def.annotations ? { annotations: def.annotations } : {}),
-        ...(def.outputSchema ? { outputSchema: def.outputSchema } : {}),
+        ...(def.outputSchema && !omitOutputSchema ? { outputSchema: def.outputSchema } : {}),
       };
     });
     return { tools: toolsForClient };
@@ -80,7 +81,7 @@ export function createPolarionServer(): Server {
    */
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name: toolName, arguments: toolArgs } = request.params;
-    const toolDefinition = toolDefinitionMap.get(toolName);
+    const toolDefinition = enabledTools.get(toolName);
     if (!toolDefinition) {
       console.error(`[ERROR] Unknown tool requested: ${toolName}`);
       return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }] };
