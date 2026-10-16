@@ -23,7 +23,7 @@
 - MCP_MAX_SESSIONS: Most MCP sessions held at once (default 1000); beyond it the least recently used one is closed. A session only answers to the Polarion token that created it.
 - MCP_TOOLS: Optional comma-separated allowlist of tool names. Other tools are neither listed nor callable, over MCP or the REST wrapper. Unknown names are logged at startup.
 - MCP_READ_ONLY: `true` keeps only tools annotated `readOnlyHint: true` (combined with MCP_TOOLS, both must match).
-- MCP_OMIT_OUTPUT_SCHEMA: `true` leaves output schemas out of tools/list, which roughly halves its size (about 980 KB to 530 KB for all tools). Results still carry structured content.
+- MCP_OMIT_OUTPUT_SCHEMA: `true` leaves output schemas out of tools/list, which shrinks it from about 840 KB to 530 KB for all tools. Results still carry structured content.
 - LOG_LEVEL: Reserved for logging configuration (informational only).
 
 ## Minimal Configuration by Mode

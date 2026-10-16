@@ -407,7 +407,7 @@ npm run build
 npm run start:mcp-http # Streamable HTTP MCP server on :3000
 ```
 
-See `docs/examples.http` for ready-to-run HTTP requests and `docs/client-example.ts` for a complete Node.js client example.
+See [Usage Examples](#usage-examples) below for a Node.js client.
 
 ---
 
@@ -452,7 +452,7 @@ MCP_SESSION_IDLE_MINUTES=60            # close unused MCP sessions (clients re-i
 MCP_MAX_SESSIONS=1000                  # cap on concurrent sessions (least recently used is dropped)
 MCP_TOOLS=getWorkItems,getWorkItem     # tool allowlist; others are neither listed nor callable
 MCP_READ_ONLY=true                     # only read-only tools
-MCP_OMIT_OUTPUT_SCHEMA=true            # halves tools/list (about 980 KB to 530 KB)
+MCP_OMIT_OUTPUT_SCHEMA=true            # shrinks tools/list from about 840 KB to 530 KB
 GPT_CLIENT_ID=polarion-gpt             # Custom GPT OAuth client (method E), with GPT_CLIENT_SECRET
 GPT_CLIENT_SECRET=...
 NODE_TLS_REJECT_UNAUTHORIZED=0         # disable SSL verification for self-signed certs

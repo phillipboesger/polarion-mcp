@@ -27,6 +27,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import type { Server as HttpServer } from 'node:http';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { rateLimit } from 'express-rate-limit';
@@ -624,6 +626,8 @@ export function startMcpHttpServer(): HttpServer {
 }
 
 // Auto-start when executed directly (node build/mcp-http-server.js), but not when imported by tests.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+// Compared as resolved file URLs: a plain string match fails for paths with
+// spaces or symlinks, and the server then exits without ever listening.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   startMcpHttpServer();
 }

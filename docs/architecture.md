@@ -5,7 +5,7 @@
 The application has two runtime modes that share the same execution core:
 
 - MCP stdio mode: src/index.ts registers MCP handlers for tools, resources, and prompts.
-- HTTP mode: src/http-server.ts exposes the same tool execution path over Express, and src/index-http.ts is the deployment entry.
+- HTTP mode: src/http-server.ts exposes the same tool execution path over Express (on Render, `npm run build:http` copies it over build/index.js).
 
 ## Components
 

@@ -24,6 +24,7 @@ import { enabledTools } from './tool-filter.js';
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import { createRestToolsRouter } from './rest-api.js';
+import { safeEqual } from './sealed.js';
 
 // Load environment variables
 dotenv.config();
@@ -72,7 +73,7 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
     });
   }
 
-  if (token !== HTTP_API_KEY) {
+  if (!safeEqual(token ?? '', HTTP_API_KEY)) {
     return res.status(401).json({
       success: false,
       error: 'Invalid API key',
