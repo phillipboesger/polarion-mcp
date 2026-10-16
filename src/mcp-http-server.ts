@@ -108,6 +108,12 @@ export interface McpHttpAppOptions {
   gptClient?: { clientId: string; clientSecret: string };
   /** Token check used by the login page; injectable so tests need no Polarion. */
   validateToken?: TokenValidator;
+  /**
+   * Express `trust proxy` setting, for running behind a reverse proxy: rate
+   * limits then count per client (X-Forwarded-For) instead of one shared
+   * counter for every user. Unset, the peer address is used.
+   */
+  trustProxy?: string | number;
 }
 
 /**
@@ -133,8 +139,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   app: express.Express;
   closeAllSessions: () => Promise<void>;
 } {
-  const { allowedHosts, publicUrl, validateToken, gptClient } = options;
+  const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy } = options;
   const app = express();
+  if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   app.use(express.json({ limit: '10mb' }));
 
   // Active transports keyed by MCP session id.
@@ -446,13 +453,30 @@ function mountCustomGpt(
 }
 
 /**
+ * Parses `TRUST_PROXY`: a hop count, or what Express accepts as a string
+ * ("loopback", or a comma-separated list of addresses/subnets).
+ *
+ * @param value - The raw environment value.
+ * @returns The `trust proxy` setting, or undefined to leave it off.
+ * @throws Error for "true", which would trust any X-Forwarded-For a client sends.
+ */
+export function parseTrustProxy(value: string | undefined): string | number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === 'false') return undefined;
+  if (trimmed === 'true') {
+    throw new Error('TRUST_PROXY=true trusts any X-Forwarded-For a client sends; use "loopback", a hop count or the proxy address');
+  }
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : trimmed;
+}
+
+/**
  * Starts the Streamable HTTP MCP server using environment configuration.
  *
  * Required env: `API_BASE_URL`. Optional: `MCP_PUBLIC_URL` (enables the OAuth
  * login flow), `MCP_TOKEN_SECRET` (keeps logins valid across restarts),
  * `GPT_CLIENT_ID` + `GPT_CLIENT_SECRET` (enable Custom GPT Actions),
  * `MCP_HTTP_PORT` (or `HTTP_PORT`), `MCP_HTTP_HOST`, `MCP_ALLOWED_HOSTS`
- * (comma-separated). No Polarion credentials are read here — each client
+ * (comma-separated), `TRUST_PROXY` (e.g. "loopback" behind a same-host proxy). No Polarion credentials are read here — each client
  * brings its own Polarion PAT.
  *
  * @returns The underlying Node HTTP server once it is listening.
@@ -469,7 +493,9 @@ export function startMcpHttpServer(): HttpServer {
     ? { clientId: process.env.GPT_CLIENT_ID, clientSecret: process.env.GPT_CLIENT_SECRET }
     : undefined;
 
-  const { app, closeAllSessions } = createMcpHttpApp({ allowedHosts, publicUrl, tokenSecret, gptClient });
+  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+
+  const { app, closeAllSessions } = createMcpHttpApp({ allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
   // port — over which clients send their Polarion PAT — is never public.
@@ -490,6 +516,9 @@ export function startMcpHttpServer(): HttpServer {
       }
     } else {
       console.log('[WARN] MCP_PUBLIC_URL is not set: no OAuth login, clients must send a Polarion PAT themselves.');
+    }
+    if (trustProxy !== undefined) {
+      console.log(`[INFO] Trusting X-Forwarded-For from: ${trustProxy}`);
     }
     if (allowedHosts.length === 0) {
       console.log('[WARN] DNS-rebinding protection is OFF. Set MCP_ALLOWED_HOSTS to enable it.');
