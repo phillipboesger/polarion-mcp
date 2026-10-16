@@ -24,7 +24,8 @@ import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/serv
 import type { AuthorizationParams, OAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/provider.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { InvalidGrantError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import { InvalidClientMetadataError, InvalidGrantError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
 import { Sealer, safeEqual } from './sealed.js';
@@ -124,30 +125,88 @@ export async function validatePolarionToken(token: string): Promise<boolean | 'u
   }
 }
 
+/** Hosts whose redirect URIs may use any port (RFC 8252 section 7.3). */
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Parses the redirect URI allowlist (`MCP_ALLOWED_REDIRECT_PREFIXES`).
+ *
+ * @param value - Comma-separated entries. One ending in "/" is a prefix,
+ *   any other must match exactly (a loopback one on any port).
+ * @returns The entries, prefixes normalized; empty when unset.
+ * @throws Error for an entry that is not an absolute URL.
+ */
+export function parseRedirectAllowlist(value: string | undefined): string[] {
+  return (value ?? '').split(',').map(entry => entry.trim()).filter(Boolean).map(entry => {
+    if (!URL.canParse(entry)) throw new Error(`Redirect URI allowlist entry is not an absolute URL: ${entry}`);
+    return entry.endsWith('/') ? loopbackAnyPort(new URL(entry)).href : entry;
+  });
+}
+
+/**
+ * @param url - A parsed URL; modified in place.
+ * @returns The URL, without its port if it is a loopback one.
+ */
+function loopbackAnyPort(url: URL): URL {
+  if (LOOPBACK_HOSTS.has(url.hostname)) url.port = '';
+  return url;
+}
+
+/**
+ * Checks a redirect URI against the allowlist. A prefix is compared with the
+ * normalized URI, so "../" or "%2e%2e" cannot climb out of it.
+ *
+ * @param uri - A redirect URI a client registered.
+ * @param allowlist - Entries from {@link parseRedirectAllowlist}; empty allows all.
+ * @returns True if the URI may be used.
+ */
+export function isRedirectAllowed(uri: string, allowlist: readonly string[]): boolean {
+  if (allowlist.length === 0) return true;
+  if (!URL.canParse(uri)) return false;
+  const normalized = loopbackAnyPort(new URL(uri)).href;
+  return allowlist.some(entry => (entry.endsWith('/') ? normalized.startsWith(entry) : redirectUriMatches(uri, entry)));
+}
+
 /**
  * Registry of the MCP clients that registered themselves via DCR.
  *
  * Stores nothing: the client id is the sealed registration, and a
  * confidential client's secret is derived from its id. ChatGPT registers once
  * per connection and never again, so a registration must outlive restarts.
+ *
+ * Registration is open to anyone, so without a redirect allowlist anyone can
+ * register their own callback and send a user a genuine login link that hands
+ * the authorization code (and so the user's Polarion access) to them.
  */
 class SealedClientsStore implements OAuthRegisteredClientsStore {
-  constructor(private readonly sealer: Sealer) {}
+  /**
+   * @param sealer - Seals and opens client ids.
+   * @param redirectAllowlist - Allowed redirect URIs; empty allows any.
+   */
+  constructor(private readonly sealer: Sealer, private readonly redirectAllowlist: readonly string[]) {}
 
   /**
    * @param clientId - The client id handed out at registration.
-   * @returns The registered client, or undefined if this server never issued it.
+   * @returns The registered client, or undefined if this server never issued
+   *   it or its redirect URIs are no longer allowed.
    */
   getClient(clientId: string): OAuthClientInformationFull | undefined {
     const client = this.sealer.open<SealedClient>('c', clientId);
-    return client ? this.withCredentials(client, clientId) : undefined;
+    // A sealed registration never expires, so one issued before the allowlist was set is checked again here.
+    if (!client || !this.redirectsAllowed(client.redirect_uris)) return undefined;
+    return this.withCredentials(client, clientId);
   }
 
   /**
    * @param client - Client metadata sent by the MCP client.
    * @returns The registration, including the generated client id.
+   * @throws InvalidClientMetadataError if a redirect URI is not on the allowlist.
    */
   registerClient(client: Omit<OAuthClientInformationFull, 'client_id' | 'client_id_issued_at'>): OAuthClientInformationFull {
+    if (!this.redirectsAllowed(client.redirect_uris)) {
+      console.error(`[WARN] Refused client registration "${client.client_name ?? ''}": redirect URI not on the allowlist`);
+      throw new InvalidClientMetadataError('redirect_uri is not allowed by this server');
+    }
     const metadata: SealedClient = {
       redirect_uris: client.redirect_uris,
       client_name: client.client_name,
@@ -158,6 +217,14 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
       client_id_issued_at: Math.floor(Date.now() / 1000),
     };
     return this.withCredentials(metadata, this.sealer.seal('c', metadata));
+  }
+
+  /**
+   * @param uris - A client's redirect URIs.
+   * @returns True if every one is allowed.
+   */
+  private redirectsAllowed(uris: readonly string[]): boolean {
+    return uris.every(uri => isRedirectAllowed(String(uri), this.redirectAllowlist));
   }
 
   /**
@@ -196,10 +263,12 @@ function escapeHtml(value: string): string {
  * @param loginId - Id of the pending login this form belongs to.
  * @param polarionUrl - Base URL of the Polarion instance, shown to the user.
  * @param clientName - Name of the MCP client that sent the user here.
+ * @param returnTo - Host the login hands its result to. The client name is
+ *   whatever the client registered with; this is where the access really goes.
  * @param error - Message to show after a rejected attempt.
  * @returns A complete HTML document.
  */
-export function renderLoginPage(loginId: string, polarionUrl: string, clientName: string, error?: string): string {
+export function renderLoginPage(loginId: string, polarionUrl: string, clientName: string, returnTo: string, error?: string): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -298,7 +367,7 @@ export function renderLoginPage(loginId: string, polarionUrl: string, clientName
 <body>
 <main>
   <h1>Connect to Polarion</h1>
-  <p class="lede">${escapeHtml(clientName)} wants to work with Polarion as you.</p>
+  <p class="lede">${escapeHtml(clientName)} wants to work with Polarion as you. Connecting sends you back to <strong>${escapeHtml(returnTo)}</strong>; continue only if that is where you came from.</p>
   ${error ? `<p class="error" role="alert">${escapeHtml(error)}</p>` : ''}
   <form method="post" action="${LOGIN_PATH}">
     <input type="hidden" name="login_id" value="${escapeHtml(loginId)}">
@@ -332,13 +401,15 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param polarionUrl - Polarion base URL shown on the login page.
    * @param sealer - Seals client ids and tokens.
    * @param validateToken - Token check; injectable so tests need no Polarion.
+   * @param redirectAllowlist - Redirect URIs registered clients may use; empty allows any.
    */
   constructor(
     private readonly polarionUrl: string,
     private readonly sealer: Sealer,
-    private readonly validateToken: TokenValidator = validatePolarionToken
+    private readonly validateToken: TokenValidator = validatePolarionToken,
+    redirectAllowlist: readonly string[] = []
   ) {
-    this.clients = new SealedClientsStore(sealer);
+    this.clients = new SealedClientsStore(sealer, redirectAllowlist);
   }
 
   /** @returns The registry of dynamically registered MCP clients. */
@@ -397,7 +468,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     const loginId = randomBytes(24).toString('base64url');
     this.pendingLogins.set(loginId, { ...login, expiresAt: Date.now() + PENDING_LOGIN_TTL_MS });
     res.set('Cache-Control', 'no-store');
-    res.send(renderLoginPage(loginId, this.polarionUrl, login.clientName));
+    res.send(renderLoginPage(loginId, this.polarionUrl, login.clientName, new URL(login.redirectUri).host));
   }
 
   /**
@@ -411,13 +482,13 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
   async completeLogin(
     loginId: string,
     polarionToken: string
-  ): Promise<{ ok: true; redirectTo: string } | { ok: false; reason: string; pending?: { loginId: string; clientName: string } }> {
+  ): Promise<{ ok: true; redirectTo: string } | { ok: false; reason: string; pending?: { loginId: string; clientName: string; returnTo: string } }> {
     const pending = this.pendingLogins.get(loginId);
     if (!pending || pending.expiresAt < Date.now()) {
       this.pendingLogins.delete(loginId);
       return { ok: false, reason: 'This login has expired. Start again from your MCP client.' };
     }
-    const retry = { loginId, clientName: pending.clientName };
+    const retry = { loginId, clientName: pending.clientName, returnTo: new URL(pending.redirectUri).host };
     if (!polarionToken.trim()) {
       return { ok: false, reason: 'Enter your Polarion Personal Access Token.', pending: retry };
     }

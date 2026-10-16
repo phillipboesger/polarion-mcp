@@ -40,7 +40,7 @@ import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextproto
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, requestBearerToken, getPolarionBaseUrl } from './config.js';
 import { createPolarionServer } from './server.js';
-import { PolarionOAuthProvider, renderLoginPage, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, renderLoginPage, parseRedirectAllowlist, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
 
@@ -109,6 +109,11 @@ export interface McpHttpAppOptions {
   /** Token check used by the login page; injectable so tests need no Polarion. */
   validateToken?: TokenValidator;
   /**
+   * Redirect URIs dynamically registered clients may use, from
+   * {@link parseRedirectAllowlist}. Empty or unset allows any.
+   */
+  allowedRedirectUris?: string[];
+  /**
    * Express `trust proxy` setting, for running behind a reverse proxy: rate
    * limits then count per client (X-Forwarded-For) instead of one shared
    * counter for every user. Unset, the peer address is used.
@@ -139,7 +144,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   app: express.Express;
   closeAllSessions: () => Promise<void>;
 } {
-  const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy } = options;
+  const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris } = options;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   app.use(express.json({ limit: '10mb' }));
@@ -149,7 +154,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
 
   // OAuth login, for clients that cannot be handed a token by hand.
   const sealer = publicUrl ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url')) : undefined;
-  const oauth = publicUrl && sealer ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, validateToken) : undefined;
+  const oauth = publicUrl && sealer ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, validateToken, allowedRedirectUris) : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
   /**
@@ -203,7 +208,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         return;
       }
       if (result.pending) {
-        res.status(400).send(renderLoginPage(result.pending.loginId, getPolarionBaseUrl(), result.pending.clientName, result.reason));
+        res.status(400).send(renderLoginPage(result.pending.loginId, getPolarionBaseUrl(), result.pending.clientName, result.pending.returnTo, result.reason));
         return;
       }
       // No pending login left to retry into — the form would post into nothing.
@@ -476,7 +481,8 @@ export function parseTrustProxy(value: string | undefined): string | number | un
  * login flow), `MCP_TOKEN_SECRET` (keeps logins valid across restarts),
  * `GPT_CLIENT_ID` + `GPT_CLIENT_SECRET` (enable Custom GPT Actions),
  * `MCP_HTTP_PORT` (or `HTTP_PORT`), `MCP_HTTP_HOST`, `MCP_ALLOWED_HOSTS`
- * (comma-separated), `TRUST_PROXY` (e.g. "loopback" behind a same-host proxy). No Polarion credentials are read here — each client
+ * (comma-separated), `TRUST_PROXY` (e.g. "loopback" behind a same-host proxy),
+ * `MCP_ALLOWED_REDIRECT_PREFIXES` (comma-separated OAuth redirect URI allowlist). No Polarion credentials are read here — each client
  * brings its own Polarion PAT.
  *
  * @returns The underlying Node HTTP server once it is listening.
@@ -494,8 +500,9 @@ export function startMcpHttpServer(): HttpServer {
     : undefined;
 
   const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+  const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
 
-  const { app, closeAllSessions } = createMcpHttpApp({ allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy });
+  const { app, closeAllSessions } = createMcpHttpApp({ allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
   // port — over which clients send their Polarion PAT — is never public.
@@ -510,6 +517,11 @@ export function startMcpHttpServer(): HttpServer {
       console.log(`[INFO] OAuth login enabled at ${new URL('/authorize', publicUrl).href}`);
       if (!tokenSecret) {
         console.log('[WARN] MCP_TOKEN_SECRET is not set: every login and client registration ends when the server restarts.');
+      }
+      if (allowedRedirectUris.length > 0) {
+        console.log(`[INFO] OAuth redirect URIs limited to: ${allowedRedirectUris.join(', ')}`);
+      } else {
+        console.log('[WARN] MCP_ALLOWED_REDIRECT_PREFIXES is not set: any client may register any redirect URI.');
       }
       if (gptClient) {
         console.log(`[INFO] Custom GPT OAuth enabled: authorize ${new URL(GPT_AUTHORIZE_PATH, publicUrl).href}, token ${new URL(GPT_TOKEN_PATH, publicUrl).href}`);
