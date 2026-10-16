@@ -604,7 +604,8 @@ export async function executeApiTool(
         // Polarion's parser can't make sense of that and rejects it with a
         // content-less 400 before any JSON:API validation runs.
         const form = buildMultipartFormData(requestBody);
-        requestBodyData = form;
+        // A buffer, not the one-shot form stream: a retry must send the whole body again.
+        requestBodyData = form.getBuffer();
         Object.assign(headers, form.getHeaders());
         dryRunBodyPreview = summarizeMultipartForPreview(requestBody);
       } else {

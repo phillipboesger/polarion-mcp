@@ -2,7 +2,6 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { AxiosError } from "axios"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
-import type FormData from "form-data"
 import type { McpToolDefinition } from "../src/types.js"
 import { executeApiTool, sendWithRetry, CUSTOM_FIELD_TOOL_SPECS } from "../src/executor.js"
 import { _optionsCache, _fieldKeyCache } from "../src/guards.js"
@@ -1229,9 +1228,9 @@ test("executeApiTool sends a real multipart/form-data body (with boundary) for p
   const contentType = String((capturedConfig!.headers as Record<string, string>)["content-type"])
   assert.match(contentType, /^multipart\/form-data; boundary=/, "Content-Type must include a real boundary")
 
-  const form = capturedConfig!.data as FormData
-  assert.equal(typeof (form as any).getBuffer, "function", "the body must be a real FormData instance, not a JSON string")
-  const buffer = form.getBuffer()
+  // Sent as the form's buffer, so a retry can resend the whole body.
+  const buffer = capturedConfig!.data as Buffer
+  assert.ok(Buffer.isBuffer(buffer), "the body must be the encoded multipart form, not a JSON string")
   const raw = buffer.toString("latin1")
   assert.match(raw, /name="resource"/)
   // Deliberately NOT "Content-Type: application/json" -- Polarion's server-side
@@ -1277,8 +1276,7 @@ test("executeApiTool builds multipart parts for the 'file' + 'parameters' shape 
   )
 
   assert.ok(capturedConfig, "expected the HTTP client to be invoked")
-  const form = capturedConfig!.data as FormData
-  const raw = form.getBuffer().toString("latin1")
+  const raw = (capturedConfig!.data as Buffer).toString("latin1")
   assert.match(raw, /name="file"/)
   assert.match(raw, /filename="file"/)
   assert.match(raw, /name="parameters"/)
@@ -1358,8 +1356,7 @@ test("executeApiTool decodes the 'content' field (patch*Attachment replace-conte
   )
 
   assert.ok(capturedConfig, "expected the HTTP client to be invoked")
-  const form = capturedConfig!.data as FormData
-  const raw = form.getBuffer().toString("latin1")
+  const raw = (capturedConfig!.data as Buffer).toString("latin1")
   assert.match(raw, /name="content"/)
   assert.match(raw, /filename="content"/)
   // The decoded PNG signature bytes must appear as raw binary, not as the base64 text.
@@ -1386,8 +1383,7 @@ test("executeApiTool decodes a bare 'content' field (updateAvatar shape, no reso
   )
 
   assert.ok(capturedConfig, "expected the HTTP client to be invoked")
-  const form = capturedConfig!.data as FormData
-  const raw = form.getBuffer().toString("latin1")
+  const raw = (capturedConfig!.data as Buffer).toString("latin1")
   assert.match(raw, /name="content"/)
   assert.ok(!raw.includes(pngBase64), "the raw base64 string must not appear verbatim -- it must be decoded")
 })
