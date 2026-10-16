@@ -55,10 +55,13 @@ const AUTHORIZATION_CODE_TTL_MS = 60 * 1000;
 const MAX_PENDING_LOGINS = 10_000;
 
 /**
- * Result of asking Polarion about a PAT: accepted, rejected, or no answer
+ * Result of asking Polarion about a PAT: accepted, rejected (401), known but
+ * without access (403, e.g. no license or REST permission), or no answer
  * (network error, Polarion down) — the last must not end a login.
  */
-export type TokenValidator = (token: string) => Promise<boolean | 'unavailable'>;
+export type TokenCheck = boolean | 'forbidden' | 'unavailable';
+
+export type TokenValidator = (token: string) => Promise<TokenCheck>;
 
 /** Which token endpoint may redeem a code: the PKCE one, or the Custom GPT one. */
 type Flow = 'mcp' | 'gpt';
@@ -105,10 +108,11 @@ type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secre
  * call the REST API offers: asking for a single project.
  *
  * @param token - The token to check.
- * @returns True if Polarion accepted it, false if Polarion rejected it, or
- *   'unavailable' if Polarion gave no usable answer.
+ * @returns True if Polarion accepted it, false if it rejected it, 'forbidden'
+ *   if it knows the token but denies access, or 'unavailable' if Polarion gave
+ *   no usable answer.
  */
-export async function validatePolarionToken(token: string): Promise<boolean | 'unavailable'> {
+export async function validatePolarionToken(token: string): Promise<TokenCheck> {
   try {
     const response = await axios.get(`${API_BASE_URL}/projects`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -118,9 +122,16 @@ export async function validatePolarionToken(token: string): Promise<boolean | 'u
       validateStatus: () => true,
     });
     if (response.status >= 200 && response.status < 300) return true;
-    if (response.status === 401 || response.status === 403) return false;
+    // Why Polarion refused (status and its own error detail), never the token:
+    // without it a 403 on the login page is indistinguishable from a typo.
+    const detail = String(response.data?.errors?.[0]?.detail ?? response.data?.errors?.[0]?.title ?? '')
+      .replace(/\s+/g, ' ').slice(0, 200);
+    console.error(`[WARN] Polarion token check failed: HTTP ${response.status}${detail ? ` - ${detail}` : ''}`);
+    if (response.status === 401) return false;
+    if (response.status === 403) return 'forbidden';
     return 'unavailable';
-  } catch {
+  } catch (error) {
+    console.error(`[WARN] Polarion token check failed: ${error instanceof Error ? error.message : String(error)}`);
     return 'unavailable';
   }
 }
@@ -489,14 +500,24 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
       return { ok: false, reason: 'This login has expired. Start again from your MCP client.' };
     }
     const retry = { loginId, clientName: pending.clientName, returnTo: new URL(pending.redirectUri).host };
-    if (!polarionToken.trim()) {
+    // A PAT has no whitespace; a line break picked up while copying would
+    // otherwise make Apache answer 400, shown as "could not be reached".
+    polarionToken = polarionToken.replace(/\s+/g, '');
+    if (!polarionToken) {
       return { ok: false, reason: 'Enter your Polarion Personal Access Token.', pending: retry };
     }
-    const check = await this.validateToken(polarionToken.trim());
+    const check = await this.validateToken(polarionToken);
     if (check === 'unavailable') {
       return { ok: false, reason: 'Polarion could not be reached to check the token. Try again in a moment.', pending: retry };
     }
-    if (!check) {
+    if (check === 'forbidden') {
+      return {
+        ok: false,
+        reason: 'Polarion recognized the token but denied access (HTTP 403). Your account may lack a license or the permission to use the REST API; ask your Polarion administrator. A new token will not help.',
+        pending: retry,
+      };
+    }
+    if (check !== true) {
       return {
         ok: false,
         reason: 'Polarion did not accept that token. Check that you copied it completely and that it has not expired.',
@@ -506,7 +527,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
 
     this.pendingLogins.delete(loginId);
     const code = randomBytes(24).toString('base64url');
-    this.codes.set(code, { ...pending, polarionToken: polarionToken.trim(), expiresAt: Date.now() + AUTHORIZATION_CODE_TTL_MS });
+    this.codes.set(code, { ...pending, polarionToken, expiresAt: Date.now() + AUTHORIZATION_CODE_TTL_MS });
 
     const target = new URL(pending.redirectUri);
     target.searchParams.set('code', code);
@@ -613,7 +634,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
       // Not invalid_grant: that would make the client drop the login for good.
       throw new ServerError('Polarion could not be reached to renew the login; try again later');
     }
-    if (!check) {
+    // Strictly true: 'forbidden' is a truthy string and must end the login too.
+    if (check !== true) {
       throw new InvalidGrantError('Polarion no longer accepts the token behind this login');
     }
     return this.issue({ clientId, polarionToken: entry.p, scopes: entry.s, resource: entry.r });
