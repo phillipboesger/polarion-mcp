@@ -38,7 +38,7 @@ import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, requestBearerToken, getPolarionBaseUrl } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, requestBearerToken, getPolarionBaseUrl, callerCacheScope } from './config.js';
 import { createPolarionServer } from './server.js';
 import { PolarionOAuthProvider, renderLoginPage, parseRedirectAllowlist, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
@@ -47,6 +47,12 @@ import { createRestToolsRouter } from './rest-api.js';
 dotenv.config();
 
 const MCP_PATH = '/mcp';
+
+/** A session nobody used for this long is closed; the client re-initializes on the 404. */
+const DEFAULT_SESSION_IDLE_MS = 60 * 60 * 1000;
+
+/** Most sessions held at once; beyond it the least recently used one is dropped. */
+const DEFAULT_MAX_SESSIONS = 1000;
 
 /** Custom GPT Action endpoints; separate from the MCP ones because they skip PKCE. */
 const GPT_AUTHORIZE_PATH = '/gpt/authorize';
@@ -108,6 +114,10 @@ export interface McpHttpAppOptions {
   gptClient?: { clientId: string; clientSecret: string };
   /** Token check used by the login page; injectable so tests need no Polarion. */
   validateToken?: TokenValidator;
+  /** Idle time after which a session is closed. Default 1 h. */
+  sessionIdleMs?: number;
+  /** Most sessions held at once. Default 1000. */
+  maxSessions?: number;
   /**
    * Redirect URIs dynamically registered clients may use, from
    * {@link parseRedirectAllowlist}. Empty or unset allows any.
@@ -147,10 +157,49 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris } = options;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
-  app.use(express.json({ limit: '10mb' }));
+  // Parsed per route, after authentication, so anonymous callers cannot make
+  // the server parse 10 MB bodies.
+  const jsonBody = express.json({ limit: '10mb' });
+  const sessionIdleMs = options.sessionIdleMs ?? DEFAULT_SESSION_IDLE_MS;
+  const maxSessions = options.maxSessions ?? DEFAULT_MAX_SESSIONS;
 
-  // Active transports keyed by MCP session id.
-  const transports: Record<string, StreamableHTTPServerTransport> = {};
+  /**
+   * Active sessions by MCP session id. A Map iterates in insertion order and
+   * every use re-inserts its session, so the first entry is the least
+   * recently used. `owner` is a hash of the caller's Polarion token: a session
+   * id alone must not let another user end or hijack the stream of a session.
+   */
+  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; owner: string; lastSeen: number }>();
+
+  /**
+   * @param sessionId - Session id from the request.
+   * @returns The caller's live session, refreshed as most recently used; or
+   *   undefined if it is unknown, expired, or belongs to someone else.
+   */
+  const useSession = (sessionId: string): StreamableHTTPServerTransport | undefined => {
+    const session = sessions.get(sessionId);
+    if (!session || session.owner !== callerCacheScope()) return undefined;
+    if (Date.now() - session.lastSeen > sessionIdleMs) {
+      void session.transport.close().catch(() => undefined);
+      sessions.delete(sessionId);
+      return undefined;
+    }
+    sessions.delete(sessionId);
+    sessions.set(sessionId, { ...session, lastSeen: Date.now() });
+    return session.transport;
+  };
+
+  /** Closes idle sessions, then the least recently used ones beyond the cap. */
+  const evictSessions = (): void => {
+    const now = Date.now();
+    for (const [id, session] of sessions) {
+      if (now - session.lastSeen <= sessionIdleMs && sessions.size <= maxSessions) break;
+      void session.transport.close().catch(() => undefined);
+      sessions.delete(id);
+    }
+  };
+  const sweep = setInterval(evictSessions, Math.min(sessionIdleMs, 60_000));
+  sweep.unref();
 
   // OAuth login, for clients that cannot be handed a token by hand.
   const sealer = publicUrl ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url')) : undefined;
@@ -271,7 +320,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       version: SERVER_VERSION,
       transport: 'streamable-http',
       apiBaseUrl: API_BASE_URL,
-      activeSessions: Object.keys(transports).length,
+      activeSessions: sessions.size,
     });
   });
 
@@ -300,25 +349,29 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       res.status(400).json(jsonRpcError('Missing session ID'));
       return;
     }
-    if (!transports[sessionId]) {
+    const transport = useSession(sessionId);
+    if (!transport) {
       sessionNotFound(res);
       return;
     }
-    await transports[sessionId].handleRequest(req, res);
+    await transport.handleRequest(req, res);
   };
 
   // POST: initialize a new session, or dispatch into an existing one.
-  app.post(MCP_PATH, requireBearer, async (req: Request, res: Response) => {
+  app.post(MCP_PATH, requireBearer, jsonBody, async (req: Request, res: Response) => {
     const sessionId = req.header('mcp-session-id');
+    const existing = sessionId ? useSession(sessionId) : undefined;
     let transport: StreamableHTTPServerTransport;
 
-    if (sessionId && transports[sessionId]) {
-      transport = transports[sessionId];
+    if (existing) {
+      transport = existing;
     } else if (!sessionId && isInitializeRequest(req.body)) {
+      const owner = callerCacheScope();
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
-          transports[sid] = transport;
+          sessions.set(sid, { transport, owner, lastSeen: Date.now() });
+          evictSessions();
         },
         ...(allowedHosts && allowedHosts.length > 0
           ? { enableDnsRebindingProtection: true, allowedHosts }
@@ -326,8 +379,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       });
 
       transport.onclose = () => {
-        if (transport.sessionId) {
-          delete transports[transport.sessionId];
+        if (transport.sessionId && sessions.get(transport.sessionId)?.transport === transport) {
+          sessions.delete(transport.sessionId);
         }
       };
 
@@ -353,8 +406,23 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * @returns A promise that resolves once all transports are closed.
    */
   const closeAllSessions = async (): Promise<void> => {
-    await Promise.all(Object.values(transports).map(t => t.close().catch(() => undefined)));
+    clearInterval(sweep);
+    await Promise.all([...sessions.values()].map(s => s.transport.close().catch(() => undefined)));
+    sessions.clear();
   };
+
+  // Last: malformed JSON and other errors get a JSON-RPC error, never
+  // Express's HTML page with a stack trace and server paths.
+  app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+    const status = (error as { status?: number })?.status;
+    const clientError = typeof status === 'number' && status >= 400 && status < 500;
+    if (!clientError) console.error('[ERROR] Unhandled request error:', error);
+    res.status(clientError ? status : 500).json(jsonRpcError(clientError ? 'Bad Request: the body is not valid JSON or too large' : 'Internal server error'));
+  });
 
   return { app, closeAllSessions };
 }
@@ -482,7 +550,8 @@ export function parseTrustProxy(value: string | undefined): string | number | un
  * `GPT_CLIENT_ID` + `GPT_CLIENT_SECRET` (enable Custom GPT Actions),
  * `MCP_HTTP_PORT` (or `HTTP_PORT`), `MCP_HTTP_HOST`, `MCP_ALLOWED_HOSTS`
  * (comma-separated), `TRUST_PROXY` (e.g. "loopback" behind a same-host proxy),
- * `MCP_ALLOWED_REDIRECT_PREFIXES` (comma-separated OAuth redirect URI allowlist). No Polarion credentials are read here — each client
+ * `MCP_ALLOWED_REDIRECT_PREFIXES` (comma-separated OAuth redirect URI allowlist),
+ * `MCP_SESSION_IDLE_MINUTES` (default 60), `MCP_MAX_SESSIONS` (default 1000). No Polarion credentials are read here — each client
  * brings its own Polarion PAT.
  *
  * @returns The underlying Node HTTP server once it is listening.
@@ -500,9 +569,14 @@ export function startMcpHttpServer(): HttpServer {
     : undefined;
 
   const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+  const idleMinutes = Number(process.env.MCP_SESSION_IDLE_MINUTES);
+  const sessionIdleMs = idleMinutes > 0 ? idleMinutes * 60_000 : undefined;
+  const maxSessions = Number(process.env.MCP_MAX_SESSIONS) > 0 ? Number(process.env.MCP_MAX_SESSIONS) : undefined;
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
 
-  const { app, closeAllSessions } = createMcpHttpApp({ allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris });
+  const { app, closeAllSessions } = createMcpHttpApp({
+    allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions,
+  });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
   // port — over which clients send their Polarion PAT — is never public.

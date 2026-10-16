@@ -155,7 +155,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
    * POST /api/tools/:toolName
    * Body: { "arguments": { ... } }
    */
-  router.post('/api/tools/:toolName', authenticate, async (req: Request, res: Response) => {
+  router.post('/api/tools/:toolName', authenticate, express.json({ limit: '10mb' }), async (req: Request, res: Response) => {
     // Express 5 types route params as string | string[]; a single :toolName is always a string.
     const toolName = String(req.params.toolName);
     const toolArgs: JsonObject = req.body?.arguments || req.body || {};

@@ -1,0 +1,98 @@
+import test from "node:test"
+import assert from "node:assert/strict"
+import type { AddressInfo } from "node:net"
+
+import { createMcpHttpApp, type McpHttpAppOptions } from "../src/mcp-http-server.js"
+
+const HEADERS = { "content-type": "application/json", accept: "application/json, text/event-stream" }
+const INIT = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } })
+const LIST = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} })
+
+async function startApp(options: McpHttpAppOptions = {}) {
+  const { app, closeAllSessions } = createMcpHttpApp(options)
+  const server = app.listen(0)
+  await new Promise<void>((resolve) => server.once("listening", () => resolve()))
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  const stop = async () => {
+    await closeAllSessions()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+  const init = async (token: string) => {
+    const res = await fetch(`${base}/mcp`, { method: "POST", headers: { ...HEADERS, authorization: `Bearer ${token}` }, body: INIT })
+    assert.equal(res.status, 200)
+    return res.headers.get("mcp-session-id") as string
+  }
+  const list = (token: string, sessionId: string) =>
+    fetch(`${base}/mcp`, { method: "POST", headers: { ...HEADERS, authorization: `Bearer ${token}`, "mcp-session-id": sessionId }, body: LIST })
+  return { base, stop, init, list }
+}
+
+test("a session belongs to the token that created it: another token gets 404", async () => {
+  const app = await startApp()
+  try {
+    const sid = await app.init("pat-alice")
+    assert.equal((await app.list("pat-bob", sid)).status, 404)
+    const del = await fetch(`${app.base}/mcp`, { method: "DELETE", headers: { authorization: "Bearer pat-bob", "mcp-session-id": sid } })
+    assert.equal(del.status, 404, "another user must not be able to end the session")
+    assert.equal((await app.list("pat-alice", sid)).status, 200)
+  } finally {
+    await app.stop()
+  }
+})
+
+test("an idle session expires and then gets 404, so the client re-initializes", async () => {
+  const app = await startApp({ sessionIdleMs: 50 })
+  try {
+    const sid = await app.init("pat-alice")
+    assert.equal((await app.list("pat-alice", sid)).status, 200)
+    await new Promise((r) => setTimeout(r, 120))
+    assert.equal((await app.list("pat-alice", sid)).status, 404)
+  } finally {
+    await app.stop()
+  }
+})
+
+test("activity keeps a session alive", async () => {
+  const app = await startApp({ sessionIdleMs: 150 })
+  try {
+    const sid = await app.init("pat-alice")
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => setTimeout(r, 60))
+      assert.equal((await app.list("pat-alice", sid)).status, 200)
+    }
+  } finally {
+    await app.stop()
+  }
+})
+
+test("at the session cap the least recently used session is dropped", async () => {
+  const app = await startApp({ maxSessions: 2 })
+  try {
+    const first = await app.init("pat-a")
+    const second = await app.init("pat-b")
+    assert.equal((await app.list("pat-a", first)).status, 200) // first is now the most recent
+    const third = await app.init("pat-c")
+    assert.equal((await app.list("pat-b", second)).status, 404)
+    assert.equal((await app.list("pat-a", first)).status, 200)
+    assert.equal((await app.list("pat-c", third)).status, 200)
+    const health = (await (await fetch(`${app.base}/health`)).json()) as { activeSessions: number }
+    assert.equal(health.activeSessions, 2)
+  } finally {
+    await app.stop()
+  }
+})
+
+test("a body is only parsed after authentication, and bad JSON gets a JSON error without a stack trace", async () => {
+  const app = await startApp()
+  try {
+    const anonymous = await fetch(`${app.base}/mcp`, { method: "POST", headers: HEADERS, body: "{not json" })
+    assert.equal(anonymous.status, 401)
+    const bad = await fetch(`${app.base}/mcp`, { method: "POST", headers: { ...HEADERS, authorization: "Bearer pat" }, body: "{not json" })
+    assert.equal(bad.status, 400)
+    const text = await bad.text()
+    assert.doesNotMatch(text, /node_modules|at parse|<pre>/)
+    assert.equal(JSON.parse(text).jsonrpc, "2.0")
+  } finally {
+    await app.stop()
+  }
+})
