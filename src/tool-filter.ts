@@ -14,6 +14,7 @@
  */
 
 import { toolDefinitionMap } from './tools.js';
+import { correctAnnotations } from './annotations.js';
 import type { McpToolDefinition } from './types.js';
 
 export interface ToolFilter {
@@ -44,7 +45,9 @@ export function filterTools(
 ): { tools: Map<string, McpToolDefinition>; unknown: string[] } {
   const allow = filter.allow ? new Set(filter.allow) : undefined;
   const kept = new Map(
-    [...tools].filter(([name, def]) => (!allow || allow.has(name)) && (!filter.readOnly || def.annotations?.readOnlyHint === true))
+    [...tools]
+      .filter(([name, def]) => (!allow || allow.has(name)) && (!filter.readOnly || def.annotations?.readOnlyHint === true))
+      .map(([name, def]) => [name, correctAnnotations(def)] as const)
   );
   return { tools: kept, unknown: (filter.allow ?? []).filter(name => !tools.has(name)) };
 }
@@ -57,7 +60,7 @@ if (filtered.tools.size !== toolDefinitionMap.size) {
   console.error(`[INFO] Tool filter: ${filtered.tools.size}/${toolDefinitionMap.size} tools enabled`);
 }
 
-/** The tools this deployment exposes. */
+/** The tools this deployment exposes, with corrected annotations. */
 export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered.tools;
 
 /** Whether tools/list leaves out output schemas. */
