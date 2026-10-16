@@ -56,6 +56,13 @@ const DEFAULT_SESSION_IDLE_MS = 60 * 60 * 1000;
 /** Most sessions held at once; beyond it the least recently used one is dropped. */
 const DEFAULT_MAX_SESSIONS = 1000;
 
+/**
+ * Most sessions one caller (token) holds. A caller over it loses its own
+ * oldest session, so nobody can push other users' sessions out of the
+ * global cap by opening sessions in a loop.
+ */
+const MAX_SESSIONS_PER_OWNER = 20;
+
 /** Custom GPT Action endpoints; separate from the MCP ones because they skip PKCE. */
 const GPT_AUTHORIZE_PATH = '/gpt/authorize';
 const GPT_TOKEN_PATH = '/gpt/token';
@@ -171,7 +178,16 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * recently used. `owner` is a hash of the caller's Polarion token: a session
    * id alone must not let another user end or hijack the stream of a session.
    */
-  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; owner: string; lastSeen: number }>();
+  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; owner: string; lastSeen: number; openStreams: number }>();
+
+  /**
+   * @param id - Session id.
+   * @param session - The session.
+   */
+  const closeSession = (id: string, session: { transport: StreamableHTTPServerTransport }): void => {
+    void session.transport.close().catch(() => undefined);
+    sessions.delete(id);
+  };
 
   /**
    * @param sessionId - Session id from the request.
@@ -181,26 +197,38 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const useSession = (sessionId: string): StreamableHTTPServerTransport | undefined => {
     const session = sessions.get(sessionId);
     if (!session || session.owner !== callerCacheScope()) return undefined;
-    if (Date.now() - session.lastSeen > sessionIdleMs) {
-      void session.transport.close().catch(() => undefined);
-      sessions.delete(sessionId);
+    if (session.openStreams === 0 && Date.now() - session.lastSeen > sessionIdleMs) {
+      closeSession(sessionId, session);
       return undefined;
     }
+    session.lastSeen = Date.now();
     sessions.delete(sessionId);
-    sessions.set(sessionId, { ...session, lastSeen: Date.now() });
+    sessions.set(sessionId, session);
     return session.transport;
   };
 
-  /** Closes idle sessions, then the least recently used ones beyond the cap. */
-  const evictSessions = (): void => {
+  /**
+   * Closes idle sessions (an open SSE stream counts as activity), the given
+   * owner's oldest sessions beyond its own cap, then the least recently used
+   * sessions beyond the global cap.
+   *
+   * @param owner - Owner of a session just created, if any.
+   */
+  const evictSessions = (owner?: string): void => {
     const now = Date.now();
     for (const [id, session] of sessions) {
-      if (now - session.lastSeen <= sessionIdleMs && sessions.size <= maxSessions) break;
-      void session.transport.close().catch(() => undefined);
-      sessions.delete(id);
+      if (session.openStreams === 0 && now - session.lastSeen > sessionIdleMs) closeSession(id, session);
+    }
+    if (owner) {
+      const own = [...sessions].filter(([, session]) => session.owner === owner);
+      for (const [id, session] of own.slice(0, Math.max(0, own.length - MAX_SESSIONS_PER_OWNER))) closeSession(id, session);
+    }
+    for (const [id, session] of sessions) {
+      if (sessions.size <= maxSessions) break;
+      closeSession(id, session);
     }
   };
-  const sweep = setInterval(evictSessions, Math.min(sessionIdleMs, 60_000));
+  const sweep = setInterval(() => evictSessions(), Math.min(sessionIdleMs, 60_000));
   sweep.unref();
 
   // OAuth login, for clients that cannot be handed a token by hand.
@@ -356,6 +384,15 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       sessionNotFound(res);
       return;
     }
+    const session = sessions.get(sessionId);
+    if (req.method === 'GET' && session) {
+      // A client that only listens on the SSE stream is still using the session.
+      session.openStreams++;
+      res.on('close', () => {
+        session.openStreams--;
+        session.lastSeen = Date.now();
+      });
+    }
     await transport.handleRequest(req, res);
   };
 
@@ -372,8 +409,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
-          sessions.set(sid, { transport, owner, lastSeen: Date.now() });
-          evictSessions();
+          sessions.set(sid, { transport, owner, lastSeen: Date.now(), openStreams: 0 });
+          evictSessions(owner);
         },
         ...(allowedHosts && allowedHosts.length > 0
           ? { enableDnsRebindingProtection: true, allowedHosts }
@@ -423,7 +460,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     const status = (error as { status?: number })?.status;
     const clientError = typeof status === 'number' && status >= 400 && status < 500;
     if (!clientError) console.error('[ERROR] Unhandled request error:', error);
-    res.status(clientError ? status : 500).json(jsonRpcError(clientError ? 'Bad Request: the body is not valid JSON or too large' : 'Internal server error'));
+    const message = status === 413 ? 'Request body too large' : status === 400 ? 'Bad Request: the body is not valid JSON' : 'Bad Request';
+    res.status(clientError ? status : 500).json(jsonRpcError(clientError ? message : 'Internal server error'));
   });
 
   return { app, closeAllSessions };

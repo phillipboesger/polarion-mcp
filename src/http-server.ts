@@ -88,7 +88,6 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
 
 // Middleware
 app.use(cors()); // Enable CORS for Custom GPT access
-app.use(express.json({ limit: '10mb' })); // Parse JSON request bodies
 app.use(authenticateRequest); // Authenticate all requests (except health/openapi)
 
 /**

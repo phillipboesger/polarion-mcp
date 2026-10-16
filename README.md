@@ -9,7 +9,7 @@ An open-source **Model Context Protocol** server that exposes **284 Polarion RES
 [![CI](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml)
 [![Publish Docker image](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
+[![Node.js >=22](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![Docker image](https://img.shields.io/badge/ghcr.io-polarion--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-server-6E56CF)](https://modelcontextprotocol.io)
@@ -108,7 +108,7 @@ URL: the server's public origin plus `/mcp`.
   (`com.siemens.polarion.rest.enabled=true` in `polarion.properties`).
 - A Polarion PAT per user: Polarion, *My Account > Personal Access Tokens*.
   The token carries the user's own permissions.
-- Node.js 20+ **or** Docker. From source:
+- Node.js 22+ **or** Docker. From source:
 
   ```bash
   git clone https://github.com/phillipboesger/polarion-mcp.git

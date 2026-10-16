@@ -29,7 +29,7 @@ export const SERVER_INSTRUCTIONS = `Polarion ALM over its REST API. Every call r
 
 - Start with getProjects to find a projectId. Work Item, Document and Test Run tools are project-scoped; getAllWorkItems searches across projects.
 - Search with the \`query\` parameter (Lucene syntax, e.g. \`type:requirement AND status:open\`). See polarion://guide/query-syntax.
-- Lists are paged: page_size_ (max 100) and page_number_ (1-based). Follow links.next until it is absent; meta.totalCount gives the total.
+- Lists are paged: page_size_ (usually at most 100) and page_number_ (1-based). Follow links.next until it is absent; meta.totalCount gives the total.
 - Ask for fewer fields with \`fields\`, e.g. {"workitems": "id,title,status"}, and expand relations with \`include\`, e.g. "author,assignee".
 - IDs in request bodies are composite: "PROJECT/WI-123" for Work Items. Path parameters take the plain parts.
 - Writes take a JSON:API body ({"data": ...}); see polarion://guide/writing. Every write tool accepts dry_run: true to validate and preview without writing.

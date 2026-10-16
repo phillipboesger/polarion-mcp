@@ -1,6 +1,6 @@
 # polarion-mcp
 
-MCP server for the Polarion ALM REST API (TypeScript, ESM, Node >= 20).
+MCP server for the Polarion ALM REST API (TypeScript, ESM, Node >= 22).
 
 ## Commands
 

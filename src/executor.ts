@@ -36,7 +36,7 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
-import { isDownloadTool, downloadResult } from "./binary.js";
+import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
 import { omitOutputSchema } from "./tool-filter.js";
 
 /**
@@ -806,7 +806,8 @@ export async function executeApiTool(
       params: queryParams, // Query string parameters
       headers: headers, // HTTP headers (including auth)
       ...(requestBodyData !== undefined && { data: requestBodyData }), // Request body (if applicable)
-      ...(download ? { responseType: 'arraybuffer' as const } : {}),
+      // One byte over the cap is enough to refuse it without buffering more.
+      ...(download ? { responseType: 'arraybuffer' as const, maxContentLength: MAX_DOWNLOAD_BYTES + 1 } : {}),
       httpsAgent: httpsAgent(shouldRejectUnauthorized()),
     };
 

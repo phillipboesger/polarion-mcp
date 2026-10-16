@@ -41,11 +41,12 @@ test("a session belongs to the token that created it: another token gets 404", a
 })
 
 test("an idle session expires and then gets 404, so the client re-initializes", async () => {
-  const app = await startApp({ sessionIdleMs: 50 })
+  // Margins large enough that a loaded CI machine cannot expire it early.
+  const app = await startApp({ sessionIdleMs: 400 })
   try {
     const sid = await app.init("pat-alice")
     assert.equal((await app.list("pat-alice", sid)).status, 200)
-    await new Promise((r) => setTimeout(r, 120))
+    await new Promise((r) => setTimeout(r, 900))
     assert.equal((await app.list("pat-alice", sid)).status, 404)
   } finally {
     await app.stop()
@@ -93,6 +94,22 @@ test("a body is only parsed after authentication, and bad JSON gets a JSON error
     const text = await bad.text()
     assert.doesNotMatch(text, /node_modules|at parse|<pre>/)
     assert.equal(JSON.parse(text).jsonrpc, "2.0")
+  } finally {
+    await app.stop()
+  }
+})
+
+test("one caller opening sessions in a loop only loses its own oldest ones, never other users'", async () => {
+  const app = await startApp({ maxSessions: 1000 })
+  try {
+    const victim = await app.init("pat-victim")
+    const flood: string[] = []
+    for (let i = 0; i < 25; i++) flood.push(await app.init("pat-flooder"))
+    assert.equal((await app.list("pat-victim", victim)).status, 200)
+    assert.equal((await app.list("pat-flooder", flood[0])).status, 404, "the flooder's oldest session goes")
+    assert.equal((await app.list("pat-flooder", flood[24])).status, 200)
+    const health = (await (await fetch(`${app.base}/health`)).json()) as { activeSessions: number }
+    assert.equal(health.activeSessions, 21)
   } finally {
     await app.stop()
   }

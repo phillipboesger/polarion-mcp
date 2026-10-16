@@ -74,9 +74,14 @@ function toolOperation(name: string, unauthorizedDescription: string) {
               schema: {
                 type: 'object',
                 properties: {
-                  success: { type: 'boolean' },
+                  success: { type: 'boolean', description: 'False if the tool reported an error; the reason is in result' },
                   tool: { type: 'string' },
                   result: { type: 'string' },
+                  files: {
+                    type: 'array',
+                    description: 'Downloaded files (images, binaries), base64-encoded',
+                    items: { type: 'object', properties: { mimeType: { type: 'string' }, base64: { type: 'string' } } }
+                  },
                   timestamp: { type: 'string', format: 'date-time' }
                 }
               }
@@ -181,11 +186,18 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
         .map(item => 'text' in item ? item.text : '')
         .join('\n');
 
-      // Return result
+      // Downloaded files (MCP image / embedded resource content) as base64.
+      const files = result.content.flatMap(item => {
+        if (item.type === 'image') return [{ mimeType: item.mimeType, base64: item.data }];
+        if (item.type === 'resource' && 'blob' in item.resource) return [{ mimeType: item.resource.mimeType, base64: item.resource.blob }];
+        return [];
+      });
+
       res.json({
-        success: true,
+        success: !result.isError,
         tool: toolName,
         result: textContent,
+        ...(files.length > 0 ? { files } : {}),
         timestamp: new Date().toISOString()
       });
 

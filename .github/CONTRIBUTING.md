@@ -322,7 +322,7 @@ What am I missing?
 
 ### Project-Specific
 - **MCP Protocol**: https://modelcontextprotocol.io/
-- **Polarion REST API**: Check `POLARION_RESOURCES` in `src/config.ts`
+- **Polarion REST API**: the guides in `src/polarion.ts` (served as `polarion://guide/*` resources)
 
 ### General Development
 - **TypeScript Handbook**: https://www.typescriptlang.org/docs/
