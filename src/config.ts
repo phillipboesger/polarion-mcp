@@ -13,6 +13,9 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -24,7 +27,23 @@ dotenv.config();
  * These values identify this MCP server to AI assistants
  */
 export const SERVER_NAME = "polarion-rest-api";
-export const SERVER_VERSION = "v1";
+
+/**
+ * @returns The version in this package's package.json, found by walking up
+ *   from the compiled module (build/ and build-tests/src/ sit at different depths).
+ */
+function packageVersion(): string {
+  for (let dir = dirname(fileURLToPath(import.meta.url)); dir !== dirname(dir); dir = dirname(dir)) {
+    const file = join(dir, 'package.json');
+    if (!existsSync(file)) continue;
+    const pkg = JSON.parse(readFileSync(file, 'utf8')) as { name?: string; version?: string };
+    if (pkg.name === 'polarion-mcp' && pkg.version) return pkg.version;
+  }
+  return '0.0.0';
+}
+
+/** Reported in serverInfo and /health, so a deployment shows which build runs. */
+export const SERVER_VERSION = packageVersion();
 
 /**
  * API Base URL - configurable via environment variable

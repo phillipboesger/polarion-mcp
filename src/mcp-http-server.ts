@@ -583,7 +583,7 @@ export function startMcpHttpServer(): HttpServer {
   const host = process.env.MCP_HTTP_HOST || '0.0.0.0';
 
   const httpServer = app.listen(port, host, () => {
-    console.log(`[INFO] ${SERVER_NAME} MCP Streamable HTTP server ${SERVER_VERSION} listening on port ${port}`);
+    console.log(`[INFO] ${SERVER_NAME} MCP Streamable HTTP server v${SERVER_VERSION} listening on port ${port}`);
     console.log(`[INFO] MCP endpoint: http://localhost:${port}${MCP_PATH} (send your Polarion PAT as Bearer token)`);
     console.log(`[INFO] Health:       http://localhost:${port}/health`);
     console.log(`[INFO] Proxying Polarion API at ${API_BASE_URL}`);

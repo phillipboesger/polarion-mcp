@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20.x, 22.x]
+        node-version: [22.x, 24.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
           cache: npm
 
       - name: Install dependencies
@@ -113,9 +113,34 @@ jobs:
 
           echo "Release ZIP verified: production install succeeds, server starts, MCP initialize works."
 
+      - name: Verify the stdio bin runs directly (shebang, MCP initialize)
+        run: |
+          set -euo pipefail
+          cd _verify/polarion-mcp
+          INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
+          out="$(echo "${INIT}" | API_BASE_URL=https://polarion.example.com/polarion/rest/v1 BEARER_TOKEN=x timeout 20 ./build/index.js || true)"
+          echo "${out}" | grep -q '"serverInfo"' || { echo "::error::stdio initialize failed: ${out}"; exit 1; }
+
       - name: Upload release ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: polarion-mcp-dist
           path: ${{ steps.pack.outputs.zip }}
           if-no-files-found: error
+
+  docker:
+    name: Build Docker image and smoke-test stdio
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t polarion-mcp:ci .
+
+      - name: MCP initialize over stdio inside the image
+        run: |
+          set -euo pipefail
+          INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
+          out="$(echo "${INIT}" | timeout 30 docker run -i --rm -e API_BASE_URL=https://polarion.example.com/polarion/rest/v1 -e BEARER_TOKEN=x polarion-mcp:ci node build/index.js || true)"
+          echo "${out}" | grep -q '"serverInfo"' || { echo "::error::stdio initialize in the image failed: ${out}"; exit 1; }

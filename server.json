@@ -6,12 +6,12 @@
     "url": "https://github.com/phillipboesger/polarion-mcp",
     "source": "github"
   },
-  "version": "1.0.0",
+  "version": "1.2.2",
   "packages": [
     {
       "registryType": "oci",
       "identifier": "ghcr.io/phillipboesger/polarion-mcp",
-      "version": "latest",
+      "version": "1.2.2",
       "transport": {
         "type": "stdio"
       },
@@ -26,6 +26,16 @@
           "description": "Personal Access Token (PAT) for authenticating with the Polarion REST API",
           "isRequired": true,
           "isSecret": true
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "node"
+        },
+        {
+          "type": "positional",
+          "value": "build/index.js"
         }
       ]
     }

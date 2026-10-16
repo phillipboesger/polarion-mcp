@@ -53,11 +53,12 @@ test("an idle session expires and then gets 404, so the client re-initializes", 
 })
 
 test("activity keeps a session alive", async () => {
-  const app = await startApp({ sessionIdleMs: 150 })
+  // Total time (4 x 250 ms) exceeds the idle limit; each step stays well under it.
+  const app = await startApp({ sessionIdleMs: 600 })
   try {
     const sid = await app.init("pat-alice")
     for (let i = 0; i < 4; i++) {
-      await new Promise((r) => setTimeout(r, 60))
+      await new Promise((r) => setTimeout(r, 250))
       assert.equal((await app.list("pat-alice", sid)).status, 200)
     }
   } finally {
