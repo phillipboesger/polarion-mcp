@@ -215,8 +215,10 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
    */
   registerClient(client: Omit<OAuthClientInformationFull, 'client_id' | 'client_id_issued_at'>): OAuthClientInformationFull {
     if (!this.redirectsAllowed(client.redirect_uris)) {
-      // JSON-quoted: both values come from the unauthenticated registration request.
-      console.error(`[WARN] Refused client registration ${JSON.stringify(client.client_name ?? '')}: redirect URIs ${JSON.stringify(client.redirect_uris)} not on the allowlist`);
+      // JSON-quoted and capped: both values come from the unauthenticated registration request.
+      const name = JSON.stringify(client.client_name ?? '').slice(0, 100);
+      const uris = JSON.stringify(client.redirect_uris).slice(0, 300);
+      console.error(`[WARN] Refused client registration ${name}: redirect URIs ${uris} not on the allowlist`);
       throw new InvalidClientMetadataError('redirect_uri is not allowed by this server');
     }
     const metadata: SealedClient = {
