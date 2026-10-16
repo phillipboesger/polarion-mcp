@@ -17,6 +17,7 @@
 import express, { type Request, type RequestHandler, type Response } from 'express';
 import { executeApiTool } from './executor.js';
 import { toolDefinitionMap, securitySchemes } from './tools.js';
+import { enabledTools } from './tool-filter.js';
 import { sanitizeInputSchema } from './utils.js';
 import { SERVER_VERSION } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
@@ -130,7 +131,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
    * Returns tool names, descriptions, and input schemas
    */
   router.get('/api/tools', authenticate, (req: Request, res: Response) => {
-    const tools = Array.from(toolDefinitionMap.values()).map(def => {
+    const tools = Array.from(enabledTools.values()).map(def => {
       const nameMap = {};
       const sanitizedSchema = sanitizeInputSchema(def.inputSchema, nameMap);
 
@@ -161,7 +162,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
 
     try {
       // Look up the tool definition
-      const toolDefinition = toolDefinitionMap.get(toolName);
+      const toolDefinition = enabledTools.get(toolName);
 
       if (!toolDefinition) {
         return res.status(404).json({
@@ -253,7 +254,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
     };
 
     // Add each tool as a separate endpoint
-    for (const name of toolDefinitionMap.keys()) {
+    for (const name of enabledTools.keys()) {
       paths[`/api/tools/${name}`] = toolOperation(name, unauthorizedDescription);
     }
 
@@ -262,7 +263,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       info: {
         title: 'Polarion REST API via MCP',
         version: SERVER_VERSION,
-        description: `HTTP REST API wrapper for Polarion MCP Server. Provides access to ${toolDefinitionMap.size} Polarion API operations.`
+        description: `HTTP REST API wrapper for Polarion MCP Server. Provides access to ${enabledTools.size} Polarion API operations.`
       },
       servers: [{ url: serverUrl(req), description: 'Polarion MCP HTTP Server' }],
       paths,
@@ -290,8 +291,9 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
     // Add only essential tools (max 30 for Custom GPT)
     let toolCount = 0;
     for (const toolName of ESSENTIAL_GPT_TOOLS) {
-      if (!toolDefinitionMap.has(toolName)) {
-        console.error(`[WARNING] Essential tool '${toolName}' not found in toolDefinitionMap`);
+      if (!enabledTools.has(toolName)) {
+        // A tool switched off by the tool filter is left out on purpose.
+        if (!toolDefinitionMap.has(toolName)) console.error(`[WARNING] Essential tool '${toolName}' not found in toolDefinitionMap`);
         continue;
       }
       paths[`/api/tools/${toolName}`] = toolOperation(toolName, unauthorizedDescription);

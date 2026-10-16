@@ -20,7 +20,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { toolDefinitionMap } from './tools.js';
+import { enabledTools } from './tool-filter.js';
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import { createRestToolsRouter } from './rest-api.js';
@@ -148,7 +148,7 @@ app.use((err: Error, req: Request, res: Response, next: Function) => {
 const server = app.listen(PORT, () => {
   console.log(`[INFO] Polarion MCP HTTP Server v${SERVER_VERSION} running on port ${PORT}`);
   console.log(`[INFO] API Base URL: ${API_BASE_URL}`);
-  console.log(`[INFO] Available tools: ${toolDefinitionMap.size}`);
+  console.log(`[INFO] Available tools: ${enabledTools.size}`);
   console.log(`[INFO] Essential GPT tools: ${ESSENTIAL_GPT_TOOLS.length}`);
   console.log(`[INFO] Endpoints:`);
   console.log(`       - Health: http://localhost:${PORT}/health`);

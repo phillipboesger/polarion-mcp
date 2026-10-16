@@ -3,8 +3,8 @@
 ## Render Deployment
 
 - render.yaml defines a web service using Node.
-- The build command runs `npm ci && npm run build:http`.
-- The service starts with node build/index.js (HTTP server).
+- The build command runs `npm ci && npm run build:http`, which copies the REST wrapper (`build/http-server.js`) over `build/index.js`.
+- The service starts with node build/index.js, which on Render is therefore the REST HTTP server, not the stdio entry point it is in a normal build.
 - Configure environment variables in the Render dashboard.
 
 Required environment variables on Render:
@@ -20,8 +20,9 @@ Optional environment variables:
 
 ## Other Platforms
 
-- HTTP deployments run node build/index.js.
-- MCP deployments run node build/index.js under a stdio MCP client.
+- REST HTTP deployments run node build/http-server.js (or build/index.js after `npm run build:http`).
+- Streamable HTTP MCP deployments run node build/mcp-http-server.js.
+- stdio MCP runs node build/index.js under an MCP client (after a normal `npm run build`).
 - Ensure HTTP_PORT is provided by the platform or set explicitly.
 
 ## Mode-Specific Deployment Notes
@@ -76,6 +77,11 @@ EnvironmentFile=/etc/polarion-mcp/secrets.env
 Environment=MCP_HTTP_HOST=127.0.0.1
 Environment=MCP_HTTP_PORT=3000
 Environment=MCP_ALLOWED_HOSTS=polarion.example.com
+# Apache on the same host: rate limits per client, not one counter for everyone.
+Environment=TRUST_PROXY=loopback
+# Only these OAuth callbacks may register; add one per client you support.
+Environment=MCP_ALLOWED_REDIRECT_PREFIXES=https://claude.ai/api/mcp/auth_callback
+# Optional: expose fewer tools, e.g. MCP_READ_ONLY=true or MCP_TOOLS=getWorkItems,getWorkItem,...
 ExecStart=/opt/polarion-mcp/node/bin/node build/mcp-http-server.js
 Restart=on-failure
 RestartSec=5
@@ -139,7 +145,25 @@ ProxyPassReverse /openapi.json http://127.0.0.1:3000/openapi.json
 ```
 
 `ProxyPreserveHost On` passes the public host name through, which is what
-`MCP_ALLOWED_HOSTS` checks. Reload and verify:
+`MCP_ALLOWED_HOSTS` checks.
+
+**Own subdomain for the MCP server?** Polarion's installer may define its
+`/polarion` proxy globally (in `conf-enabled/`), and Apache then applies it to
+every virtual host, including a dedicated `mcp.example.com`. In such a vhost,
+deny everything and open only the MCP and OAuth paths:
+
+```apache
+<Location />
+    Require all denied
+</Location>
+<LocationMatch "^/(mcp|authorize|token|register|polarion-login|health|\.well-known/oauth-(authorization-server|protected-resource)(/.*)?)$">
+    Require all granted
+</LocationMatch>
+```
+
+Add `gpt/`, `api/tools` and the `openapi*.json` paths to the pattern if you use Custom GPT OAuth.
+
+Reload and verify:
 
 ```bash
 apache2ctl configtest && systemctl reload apache2
