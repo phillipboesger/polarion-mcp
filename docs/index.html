@@ -1035,6 +1035,67 @@ html { scroll-padding-top: 90px; }
   .nav-cta .cta-text { display: none; }
 }
 
+
+/* ─── DEMO MOCKUPS (animated by demo.js) ─── */
+.pl-hide { opacity: 0; transform: translateY(6px); }
+[data-step], [data-play-lines] > * { transition: opacity .35s ease, transform .35s ease; }
+.pl-caret::after { content: ''; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--accent); animation: plblink 1s steps(2) infinite; }
+@keyframes plblink { 50% { opacity: 0; } }
+.mk { position: absolute; inset: 0; display: flex; flex-direction: column; background: #0d2440; font-size: 13px; color: #e6eefa; }
+.mk-bar { display: flex; align-items: center; gap: 7px; padding: 10px 14px; background: #0a1e36; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.mk-bar i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+.mk-bar i:nth-child(2) { background: #febc2e; } .mk-bar i:nth-child(3) { background: #28c840; }
+.mk-bar span { margin-left: 10px; font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); }
+.mk-bar .mk-url { margin: 0 auto; padding: 4px 60px; border-radius: 8px; background: rgba(255,255,255,0.06); color: var(--text-sub); }
+.mk-body, .mk-cbody { flex: 1; display: flex; min-height: 0; }
+.mk-act { width: 44px; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 14px; background: #0a1e36; border-right: 1px solid rgba(255,255,255,0.06); }
+.mk-act b { width: 18px; height: 18px; border-radius: 5px; background: rgba(255,255,255,0.12); }
+.mk-act b.on { background: var(--accent); }
+.mk-chat { width: 46%; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.08); min-width: 0; }
+.mk-chat-h { padding: 10px 14px; font-weight: 600; font-size: 12.5px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mk-ok { font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: #7be0b0; }
+.mk-feed { flex: 1; overflow: hidden; padding: 14px; display: flex; flex-direction: column; gap: 9px; }
+.mk-msg { line-height: 1.5; }
+.mk-user { align-self: flex-end; max-width: 88%; padding: 9px 12px; border-radius: 12px 12px 4px 12px; background: rgba(98,214,255,0.16); border: 1px solid rgba(98,214,255,0.3); min-height: 1.5em; }
+.mk-ai code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.mk-tool { align-self: flex-start; font-family: var(--mono); font-size: 11.5px; padding: 6px 10px; border-radius: 8px; color: #7be0b0; background: rgba(123,224,176,0.08); border: 1px solid rgba(123,224,176,0.3); }
+.mk-tool::before { content: '✓ '; }
+.mk-tool.pl-pending { color: var(--warm); background: rgba(255,194,102,0.08); border-color: rgba(255,194,102,0.35); }
+.mk-tool.pl-pending::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; border: 2px solid var(--warm); border-right-color: transparent; animation: plspin .8s linear infinite; vertical-align: -1px; }
+@keyframes plspin { to { transform: rotate(360deg); } }
+.mk-row { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); font-size: 12.5px; }
+.mk-row b { font-family: var(--mono); color: var(--accent); }
+.mk-row span { color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk em { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; }
+.p-crit { color: #1a0b10; background: #ff8fa3; } .p-high { color: #2a1a00; background: #ffc266; } .p-med { color: #0b2a4c; background: #bdeeff; }
+.mk-input { margin: 10px 14px 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); color: var(--text-dim); font-size: 12.5px; }
+.mk-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #0b1f38; }
+.mk-tabs { display: flex; font-family: var(--mono); font-size: 11.5px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.mk-tabs span { padding: 9px 14px; color: var(--text-dim); }
+.mk-tabs span.on { color: #fff; box-shadow: inset 0 -2px 0 var(--accent); background: rgba(255,255,255,0.03); }
+.mk-code { margin: 0; padding: 12px 0; font-family: var(--mono); font-size: 12px; line-height: 1.85; color: #cfe3f7; white-space: pre; overflow: hidden; }
+.mk-code i { display: inline-block; width: 36px; padding-right: 12px; text-align: right; font-style: normal; color: rgba(255,255,255,0.25); }
+.mk-code k { color: #ff8fa3; } .mk-code f { color: #62d6ff; } .mk-code c { color: #7f9bb8; } .mk-code n { color: #ffc266; }
+.mk-code .hl { background: rgba(255,194,102,0.12); }
+.mk-status { display: flex; gap: 18px; padding: 5px 14px; font-family: var(--mono); font-size: 11px; color: #0b2a4c; background: var(--accent); }
+.mk-cside { width: 190px; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; background: #0a1e36; border-right: 1px solid rgba(255,255,255,0.06); }
+.mk-new { padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,0.08); font-size: 12.5px; font-weight: 600; }
+.mk-cside b { height: 9px; border-radius: 4px; background: rgba(255,255,255,0.1); margin: 4px 4px 0; }
+.mk-cside b.s { width: 60%; }
+.mk-conn { margin-top: auto; font-family: var(--mono); font-size: 10.5px; color: #7be0b0; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(123,224,176,0.3); }
+.mk-cchat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.mk-cchat .mk-feed { max-width: 620px; width: 100%; margin: 0 auto; }
+@media (max-width: 760px) {
+  .demo-wrap { aspect-ratio: auto; height: 540px; }
+  .mk-editor, .mk-act, .mk-cside { display: none; }
+  .mk-chat { width: 100%; border-right: 0; }
+  .mk-bar .mk-url { padding: 4px 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .pl-caret::after, .mk-tool.pl-pending::before { animation: none; } }
+
+.mk-feed > * { flex-shrink: 0; }
+.mk-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+@media (max-width: 760px) { .demo-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; padding-bottom: 4px; } .demo-tabs::-webkit-scrollbar { display: none; } .demo-tab { white-space: nowrap; flex-shrink: 0; } }
 /* ─── AUDIT FIXES ─── */
 .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
@@ -1186,7 +1247,7 @@ html { scroll-padding-top: 90px; }
         <span class="tab-icon">💻</span> VS Code · GitHub Copilot
       </button>
       <button class="demo-tab" onclick="switchDemo('cloud', this)">
-        <span class="tab-icon">☁️</span> Cloud AI · For everyone
+        <span class="tab-icon">☁️</span> Claude.ai · in the browser
       </button>
       <button class="demo-tab" onclick="switchDemo('terminal', this)">
         <span class="tab-icon">⌨️</span> Terminal output
@@ -1195,18 +1256,63 @@ html { scroll-padding-top: 90px; }
 
     <div class="demo-wrap">
       <div class="demo-panel active" id="demo-vscode">
-        <img
-          src="assets/demo.gif"
-          alt="GitHub Copilot queries Polarion work items via polarion-mcp in VS Code"
-          style="width:100%;height:100%;object-fit:cover;display:block;border-radius:var(--radius-lg);"
-        />
+        <div class="mk mk-vscode" role="img" aria-label="GitHub Copilot in VS Code asks polarion-mcp for open defects and gets real Polarion work items back">
+          <div class="mk-bar"><i></i><i></i><i></i><span>reportGenerator.ts · polarion-demo · Visual Studio Code</span></div>
+          <div class="mk-body">
+            <aside class="mk-act"><b></b><b class="on"></b><b></b><b></b></aside>
+            <section class="mk-chat">
+              <div class="mk-chat-h">Copilot · Agent mode <span class="mk-ok">polarion-mcp connected</span></div>
+              <div class="mk-feed" data-play>
+                <div class="mk-msg mk-user" data-step><span data-type>Which open defects in DEMO are assigned to me?</span></div>
+                <div class="mk-tool" data-step data-pending="Running getWorkItems on polarion-mcp" data-done="Ran getWorkItems · project DEMO · 3 results"></div>
+                <div class="mk-msg mk-ai" data-step>Three open defects are assigned to you:</div>
+                <div class="mk-row" data-step data-wait="260"><b>DEMO-447</b><em class="p-crit">Critical</em><span>NullPointerException in report generator</span></div>
+                <div class="mk-row" data-step data-wait="260"><b>DEMO-421</b><em class="p-high">High</em><span>Login page crashes on Safari mobile</span></div>
+                <div class="mk-row" data-step data-wait="260"><b>DEMO-435</b><em class="p-med">Medium</em><span>Export dialog does not close after save</span></div>
+                <div class="mk-msg mk-ai" data-step>DEMO-447 matches <code>reportGenerator.ts</code>, which is open. Want me to draft a fix and link it to the work item?</div>
+              </div>
+              <div class="mk-input">Ask Copilot</div>
+            </section>
+            <section class="mk-editor">
+              <div class="mk-tabs"><span class="on">reportGenerator.ts</span><span>workItems.ts</span></div>
+<pre class="mk-code"><i>1</i><c>// Builds the defect report</c>
+<i>2</i><k>export async function</k> <f>buildReport</f>(items) {
+<i>3</i>  <k>const</k> rows = items.<f>map</f>(toRow)
+<i>4</i>  <k>return</k> rows.<f>filter</f>(r =&gt; r.total &gt; <n>0</n>)
+<i>5</i>}
+<i>6</i>
+<i>7</i><k>function</k> <f>toRow</f>(item) {
+<i class="hl">8</i><span class="hl">  <k>return</k> { id: item.id, total: item.hours.sum }</span>
+<i>9</i>}
+</pre>
+            </section>
+          </div>
+          <div class="mk-status"><span>main</span><span>polarion-mcp: 284 tools</span><span>TypeScript</span></div>
+        </div>
       </div>
       <div class="demo-panel" id="demo-cloud">
-        <img
-          src="assets/demo-cloud.gif"
-          alt="Cloud AI assistant queries Polarion in the browser — no developer skills needed"
-          style="width:100%;height:100%;object-fit:cover;display:block;border-radius:var(--radius-lg);"
-        />
+        <div class="mk mk-cloud" role="img" aria-label="Claude in the browser reads and updates Polarion work items through the polarion-mcp connector">
+          <div class="mk-bar"><i></i><i></i><i></i><span class="mk-url">claude.ai</span></div>
+          <div class="mk-cbody">
+            <aside class="mk-cside">
+              <div class="mk-new">+ New chat</div>
+              <b></b><b></b><b class="s"></b><b></b>
+              <div class="mk-conn">polarion-mcp ✓</div>
+            </aside>
+            <section class="mk-cchat">
+              <div class="mk-feed" data-play>
+                <div class="mk-msg mk-user" data-step><span data-type>Which open defects block the DEMO release? Raise DEMO-447 to critical.</span></div>
+                <div class="mk-tool" data-step data-pending="Calling polarion-mcp · getWorkItems" data-done="polarion-mcp · getWorkItems · 2 blockers"></div>
+                <div class="mk-msg mk-ai" data-step>Two open defects block the release:</div>
+                <div class="mk-row" data-step data-wait="260"><b>DEMO-447</b><em class="p-high">High</em><span>NullPointerException in report generator</span></div>
+                <div class="mk-row" data-step data-wait="260"><b>DEMO-421</b><em class="p-high">High</em><span>Login page crashes on Safari mobile</span></div>
+                <div class="mk-tool" data-step data-pending="Calling polarion-mcp · patchWorkItem" data-done="polarion-mcp · patchWorkItem · DEMO-447 updated"></div>
+                <div class="mk-msg mk-ai" data-step>Done. DEMO-447 is now <em class="p-crit">Critical</em> in Polarion, under your own account.</div>
+              </div>
+              <div class="mk-input">Reply</div>
+            </section>
+          </div>
+        </div>
       </div>
       <div class="demo-panel demo-panel--terminal" id="demo-terminal">
         <div class="terminal" style="margin:0;border:none;border-radius:var(--radius-lg);height:100%;display:flex;flex-direction:column;">
@@ -1216,7 +1322,7 @@ html { scroll-padding-top: 90px; }
             <div class="dot dot-g"></div>
             <span class="terminal-title">polarion-mcp · tool response</span>
           </div>
-          <div class="terminal-body" style="flex:1;overflow:auto;">
+          <div class="terminal-body" style="flex:1;overflow:auto;" data-play-lines>
             <div><span class="t-prompt">You ›</span> <span class="t-cmd">List all open defects in the DEMO project assigned to me</span></div>
             <div style="margin-top:12px"><span class="t-comment">// polarion-mcp calls getWorkItems</span></div>
             <div style="margin-top:8px"><span class="t-key">project</span><span class="t-out">: </span><span class="t-str">"DEMO"</span><span class="t-out">,</span> <span class="t-key">type</span><span class="t-out">: </span><span class="t-str">"defect"</span><span class="t-out">,</span> <span class="t-key">status</span><span class="t-out">: </span><span class="t-str">"open"</span><span class="t-out">,</span> <span class="t-key">assignedTo</span><span class="t-out">: </span><span class="t-str">"me"</span></div>
@@ -1683,6 +1789,7 @@ html { scroll-padding-top: 90px; }
   }
 </script>
 
+<script src="demo.js?v=20261016a"></script>
 <script src="viz.js?v=20261016b"></script>
 </body>
 </html>
