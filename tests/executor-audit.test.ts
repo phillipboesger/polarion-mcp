@@ -128,3 +128,35 @@ test("an empty path parameter is refused instead of silently hitting the list or
     assert.equal(requests.length, 0, tool)
   }
 })
+
+test("uploads: text that is not base64 is refused instead of uploaded as garbage bytes", async () => {
+  for (const bad of ["hello world, plain text!", "", "%%%"]) {
+    const requestBody = JSON.stringify({ resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "a.txt" } }] }, files: [bad] })
+    const { result, requests } = await run("postWorkItemAttachments", { projectId: "P", workItemId: "W-1", requestBody })
+    assert.equal(result.isError, true, JSON.stringify(bad))
+    assert.match((result.content[0] as any).text, /base64/)
+    assert.equal(requests.length, 0)
+  }
+})
+
+test("uploads: standard and URL-safe base64 both arrive as the original bytes", async () => {
+  const bytes = Buffer.from([0xfb, 0xff, 0xbf, 0x00, 0x41])
+  for (const encoded of [bytes.toString("base64"), bytes.toString("base64url")]) {
+    const requestBody = JSON.stringify({ resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "a.bin" } }] }, files: [encoded] })
+    const { requests } = await run("postWorkItemAttachments", { projectId: "P", workItemId: "W-1", requestBody }, () => ({ status: 201 }))
+    assert.ok((requests[0].data as Buffer).includes(bytes), encoded)
+  }
+})
+
+test("a JSON:API response labelled application/vnd.api+json is read as JSON", async () => {
+  const { result } = await run("getWorkItem", { projectId: "P", workItemId: "W-1" }, () => ({
+    headers: { "content-type": "application/vnd.api+json" }, data: { data: { type: "workitems", id: "P/W-1" } },
+  }))
+  assert.notEqual(result.isError, true)
+  assert.equal((result.structuredContent as any)?.data?.id, "P/W-1")
+})
+
+test("regeneration guard: output schemas and curated descriptions are still in place", () => {
+  const withOutput = [...toolDefinitionMap.values()].filter((d) => d.outputSchema).length
+  assert.ok(withOutput >= 170, `only ${withOutput} tools have an outputSchema; did enrich-output-schemas run without openapi.json?`)
+})

@@ -49,8 +49,7 @@
  */
 
 import axios, { type AxiosRequestConfig } from 'axios';
-import https from 'https';
-import { sendWithRetry, type SendWithRetryOpts } from './httpClient.js';
+import { sendWithRetry, httpsAgent, type SendWithRetryOpts } from './httpClient.js';
 import { formatApiError } from './utils.js';
 import { callerCacheScope } from './config.js';
 
@@ -120,14 +119,14 @@ async function fetchOptions(
         method: 'GET',
         url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId)}/workitems/${encodeURIComponent(target.workItemId)}/fields/${encodeURIComponent(field)}/actions/getAvailableOptions`,
         headers: requestContext.headers,
-        httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+        httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
       }
     : {
         method: 'GET',
         url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId)}/workitems/fields/${encodeURIComponent(field)}/actions/getAvailableOptions`,
         params: { type: target.type },
         headers: requestContext.headers,
-        httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+        httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
       };
 
   try {
@@ -347,14 +346,14 @@ export async function checkResourceCustomFieldKeys(
           method: 'GET',
           url: `${requestContext.baseUrl}${target.instancePath}/actions/getFieldsMetadata`,
           headers: requestContext.headers,
-          httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
         }
       : {
           method: 'GET',
           url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId!)}/actions/getFieldsMetadata`,
           params: { resourceType: target.resourceType, targetType: target.type ?? '~' },
           headers: requestContext.headers,
-          httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
         };
     try {
       const response = await sendWithRetry(config, sendOpts);
@@ -455,7 +454,7 @@ export async function checkWorkItemUserReferences(
       method: 'GET',
       url: `${requestContext.baseUrl}/users/${encodeURIComponent(userId)}`,
       headers: requestContext.headers,
-      httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+      httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
     };
     try {
       await sendWithRetry(config, sendOpts);

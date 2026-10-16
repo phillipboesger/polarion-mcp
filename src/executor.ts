@@ -20,13 +20,12 @@
 import { ZodError } from "zod";
 import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
-import https from 'https';
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
-import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
+import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
 import {
   checkWorkItemsEnumFields,
   checkResourceCustomFieldKeys,
@@ -383,6 +382,23 @@ function buildCustomFieldKeyTargets(
  *   reaches this branch, so it's left unverified/unchanged rather than
  *   guessed at).
  */
+/**
+ * Decodes a file sent as base64 (standard or URL-safe alphabet).
+ *
+ * @param value - The encoded file.
+ * @param label - Where it came from, for the error message.
+ * @returns The file bytes.
+ * @throws Error if the value is empty or not base64: Buffer.from() would
+ *   otherwise silently turn plain text into garbage bytes and upload them.
+ */
+function decodeBase64File(value: string, label: string): Buffer {
+  const compact = value.replace(/\s+/g, '');
+  if (!compact || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(compact) || compact.replace(/=+$/, '').length % 4 === 1) {
+    throw new Error(`${label} must be the file content encoded as base64`);
+  }
+  return Buffer.from(compact, compact.includes('-') || compact.includes('_') ? 'base64url' : 'base64');
+}
+
 function buildMultipartFormData(requestBody: unknown): FormData {
   let parsed: unknown = requestBody;
   if (typeof requestBody === 'string') {
@@ -412,10 +428,10 @@ function buildMultipartFormData(requestBody: unknown): FormData {
         if (typeof item !== 'string') {
           throw new Error(`requestBody.files[${index}] must be a base64-encoded string, got ${typeof item}`);
         }
-        form.append('files', Buffer.from(item, 'base64'), { filename: `file-${index}` });
+        form.append('files', decodeBase64File(item, `requestBody.files[${index}]`), { filename: `file-${index}` });
       });
     } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
-      form.append(key, Buffer.from(value, 'base64'), { filename: key });
+      form.append(key, decodeBase64File(value, `requestBody.${key}`), { filename: key });
     } else if (typeof value === 'string') {
       form.append(key, value);
     } else {
@@ -791,9 +807,7 @@ export async function executeApiTool(
       headers: headers, // HTTP headers (including auth)
       ...(requestBodyData !== undefined && { data: requestBodyData }), // Request body (if applicable)
       ...(download ? { responseType: 'arraybuffer' as const } : {}),
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: shouldRejectUnauthorized()
-      }),
+      httpsAgent: httpsAgent(shouldRejectUnauthorized()),
     };
 
     // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
@@ -892,7 +906,7 @@ export async function executeApiTool(
     const contentType = String(response.headers['content-type'] ?? '').toLowerCase();
 
     // Handle JSON responses (most common for REST APIs)
-    if (contentType.includes('application/json') && typeof response.data === 'object' && response.data !== null) {
+    if (/[/+]json\b/.test(contentType) && typeof response.data === 'object' && response.data !== null) {
       try {
         // Add a `value_markdown` sibling to every rich-text ({type:"text/html", value})
         // field so the model gets readable Markdown alongside the raw HTML, without

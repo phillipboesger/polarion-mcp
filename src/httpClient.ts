@@ -7,6 +7,7 @@
  * each hammering the server independently.
  */
 
+import https from 'node:https';
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios';
 
 export const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -53,6 +54,22 @@ async function paceRequest(minIntervalMs: number): Promise<void> {
  */
 function isRetryable(method: string, status: number): boolean {
   return status === 429 || (status >= 500 && IDEMPOTENT_METHODS.has(method));
+}
+
+const agents = new Map<boolean, https.Agent>();
+
+/**
+ * @param rejectUnauthorized - Whether TLS certificates are verified.
+ * @returns A shared keep-alive agent, so calls reuse connections instead of
+ *   paying a TLS handshake each.
+ */
+export function httpsAgent(rejectUnauthorized: boolean): https.Agent {
+  let agent = agents.get(rejectUnauthorized);
+  if (!agent) {
+    agent = new https.Agent({ keepAlive: true, rejectUnauthorized });
+    agents.set(rejectUnauthorized, agent);
+  }
+  return agent;
 }
 
 export interface SendWithRetryOpts {
