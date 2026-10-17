@@ -18,6 +18,44 @@ import TurndownService from 'turndown';
 
 const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 
+/**
+ * Replaces Polarion Work Item cross-references with their ids. Such a link is
+ * an empty span with the id in data attributes, which turndown drops as a
+ * blank element, so the ids vanished from the Markdown.
+ *
+ * @param html - Rich text from Polarion.
+ * @returns The HTML with each cross-reference as plain "[scope/]id" text.
+ */
+function inlinePolarionLinks(html: string): string {
+  return html.replace(/<span\b([^>]*\bpolarion-rte-link\b[^>]*)>\s*<\/span>/gi, (whole, attrs: string) => {
+    const attr = (name: string) => new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1];
+    const id = attr('data-item-id');
+    if (!id) return whole;
+    const scope = attr('data-scope');
+    return scope ? `${scope}/${id}` : id;
+  });
+}
+
+// Tables have no lossless plain-Markdown form without a plugin; keep them as HTML.
+turndown.keep(['table']);
+
+/**
+ * Conversion is synchronous and super-linear in nesting depth (20,000 nested
+ * divs took 47 s), so huge or deeply nested values are left unconverted
+ * rather than block every request on the server.
+ */
+const MAX_CONVERTIBLE_LENGTH = 100_000;
+const MAX_CONVERTIBLE_BLOCKS = 2_000;
+
+function isConvertible(html: string): boolean {
+  if (html.length > MAX_CONVERTIBLE_LENGTH) return false;
+  let blocks = 0;
+  for (const _ of html.matchAll(/<(div|ul|ol|li|table|blockquote)\b/gi)) {
+    if (++blocks > MAX_CONVERTIBLE_BLOCKS) return false;
+  }
+  return true;
+}
+
 interface RichTextField {
   type: 'text/html' | 'text/plain';
   value: string;
@@ -43,14 +81,8 @@ export function renderRichTextFieldsAsMarkdown(data: unknown): unknown {
 
   if (data && typeof data === 'object') {
     if (isRichTextField(data) && data.type === 'text/html') {
-      let value_markdown: string;
-      try {
-        value_markdown = turndown.turndown(data.value);
-      } catch {
-        // Malformed/unexpected HTML: leave the field as-is rather than fail the whole response.
-        return data;
-      }
-      return { ...data, value_markdown };
+      if (!isConvertible(data.value)) return data;
+      return { ...data, value_markdown: turndown.turndown(inlinePolarionLinks(data.value)) };
     }
 
     const result: Record<string, unknown> = {};
