@@ -230,6 +230,9 @@ test("checkResourceCustomFieldKeys fails closed when the metadata response is em
   const httpClient = async (): Promise<AxiosResponse> => fieldsMetadataResponse([])
   const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
+  // The specific branch, not the generic unknown-key refusal; and nothing cached.
+  if (!result.ok) assert.match(result.reason, /returned no fields/)
+  assert.equal(_fieldKeyCache.size, 0)
 })
 
 test("checkResourceCustomFieldKeys fails closed on the OLD, wrong getAvailableOptions-style list shape ({data:[{id}]}), not just the real object shape", async () => {
@@ -238,6 +241,8 @@ test("checkResourceCustomFieldKeys fails closed on the OLD, wrong getAvailableOp
     ({ data: { data: [{ id: "realField" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
   const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false, "the list shape must not be silently accepted as if it were the real object-map shape")
+  if (!result.ok) assert.match(result.reason, /returned no fields/)
+  assert.equal(_fieldKeyCache.size, 0)
 })
 
 test("checkResourceCustomFieldKeys fails closed when attributes is missing or null in the response", async () => {
@@ -246,6 +251,8 @@ test("checkResourceCustomFieldKeys fails closed when attributes is missing or nu
     ({ data: { data: { attributes: null } }, status: 200, statusText: "OK", headers: {}, config: {} as any })
   const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
+  if (!result.ok) assert.match(result.reason, /returned no fields/)
+  assert.equal(_fieldKeyCache.size, 0)
 })
 
 test("checkResourceCustomFieldKeys caches the field list per (project, resourceType, type)", async () => {

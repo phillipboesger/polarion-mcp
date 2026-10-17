@@ -839,12 +839,16 @@ test("executeApiTool accepts a postDocuments create with a real registered custo
   assert.equal(acceptMessage.type, "text")
   if (acceptMessage.type === "text") assert.match(acceptMessage.text, /API Response \(Status: 201\)/)
 
-  _optionsCache.clear()
+  // The field-key cache, not the options cache: otherwise the refusal below
+  // came from the first half's cached entry and this mock was never called.
+  _fieldKeyCache.clear()
+  let metadataCalled = false
   let postCalled = false
   const httpClientRefuse = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
     const url = String(config.url)
     if (url.includes("/actions/getFieldsMetadata")) {
-      return { data: { data: { attributes: {} } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+      metadataCalled = true
+      return { data: { data: { attributes: { otherField: {} } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
     }
     postCalled = true
     throw new Error("create must never be reached once the field-key guard refuses")
@@ -856,6 +860,7 @@ test("executeApiTool accepts a postDocuments create with a real registered custo
     {},
     { httpClient: httpClientRefuse, minIntervalMs: 0, postMutationDelayMs: 0 }
   )
+  assert.ok(metadataCalled, "the refusal must come from a fresh lookup")
   assert.ok(!postCalled)
   const refuseMessage = refuseResult.content[0]
   assert.equal(refuseMessage.type, "text")
@@ -1107,9 +1112,12 @@ test("executeApiTool refuses a postWorkItems create when the assignee does not e
 test("executeApiTool refuses a patchWorkItems bulk update using the composite PROJECT/WORKITEMID id", async () => {
   _optionsCache.clear()
   let patchCalled = false
+  const lookups: string[] = []
   const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
     if (String(config.method).toLowerCase() === "get") {
-      assert.match(String(config.url), /\/workitems\/DEMO-2\//, "should resolve options for the specific item parsed out of the composite id")
+      // Recorded and asserted after the call: an assert thrown in here is
+      // swallowed by the guard as a failed lookup, which also says "Write refused".
+      lookups.push(String(config.url))
       return { data: { data: [{ id: "open" }, { id: "closed" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
     }
     patchCalled = true
@@ -1125,16 +1133,18 @@ test("executeApiTool refuses a patchWorkItems bulk update using the composite PR
   )
 
   assert.ok(!patchCalled)
+  assert.ok(lookups.length > 0 && lookups.every((u) => /\/projects\/DEMO\/workitems\/DEMO-2\//.test(u)), lookups.join(", "))
   const message = result.content[0]
   assert.equal(message.type, "text")
-  if (message.type === "text") assert.match(message.text, /Write refused/)
+  if (message.type === "text") assert.match(message.text, /'status' value 'bogus'/)
 })
 
 test("executeApiTool refuses a patchAllWorkItems (global) update, parsing project from the composite id", async () => {
   _optionsCache.clear()
+  const lookups: string[] = []
   const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
     if (String(config.method).toLowerCase() === "get") {
-      assert.match(String(config.url), /\/projects\/OTHERPROJ\/workitems\/OTHERPROJ-9\//)
+      lookups.push(String(config.url))
       return { data: { data: [{ id: "open" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
     }
     throw new Error("must never be reached")
@@ -1148,9 +1158,10 @@ test("executeApiTool refuses a patchAllWorkItems (global) update, parsing projec
     { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
   )
 
+  assert.ok(lookups.length > 0 && lookups.every((u) => /\/projects\/OTHERPROJ\/workitems\/OTHERPROJ-9\//.test(u)), lookups.join(", "))
   const message = result.content[0]
   assert.equal(message.type, "text")
-  if (message.type === "text") assert.match(message.text, /Write refused/)
+  if (message.type === "text") assert.match(message.text, /'status' value 'bogus'/)
 })
 
 test("regenerated tools.ts advertises dry_run on every mutating tool and no GET tool", async () => {
