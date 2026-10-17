@@ -26,9 +26,16 @@ async function listen(app: express.Express) {
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, server }
 }
 
+test("parseToolFilter: MCP_READ_ONLY accepts 1/true/yes in any case; a set but empty MCP_TOOLS exposes nothing", () => {
+  for (const v of ["1", "TRUE", "yes", "True"]) assert.equal(parseToolFilter({ MCP_READ_ONLY: v }).readOnly, true, v)
+  assert.equal(parseToolFilter({ MCP_READ_ONLY: "0" }).readOnly, false)
+  assert.deepEqual(parseToolFilter({ MCP_TOOLS: "," }).allow, [])
+  assert.equal(filterTools(toolDefinitionMap, parseToolFilter({ MCP_TOOLS: " , " })).tools.size, 0)
+})
+
 test("parseToolFilter: unset means no filter", () => {
   assert.deepEqual(parseToolFilter({}), { allow: undefined, readOnly: false })
-  assert.deepEqual(parseToolFilter({ MCP_TOOLS: " , ", MCP_READ_ONLY: "yes" }), { allow: undefined, readOnly: false })
+  assert.deepEqual(parseToolFilter({ MCP_TOOLS: "", MCP_READ_ONLY: "no" }), { allow: undefined, readOnly: false })
   assert.deepEqual(parseToolFilter({ MCP_TOOLS: "a, b", MCP_READ_ONLY: "true" }), { allow: ["a", "b"], readOnly: true })
 })
 
@@ -73,6 +80,7 @@ test("over MCP a filtered tool is neither listed nor callable, and output schema
       body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "deleteWorkItems", arguments: { projectId: "p" } } }),
     })).text())
     assert.match(call.result.content[0].text, /Unknown tool/)
+    assert.equal(call.result.isError, true)
   } finally {
     await closeAllSessions()
     server.close()

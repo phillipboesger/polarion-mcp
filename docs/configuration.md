@@ -9,9 +9,10 @@
 
 - API_BASE_URL: Base URL for the Polarion REST API. Must point at your own instance, e.g. https://your-polarion-server/polarion/rest/v1 (the built-in default is a non-functional placeholder).
 - BEARER_TOKEN: Personal Access Token for Polarion, used by stdio and REST HTTP mode. Obtain it from your Polarion user profile or personal settings. If Personal Access Tokens are not available in your instance, ask your administrator. The Streamable HTTP MCP transport ignores it whenever the request carries its own token.
-- HTTP_PORT: Port for the REST HTTP server (default 3000).
+- HTTP_PORT: Port for the REST HTTP server (default 3000). PORT, which platforms such as Render inject, takes precedence.
+- After `git pull`, run `npm run build` before starting: `npm start` runs the existing build, it does not rebuild.
 - HTTP_API_KEY: Required for the REST HTTP wrapper (ChatGPT Custom GPT) authentication.
-- MCP_HTTP_PORT: Optional port for the MCP HTTP server (falls back to HTTP_PORT, then 3000).
+- MCP_HTTP_PORT: Optional port for the MCP HTTP server (falls back to PORT, then HTTP_PORT, then 3000).
 - MCP_PUBLIC_URL: Public HTTPS base URL of the deployment. Setting it enables the OAuth login flow (client registration, authorization, token endpoints, and the page where a user pastes their Polarion PAT), which is how clients that cannot be handed a token by hand — Claude.ai connectors — authenticate. Unset, the server only accepts a Polarion PAT sent directly as the Bearer token.
 - MCP_TOKEN_SECRET: Secret (at least 32 characters) that encrypts the tokens the OAuth login hands out; they carry the user's PAT, so the server stores nothing. Keep it stable and identical on every instance: a login then lasts until Polarion stops accepting the PAT, across restarts. Unset, a random secret is used and every login ends on restart. Changing it logs everyone out.
 - GPT_CLIENT_ID / GPT_CLIENT_SECRET: Enable per-user OAuth for ChatGPT Custom GPT Actions on the Streamable HTTP MCP server (needs MCP_PUBLIC_URL). Enter the same values in the GPT editor; endpoints are `/gpt/authorize` and `/gpt/token`.
@@ -19,9 +20,11 @@
 - MCP_ALLOWED_HOSTS: Optional comma-separated Host allow-list; setting it enables DNS-rebinding protection for the MCP HTTP server.
 - MCP_ALLOWED_REDIRECT_PREFIXES: Optional comma-separated allowlist of OAuth redirect URIs that clients may register (MCP HTTP server with OAuth). An entry ending in `/` is a prefix, any other must match exactly; loopback entries such as `http://localhost/callback` match on any port. Unset, any client may register any redirect URI, so anyone can send your users a genuine login link that hands their Polarion access to a callback of their choosing. Set it for every production deployment, e.g. `https://claude.ai/api/mcp/auth_callback`. A refused registration is logged with its redirect URIs. Registrations issued before it was set stop working if their redirect URIs are not on the list.
 - TRUST_PROXY: Express `trust proxy` setting for the MCP HTTP server behind a reverse proxy: `loopback` for a proxy on the same host, a hop count such as `1`, or a comma-separated list of proxy addresses. Without it, every request behind the proxy shares one rate-limit counter (login, token, registration), so one client can lock everyone out. `true` is refused: it would trust an X-Forwarded-For sent by anyone.
+- MCP_SESSION_IDLE_MINUTES: Minutes after which an unused MCP session is closed (default 60). The client then gets a 404 and starts a new session on its own.
+- MCP_MAX_SESSIONS: Most MCP sessions held at once (default 1000); beyond it the least recently used one is closed. A session only answers to the Polarion token that created it.
 - MCP_TOOLS: Optional comma-separated allowlist of tool names. Other tools are neither listed nor callable, over MCP or the REST wrapper. Unknown names are logged at startup.
 - MCP_READ_ONLY: `true` keeps only tools annotated `readOnlyHint: true` (combined with MCP_TOOLS, both must match).
-- MCP_OMIT_OUTPUT_SCHEMA: `true` leaves output schemas out of tools/list, which roughly halves its size (about 980 KB to 530 KB for all tools). Results still carry structured content.
+- MCP_OMIT_OUTPUT_SCHEMA: `true` leaves output schemas out of tools/list, which shrinks it from about 840 KB to 530 KB for all tools. Results still carry structured content.
 - LOG_LEVEL: Reserved for logging configuration (informational only).
 
 ## Minimal Configuration by Mode

@@ -268,6 +268,18 @@ function escapeHtml(value: string): string {
 }
 
 /**
+ * Headers for every login page response: never cached, never framed (a
+ * framing page could hide the "sends you back to" warning).
+ *
+ * @param res - The response.
+ */
+export function setLoginPageHeaders(res: Response): void {
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Content-Security-Policy', "frame-ancestors 'none'");
+}
+
+/**
  * Renders the login page.
  *
  * One field, one button, and a link to where the token is generated — the user
@@ -448,7 +460,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
         redirectUri: params.redirectUri,
         state: params.state,
         codeChallenge: params.codeChallenge,
-        scopes: params.scopes ?? [POLARION_SCOPE],
+        // The SDK passes [] when the client asks for no scope.
+        scopes: params.scopes?.length ? params.scopes : [POLARION_SCOPE],
         resource: params.resource?.href,
       },
       res
@@ -481,7 +494,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     }
     const loginId = randomBytes(24).toString('base64url');
     this.pendingLogins.set(loginId, { ...login, expiresAt: Date.now() + PENDING_LOGIN_TTL_MS });
-    res.set('Cache-Control', 'no-store');
+    setLoginPageHeaders(res);
     res.send(renderLoginPage(loginId, this.polarionUrl, login.clientName, new URL(login.redirectUri).host));
   }
 

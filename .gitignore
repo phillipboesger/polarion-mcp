@@ -68,3 +68,6 @@ Thumbs.db
 
 # Playwright MCP browser-automation scratch output (can contain live tokens/secrets)
 .playwright-mcp/
+
+# Agent worktrees
+.claude/worktrees/

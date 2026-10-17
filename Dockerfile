@@ -1,6 +1,7 @@
 # polarion-mcp — Multi-stage build
 #
 # Runs the MCP Streamable HTTP server on port 3000 (MCP_HTTP_PORT overrides).
+# For stdio (MCP registry clients): docker run -i <image> node build/index.js
 #
 # Required env vars at runtime:
 #   API_BASE_URL    — e.g. https://your-polarion.com/polarion/rest/v1
@@ -13,7 +14,7 @@
 #   NODE_TLS_REJECT_UNAUTHORIZED=0  disable SSL verification for self-signed certs
 
 # ── Builder ──────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -25,8 +26,10 @@ COPY scripts ./scripts
 RUN npm run build
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
+# Lets the MCP registry verify that server.json's name owns this image.
+LABEL io.modelcontextprotocol.server.name="io.github.phillipboesger/polarion-mcp"
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./

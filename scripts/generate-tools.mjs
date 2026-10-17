@@ -104,6 +104,32 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map(${mapAr
 export const securitySchemes = ${secObj};
 `;
 
+// The generated file is TypeScript that the build and tests import, and the
+// spec comes from a third-party host. The generator escapes only backslashes
+// and backticks in descriptions and interpolates names and paths raw, so
+// refuse anything that could become code.
+const unsafe = [];
+if (mapArray.includes('${')) unsafe.push('a "${" in a template literal (description)');
+// Checked per whole line: a value with a quote in it ("a"+code+"b") must not
+// pass by its harmless first part. Every tool must have exactly one of each.
+const lines = mapArray.split('\n');
+const nameLines = lines.filter((line) => /^\s*name:/.test(line));
+const pathLines = lines.filter((line) => /^\s*pathTemplate:/.test(line));
+for (const line of nameLines) {
+  if (!/^\s*name: "[A-Za-z0-9_]+",\s*$/.test(line)) unsafe.push(`tool name line ${JSON.stringify(line.trim())}`);
+}
+for (const line of pathLines) {
+  if (!/^\s*pathTemplate: "[A-Za-z0-9_/{}.~-]+",\s*$/.test(line)) unsafe.push(`path line ${JSON.stringify(line.trim())}`);
+}
+const entryCount = splitTopLevelArrayEntries(mapArray).length;
+if (nameLines.length !== entryCount || pathLines.length !== entryCount) {
+  unsafe.push(`expected ${entryCount} name and path lines (one per tool), found ${nameLines.length} and ${pathLines.length}`);
+}
+if (unsafe.length > 0) {
+  console.error(`Refusing to write ${outputPath}: the spec produced unsafe generated code:\n  ${unsafe.join('\n  ')}`);
+  process.exit(1);
+}
+
 writeFileSync(outputPath, out, 'utf8');
 console.log(`Wrote ${outputPath} with ${toolCount} tools and securitySchemes.`);
 console.log(`Injected dry_run into ${mutatingCount} mutating tool schema(s).`);

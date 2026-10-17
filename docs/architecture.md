@@ -5,7 +5,7 @@
 The application has two runtime modes that share the same execution core:
 
 - MCP stdio mode: src/index.ts registers MCP handlers for tools, resources, and prompts.
-- HTTP mode: src/http-server.ts exposes the same tool execution path over Express, and src/index-http.ts is the deployment entry.
+- HTTP mode: src/http-server.ts exposes the same tool execution path over Express (on Render, `npm run build:http` copies it over build/index.js).
 
 ## Components
 
@@ -44,9 +44,8 @@ The application has two runtime modes that share the same execution core:
 
 ## Supporting Capabilities
 
-- Local SDK PDFs in sdk/ can be exposed as readable documentation for AI clients.
-- refresh_polarion_config caches project metadata in memory so assistants can work with project-specific enums and work item types.
-- Prompt templates in src/polarion.ts provide higher-level task guidance on top of raw REST operations.
+- Server instructions, offline guide resources and prompt templates in src/polarion.ts give the model task guidance on top of the raw REST operations.
+- Optional local SDK PDFs in sdk/ are exposed as text resources when present.
 
 ## Schema Sanitization and Validation
 
@@ -56,8 +55,7 @@ The application has two runtime modes that share the same execution core:
 
 ## Resources and Project Configuration
 
-- Resources include online docs, local SDK PDFs, database references, and cached project configs.
-- refresh_polarion_config fetches and caches project metadata for prompts and validation.
+- Resources are offline guides (query syntax, write bodies, paging) plus optional local SDK PDFs; nothing is fetched from the network.
 
 ## Operational Constraints
 

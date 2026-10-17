@@ -22,7 +22,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
           cache: npm
 
       - name: Verify tag matches package.json version
@@ -66,8 +66,9 @@ jobs:
           unzip -q "${ZIP}" -d _verify
           cd _verify/polarion-mcp
 
-          # Install only production dependencies — no dev tools, no build step.
-          npm ci --omit=dev --ignore-scripts
+          # Exactly what users run, lifecycle scripts included.
+          npm ci --omit=dev
+          test -f build/index.js || { echo "::error::npm ci removed build/"; exit 1; }
 
           # The server holds no credentials in HTTP mode; this stands in for a
           # client's own Polarion PAT, which the server forwards verbatim and

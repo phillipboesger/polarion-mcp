@@ -41,9 +41,11 @@ import axios from 'axios';
 export async function acquireOAuth2Token(schemeName: string, scheme: any): Promise<string | null | undefined> {
   try {
     // Check if we have the necessary credentials from environment variables
-    const clientId = process.env[`OAUTH_CLIENT_ID_SCHEMENAME`];
-    const clientSecret = process.env[`OAUTH_CLIENT_SECRET_SCHEMENAME`];
-    const scopes = process.env[`OAUTH_SCOPES_SCHEMENAME`];
+    // Same naming as the executor's availability check: OAUTH_CLIENT_ID_<SCHEME>.
+    const envName = schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
+    const clientId = process.env[`OAUTH_CLIENT_ID_${envName}`];
+    const clientSecret = process.env[`OAUTH_CLIENT_SECRET_${envName}`];
+    const scopes = process.env[`OAUTH_SCOPES_${envName}`];
 
     if (!clientId || !clientSecret) {
       console.error(`[ERROR] Missing client credentials for OAuth2 scheme '${schemeName}'`);

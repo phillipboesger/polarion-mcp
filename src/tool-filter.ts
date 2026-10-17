@@ -14,6 +14,7 @@
  */
 
 import { toolDefinitionMap } from './tools.js';
+import { correctAnnotations } from './annotations.js';
 import type { McpToolDefinition } from './types.js';
 
 export interface ToolFilter {
@@ -28,8 +29,10 @@ export interface ToolFilter {
  * @returns The filter it describes.
  */
 export function parseToolFilter(env: NodeJS.ProcessEnv): ToolFilter {
-  const allow = (env.MCP_TOOLS ?? '').split(',').map(name => name.trim()).filter(Boolean);
-  return { allow: allow.length > 0 ? allow : undefined, readOnly: env.MCP_READ_ONLY === 'true' };
+  const raw = env.MCP_TOOLS?.trim();
+  // Set but without names (e.g. ","): expose nothing rather than everything.
+  const allow = raw ? raw.split(',').map(name => name.trim()).filter(Boolean) : undefined;
+  return { allow, readOnly: /^(1|true|yes)$/i.test(env.MCP_READ_ONLY?.trim() ?? '') };
 }
 
 /**
@@ -44,7 +47,9 @@ export function filterTools(
 ): { tools: Map<string, McpToolDefinition>; unknown: string[] } {
   const allow = filter.allow ? new Set(filter.allow) : undefined;
   const kept = new Map(
-    [...tools].filter(([name, def]) => (!allow || allow.has(name)) && (!filter.readOnly || def.annotations?.readOnlyHint === true))
+    [...tools]
+      .filter(([name, def]) => (!allow || allow.has(name)) && (!filter.readOnly || def.annotations?.readOnlyHint === true))
+      .map(([name, def]) => [name, correctAnnotations(def)] as const)
   );
   return { tools: kept, unknown: (filter.allow ?? []).filter(name => !tools.has(name)) };
 }
@@ -57,7 +62,7 @@ if (filtered.tools.size !== toolDefinitionMap.size) {
   console.error(`[INFO] Tool filter: ${filtered.tools.size}/${toolDefinitionMap.size} tools enabled`);
 }
 
-/** The tools this deployment exposes. */
+/** The tools this deployment exposes, with corrected annotations. */
 export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered.tools;
 
 /** Whether tools/list leaves out output schemas. */

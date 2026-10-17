@@ -28,7 +28,6 @@ Root holds only entry points and tooling config; everything else is in folders.
 - src/index.ts - stdio MCP entry point (local clients).
 - src/mcp-http-server.ts - Streamable HTTP MCP transport (remote clients, e.g. Claude.ai).
 - src/http-server.ts - REST HTTP wrapper for ChatGPT Custom GPT Actions.
-- src/index-http.ts - REST HTTP entry for deployment platforms.
 
 ## Handwritten vs Generated Code
 

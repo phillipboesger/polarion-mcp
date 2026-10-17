@@ -8,7 +8,7 @@
 
 ## MCP Mode (stdio)
 
-- Run the MCP server with `npm run start` when you want to test it directly.
+- Run the MCP server with `node build/index.js` (after `npm run build`) when you want to test it directly; `npm start` prints npm banners to stdout, which breaks a stdio MCP client.
 - In normal use, configure your MCP client to launch build/index.js with the required environment variables.
 - MCP mode exposes three capability types:
   - tools for Polarion REST operations,
@@ -20,7 +20,7 @@ Typical MCP workflow:
 1. Configure the client with API_BASE_URL and BEARER_TOKEN.
 2. Restart the MCP client so it discovers the server.
 3. Ask the client to list or use tools.
-4. For project-specific create or update tasks, call refresh_polarion_config first.
+4. For create or update tasks, the create-work-item and update-work-item prompts walk the model through the project's real fields and allowed values.
 
 ## MCP over HTTP (Streamable HTTP — for Claude.ai)
 

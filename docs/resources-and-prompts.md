@@ -1,40 +1,31 @@
 # Resources and Prompts
 
+## Server Instructions
+
+On `initialize` the server sends `instructions`: how to find a projectId, query syntax, paging, sparse fields, composite IDs, the JSON:API write shape, dry_run and workflow actions. Clients that support instructions put them in the model's context.
+
 ## Resources
 
-The MCP server exposes documentation and configuration as resources via polarion:// URIs.
+Short offline guides, served from the server itself (no network calls):
 
-Resource categories:
+- `polarion://guide/query-syntax`: Lucene query syntax for the `query` parameter.
+- `polarion://guide/writing`: JSON:API bodies for creating and updating Work Items, links, comments, status changes and attachments.
+- `polarion://guide/paging-and-fields`: paging, sparse `fields` and `include`.
 
-- sdk: SDK HTML documentation.
-- docs: Siemens documentation for REST and configuration.
-- guides: PDF guides from online sources.
-- database: Database schema references.
-- local: Local SDK PDFs from sdk/ (Git LFS).
-- config: Cached project configuration (see refresh_polarion_config).
+Optional local SDK PDFs (`polarion://local/*`) are listed only when the file is present in `sdk/` (see `sdk/README.md`); their text is extracted with pdf-parse and cut at 200,000 characters.
 
 Resources are available only through MCP mode because they are part of the MCP capability model. The HTTP wrapper exposes tool execution and OpenAPI documents, not generic MCP resource reads.
 
-## Local SDK Files
-
-Local PDFs are stored in sdk/ and read via pdf-parse. Use git lfs pull to ensure files are present.
-
-## Project Configuration Cache
-
-- refresh_polarion_config fetches and caches configuration per project.
-- Cached configs are readable at polarion://config/<projectId>.
-- Cached configs improve prompt quality and reduce repeated metadata lookups during a session.
-
 ## Prompts
 
-The server provides guided prompts:
+The server provides guided prompts that work with the real tools:
 
-- create-work-item (requires projectId)
-- search-work-items (requires projectId)
-- update-work-item (requires projectId and workItemId)
+- create-work-item (requires projectId): reads the project's fields and allowed values, previews with dry_run, then creates.
+- search-work-items (requires projectId): builds a Lucene query and pages through the results.
+- update-work-item (requires projectId and workItemId): shows the item, uses workflow actions for status changes, previews, applies and confirms.
 
-Prompts are intended to guide an assistant through common Polarion tasks by combining generated API tools with repository-specific instructions.
+A test checks that every tool and resource named in the instructions, guides and prompts exists.
 
 ## read_when
 
-- Use this guide when working with resources, prompts, or project caching.
+- Use this guide when working with resources, prompts, or server instructions.
