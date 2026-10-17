@@ -31,6 +31,7 @@ import {
   checkResourceCustomFieldKeys,
   checkWorkItemUserReferences,
   splitWorkItemId,
+  invalidateWorkItemOptions,
   type WorkItemEnumCheckTarget,
   type CustomFieldKeyCheckTarget,
   type EnumGuardResult,
@@ -888,6 +889,9 @@ export async function executeApiTool(
 
     // Execute the request with pacing + retry-with-backoff on 429/5xx
     const response = await sendWithRetry(config, sendOpts);
+    for (const target of enumTargets ?? []) {
+      if (target.workItemId) invalidateWorkItemOptions(target.projectId, target.workItemId);
+    }
 
     if (download) {
       const fileName = String(readArg(validatedArgs, 'attachmentId', nameMap) ?? readArg(validatedArgs, 'filename', nameMap) ?? '');
