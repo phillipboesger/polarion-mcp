@@ -104,6 +104,23 @@ export const toolDefinitionMap: Map<string, McpToolDefinition> = new Map(${mapAr
 export const securitySchemes = ${secObj};
 `;
 
+// The generated file is TypeScript that the build and tests import, and the
+// spec comes from a third-party host. The generator escapes only backslashes
+// and backticks in descriptions and interpolates names and paths raw, so
+// refuse anything that could become code.
+const unsafe = [];
+if (mapArray.includes('${')) unsafe.push('a "${" in a template literal (description)');
+for (const [, name] of mapArray.matchAll(/\bname:\s*"([^"]*)"/g)) {
+  if (!/^[A-Za-z0-9_]+$/.test(name)) unsafe.push(`tool name ${JSON.stringify(name)}`);
+}
+for (const [, path] of mapArray.matchAll(/\bpathTemplate:\s*"([^"]*)"/g)) {
+  if (!/^[A-Za-z0-9_/{}.~-]+$/.test(path)) unsafe.push(`path ${JSON.stringify(path)}`);
+}
+if (unsafe.length > 0) {
+  console.error(`Refusing to write ${outputPath}: the spec produced unsafe generated code:\n  ${unsafe.join('\n  ')}`);
+  process.exit(1);
+}
+
 writeFileSync(outputPath, out, 'utf8');
 console.log(`Wrote ${outputPath} with ${toolCount} tools and securitySchemes.`);
 console.log(`Injected dry_run into ${mutatingCount} mutating tool schema(s).`);

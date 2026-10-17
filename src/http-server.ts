@@ -31,7 +31,8 @@ import { bearerCredential } from './utils.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.HTTP_PORT || 3000;
+// PORT is what Render and most platforms inject.
+const PORT = process.env.PORT || process.env.HTTP_PORT || 3000;
 const HTTP_API_KEY = process.env.HTTP_API_KEY;
 
 // Security check

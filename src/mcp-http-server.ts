@@ -617,7 +617,7 @@ export function parseTrustProxy(value: string | undefined): string | number | un
  * @returns The underlying Node HTTP server once it is listening.
  */
 export function startMcpHttpServer(): HttpServer {
-  const port = Number(process.env.MCP_HTTP_PORT || process.env.HTTP_PORT || 3000);
+  const port = Number(process.env.MCP_HTTP_PORT || process.env.PORT || process.env.HTTP_PORT || 3000);
   const allowedHosts = (process.env.MCP_ALLOWED_HOSTS || '')
     .split(',')
     .map(h => h.trim())

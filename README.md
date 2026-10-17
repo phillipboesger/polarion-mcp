@@ -553,8 +553,8 @@ Please open an issue before submitting a larger change so we can discuss the app
 
 Releases are automated by [`.github/workflows/release.yml`](.github/workflows/release.yml):
 
-1. Bump `"version"` in `package.json` and commit it to `main`.
-2. Tag the commit and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+1. Run `npm version X.Y.Z` on `main` (bumps package.json, package-lock.json and server.json in one commit), then push.
+2. Push the tag `npm version` created: `git push origin vX.Y.Z`.
 3. The workflow builds, tests, and packages the release ZIP, then publishes a GitHub Release for the tag with notes auto-generated from the pull requests merged since the previous tag (from the start of the history for the first release).
 
 ---

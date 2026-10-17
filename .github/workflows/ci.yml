@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -77,8 +80,10 @@ jobs:
           unzip -q "${ZIP}" -d _verify
           cd _verify/polarion-mcp
 
-          # Install only production dependencies — no dev tools, no build step.
-          npm ci --omit=dev --ignore-scripts
+          # Exactly what users run (docs/repository-overview.md), lifecycle scripts
+          # included: a prepare hook that rebuilds would delete the shipped build/.
+          npm ci --omit=dev
+          test -f build/index.js || { echo "::error::npm ci removed build/"; exit 1; }
 
           # The server holds no credentials in HTTP mode; this stands in for a
           # client's own Polarion PAT, which the server forwards verbatim and
@@ -118,7 +123,10 @@ jobs:
           set -euo pipefail
           cd _verify/polarion-mcp
           INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
-          out="$(echo "${INIT}" | API_BASE_URL=https://polarion.example.com/polarion/rest/v1 BEARER_TOKEN=x timeout 20 ./build/index.js || true)"
+          # The server exits on its own when stdin closes; a crash or a timeout (124) fails the step.
+          rc=0
+          out="$(echo "${INIT}" | API_BASE_URL=https://polarion.example.com/polarion/rest/v1 BEARER_TOKEN=x timeout 20 ./build/index.js)" || rc=$?
+          test "${rc}" = "0" || { echo "::error::stdio server exited with ${rc}: ${out}"; exit 1; }
           echo "${out}" | grep -q '"serverInfo"' || { echo "::error::stdio initialize failed: ${out}"; exit 1; }
 
       - name: Upload release ZIP artifact
@@ -142,5 +150,21 @@ jobs:
         run: |
           set -euo pipefail
           INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
-          out="$(echo "${INIT}" | timeout 30 docker run -i --rm -e API_BASE_URL=https://polarion.example.com/polarion/rest/v1 -e BEARER_TOKEN=x polarion-mcp:ci node build/index.js || true)"
+          rc=0
+          out="$(echo "${INIT}" | timeout 30 docker run -i --rm -e API_BASE_URL=https://polarion.example.com/polarion/rest/v1 -e BEARER_TOKEN=x polarion-mcp:ci node build/index.js)" || rc=$?
+          test "${rc}" = "0" || { echo "::error::stdio server in the image exited with ${rc}: ${out}"; exit 1; }
           echo "${out}" | grep -q '"serverInfo"' || { echo "::error::stdio initialize in the image failed: ${out}"; exit 1; }
+
+      - name: Default command (HTTP server) answers /health and refuses an anonymous /mcp
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name mcp-ci -p 3010:3000 -e API_BASE_URL=https://polarion.example.com/polarion/rest/v1 polarion-mcp:ci
+          trap 'docker stop mcp-ci >/dev/null 2>&1 || true' EXIT
+          ok=""
+          for _ in $(seq 1 40); do
+            if curl -sf http://localhost:3010/health >/dev/null; then ok=1; break; fi
+            sleep 0.5
+          done
+          test "${ok}" = "1" || { docker logs mcp-ci; echo "::error::image did not become healthy"; exit 1; }
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3010/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -d '{}')"
+          test "${code}" = "401" || { echo "::error::expected 401 without token, got ${code}"; exit 1; }

@@ -8,7 +8,7 @@
 
 ## MCP Mode (stdio)
 
-- Run the MCP server with `npm run start` when you want to test it directly.
+- Run the MCP server with `node build/index.js` (after `npm run build`) when you want to test it directly; `npm start` prints npm banners to stdout, which breaks a stdio MCP client.
 - In normal use, configure your MCP client to launch build/index.js with the required environment variables.
 - MCP mode exposes three capability types:
   - tools for Polarion REST operations,
