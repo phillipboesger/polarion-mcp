@@ -9,9 +9,10 @@
 
 - API_BASE_URL: Base URL for the Polarion REST API. Must point at your own instance, e.g. https://your-polarion-server/polarion/rest/v1 (the built-in default is a non-functional placeholder).
 - BEARER_TOKEN: Personal Access Token for Polarion, used by stdio and REST HTTP mode. Obtain it from your Polarion user profile or personal settings. If Personal Access Tokens are not available in your instance, ask your administrator. The Streamable HTTP MCP transport ignores it whenever the request carries its own token.
-- HTTP_PORT: Port for the REST HTTP server (default 3000).
+- HTTP_PORT: Port for the REST HTTP server (default 3000). PORT, which platforms such as Render inject, takes precedence.
+- After `git pull`, run `npm run build` before starting: `npm start` runs the existing build, it does not rebuild.
 - HTTP_API_KEY: Required for the REST HTTP wrapper (ChatGPT Custom GPT) authentication.
-- MCP_HTTP_PORT: Optional port for the MCP HTTP server (falls back to HTTP_PORT, then 3000).
+- MCP_HTTP_PORT: Optional port for the MCP HTTP server (falls back to PORT, then HTTP_PORT, then 3000).
 - MCP_PUBLIC_URL: Public HTTPS base URL of the deployment. Setting it enables the OAuth login flow (client registration, authorization, token endpoints, and the page where a user pastes their Polarion PAT), which is how clients that cannot be handed a token by hand — Claude.ai connectors — authenticate. Unset, the server only accepts a Polarion PAT sent directly as the Bearer token.
 - MCP_TOKEN_SECRET: Secret (at least 32 characters) that encrypts the tokens the OAuth login hands out; they carry the user's PAT, so the server stores nothing. Keep it stable and identical on every instance: a login then lasts until Polarion stops accepting the PAT, across restarts. Unset, a random secret is used and every login ends on restart. Changing it logs everyone out.
 - GPT_CLIENT_ID / GPT_CLIENT_SECRET: Enable per-user OAuth for ChatGPT Custom GPT Actions on the Streamable HTTP MCP server (needs MCP_PUBLIC_URL). Enter the same values in the GPT editor; endpoints are `/gpt/authorize` and `/gpt/token`.

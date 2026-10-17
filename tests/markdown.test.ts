@@ -69,3 +69,19 @@ test("very large or deeply nested rich text is not converted, so it cannot block
   assert.equal(result.d.value, nested)
   assert.equal(result.d.value_markdown, undefined)
 })
+
+test("deep inline nesting that overflows turndown's stack leaves that field unconverted, the rest of the response intact", () => {
+  // 3000 nested tags: under the conversion caps, yet turndown overflows its stack.
+  const deep = "<b>".repeat(3_000) + "x" + "</b>".repeat(3_000)
+  const result = renderRichTextFieldsAsMarkdown({ a: { type: "text/html", value: deep }, b: { type: "text/html", value: "<p>fine</p>" } }) as any
+  assert.equal(result.a.value, deep)
+  assert.equal(result.a.value_markdown, undefined)
+  assert.equal(result.b.value_markdown, "fine")
+})
+
+test("cross-reference matching stays linear on hostile input", () => {
+  const hostile = "<span ".repeat(16_000)
+  const started = Date.now()
+  renderRichTextFieldsAsMarkdown({ d: { type: "text/html", value: hostile } })
+  assert.ok(Date.now() - started < 1000, `took ${Date.now() - started} ms`)
+})

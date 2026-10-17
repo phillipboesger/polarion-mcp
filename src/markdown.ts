@@ -27,7 +27,9 @@ const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fen
  * @returns The HTML with each cross-reference as plain "[scope/]id" text.
  */
 function inlinePolarionLinks(html: string): string {
-  return html.replace(/<span\b([^>]*\bpolarion-rte-link\b[^>]*)>\s*<\/span>/gi, (whole, attrs: string) => {
+  // The attribute run is bounded and cannot cross '<', so this stays linear.
+  return html.replace(/<span\b([^<>]{0,2000})>\s*<\/span>/gi, (whole, attrs: string) => {
+    if (!/\bpolarion-rte-link\b/.test(attrs)) return whole;
     const attr = (name: string) => new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1];
     const id = attr('data-item-id');
     if (!id) return whole;
@@ -45,13 +47,13 @@ turndown.keep(['table']);
  * rather than block every request on the server.
  */
 const MAX_CONVERTIBLE_LENGTH = 100_000;
-const MAX_CONVERTIBLE_BLOCKS = 2_000;
+const MAX_CONVERTIBLE_TAGS = 5_000;
 
 function isConvertible(html: string): boolean {
   if (html.length > MAX_CONVERTIBLE_LENGTH) return false;
-  let blocks = 0;
-  for (const _ of html.matchAll(/<(div|ul|ol|li|table|blockquote)\b/gi)) {
-    if (++blocks > MAX_CONVERTIBLE_BLOCKS) return false;
+  let tags = 0;
+  for (const _ of html.matchAll(/<[a-z]/gi)) {
+    if (++tags > MAX_CONVERTIBLE_TAGS) return false;
   }
   return true;
 }
@@ -82,7 +84,12 @@ export function renderRichTextFieldsAsMarkdown(data: unknown): unknown {
   if (data && typeof data === 'object') {
     if (isRichTextField(data) && data.type === 'text/html') {
       if (!isConvertible(data.value)) return data;
-      return { ...data, value_markdown: turndown.turndown(inlinePolarionLinks(data.value)) };
+      try {
+        return { ...data, value_markdown: turndown.turndown(inlinePolarionLinks(data.value)) };
+      } catch {
+        // e.g. a stack overflow on deep nesting: lose this field's Markdown, not the whole response.
+        return data;
+      }
     }
 
     const result: Record<string, unknown> = {};
