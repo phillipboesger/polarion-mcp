@@ -29,7 +29,7 @@ export const SERVER_INSTRUCTIONS = `Polarion ALM over its REST API. Every call r
 
 - Start with getProjects to find a projectId. Work Item, Document and Test Run tools are project-scoped; getAllWorkItems searches across projects.
 - Search with the \`query\` parameter (Lucene syntax, e.g. \`type:requirement AND status:open\`). See polarion://guide/query-syntax.
-- Lists are paged: page_size_ (usually at most 100) and page_number_ (1-based). Follow links.next until it is absent; meta.totalCount gives the total.
+- Lists are paged: page_size_ (usually at most 100) and page_number_ (1-based). Follow links.next until it is absent; meta.totalCount gives the total when there is more than one page.
 - Ask for fewer fields with \`fields\`, e.g. {"workitems": "id,title,status"}, and expand relations with \`include\`, e.g. "author,assignee".
 - IDs in request bodies are composite: "PROJECT/WI-123" for Work Items. Path parameters take the plain parts.
 - Writes take a JSON:API body ({"data": ...}); see polarion://guide/writing. Every write tool accepts dry_run: true to validate and preview without writing.
@@ -59,7 +59,7 @@ Pass the query as the \`query\` parameter of a list tool (getWorkItems, getAllWo
 | Full text | \`brake pedal\` (searches all indexed text) |
 | Assignee / author | \`assignee.id:jdoe\`, \`author.id:jdoe\` |
 | Date range | \`created:[20240101 TO 20241231]\`, \`updated:[$today-7d$ TO $today$]\` |
-| Has a value | \`HAS_VALUE:resolution\`, \`NOT HAS_VALUE:assignee\` |
+| Has a value | \`HAS_VALUE:resolution\`, \`NOT HAS_VALUE:resolution\` (works for fields such as resolution, description, priority; not for assignee) |
 | One project (cross-project tools) | \`project.id:drivepilot\` |
 | Linked to | \`linkedWorkItems:DP-123\` |
 | Custom field | \`myCustomField:value\` (the field id, not its label) |
@@ -67,7 +67,7 @@ Pass the query as the \`query\` parameter of a list tool (getWorkItems, getAllWo
 Notes:
 - Field values are ids, not labels: use the enumeration option id (\`inprogress\`), not "In Progress". getAvailableEnumOptionsForWorkItemType lists them.
 - An unknown field name does not fail; it just matches nothing. If a query returns nothing, check the field ids with getProjectFieldsMetadata.
-- Sort with \`sort\`, e.g. \`-updated\` (newest first) or \`id\`.`,
+- Sort with \`sort\`, e.g. \`-updated\` (newest first; Polarion orders dates by day, so items from the same day may come in any order) or \`id\`.`,
   },
   'polarion://guide/writing': {
     name: 'Writing Work Items',
@@ -82,13 +82,14 @@ All write tools take \`requestBody\` with a top-level \`data\`. Run with \`dry_r
   "type": "requirement",
   "title": "Brake pedal response time",
   "description": {"type": "text/html", "value": "<p>The system shall ...</p>"},
-  "priority": "high",
-  "myCustomField": "value"
+  "priority": "<option id>",
+  "<customFieldId>": "value"
 }, "relationships": {
-  "assignee": {"data": [{"type": "users", "id": "jdoe"}]}
+  "assignee": {"data": [{"type": "users", "id": "<user id>"}]}
 }}]}
 \`\`\`
 \`data\` is always a list; several items can be created at once. Custom fields go into \`attributes\` by field id.
+Placeholders: enumeration values are option ids, which are project-specific (priority is often "90.0"-style, not "high"): get them with getAvailableEnumOptionsForWorkItemType; field ids with getProjectFieldsMetadata; user ids with getUsers. The server refuses unknown values, fields and users.
 
 ## Update one Work Item (patchWorkItem)
 \`\`\`json
@@ -98,7 +99,7 @@ Send only the fields that change. The \`id\` is the composite "PROJECT/WI-123".
 Relationships in a PATCH replace the whole set: to add an assignee, send the existing ones too.
 
 ## Change status
-Use patchWorkItem's \`workflowAction\` parameter with an action id from getWorkflowActionsForWorkItem (use \`nativeActionId\`, e.g. "activate"), together with a body (it may carry no attributes).
+Use patchWorkItem's \`workflowAction\` parameter with an action id from getWorkflowActionsForWorkItem (use \`nativeActionId\`, e.g. "activate"), together with a body that has at least \`"attributes": {}\` (Polarion refuses a body with neither attributes nor relationships).
 
 ## Link two Work Items (postLinkedWorkItems)
 \`\`\`json
@@ -122,7 +123,7 @@ Link role ids are project-specific (e.g. relates_to, parent, implements); getLin
     text: `# Paging, sparse fields and includes
 
 - \`page_size_\`: items per page (Polarion's maximum is usually 100). \`page_number_\`: 1-based page.
-- The response has \`links.next\` while more pages exist, and \`meta.totalCount\`.
+- The response has \`links.next\` while more pages exist, and \`meta.totalCount\` (only when the result spans more than one page).
 - \`fields\`: which attributes to return, per resource type, e.g. \`{"workitems": "id,title,status,assignee"}\`. \`@basic\` is the default set, \`@all\` returns everything (large).
 - \`include\`: expand relationships into \`included\`, e.g. \`author,assignee\`; ask for their fields too, e.g. \`{"workitems": "title,assignee", "users": "name"}\`.
 - Ask for small pages with few fields first, then fetch details for the items you need with getWorkItem.`,
@@ -233,7 +234,7 @@ export function getPolarionPrompt(name: string, args?: Record<string, unknown>) 
 
 1. Build a Lucene query from what I describe (syntax: resource polarion://guide/query-syntax). Use field ids and enumeration option ids; check them with getProjectFieldsMetadata or getAvailableEnumOptionsForWorkItemType if unsure.
 2. Call getWorkItems with that query, page_size_ 50 and fields {"workitems": "id,title,type,status,assignee"}.
-3. If links.next is present, tell me meta.totalCount and ask before fetching more pages.
+3. If links.next is present, tell me the total (meta.totalCount) and ask before fetching more pages.
 4. Show the results as a table: id, title, type, status, assignee.`);
   }
 

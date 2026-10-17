@@ -434,7 +434,7 @@ export async function checkResourceCustomFieldKeys(
       ok: false,
       reason:
         `Unknown field key(s) ${unknownKeys.join(', ')} for ${target.scopeLabel}. ` +
-        `Known custom fields: ${knownCustomFields.join(', ') || '(none)'}.`,
+        `Other field ids this type has: ${knownCustomFields.join(', ') || '(none)'}.`,
     };
   }
 

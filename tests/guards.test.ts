@@ -209,7 +209,7 @@ test("checkResourceCustomFieldKeys's rejection message lists only real custom fi
   const result = await checkResourceCustomFieldKeys(wiCreateTarget({ bogusField: "x" }), requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false)
   if (!result.ok) {
-    assert.match(result.reason, /Known custom fields: myCustomField/)
+    assert.match(result.reason, /Other field ids this type has: myCustomField/)
     assert.doesNotMatch(result.reason, /\btitle\b/, "OOTB fields must not be listed as if they were custom fields")
     assert.doesNotMatch(result.reason, /\bstatus\b/)
   }
