@@ -29,8 +29,10 @@ export interface ToolFilter {
  * @returns The filter it describes.
  */
 export function parseToolFilter(env: NodeJS.ProcessEnv): ToolFilter {
-  const allow = (env.MCP_TOOLS ?? '').split(',').map(name => name.trim()).filter(Boolean);
-  return { allow: allow.length > 0 ? allow : undefined, readOnly: env.MCP_READ_ONLY === 'true' };
+  const raw = env.MCP_TOOLS?.trim();
+  // Set but without names (e.g. ","): expose nothing rather than everything.
+  const allow = raw ? raw.split(',').map(name => name.trim()).filter(Boolean) : undefined;
+  return { allow, readOnly: /^(1|true|yes)$/i.test(env.MCP_READ_ONLY?.trim() ?? '') };
 }
 
 /**

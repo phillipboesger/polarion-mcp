@@ -321,30 +321,65 @@ function makeNestedObjectsPermissive(schema: any, depth = 0): any {
  * @param toolName - Name of the tool (for error reporting)
  * @returns Zod schema for runtime validation
  */
+/**
+ * Rewrites `oneOf` as `anyOf`: json-schema-to-zod emits TypeScript syntax for
+ * `oneOf` that eval() cannot run (the relationship tools' bodies fell back to
+ * accept-anything). Each branch of the Polarion relationship bodies has a
+ * single property (`data` as object or array) and no `required`, so `{}`
+ * would match every branch; that one property is made required.
+ *
+ * @param schema - A JSON Schema (sub)tree.
+ * @returns A copy with `oneOf` replaced.
+ */
+function oneOfAsAnyOf(schema: any): any {
+  if (Array.isArray(schema)) return schema.map(oneOfAsAnyOf);
+  if (!schema || typeof schema !== 'object') return schema;
+  const copy: any = {};
+  for (const [key, value] of Object.entries(schema)) copy[key] = oneOfAsAnyOf(value);
+  if (Array.isArray(copy.oneOf)) {
+    copy.anyOf = copy.oneOf.map((branch: any) => {
+      const props = branch?.properties ? Object.keys(branch.properties) : [];
+      return props.length === 1 && !branch.required ? { ...branch, required: props } : branch;
+    });
+    delete copy.oneOf;
+  }
+  return copy;
+}
+
+const zodSchemaCache = new WeakMap<object, z.ZodTypeAny>();
+
+/**
+ * Compiles a tool's input schema to Zod, cached per schema object.
+ *
+ * @param jsonSchema - The tool's input schema.
+ * @returns The Zod schema.
+ * @throws Error if the schema cannot be compiled.
+ */
+export function compileZodSchema(jsonSchema: object): z.ZodTypeAny {
+  const cached = zodSchemaCache.get(jsonSchema);
+  if (cached) return cached;
+  // Nested objects (everything under e.g. requestBody) are made permissive
+  // first so dynamic data like Work Item customFields survives validation.
+  // eval is safe here: the code is generated from our own static tools.ts
+  // schemas, never from request input.
+  const zodSchema = eval(jsonSchemaToZod(oneOfAsAnyOf(makeNestedObjectsPermissive(jsonSchema))));
+  if (typeof zodSchema?.parse !== 'function') {
+    throw new Error('Eval did not produce a valid Zod schema.');
+  }
+  zodSchemaCache.set(jsonSchema, zodSchema);
+  return zodSchema as z.ZodTypeAny;
+}
+
 export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z.ZodTypeAny {
   if (typeof jsonSchema !== 'object' || jsonSchema === null) {
     // Invalid schema, return a permissive schema
     return z.object({}).passthrough();
   }
-
   try {
-    // Convert JSON Schema to Zod schema code -- nested objects (everything
-    // under e.g. requestBody) are made permissive first so dynamic data like
-    // Work Item customFields survives validation instead of being stripped.
-    const zodSchemaString = jsonSchemaToZod(makeNestedObjectsPermissive(jsonSchema));
-
-    // Evaluate the code to create actual schema
-    // This is safe because we control the input
-    const zodSchema = eval(zodSchemaString);
-
-    if (typeof zodSchema?.parse !== 'function') {
-      throw new Error('Eval did not produce a valid Zod schema.');
-    }
-
-    return zodSchema as z.ZodTypeAny;
+    return compileZodSchema(jsonSchema);
   } catch (err: any) {
+    // A test compiles every generated tool, so this only guards hand-written definitions.
     console.error(`Failed to generate/evaluate Zod schema for '${toolName}':`, err);
-    // Fall back to permissive schema that accepts anything
     return z.object({}).passthrough();
   }
 }

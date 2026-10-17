@@ -416,9 +416,22 @@ function buildMultipartFormData(requestBody: unknown): FormData {
     throw new Error('requestBody for a multipart/form-data tool must decode to a JSON object of form field names');
   }
 
+  // Name each file part after its attachment, so Polarion never falls back to "file-0".
+  const fileNames: unknown[] = Array.isArray((parsed as JsonObject).resource?.data)
+    ? (parsed as JsonObject).resource.data.map((item: any) => item?.attributes?.fileName)
+    : [];
+  const partName = (index: number, fallback: string) => (typeof fileNames[index] === 'string' && fileNames[index]) || fallback;
+
   const form = new FormData();
-  for (const [key, value] of Object.entries(parsed as JsonObject)) {
-    if (value === undefined || value === null) continue;
+  for (const [key, rawValue] of Object.entries(parsed as JsonObject)) {
+    if (rawValue === undefined || rawValue === null) continue;
+    // Models mix up one file and a list of one: accept both shapes.
+    let value: unknown = rawValue;
+    if (key === 'files' && typeof value === 'string') value = [value];
+    if ((key === 'file' || key === 'content') && Array.isArray(value) && value.length === 1) value = value[0];
+    if ((key === 'files' && !Array.isArray(value)) || ((key === 'file' || key === 'content') && typeof value !== 'string')) {
+      throw new Error(`requestBody.${key} must be ${key === 'files' ? 'a list of base64-encoded files' : 'one base64-encoded file'}`);
+    }
 
     if (key === 'resource' && typeof value === 'object') {
       form.append(key, JSON.stringify(value));
@@ -429,10 +442,10 @@ function buildMultipartFormData(requestBody: unknown): FormData {
         if (typeof item !== 'string') {
           throw new Error(`requestBody.files[${index}] must be a base64-encoded string, got ${typeof item}`);
         }
-        form.append('files', decodeBase64File(item, `requestBody.files[${index}]`), { filename: `file-${index}` });
+        form.append('files', decodeBase64File(item, `requestBody.files[${index}]`), { filename: partName(index, `file-${index}`) });
       });
     } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
-      form.append(key, decodeBase64File(value, `requestBody.${key}`), { filename: key });
+      form.append(key, decodeBase64File(value, `requestBody.${key}`), { filename: partName(0, key) });
     } else if (typeof value === 'string') {
       form.append(key, value);
     } else {
@@ -512,8 +525,14 @@ export async function executeApiTool(
     // transition period, and it never leaks into `validatedArgs` sent to Polarion.
     const isMutating = MUTATING_METHODS.has(definition.method.toLowerCase());
     const argsForValidation: JsonObject = (typeof toolArgs === 'object' && toolArgs !== null) ? { ...toolArgs } : {};
-    const dryRun = argsForValidation.dry_run === true;
+    // Models often send booleans as strings; an unreadable value must never
+    // fall through to the real (possibly irreversible) write.
+    const rawDryRun = argsForValidation.dry_run;
     delete argsForValidation.dry_run;
+    const dryRun = rawDryRun === true || rawDryRun === 'true' || rawDryRun === 1;
+    if (rawDryRun !== undefined && !dryRun && rawDryRun !== false && rawDryRun !== 'false' && rawDryRun !== 0) {
+      return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true };
+    }
 
     // Validation runs against the original schema, whose keys are the
     // original names; a sanitized name would otherwise be stripped by Zod.
@@ -617,6 +636,9 @@ export async function executeApiTool(
     // ===== STEP 4: Handle Request Body =====
     const requestBody = readArg(validatedArgs, 'requestBody', nameMap);
     let dryRunBodyPreview: unknown;
+    if (definition.requestBodyContentType === 'multipart/form-data' && typeof requestBody === 'undefined' && isMutating) {
+      throw new Error(`requestBody is required for '${toolName}': an upload needs the file and its metadata`);
+    }
     if (definition.requestBodyContentType && typeof requestBody !== 'undefined') {
       if (definition.requestBodyContentType === 'multipart/form-data') {
         // Build a real multipart body with a boundary instead of sending the raw
@@ -858,7 +880,7 @@ export async function executeApiTool(
       if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
       const preview = {
         method: config.method,
-        url: config.url,
+        url: axios.getUri({ url: config.url, params: config.params }),
         headers: redactedHeaders,
         body: dryRunBodyPreview,
       };
@@ -911,7 +933,9 @@ export async function executeApiTool(
     const contentType = String(response.headers['content-type'] ?? '').toLowerCase();
 
     // Handle JSON responses (most common for REST APIs)
-    if (/[/+]json\b/.test(contentType) && typeof response.data === 'object' && response.data !== null) {
+    // axios parses a JSON body whatever its label, so an object is JSON even
+    // without a JSON content type.
+    if (typeof response.data === 'object' && response.data !== null && !Buffer.isBuffer(response.data)) {
       try {
         // Add a `value_markdown` sibling to every rich-text ({type:"text/html", value})
         // field so the model gets readable Markdown alongside the raw HTML, without
@@ -937,6 +961,18 @@ export async function executeApiTool(
     // Handle empty responses
     else {
       responseText = `(Status: ${response.status} - No body content)`;
+    }
+
+    // An SSO login or proxy page answers with 200 text/html; that is not the API confirming a write.
+    if (isMutating && contentType.includes('text/html')) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Polarion answered with an HTML page (status ${response.status}) instead of the API, probably a login or proxy page. ` +
+            `The write may not have happened; check the item before retrying.\n${responseText.slice(0, 500)}`,
+        }],
+        isError: true,
+      };
     }
 
     // ===== STEP 9: Return Formatted Response =====

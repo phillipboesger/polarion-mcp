@@ -1215,7 +1215,7 @@ test("executeApiTool sends a real multipart/form-data body (with boundary) for p
   )
   assert.match(raw, /workitem_attachments/)
   assert.match(raw, /name="files"/)
-  assert.match(raw, /filename="file-0"/)
+  assert.match(raw, /filename="test.png"/, "the file part is named after resource.data[0].attributes.fileName")
 
   const message = result.content[0]
   assert.equal(message.type, "text")

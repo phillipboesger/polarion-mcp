@@ -160,3 +160,83 @@ test("regeneration guard: output schemas and curated descriptions are still in p
   const withOutput = [...toolDefinitionMap.values()].filter((d) => d.outputSchema).length
   assert.ok(withOutput >= 170, `only ${withOutput} tools have an outputSchema; did enrich-output-schemas run without openapi.json?`)
 })
+
+test("every generated tool gets a real validation schema (none falls back to accept-anything)", async () => {
+  const { compileZodSchema } = await import("../src/utils.js")
+  for (const def of toolDefinitionMap.values()) {
+    assert.doesNotThrow(() => compileZodSchema(def.inputSchema), def.name)
+  }
+})
+
+test("relationship tools validate their body: missing or junk bodies are refused", async () => {
+  for (const args of [
+    { projectId: "P", workItemId: "W-1", relationshipId: "assignee" },
+    { projectId: "P", workItemId: "W-1", relationshipId: "assignee", requestBody: { foo: 1 } },
+    { projectId: "P", workItemId: "W-1", relationshipId: "assignee", requestBody: "hello" },
+  ]) {
+    const { result, requests } = await run("postWorkItemRelationships", args)
+    assert.equal(result.isError, true, JSON.stringify(args))
+    assert.equal(requests.length, 0, JSON.stringify(args))
+  }
+  const { result, requests } = await run("postWorkItemRelationships", {
+    projectId: "P", workItemId: "W-1", relationshipId: "assignee", requestBody: { data: [{ type: "users", id: "alice" }] },
+  }, () => ({ status: 204, headers: {}, data: "" }))
+  assert.notEqual(result.isError, true, JSON.stringify(result.content))
+  assert.equal(requests.length, 1)
+})
+
+const DELETE_ARGS = { projectId: "P", requestBody: { data: [{ type: "workitems", id: "P/X" }] } }
+
+test("dry_run: the string \"true\" previews instead of deleting", async () => {
+  const { result, requests } = await run("deleteWorkItems", { ...DELETE_ARGS, dry_run: "true" })
+  assert.match((result.content[0] as any).text, /Dry run/)
+  assert.ok(!requests.some((r) => String(r.method).toUpperCase() === "DELETE"))
+})
+
+test("dry_run: an unrecognisable value is refused, never treated as a real write", async () => {
+  const { result, requests } = await run("deleteWorkItems", { ...DELETE_ARGS, dry_run: "maybe" })
+  assert.equal(result.isError, true)
+  assert.match((result.content[0] as any).text, /dry_run/)
+  assert.equal(requests.length, 0)
+})
+
+test("dry_run: the preview URL shows the query, e.g. the workflow action", async () => {
+  const { result } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "W-1", workflowAction: "start", dry_run: true,
+    requestBody: { data: { type: "workitems", id: "P/W-1", attributes: {} } },
+  })
+  assert.match((result.content[0] as any).text, /workflowAction=start/)
+})
+
+test("uploads: files as a single string and content as a one-element array are sent as real file parts", async () => {
+  const b64 = Buffer.from("hello").toString("base64")
+  const files = JSON.stringify({ resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "notes.txt" } }] }, files: b64 })
+  const a = await run("postWorkItemAttachments", { projectId: "P", workItemId: "W-1", requestBody: files }, () => ({ status: 201 }))
+  const rawA = (a.requests[0].data as Buffer).toString("latin1")
+  assert.match(rawA, /name="files"; filename="notes\.txt"/, "the part is named after the attachment's fileName")
+  assert.ok(rawA.includes("hello") && !rawA.includes(b64))
+  const content = JSON.stringify({ content: [b64] })
+  const b = await run("patchWorkItemAttachment", { projectId: "P", workItemId: "W-1", attachmentId: "1-a.txt", requestBody: content }, () => ({ status: 204, headers: {}, data: "" }))
+  const rawB = (b.requests[0].data as Buffer).toString("latin1")
+  assert.ok(rawB.includes("hello") && !rawB.includes(b64))
+})
+
+test("uploads: a multipart tool called without a body is refused instead of sending an empty form-urlencoded request", async () => {
+  const { result, requests } = await run("patchWorkItemAttachment", { projectId: "P", workItemId: "W-1", attachmentId: "1-a.txt" })
+  assert.equal(result.isError, true)
+  assert.equal(requests.length, 0)
+})
+
+test("a write answered with an HTML page (login or proxy) is an error, not a success", async () => {
+  const { result } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "W-1", requestBody: { data: { type: "workitems", id: "P/W-1", attributes: { title: "x" } } },
+  }, () => ({ status: 200, headers: { "content-type": "text/html" }, data: "<html>login</html>" }))
+  assert.equal(result.isError, true)
+  assert.match((result.content[0] as any).text, /HTML/)
+})
+
+test("a JSON body without a JSON content type is still read as JSON, not [object Object]", async () => {
+  const { result } = await run("getWorkItem", { projectId: "P", workItemId: "W-1" }, () => ({ headers: {}, data: { data: { id: "P/W-1" } } }))
+  assert.doesNotMatch((result.content[0] as any).text, /object Object/)
+  assert.equal((result.structuredContent as any)?.data?.id, "P/W-1")
+})
