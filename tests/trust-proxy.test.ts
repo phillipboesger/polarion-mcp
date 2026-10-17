@@ -63,3 +63,11 @@ test("parseTrustProxy accepts hop counts and address lists, refuses the permissi
   assert.equal(parseTrustProxy("10.0.0.1, 10.0.0.2"), "10.0.0.1, 10.0.0.2")
   assert.throws(() => parseTrustProxy("true"), /X-Forwarded-For/)
 })
+
+test("MCP_PUBLIC_URL with a path is refused at startup instead of silently breaking the OAuth URLs", async () => {
+  const { parsePublicUrl } = await import("../src/mcp-http-server.js")
+  assert.equal(parsePublicUrl(undefined), undefined)
+  assert.equal(parsePublicUrl("https://mcp.example.com")?.href, "https://mcp.example.com/")
+  assert.equal(parsePublicUrl("https://mcp.example.com/")?.href, "https://mcp.example.com/")
+  assert.throws(() => parsePublicUrl("https://host.example/pmcp/"), /path/)
+})

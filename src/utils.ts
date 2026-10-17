@@ -199,6 +199,16 @@ function decodeBufferBody(data: unknown): unknown {
   }
 }
 
+/**
+ * @param header - An Authorization header.
+ * @returns Its Bearer credential, or undefined. The scheme is matched
+ *   case-insensitively (RFC 7235) and spaces or tabs may separate it.
+ */
+export function bearerCredential(header: string | undefined): string | undefined {
+  const value = /^Bearer[ \t]+(.+)$/i.exec(header ?? '')?.[1]?.trim();
+  return value || undefined;
+}
+
 export function formatApiError(error: AxiosError): string {
   let message = 'API request failed.';
 

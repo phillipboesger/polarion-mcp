@@ -25,6 +25,7 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import { createRestToolsRouter } from './rest-api.js';
 import { safeEqual } from './sealed.js';
+import { bearerCredential } from './utils.js';
 
 // Load environment variables
 dotenv.config();
@@ -62,9 +63,9 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
     });
   }
 
-  const [scheme, token] = authHeader.split(' ');
-  
-  if (scheme !== 'Bearer') {
+  const token = bearerCredential(authHeader);
+
+  if (!token) {
     return res.status(401).json({
       success: false,
       error: 'Invalid authentication scheme',
@@ -73,7 +74,7 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
     });
   }
 
-  if (!safeEqual(token ?? '', HTTP_API_KEY)) {
+  if (!safeEqual(token, HTTP_API_KEY)) {
     return res.status(401).json({
       success: false,
       error: 'Invalid API key',
@@ -98,7 +99,6 @@ app.get('/health', (req: Request, res: Response) => {
     status: 'ok',
     server: SERVER_NAME,
     version: SERVER_VERSION,
-    apiBaseUrl: API_BASE_URL,
     timestamp: new Date().toISOString()
   });
 });

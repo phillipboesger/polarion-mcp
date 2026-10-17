@@ -42,9 +42,10 @@ import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextproto
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, requestBearerToken, getPolarionBaseUrl, callerCacheScope } from './config.js';
 import { createPolarionServer } from './server.js';
-import { PolarionOAuthProvider, renderLoginPage, parseRedirectAllowlist, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
+import { bearerCredential } from './utils.js';
 
 dotenv.config();
 
@@ -94,11 +95,16 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
   const decoded = Buffer.from(match[1], 'base64').toString('utf8');
   const colon = decoded.indexOf(':');
   if (colon < 0) return undefined;
-  try {
-    return { clientId: decodeURIComponent(decoded.slice(0, colon)), clientSecret: decodeURIComponent(decoded.slice(colon + 1)) };
-  } catch {
-    return undefined;
-  }
+  // RFC 6749 form-encodes the credentials before Base64, but many clients
+  // send them raw; a raw '%' would make decodeURIComponent throw.
+  const decode = (value: string) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+  return { clientId: decode(decoded.slice(0, colon)), clientSecret: decode(decoded.slice(colon + 1)) };
 }
 
 /**
@@ -281,7 +287,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       const loginId = String(req.body?.login_id ?? '');
       const token = String(req.body?.token ?? '');
       const result = await oauth.completeLogin(loginId, token);
-      res.set('Cache-Control', 'no-store');
+      setLoginPageHeaders(res);
       if (result.ok) {
         res.redirect(302, result.redirectTo);
         return;
@@ -314,10 +320,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * @returns Nothing; either runs the chain with the token bound or sends a 401.
    */
   const requireBearer = (req: Request, res: Response, next: NextFunction): void => {
-    const header = req.get('authorization') ?? '';
-    const [scheme, ...rest] = header.split(' ');
-    const value = rest.join(' ').trim();
-    if (scheme !== 'Bearer' || !value) {
+    const value = bearerCredential(req.get('authorization'));
+    if (!value) {
       if (resourceMetadataUrl) {
         res.set('WWW-Authenticate', bearerChallenge());
       }
@@ -349,7 +353,6 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       server: SERVER_NAME,
       version: SERVER_VERSION,
       transport: 'streamable-http',
-      apiBaseUrl: API_BASE_URL,
       activeSessions: sessions.size,
     });
   });
@@ -538,10 +541,10 @@ function mountCustomGpt(
   });
 
   const authenticate = (req: Request, res: Response, next: NextFunction): void => {
-    const [scheme, ...rest] = (req.get('authorization') ?? '').split(' ');
-    const pat = scheme === 'Bearer' ? oauth.polarionTokenFor(rest.join(' ').trim()) : undefined;
+    const credential = bearerCredential(req.get('authorization'));
+    const pat = credential ? oauth.polarionTokenFor(credential) : undefined;
     if (!pat) {
-      res.set('WWW-Authenticate', bearerChallenge(scheme === 'Bearer' ? 'The access token is invalid or expired' : undefined));
+      res.set('WWW-Authenticate', bearerChallenge(credential ? 'The access token is invalid or expired' : undefined));
       res.status(401).json({ success: false, error: 'Authentication required', message: 'Log in through the GPT again.' });
       return;
     }
@@ -563,6 +566,23 @@ function mountCustomGpt(
     },
     unauthorizedDescription: 'Not logged in, or the login expired',
   }));
+}
+
+/**
+ * Parses `MCP_PUBLIC_URL`. The OAuth endpoints, metadata and login form live
+ * at the root of the host, so a base URL with a path cannot work.
+ *
+ * @param value - The raw environment value.
+ * @returns The URL, or undefined when unset.
+ * @throws Error for a URL with a path.
+ */
+export function parsePublicUrl(value: string | undefined): URL | undefined {
+  if (!value) return undefined;
+  const url = new URL(value);
+  if (url.pathname !== '/') {
+    throw new Error(`MCP_PUBLIC_URL must be the origin without a path (got ${value}); serve the server at the root of its own host or subdomain`);
+  }
+  return url;
 }
 
 /**
@@ -602,7 +622,7 @@ export function startMcpHttpServer(): HttpServer {
     .split(',')
     .map(h => h.trim())
     .filter(Boolean);
-  const publicUrl = process.env.MCP_PUBLIC_URL ? new URL(process.env.MCP_PUBLIC_URL) : undefined;
+  const publicUrl = parsePublicUrl(process.env.MCP_PUBLIC_URL);
   const tokenSecret = process.env.MCP_TOKEN_SECRET || undefined;
   const gptClient = process.env.GPT_CLIENT_ID && process.env.GPT_CLIENT_SECRET
     ? { clientId: process.env.GPT_CLIENT_ID, clientSecret: process.env.GPT_CLIENT_SECRET }

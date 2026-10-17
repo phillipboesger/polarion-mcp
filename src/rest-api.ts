@@ -44,14 +44,29 @@ export interface RestToolsOptions {
  * @param unauthorizedDescription - Description of the 401 response.
  * @returns The `post` operation object.
  */
-function toolOperation(name: string, unauthorizedDescription: string) {
+/**
+ * @param text - A tool description.
+ * @param max - Most characters allowed.
+ * @returns The text, cut at the last sentence or word boundary that fits.
+ */
+function shorten(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const sentence = cut.lastIndexOf('. ');
+  return sentence > max / 2 ? cut.slice(0, sentence + 1) : `${cut.slice(0, cut.lastIndexOf(' '))}…`;
+}
+
+/** Custom GPT Actions refuse operation descriptions over 300 characters. */
+const GPT_DESCRIPTION_LIMIT = 300;
+
+function toolOperation(name: string, unauthorizedDescription: string, gpt = false) {
   const def = toolDefinitionMap.get(name)!;
   const sanitizedSchema = sanitizeInputSchema(def.inputSchema, {});
   return {
     post: {
       operationId: def.name,
-      summary: def.description,
-      description: `Execute the ${def.name} operation. ${def.description}`,
+      summary: gpt ? shorten(def.description, 120) : def.description,
+      description: gpt ? shorten(def.description, GPT_DESCRIPTION_LIMIT) : `Execute the ${def.name} operation. ${def.description}`,
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -284,16 +299,8 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
    * Limited to 30 most essential operations to comply with Custom GPT limits
    */
   router.get('/openapi-gpt.json', (req: Request, res: Response) => {
-    const paths: Record<string, unknown> = {
-      '/health': {
-        get: {
-          summary: 'Health check',
-          description: 'Check if the API is running',
-          operationId: 'health',
-          responses: HEALTH_RESPONSE
-        }
-      }
-    };
+    // Tools only: a GPT Action holds at most 30 operations, /health included.
+    const paths: Record<string, unknown> = {};
 
     // Add only essential tools (max 30 for Custom GPT)
     let toolCount = 0;
@@ -303,7 +310,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
         if (!toolDefinitionMap.has(toolName)) console.error(`[WARNING] Essential tool '${toolName}' not found in toolDefinitionMap`);
         continue;
       }
-      paths[`/api/tools/${toolName}`] = toolOperation(toolName, unauthorizedDescription);
+      paths[`/api/tools/${toolName}`] = toolOperation(toolName, unauthorizedDescription, true);
       toolCount++;
     }
 
