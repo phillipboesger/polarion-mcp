@@ -116,7 +116,12 @@ export async function sendWithRetry(
       isRetryable(method, error.response.status) &&
       attempt <= maxRetries
     ) {
-      await new Promise((r) => setTimeout(r, initialBackoffMs * 2 ** (attempt - 1)));
+      // Honour Retry-After (seconds) on 429, within reason; else back off exponentially.
+      const retryAfter = Number(error.response.headers?.['retry-after']);
+      const wait = error.response.status === 429 && retryAfter > 0 && retryAfter <= 60
+        ? retryAfter * 1000
+        : initialBackoffMs * 2 ** (attempt - 1);
+      await new Promise((r) => setTimeout(r, wait));
       return sendWithRetry(config, opts, attempt + 1);
     }
     throw error;

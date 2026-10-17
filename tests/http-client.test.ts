@@ -76,3 +76,17 @@ test("a multipart upload that is retried sends the complete file again", async (
   assert.equal(calls, 2)
   assert.ok(bodies[1].includes("hello") && bodies[1].length === bodies[0].length)
 })
+
+test("a 429 with Retry-After waits as long as Polarion asks before retrying", async () => {
+  const startedAt: number[] = []
+  let calls = 0
+  const httpClient = async (c: AxiosRequestConfig) => {
+    startedAt.push(Date.now())
+    if (++calls === 1) {
+      throw new AxiosError("429", "ERR", undefined, undefined, { status: 429, statusText: "", headers: { "retry-after": "1" }, config: {} as any, data: {} })
+    }
+    return ok(c)
+  }
+  await sendWithRetry({ method: "GET" }, { httpClient, minIntervalMs: 0, initialBackoffMs: 1 })
+  assert.ok(startedAt[1] - startedAt[0] >= 950, `retried after ${startedAt[1] - startedAt[0]} ms`)
+})

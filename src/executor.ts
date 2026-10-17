@@ -543,6 +543,16 @@ export async function executeApiTool(
         delete argsForValidation[safe];
       }
     }
+    // Models send numbers as strings and numeric ids as numbers; convert the
+    // unambiguous cases for top-level parameters instead of refusing them.
+    for (const [key, prop] of Object.entries((definition.inputSchema?.properties ?? {}) as Record<string, { type?: string }>)) {
+      const value = argsForValidation[key];
+      if ((prop.type === 'number' || prop.type === 'integer') && typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value.trim())) {
+        argsForValidation[key] = Number(value);
+      } else if (prop.type === 'string' && typeof value === 'number' && Number.isFinite(value)) {
+        argsForValidation[key] = String(value);
+      }
+    }
 
     // ===== STEP 1: Validate Arguments =====
     // Use Zod schema to ensure arguments match expected types

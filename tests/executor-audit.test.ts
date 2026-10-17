@@ -240,3 +240,12 @@ test("a JSON body without a JSON content type is still read as JSON, not [object
   assert.doesNotMatch((result.content[0] as any).text, /object Object/)
   assert.equal((result.structuredContent as any)?.data?.id, "P/W-1")
 })
+
+test("numbers sent as strings and ids sent as numbers are accepted (models mix them up)", async () => {
+  const a = await run("getWorkItems", { projectId: "P", page_size_: "5" })
+  assert.notEqual(a.result.isError, true, JSON.stringify(a.result.content))
+  assert.equal(a.requests[0].params["page[size]"], 5)
+  const b = await run("getWorkItem", { projectId: "P", workItemId: "W-1", revision: 1234 })
+  assert.notEqual(b.result.isError, true, JSON.stringify(b.result.content))
+  assert.equal(b.requests[0].params.revision, "1234")
+})
