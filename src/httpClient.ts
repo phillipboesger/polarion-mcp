@@ -56,6 +56,9 @@ function isRetryable(method: string, status: number): boolean {
   return status === 429 || (status >= 500 && IDEMPOTENT_METHODS.has(method));
 }
 
+/** Longest Retry-After (seconds) a call waits out. */
+const MAX_RETRY_AFTER_S = 60;
+
 const agents = new Map<boolean, https.Agent>();
 
 /**
@@ -110,15 +113,23 @@ export async function sendWithRetry(
     }
     return response;
   } catch (error) {
+    // The first attempt of a DELETE may have succeeded before the 5xx (a proxy
+    // timeout); the retry then finds nothing. That is the outcome asked for.
+    if (attempt > 1 && method === 'delete' && axios.isAxiosError(error) && error.response?.status === 404) {
+      return { ...error.response, status: 204, statusText: 'No Content (deleted by an earlier attempt)', data: undefined };
+    }
     if (
       axios.isAxiosError(error) &&
       error.response &&
       isRetryable(method, error.response.status) &&
       attempt <= maxRetries
     ) {
-      // Honour Retry-After (seconds) on 429, within reason; else back off exponentially.
+      // Honour Retry-After (seconds) on 429; else back off exponentially.
       const retryAfter = Number(error.response.headers?.['retry-after']);
-      const wait = error.response.status === 429 && retryAfter > 0 && retryAfter <= 60
+      // A longer wait than a tool call should block: hand the 429 to the caller instead of
+      // burning the retries inside the window.
+      if (error.response.status === 429 && retryAfter > MAX_RETRY_AFTER_S) throw error;
+      const wait = error.response.status === 429 && retryAfter > 0
         ? retryAfter * 1000
         : initialBackoffMs * 2 ** (attempt - 1);
       await new Promise((r) => setTimeout(r, wait));

@@ -28,9 +28,12 @@ const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fen
  */
 function inlinePolarionLinks(html: string): string {
   // The attribute run is bounded and cannot cross '<', so this stays linear.
-  return html.replace(/<span\b([^<>]{0,2000})>\s*<\/span>/gi, (whole, attrs: string) => {
+  return html.replace(/<span\b([^<>]{0,2000}?)(?:\/>|>\s*<\/span>)/gi, (whole, attrs: string) => {
     if (!/\bpolarion-rte-link\b/.test(attrs)) return whole;
-    const attr = (name: string) => new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1];
+    const attr = (name: string) => {
+      const match = new RegExp(`\\b${name}=(?:"([^"]*)"|'([^']*)')`).exec(attrs);
+      return match?.[1] ?? match?.[2];
+    };
     const id = attr('data-item-id');
     if (!id) return whole;
     const scope = attr('data-scope');

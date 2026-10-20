@@ -90,3 +90,26 @@ test("a 429 with Retry-After waits as long as Polarion asks before retrying", as
   await sendWithRetry({ method: "GET" }, { httpClient, minIntervalMs: 0, initialBackoffMs: 1 })
   assert.ok(startedAt[1] - startedAt[0] >= 950, `retried after ${startedAt[1] - startedAt[0]} ms`)
 })
+
+test("a Retry-After longer than a tool call should wait ends the retrying: the 429 goes to the caller at once", async () => {
+  let calls = 0
+  const httpClient = async () => {
+    calls++
+    throw new AxiosError("429", "ERR", undefined, undefined, { status: 429, statusText: "", headers: { "retry-after": "120" }, config: {} as any, data: {} })
+  }
+  await assert.rejects(sendWithRetry({ method: "GET" }, { httpClient, minIntervalMs: 0, initialBackoffMs: 1 }), /429/)
+  assert.equal(calls, 1)
+})
+
+test("a DELETE retried after a 5xx that finds the item gone (404) counts as deleted", async () => {
+  let calls = 0
+  const res = await sendWithRetry({ method: "DELETE" }, {
+    httpClient: async () => { calls++; throw httpError(calls === 1 ? 502 : 404) }, minIntervalMs: 0, initialBackoffMs: 1, postMutationDelayMs: 0,
+  })
+  assert.equal(res.status, 204)
+  assert.equal(calls, 2)
+})
+
+test("a first-attempt 404 on DELETE is still an error", async () => {
+  await assert.rejects(sendWithRetry({ method: "DELETE" }, { httpClient: async () => { throw httpError(404) }, minIntervalMs: 0, postMutationDelayMs: 0 }), /fail/)
+})

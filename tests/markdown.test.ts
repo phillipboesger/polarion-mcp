@@ -85,3 +85,9 @@ test("cross-reference matching stays linear on hostile input", () => {
   renderRichTextFieldsAsMarkdown({ d: { type: "text/html", value: hostile } })
   assert.ok(Date.now() - started < 1000, `took ${Date.now() - started} ms`)
 })
+
+test("cross-references written with single quotes or as self-closing spans keep their ids", () => {
+  const html = "See <span class='polarion-rte-link' data-item-id='WI-1' data-scope='p'></span> and <span class=\"polarion-rte-link\" data-item-id=\"WI-2\"/>."
+  const result = renderRichTextFieldsAsMarkdown({ description: { type: "text/html", value: html } }) as any
+  assert.match(result.description.value_markdown, /See p\/WI-1 and WI-2\./)
+})
