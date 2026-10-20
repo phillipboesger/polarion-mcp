@@ -8,7 +8,7 @@ import express from "express"
 process.env.MCP_TOOLS = "getWorkItem, deleteWorkItems, getWorkItems, noSuchTool"
 process.env.MCP_READ_ONLY = "true"
 process.env.MCP_OMIT_OUTPUT_SCHEMA = "true"
-const { filterTools, parseToolFilter, enabledTools } = await import("../src/tool-filter.js")
+const { filterTools, parseToolFilter, parseFlag, enabledTools } = await import("../src/tool-filter.js")
 const { toolDefinitionMap } = await import("../src/tools.js")
 const { createMcpHttpApp } = await import("../src/mcp-http-server.js")
 const { createRestToolsRouter } = await import("../src/rest-api.js")
@@ -26,11 +26,19 @@ async function listen(app: express.Express) {
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, server }
 }
 
-test("parseToolFilter: MCP_READ_ONLY accepts 1/true/yes in any case; a set but empty MCP_TOOLS exposes nothing", () => {
-  for (const v of ["1", "TRUE", "yes", "True"]) assert.equal(parseToolFilter({ MCP_READ_ONLY: v }).readOnly, true, v)
-  assert.equal(parseToolFilter({ MCP_READ_ONLY: "0" }).readOnly, false)
-  assert.deepEqual(parseToolFilter({ MCP_TOOLS: "," }).allow, [])
-  assert.equal(filterTools(toolDefinitionMap, parseToolFilter({ MCP_TOOLS: " , " })).tools.size, 0)
+test("parseToolFilter: flags accept 1/true/yes/on in any case, and a value that is neither on nor off is an error, never a silent no-op", () => {
+  for (const v of ["1", "TRUE", "yes", "True", "on", " ON "]) assert.equal(parseToolFilter({ MCP_READ_ONLY: v }).readOnly, true, v)
+  for (const v of ["0", "false", "No", "off", "", "  "]) assert.equal(parseToolFilter({ MCP_READ_ONLY: v }).readOnly, false, v)
+  for (const v of ["enabled", "y", "2", "read-only"]) assert.throws(() => parseToolFilter({ MCP_READ_ONLY: v }), /MCP_READ_ONLY must be true or false/, v)
+  assert.equal(parseFlag("MCP_OMIT_OUTPUT_SCHEMA", "1"), true)
+  assert.throws(() => parseFlag("MCP_OMIT_OUTPUT_SCHEMA", "maybe"), /MCP_OMIT_OUTPUT_SCHEMA/)
+})
+
+test("parseToolFilter: names may be separated by commas, spaces or newlines; a list without a name is an error", () => {
+  assert.deepEqual(parseToolFilter({ MCP_TOOLS: "a,b\nc  d,\r\ne" }).allow, ["a", "b", "c", "d", "e"])
+  assert.equal(parseToolFilter({ MCP_TOOLS: "   " }).allow, undefined)
+  assert.throws(() => parseToolFilter({ MCP_TOOLS: "," }), /lists no tool names/)
+  assert.throws(() => parseToolFilter({ MCP_TOOLS: " , " }), /lists no tool names/)
 })
 
 test("parseToolFilter: unset means no filter", () => {
@@ -102,4 +110,20 @@ test("over the REST wrapper a filtered tool is neither listed nor callable", asy
   } finally {
     server.close()
   }
+})
+
+test("startup fails loudly when the filter leaves no tools or a flag is invalid", async () => {
+  const { spawnSync } = await import("node:child_process")
+  const load = (env: Record<string, string>) =>
+    spawnSync(process.execPath, ["-e", "import('./build-tests/src/tool-filter.js').then(m => console.log(m.enabledTools.size))"], {
+      env: { ...process.env, MCP_TOOLS: "", MCP_READ_ONLY: "", MCP_OMIT_OUTPUT_SCHEMA: "", ...env },
+      encoding: "utf8",
+    })
+  const typo = load({ MCP_TOOLS: "getWorkItemz" })
+  assert.notEqual(typo.status, 0)
+  assert.match(typo.stderr, /leaves no tools/)
+  const badFlag = load({ MCP_READ_ONLY: "on-ish" })
+  assert.notEqual(badFlag.status, 0)
+  assert.match(badFlag.stderr, /MCP_READ_ONLY must be true or false/)
+  assert.equal(load({ MCP_TOOLS: "getWorkItem", MCP_OMIT_OUTPUT_SCHEMA: "1" }).stdout.trim(), "1")
 })

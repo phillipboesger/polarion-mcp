@@ -25,14 +25,33 @@ export interface ToolFilter {
 }
 
 /**
+ * Reads an on/off setting. A value that is neither is an error: a restriction
+ * such as MCP_READ_ONLY=on must not silently do nothing.
+ *
+ * @param name - Setting name, for the error message.
+ * @param value - Its value.
+ * @returns True for 1/true/yes/on, false for unset, empty, 0/false/no/off.
+ * @throws Error for anything else.
+ */
+export function parseFlag(name: string, value: string | undefined): boolean {
+  const text = value?.trim() ?? '';
+  if (/^(1|true|yes|on)$/i.test(text)) return true;
+  if (text === '' || /^(0|false|no|off)$/i.test(text)) return false;
+  throw new Error(`${name} must be true or false, got "${text}"`);
+}
+
+/**
  * @param env - Environment to read `MCP_TOOLS` and `MCP_READ_ONLY` from.
  * @returns The filter it describes.
+ * @throws Error for an invalid flag, or an `MCP_TOOLS` with no tool name in it.
  */
 export function parseToolFilter(env: NodeJS.ProcessEnv): ToolFilter {
   const raw = env.MCP_TOOLS?.trim();
-  // Set but without names (e.g. ","): expose nothing rather than everything.
-  const allow = raw ? raw.split(',').map(name => name.trim()).filter(Boolean) : undefined;
-  return { allow, readOnly: /^(1|true|yes)$/i.test(env.MCP_READ_ONLY?.trim() ?? '') };
+  // Names may be separated by commas, spaces or newlines (a YAML block value).
+  const allow = raw ? raw.split(/[\s,]+/).filter(Boolean) : undefined;
+  // Set but without names (e.g. ","): a typo, not a request for zero or all tools.
+  if (raw && allow?.length === 0) throw new Error(`MCP_TOOLS="${raw}" lists no tool names`);
+  return { allow, readOnly: parseFlag('MCP_READ_ONLY', env.MCP_READ_ONLY) };
 }
 
 /**
@@ -58,6 +77,10 @@ const filtered = filterTools(toolDefinitionMap, parseToolFilter(process.env));
 if (filtered.unknown.length > 0) {
   console.error(`[WARN] MCP_TOOLS names unknown tools, ignored: ${filtered.unknown.join(', ')}`);
 }
+if (filtered.tools.size === 0) {
+  // A server without tools is never what a deployment wants; a typo or a renamed tool should not go unnoticed.
+  throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY) leaves no tools; check the names in MCP_TOOLS');
+}
 if (filtered.tools.size !== toolDefinitionMap.size) {
   console.error(`[INFO] Tool filter: ${filtered.tools.size}/${toolDefinitionMap.size} tools enabled`);
 }
@@ -66,4 +89,4 @@ if (filtered.tools.size !== toolDefinitionMap.size) {
 export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered.tools;
 
 /** Whether tools/list leaves out output schemas. */
-export const omitOutputSchema = process.env.MCP_OMIT_OUTPUT_SCHEMA === 'true';
+export const omitOutputSchema = parseFlag('MCP_OMIT_OUTPUT_SCHEMA', process.env.MCP_OMIT_OUTPUT_SCHEMA);

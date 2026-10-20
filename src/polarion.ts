@@ -15,6 +15,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
+import { toolDefinitionMap } from './tools.js';
+import { enabledTools } from './tool-filter.js';
 
 const require = createRequire(import.meta.url);
 
@@ -24,31 +26,83 @@ const SDK_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 's
 /** Text extracted from a PDF is cut here; whole manuals would swamp the context. */
 export const MAX_RESOURCE_TEXT = 200_000;
 
-/** Read before anything else; also the server's `instructions`. */
-export const SERVER_INSTRUCTIONS = `Polarion ALM over its REST API. Every call runs as the signed-in Polarion user with that user's permissions.
 
-- Start with getProjects to find a projectId. Work Item, Document and Test Run tools are project-scoped; getAllWorkItems searches across projects.
-- Search with the \`query\` parameter (Lucene syntax, e.g. \`type:requirement AND status:open\`). See polarion://guide/query-syntax.
-- Lists are paged: page_size_ (usually at most 100) and page_number_ (1-based). Follow links.next until it is absent; meta.totalCount gives the total when there is more than one page.
-- Ask for fewer fields with \`fields\`, e.g. {"workitems": "id,title,status"}, and expand relations with \`include\`, e.g. "author,assignee".
-- IDs in request bodies are composite: "PROJECT/WI-123" for Work Items. Path parameters take the plain parts.
-- Writes take a JSON:API body ({"data": ...}); see polarion://guide/writing. Every write tool accepts dry_run: true to validate and preview without writing.
-- Status changes go through workflowAction on patchWorkItem; list the allowed ones with getWorkflowActionsForWorkItem.
-- Rich text fields (description) are {"type": "text/html", "value": "<p>...</p>"}; responses add a value_markdown copy for reading.`;
+/** Names of the tools this deployment exposes; guidance must not point at the others. */
+type EnabledTools = ReadonlySet<string>;
+const ENABLED: EnabledTools = new Set(enabledTools.keys());
+
+/** @returns Whether any exposed tool writes (not annotated read-only). */
+function hasWriteTools(enabled: EnabledTools): boolean {
+  return [...enabled].some(name => toolDefinitionMap.get(name)?.annotations?.readOnlyHint !== true);
+}
+
+/**
+ * @param text - Guidance text.
+ * @param enabled - The exposed tools.
+ * @returns Whether it names a tool that exists but is not exposed.
+ */
+function namesDisabledTool(text: string, enabled: EnabledTools): boolean {
+  return [...text.matchAll(/\b[a-z]+(?:[A-Z][a-z0-9]*)+\b/g)].some(([name]) => toolDefinitionMap.has(name) && !enabled.has(name));
+}
+
+/**
+ * Drops what points a model at a tool the deployment filtered out
+ * (`MCP_TOOLS`, `MCP_READ_ONLY`): every line naming one, and the whole
+ * section under a "##" heading that names one.
+ *
+ * @param text - Markdown guidance.
+ * @param enabled - The exposed tools.
+ * @returns The text without those lines.
+ */
+export function pruneDisabledTools(text: string, enabled: EnabledTools): string {
+  let skipSection = false;
+  return text.split('\n').filter(line => {
+    if (/^##\s/.test(line)) skipSection = namesDisabledTool(line, enabled);
+    return !skipSection && !namesDisabledTool(line, enabled);
+  }).join('\n');
+}
+
+/** Read before anything else; also the server's `instructions`. */
+const INSTRUCTION_LINES: { text: string; needsWrite?: boolean }[] = [
+  { text: `- Start with getProjects to find a projectId. Work Item, Document and Test Run tools are project-scoped.` },
+  { text: `- getAllWorkItems searches Work Items across projects.` },
+  { text: `- Search with the \`query\` parameter (Lucene syntax, e.g. \`type:requirement AND status:open\`). See polarion://guide/query-syntax.` },
+  { text: `- Lists are paged: page_size_ (usually at most 100) and page_number_ (1-based). Follow links.next until it is absent; meta.totalCount gives the total when there is more than one page.` },
+  { text: `- Ask for fewer fields with \`fields\`, e.g. {"workitems": "id,title,status"}, and expand relations with \`include\`, e.g. "author,assignee".` },
+  { text: `- IDs in request bodies are composite: "PROJECT/WI-123" for Work Items. Path parameters take the plain parts.` },
+  { text: `- Writes take a JSON:API body ({"data": ...}); see polarion://guide/writing. Every write tool accepts dry_run: true to validate and preview without writing.`, needsWrite: true },
+  { text: `- Status changes go through workflowAction on patchWorkItem; list the allowed ones with getWorkflowActionsForWorkItem.`, needsWrite: true },
+  { text: `- Rich text fields (description) are {"type": "text/html", "value": "<p>...</p>"}; responses add a value_markdown copy for reading.` },
+];
+
+/**
+ * @param enabled - The exposed tools.
+ * @returns The server's `instructions`, without lines about tools the deployment removed.
+ */
+export function serverInstructions(enabled: EnabledTools = ENABLED): string {
+  const writes = hasWriteTools(enabled);
+  const lines = INSTRUCTION_LINES.filter(line => (writes || !line.needsWrite) && !namesDisabledTool(line.text, enabled)).map(line => line.text);
+  return ['Polarion ALM over its REST API. Every call runs as the signed-in Polarion user with that user\'s permissions.', '', ...lines].join('\n');
+}
+
+/** Read before anything else; also the server's `instructions`. */
+export const SERVER_INSTRUCTIONS = serverInstructions();
 
 interface Guide {
   name: string;
   description: string;
   text: string;
+  /** Only useful when the deployment exposes tools that write. */
+  needsWrite?: boolean;
 }
 
 const GUIDES: Record<string, Guide> = {
   'polarion://guide/query-syntax': {
     name: 'Polarion query syntax',
-    description: 'Lucene query syntax for the `query` parameter of getWorkItems, getAllWorkItems, getDocuments and other list tools',
+    description: 'Lucene query syntax for the `query` parameter of the list tools',
     text: `# Polarion query syntax (Lucene)
 
-Pass the query as the \`query\` parameter of a list tool (getWorkItems, getAllWorkItems, getTestRuns, ...).
+Pass the query as the \`query\` parameter of a list tool.
 
 | Need | Query |
 |---|---|
@@ -70,6 +124,7 @@ Notes:
 - Sort with \`sort\`, e.g. \`-updated\` (newest first; Polarion orders dates by day, so items from the same day may come in any order) or \`id\`.`,
   },
   'polarion://guide/writing': {
+    needsWrite: true,
     name: 'Writing Work Items',
     description: 'JSON:API request bodies for creating and updating Work Items, links, comments and status changes',
     text: `# Writing to Polarion (JSON:API bodies)
@@ -139,9 +194,13 @@ const LOCAL_PDFS: Record<string, { file: string; name: string }> = {
   'polarion://local/scripting-guide': { file: 'scripting_guide_and_examples.pdf', name: 'Polarion Scripting Guide and Examples' },
 };
 
-/** @returns The guides, plus each SDK PDF present in sdk/. */
-export function listPolarionResources(): Resource[] {
-  const guides = Object.entries(GUIDES).map(([uri, guide]) => ({ uri, name: guide.name, description: guide.description, mimeType: 'text/markdown' }));
+/**
+ * @param enabled - The exposed tools.
+ * @returns The guides this deployment can use, plus each SDK PDF present in sdk/.
+ */
+export function listPolarionResources(enabled: EnabledTools = ENABLED): Resource[] {
+  const writes = hasWriteTools(enabled);
+  const guides = Object.entries(GUIDES).filter(([, guide]) => writes || !guide.needsWrite).map(([uri, guide]) => ({ uri, name: guide.name, description: guide.description, mimeType: 'text/markdown' }));
   const pdfs = Object.entries(LOCAL_PDFS)
     .filter(([, pdf]) => fs.existsSync(path.join(SDK_DIR, pdf.file)))
     .map(([uri, pdf]) => ({ uri, name: pdf.name, description: `Text of the local ${pdf.file}`, mimeType: 'text/plain' }));
@@ -150,12 +209,15 @@ export function listPolarionResources(): Resource[] {
 
 /**
  * @param uri - A URI from {@link listPolarionResources}.
+ * @param enabled - The exposed tools.
  * @returns The resource as text.
  * @throws Error for an unknown URI or a missing PDF.
  */
-export async function readPolarionResource(uri: string) {
+export async function readPolarionResource(uri: string, enabled: EnabledTools = ENABLED) {
   const guide = GUIDES[uri];
-  if (guide) return { contents: [{ uri, mimeType: 'text/markdown', text: guide.text }] };
+  if (guide && (hasWriteTools(enabled) || !guide.needsWrite)) {
+    return { contents: [{ uri, mimeType: 'text/markdown', text: pruneDisabledTools(guide.text, enabled) }] };
+  }
 
   const pdf = LOCAL_PDFS[uri];
   if (pdf) {
@@ -176,8 +238,23 @@ export async function readPolarionResource(uri: string) {
   throw new Error(`Unknown resource URI: ${uri}`);
 }
 
-/** @returns The prompt templates. */
-export function getPolarionPrompts() {
+/** Tools without which a prompt makes no sense; it is not offered if one is not exposed. */
+const PROMPT_CORE_TOOLS: Record<string, string[]> = {
+  'create-work-item': ['postWorkItems'],
+  'search-work-items': ['getWorkItems'],
+  'update-work-item': ['getWorkItem', 'patchWorkItem'],
+};
+
+/**
+ * @param enabled - The exposed tools.
+ * @returns The prompt templates this deployment can run.
+ */
+export function getPolarionPrompts(enabled: EnabledTools = ENABLED) {
+  return allPrompts().filter(prompt => PROMPT_CORE_TOOLS[prompt.name].every(tool => enabled.has(tool)));
+}
+
+/** @returns Every prompt template, whatever tools are exposed. */
+function allPrompts() {
   return [
     {
       name: 'create-work-item',
@@ -201,12 +278,25 @@ export function getPolarionPrompts() {
 }
 
 /**
+ * @param text - Text whose numbered steps ("1. ...") may have lost some.
+ * @returns It with the steps numbered 1, 2, 3 again.
+ */
+function renumber(text: string): string {
+  let step = 0;
+  return text.split('\n').map(line => (/^\d+\. /.test(line) ? `${++step}. ${line.replace(/^\d+\. /, '')}` : line)).join('\n');
+}
+
+/**
  * @param name - Prompt name.
  * @param args - Prompt arguments.
- * @returns The prompt's messages.
- * @throws Error for an unknown prompt or a missing argument.
+ * @param enabled - The exposed tools.
+ * @returns The prompt's messages, without steps that name a tool the deployment removed.
+ * @throws Error for an unknown prompt, one this deployment cannot run, or a missing argument.
  */
-export function getPolarionPrompt(name: string, args?: Record<string, unknown>) {
+export function getPolarionPrompt(name: string, args?: Record<string, unknown>, enabled: EnabledTools = ENABLED) {
+  if (PROMPT_CORE_TOOLS[name] && !getPolarionPrompts(enabled).some(prompt => prompt.name === name)) {
+    throw new Error(`Prompt ${name} needs tools this server does not expose`);
+  }
   const required = (key: string): string => {
     const value = args?.[key];
     if (typeof value !== 'string' || !value) throw new Error(`${key} argument is required`);
@@ -214,7 +304,7 @@ export function getPolarionPrompt(name: string, args?: Record<string, unknown>) 
   };
   const prompt = (description: string, text: string) => ({
     description,
-    messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }],
+    messages: [{ role: 'user' as const, content: { type: 'text' as const, text: renumber(pruneDisabledTools(text, enabled)) } }],
   });
 
   if (name === 'create-work-item') {
