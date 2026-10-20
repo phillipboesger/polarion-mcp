@@ -249,3 +249,20 @@ test("numbers sent as strings and ids sent as numbers are accepted (models mix t
   assert.notEqual(b.result.isError, true, JSON.stringify(b.result.content))
   assert.equal(b.requests[0].params.revision, "1234")
 })
+
+test("path parameters: '.' and '..' are refused, they would address a different endpoint", async () => {
+  for (const [tool, args] of [
+    ["deletePlan", { projectId: "P", planId: ".." }],
+    ["deleteProject", { projectId: ".." }],
+    ["getWorkItem", { projectId: "P", workItemId: "." }],
+  ] as const) {
+    const { result, requests } = await run(tool, args)
+    assert.equal(result.isError, true, tool)
+    assert.equal(requests.length, 0, tool)
+  }
+})
+
+test("path parameters: a dot inside an id is fine", async () => {
+  const { requests } = await run("getWorkItem", { projectId: "P", workItemId: "WI.1..2" })
+  assert.match(String(requests[0].url), /\/projects\/P\/workitems\/WI\.1\.\.2$/)
+})

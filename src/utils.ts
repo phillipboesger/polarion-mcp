@@ -29,6 +29,22 @@ import type { NameMap } from './types.js';
 const INPUT_KEY_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
 
 /**
+ * Encodes one URL path segment. `encodeURIComponent` leaves "." and ".." as
+ * they are and the HTTP client then collapses them, so `deletePlan` with a
+ * plan id of ".." would send `DELETE /projects/p/` (a different endpoint).
+ *
+ * @param value - A path parameter or id.
+ * @returns The encoded segment.
+ * @throws Error for "." and "..".
+ */
+export function encodeSegment(value: string): string {
+  if (value === '.' || value === '..') {
+    throw new Error(`"${value}" is not a valid path segment`);
+  }
+  return encodeURIComponent(value);
+}
+
+/**
  * Sanitizes a property key to match MCP requirements
  *
  * This function:

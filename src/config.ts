@@ -54,7 +54,8 @@ export const SERVER_VERSION = packageVersion();
  * You MUST set the API_BASE_URL environment variable to your own instance:
  * export API_BASE_URL="https://your-polarion-server.com/polarion/rest/v1"
  */
-export const API_BASE_URL = process.env.API_BASE_URL || "https://polarion.example.com/polarion/rest/v1";
+// No trailing slash: every request path starts with one, and "//projects" is not "/projects".
+export const API_BASE_URL = (process.env.API_BASE_URL?.trim() || "https://polarion.example.com/polarion/rest/v1").replace(/\/+$/, "");
 
 /**
  * Per-request Polarion token, set by the Streamable HTTP transport.

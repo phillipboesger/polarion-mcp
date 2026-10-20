@@ -22,7 +22,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
+import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
@@ -203,11 +203,11 @@ const CUSTOM_FIELD_TOOL_SPECS: CustomFieldToolSpec[] = [
   { method: 'patch', pathTemplate: '/projects/{projectId}/workitems/{workItemId}', resourceType: 'workitems', mode: 'update-single', typed: true },
   {
     method: 'patch', pathTemplate: '/projects/{projectId}/workitems', resourceType: 'workitems', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
-    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/workitems/${encodeURIComponent(s[1])}`,
+    bulkInstancePath: (s) => `/projects/${encodeSegment(s[0])}/workitems/${encodeSegment(s[1])}`,
   },
   {
     method: 'patch', pathTemplate: '/all/workitems', resourceType: 'workitems', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
-    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/workitems/${encodeURIComponent(s[1])}`,
+    bulkInstancePath: (s) => `/projects/${encodeSegment(s[0])}/workitems/${encodeSegment(s[1])}`,
   },
   { method: 'post', pathTemplate: '/projects/{projectId}/spaces/{spaceId}/documents', resourceType: 'documents', mode: 'create', typed: true },
   { method: 'patch', pathTemplate: '/projects/{projectId}/spaces/{spaceId}/documents/{documentName}', resourceType: 'documents', mode: 'update-single', typed: true },
@@ -219,7 +219,7 @@ const CUSTOM_FIELD_TOOL_SPECS: CustomFieldToolSpec[] = [
   { method: 'patch', pathTemplate: '/projects/{projectId}/testruns/{testRunId}', resourceType: 'testruns', mode: 'update-single', typed: true },
   {
     method: 'patch', pathTemplate: '/projects/{projectId}/testruns', resourceType: 'testruns', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
-    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/testruns/${encodeURIComponent(s[1])}`,
+    bulkInstancePath: (s) => `/projects/${encodeSegment(s[0])}/testruns/${encodeSegment(s[1])}`,
   },
   { method: 'post', pathTemplate: '/projects/{projectId}/testruns/{testRunId}/testrecords', resourceType: 'testrecords', mode: 'create', typed: false },
   {
@@ -229,7 +229,7 @@ const CUSTOM_FIELD_TOOL_SPECS: CustomFieldToolSpec[] = [
   {
     method: 'patch', pathTemplate: '/projects/{projectId}/testruns/{testRunId}/testrecords', resourceType: 'testrecords', mode: 'update-bulk', typed: false, bulkIdSegments: 5,
     bulkInstancePath: (s) =>
-      `/projects/${encodeURIComponent(s[0])}/testruns/${encodeURIComponent(s[1])}/testrecords/${encodeURIComponent(s[2])}/${encodeURIComponent(s[3])}/${encodeURIComponent(s[4])}`,
+      `/projects/${encodeSegment(s[0])}/testruns/${encodeSegment(s[1])}/testrecords/${encodeSegment(s[2])}/${encodeSegment(s[3])}/${encodeSegment(s[4])}`,
   },
 ];
 
@@ -316,7 +316,7 @@ function buildCustomFieldKeyTargets(
     let instancePath: string | undefined;
     if (spec.resourceType === 'workitems') {
       const split = splitWorkItemId(id, typeof bulkFallbackProjectId === 'string' ? bulkFallbackProjectId : undefined);
-      if (split) instancePath = `/projects/${encodeURIComponent(split.projectId)}/workitems/${encodeURIComponent(split.workItemId)}`;
+      if (split) instancePath = `/projects/${encodeSegment(split.projectId)}/workitems/${encodeSegment(split.workItemId)}`;
     } else {
       const segments = id.split('/');
       if (segments.length === spec.bulkIdSegments) instancePath = spec.bulkInstancePath!(segments);
@@ -611,7 +611,7 @@ export async function executeApiTool(
           }
           // Path parameters: Replace placeholder in URL
           // Example: "/projects/{projectId}" -> "/projects/myproject"
-          urlPath = urlPath.replace(`{${param.name}}`, encodeURIComponent(String(value)));
+          urlPath = urlPath.replace(`{${param.name}}`, encodeSegment(String(value)));
         }
         else if (param.in === 'query') {
           // Query parameters: Add to query string

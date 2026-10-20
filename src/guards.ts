@@ -50,7 +50,7 @@
 
 import axios, { type AxiosRequestConfig } from 'axios';
 import { sendWithRetry, httpsAgent, type SendWithRetryOpts } from './httpClient.js';
-import { formatApiError } from './utils.js';
+import { formatApiError, encodeSegment } from './utils.js';
 import { callerCacheScope } from './config.js';
 
 const STANDARD_WORK_ITEM_ENUM_FIELDS = ['status', 'severity', 'priority', 'resolution'] as const;
@@ -156,13 +156,13 @@ async function fetchOptions(
   const config: AxiosRequestConfig = target.workItemId
     ? {
         method: 'GET',
-        url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId)}/workitems/${encodeURIComponent(target.workItemId)}/fields/${encodeURIComponent(field)}/actions/getAvailableOptions`,
+        url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}/fields/${encodeSegment(field)}/actions/getAvailableOptions`,
         headers: requestContext.headers,
         httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
       }
     : {
         method: 'GET',
-        url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId)}/workitems/fields/${encodeURIComponent(field)}/actions/getAvailableOptions`,
+        url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/fields/${encodeSegment(field)}/actions/getAvailableOptions`,
         params: { type: target.type },
         headers: requestContext.headers,
         httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
@@ -394,7 +394,7 @@ export async function checkResourceCustomFieldKeys(
         }
       : {
           method: 'GET',
-          url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId!)}/actions/getFieldsMetadata`,
+          url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId!)}/actions/getFieldsMetadata`,
           params: { resourceType: target.resourceType, targetType: target.type ?? '~' },
           headers: requestContext.headers,
           httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
@@ -492,7 +492,7 @@ export async function checkWorkItemUserReferences(
 
     const config: AxiosRequestConfig = {
       method: 'GET',
-      url: `${requestContext.baseUrl}/users/${encodeURIComponent(userId)}`,
+      url: `${requestContext.baseUrl}/users/${encodeSegment(userId)}`,
       headers: requestContext.headers,
       httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
     };
