@@ -38,23 +38,24 @@ import type { JsonObject } from './types.js';
  * @throws Error if `PUBLIC_URL` is not an http(s) origin.
  */
 export function specServerUrl(env: NodeJS.ProcessEnv, port: number): (req: Request) => string {
+  const source = env.PUBLIC_URL?.trim() ? 'PUBLIC_URL' : 'RENDER_EXTERNAL_URL';
   const configured = env.PUBLIC_URL?.trim() || env.RENDER_EXTERNAL_URL?.trim();
   if (configured) {
     let url: URL;
     try {
       url = new URL(configured);
     } catch {
-      throw new Error(`PUBLIC_URL must be an http(s) URL such as https://mcp.example.org, got "${configured}"`);
+      throw new Error(`${source} must be an http(s) URL such as https://mcp.example.org, got "${configured}"`);
     }
     if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password || url.search || url.hash) {
-      throw new Error(`PUBLIC_URL must be an http(s) URL without credentials, query or fragment, got "${configured}"`);
+      throw new Error(`${source} must be an http(s) URL without credentials, query or fragment, got "${configured}"`);
     }
-    return () => url.href.replace(/\/$/, '');
+    return () => url.href.replace(/\/+$/, '');
   }
   return (req) => {
     const host = req.get('host');
-    if (!host || !/^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(host)) return `http://localhost:${port}`;
-    const local = /^(localhost|127\.0\.0\.1)(:|$)/.test(host);
+    if (!host || !/^([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d{1,5})?$/.test(host)) return `http://localhost:${port}`;
+    const local = /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/i.test(host);
     return `${local ? 'http' : 'https'}://${host}`;
   };
 }

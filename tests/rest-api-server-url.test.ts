@@ -34,3 +34,17 @@ test("without a configured URL the Host header is only echoed when it is a plain
     assert.equal(url(requestWithHost(bad)), "http://localhost:3011", String(bad))
   }
 })
+
+test("trailing slashes, upper-case localhost and bracketed IPv6 hosts are handled", () => {
+  assert.equal(specServerUrl({ PUBLIC_URL: "https://x.example//" }, 3000)(requestWithHost("y")), "https://x.example")
+  assert.equal(specServerUrl({ PUBLIC_URL: "https://x.example/api/" }, 3000)(requestWithHost("y")), "https://x.example/api")
+  const url = specServerUrl({}, 3011)
+  assert.equal(url(requestWithHost("LOCALHOST:3011")), "http://LOCALHOST:3011")
+  assert.equal(url(requestWithHost("[::1]:3011")), "http://[::1]:3011")
+  assert.equal(url(requestWithHost("[2001:db8::1]")), "https://[2001:db8::1]")
+})
+
+test("an unusable URL names the variable it came from", () => {
+  assert.throws(() => specServerUrl({ RENDER_EXTERNAL_URL: "nonsense" }, 3000), /RENDER_EXTERNAL_URL/)
+  assert.throws(() => specServerUrl({ PUBLIC_URL: "nonsense" }, 3000), /PUBLIC_URL/)
+})

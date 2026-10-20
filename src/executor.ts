@@ -847,7 +847,7 @@ export async function executeApiTool(
       return {
         content: [{
           type: 'text',
-          text: `No Polarion token is configured for '${toolName}'. Set BEARER_TOKEN to a Polarion Personal Access Token (stdio), or send it as "Authorization: Bearer <token>" (HTTP).`,
+          text: `No Polarion token is configured for '${toolName}'. Set BEARER_TOKEN to a Polarion Personal Access Token (stdio and the REST wrapper), or send it as "Authorization: Bearer <token>" (Streamable HTTP).`,
         }],
         isError: true,
       };

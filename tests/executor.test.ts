@@ -1474,7 +1474,7 @@ test("executeApiTool refuses a call that needs a token when none is configured, 
     assert.equal(message.type, "text")
     if (message.type === "text") {
       assert.match(message.text, /BEARER_TOKEN/)
-      assert.match(message.text, /Authorization: Bearer/)
+      assert.match(message.text, /Streamable HTTP/)
     }
     assert.equal(calls, 0)
     // A dry run needs the token too: the write guards call Polarion with it.
