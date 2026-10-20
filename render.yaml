@@ -14,7 +14,7 @@ services:
     plan: free
 
     # Build configuration
-    buildCommand: npm ci && npm run build:http
+    buildCommand: npm ci --include=dev --ignore-scripts && npm run build:http
     startCommand: node build/index.js
 
     # Health check

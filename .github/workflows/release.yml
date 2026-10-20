@@ -70,15 +70,16 @@ jobs:
           npm ci --omit=dev
           test -f build/index.js || { echo "::error::npm ci removed build/"; exit 1; }
 
-          # The server holds no credentials in HTTP mode; this stands in for a
-          # client's own Polarion PAT, which the server forwards verbatim and
-          # never validates itself (Polarion does, on the upstream call).
+          # The server holds no credentials in HTTP mode: it asks Polarion whether the
+          # caller's PAT is valid before opening a session. A stand-in Polarion
+          # accepts exactly this one PAT.
           export CALLER_PAT="ci-verify-pat"
-          export API_BASE_URL="https://polarion.example.com/polarion/rest/v1"
+          node -e "require('http').createServer((q, r) => { r.writeHead(q.headers.authorization === 'Bearer ' + process.env.CALLER_PAT ? 200 : 401, { 'content-type': 'application/json' }); r.end('{\"data\":[]}'); }).listen(3011)" & FAKE=$!
+          export API_BASE_URL="http://localhost:3011/polarion/rest/v1"
           export MCP_HTTP_PORT="3010"
 
           node build/mcp-http-server.js & SRV=$!
-          trap 'kill ${SRV} 2>/dev/null || true' EXIT
+          trap 'kill ${SRV} ${FAKE} 2>/dev/null || true' EXIT
 
           ok=""
           for _ in $(seq 1 40); do

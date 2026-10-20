@@ -3,7 +3,7 @@
 ## Render Deployment
 
 - render.yaml defines a web service using Node.
-- The build command runs `npm ci && npm run build:http`, which copies the REST wrapper (`build/http-server.js`) over `build/index.js`.
+- The build command runs `npm ci --include=dev --ignore-scripts && npm run build:http` (the TypeScript compiler is a dev dependency, which Render skips when `NODE_ENV=production`), which copies the REST wrapper (`build/http-server.js`) over `build/index.js`.
 - The service starts with node build/index.js, which on Render is therefore the REST HTTP server, not the stdio entry point it is in a normal build.
 - Configure environment variables in the Render dashboard.
 
