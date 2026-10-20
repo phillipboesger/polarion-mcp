@@ -1450,3 +1450,39 @@ test("executeApiTool does not let a BEARER_TOKEN_<SCHEME> env var override the t
     else process.env.BEARER_TOKEN_BEARERAUTH = previous
   }
 })
+
+test("executeApiTool refuses a call that needs a token when none is configured, naming what to set, instead of sending it unauthenticated", async () => {
+  const definition: McpToolDefinition = {
+    ...emptyDefinition,
+    name: "list_things",
+    method: "get",
+    pathTemplate: "/things",
+    securityRequirements: [{ bearerAuth: [] }],
+  }
+  const securitySchemes = { bearerAuth: { type: "http", scheme: "bearer" } }
+  const previous = process.env.BEARER_TOKEN
+  delete process.env.BEARER_TOKEN
+  let calls = 0
+  const httpClient = async (): Promise<AxiosResponse> => {
+    calls++
+    throw new Error("an unauthenticated request must not be sent")
+  }
+  try {
+    const result = await executeApiTool("list_things", definition, {}, securitySchemes, { httpClient })
+    assert.equal(result.isError, true)
+    const message = result.content[0]
+    assert.equal(message.type, "text")
+    if (message.type === "text") {
+      assert.match(message.text, /BEARER_TOKEN/)
+      assert.match(message.text, /Authorization: Bearer/)
+    }
+    assert.equal(calls, 0)
+    // A dry run needs the token too: the write guards call Polarion with it.
+    const dry = await executeApiTool("list_things", { ...definition, method: "post" }, { dry_run: true }, securitySchemes, { httpClient })
+    assert.equal(dry.isError, true)
+    assert.equal(calls, 0)
+  } finally {
+    if (typeof previous === "undefined") delete process.env.BEARER_TOKEN
+    else process.env.BEARER_TOKEN = previous
+  }
+})

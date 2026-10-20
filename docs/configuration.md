@@ -12,6 +12,7 @@
 - HTTP_PORT: Port for the REST HTTP server (default 3000). PORT, which platforms such as Render inject, takes precedence.
 - After `git pull`, run `npm run build` before starting: `npm start` runs the existing build, it does not rebuild.
 - HTTP_API_KEY: Required for the REST HTTP wrapper (ChatGPT Custom GPT) authentication.
+- PUBLIC_URL: Public base URL of the REST HTTP wrapper, written into the `servers` entry of `/openapi.json` and `/openapi-gpt.json` (Render's `RENDER_EXTERNAL_URL` is used when this is unset). Without either, the request's `Host` header is echoed when it is a plain host name, with `https` (`http` for localhost); set it so a forged `Host` header cannot change which server a Custom GPT imports. The server refuses to start if it is not an `http(s)` URL.
 - MCP_HTTP_PORT: Optional port for the MCP HTTP server (falls back to PORT, then HTTP_PORT, then 3000).
 - MCP_PUBLIC_URL: Public HTTPS base URL of the deployment. Setting it enables the OAuth login flow (client registration, authorization, token endpoints, and the page where a user pastes their Polarion PAT), which is how clients that cannot be handed a token by hand — Claude.ai connectors — authenticate. Unset, the server only accepts a Polarion PAT sent directly as the Bearer token.
 - MCP_TOKEN_SECRET: Secret (at least 32 characters) that encrypts the tokens the OAuth login hands out; they carry the user's PAT, so the server stores nothing. Keep it stable: a login then lasts until Polarion stops accepting the PAT, across restarts. Run a single instance (or route each client to the same one): pending logins, authorization codes and MCP sessions live in the process's memory and are not shared between instances. Unset, a random secret is used and every login ends on restart. Changing it logs everyone out.
@@ -31,7 +32,7 @@
 
 - MCP stdio mode requires API_BASE_URL and BEARER_TOKEN.
 - Streamable HTTP MCP mode (Claude.ai, ChatGPT) requires only API_BASE_URL, and optionally MCP_HTTP_PORT / MCP_HTTP_HOST / MCP_ALLOWED_HOSTS. Each client authenticates with its own Polarion PAT as the Bearer token of every `/mcp` request; before the first request of a session the server asks Polarion whether the PAT is valid (remembered for one minute), so an invented token cannot open sessions. For the OAuth login add MCP_PUBLIC_URL, MCP_TOKEN_SECRET and MCP_ALLOWED_REDIRECT_PREFIXES; behind a reverse proxy also TRUST_PROXY; for Custom GPT OAuth also GPT_CLIENT_ID and GPT_CLIENT_SECRET. HTTP_API_KEY does not apply to this server.
-- REST HTTP mode (ChatGPT) requires API_BASE_URL, BEARER_TOKEN, HTTP_API_KEY, and optionally HTTP_PORT.
+- REST HTTP mode (ChatGPT) requires API_BASE_URL, BEARER_TOKEN, HTTP_API_KEY, and optionally HTTP_PORT and PUBLIC_URL.
 
 ## Token Storage Guidance
 

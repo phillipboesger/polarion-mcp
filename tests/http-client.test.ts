@@ -6,6 +6,9 @@ import { sendWithRetry } from "../src/httpClient.js"
 import { executeApiTool } from "../src/executor.js"
 import { toolDefinitionMap, securitySchemes } from "../src/tools.js"
 
+// The generated tools need a token; a call without one is refused before it is sent.
+process.env.BEARER_TOKEN ??= "test-token"
+
 function httpError(status: number) {
   return new AxiosError("fail", "ERR", undefined, undefined, { status, statusText: "", headers: {}, config: {} as any, data: {} })
 }

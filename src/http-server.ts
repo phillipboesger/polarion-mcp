@@ -21,9 +21,9 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { enabledTools } from './tool-filter.js';
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
-import { createRestToolsRouter } from './rest-api.js';
+import { createRestToolsRouter, specServerUrl } from './rest-api.js';
 import { safeEqual } from './sealed.js';
 import { bearerCredential } from './utils.js';
 
@@ -107,7 +107,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.use(createRestToolsRouter({
   // Already enforced app-wide above.
   authenticate: (_req, _res, next) => next(),
-  serverUrl: (req) => `https://${req.get('host') || `localhost:${PORT}`}`,
+  serverUrl: specServerUrl(process.env, Number(PORT)),
   securityScheme: {
     type: 'http',
     scheme: 'bearer',
@@ -155,6 +155,7 @@ app.use((err: Error & { status?: number }, req: Request, res: Response, next: Fu
 const server = app.listen(PORT, () => {
   console.log(`[INFO] Polarion MCP HTTP Server v${SERVER_VERSION} running on port ${PORT}`);
   console.log(`[INFO] API Base URL: ${API_BASE_URL}`);
+  for (const warning of configurationWarnings(process.env, { needsToken: true })) console.log(`[WARN] ${warning}`);
   console.log(`[INFO] Available tools: ${enabledTools.size}`);
   console.log(`[INFO] Essential GPT tools: ${ESSENTIAL_GPT_TOOLS.filter(name => enabledTools.has(name)).length}`);
   console.log(`[INFO] Endpoints:`);

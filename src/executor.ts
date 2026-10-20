@@ -842,6 +842,15 @@ export async function executeApiTool(
         .join(' OR ');
 
       console.error(`[WARN] Tool '${toolName}' requires security: ${securityRequirementsString}, but no suitable credentials found.`);
+      // Sending it anyway only earns a bare "No access token" from Polarion (or a DNS error when
+      // API_BASE_URL is unset); say what to configure instead.
+      return {
+        content: [{
+          type: 'text',
+          text: `No Polarion token is configured for '${toolName}'. Set BEARER_TOKEN to a Polarion Personal Access Token (stdio), or send it as "Authorization: Bearer <token>" (HTTP).`,
+        }],
+        isError: true,
+      };
     }
 
     // ===== STEP 7: Execute the HTTP Request =====

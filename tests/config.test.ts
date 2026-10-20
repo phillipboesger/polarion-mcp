@@ -76,3 +76,22 @@ test("config drops trailing slashes and whitespace from API_BASE_URL, so request
     restoreEnv(previous)
   }
 })
+
+test("configurationWarnings tells a stdio user what is missing, and an HTTP deployment only about the base URL", async () => {
+  const { configurationWarnings } = await importFreshConfig("warnings")
+  const none = configurationWarnings({ API_BASE_URL: "https://polarion.test/polarion/rest/v1", BEARER_TOKEN: "pat" }, { needsToken: true })
+  assert.deepEqual(none, [])
+
+  const both = configurationWarnings({}, { needsToken: true })
+  assert.equal(both.length, 2)
+  assert.match(both.join("\n"), /API_BASE_URL/)
+  assert.match(both.join("\n"), /BEARER_TOKEN/)
+
+  // Whitespace is not a value, like everywhere else the variables are read.
+  assert.equal(configurationWarnings({ API_BASE_URL: "  ", BEARER_TOKEN: " " }, { needsToken: true }).length, 2)
+
+  // Over HTTP every client sends its own token: its absence is normal.
+  const http = configurationWarnings({ API_BASE_URL: "" }, { needsToken: false })
+  assert.equal(http.length, 1)
+  assert.match(http[0], /API_BASE_URL/)
+})

@@ -5,6 +5,9 @@ import type { AxiosRequestConfig, AxiosResponse } from "axios"
 import { executeApiTool } from "../src/executor.js"
 import { toolDefinitionMap, securitySchemes } from "../src/tools.js"
 
+// The generated tools need a token; a call without one is refused before it is sent.
+process.env.BEARER_TOKEN ??= "test-token"
+
 const FAST = { minIntervalMs: 0, initialBackoffMs: 1, postMutationDelayMs: 0 }
 
 /** Runs a real generated tool against a fake Polarion, returning the result and every request sent. */

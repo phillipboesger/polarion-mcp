@@ -58,6 +58,27 @@ export const SERVER_VERSION = packageVersion();
 export const API_BASE_URL = (process.env.API_BASE_URL?.trim() || "https://polarion.example.com/polarion/rest/v1").replace(/\/+$/, "");
 
 /**
+ * Problems with the environment that would otherwise only show up as a failing
+ * tool call. The server still starts: a catalogue scan (tools/list) needs
+ * neither a Polarion nor a token.
+ *
+ * @param env - The environment to check.
+ * @param options.needsToken - Whether this deployment holds the token itself
+ *   (stdio, REST wrapper) rather than getting one per request (Streamable HTTP).
+ * @returns One line per problem, empty when the configuration is complete.
+ */
+export function configurationWarnings(env: NodeJS.ProcessEnv, options: { needsToken: boolean }): string[] {
+  const warnings: string[] = [];
+  if (!env.API_BASE_URL?.trim()) {
+    warnings.push('API_BASE_URL is not set: calls go to the placeholder https://polarion.example.com/polarion/rest/v1. Set it to your Polarion REST base URL.');
+  }
+  if (options.needsToken && !env.BEARER_TOKEN?.trim()) {
+    warnings.push('BEARER_TOKEN is not set: every tool call is refused until it holds a Polarion Personal Access Token.');
+  }
+  return warnings;
+}
+
+/**
  * Per-request Polarion token, set by the Streamable HTTP transport.
  *
  * In HTTP mode every MCP client authenticates with its *own* Polarion Personal
