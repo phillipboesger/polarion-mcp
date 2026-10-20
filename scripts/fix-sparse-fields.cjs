@@ -21,7 +21,9 @@ if (spec.components && spec.components.schemas && spec.components.schemas.sparse
   
   console.log('✅ Simplified sparseFields schema to use additionalProperties');
 } else {
-  console.log('⚠️ sparseFields schema not found');
+  // Without the fix every `fields` parameter breaks; fail instead of shipping that.
+  console.error('sparseFields schema not found in openapi.json; the spec layout changed, update this script');
+  process.exit(1);
 }
 
 // Write the modified spec back

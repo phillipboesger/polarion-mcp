@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * MCP (Model Context Protocol) Server for Polarion REST API — stdio entry point.
  *
@@ -31,7 +32,7 @@ async function main(): Promise<void> {
     await server.connect(transport);
 
     // Info messages go to stderr in MCP (stdout is reserved for protocol)
-    console.error(`[INFO] ${SERVER_NAME} MCP Server (v${SERVER_VERSION}) running on stdio${API_BASE_URL ? `, proxying API at ${API_BASE_URL}` : ''}`);
+    console.error(`[INFO] ${SERVER_NAME} MCP Server ${SERVER_VERSION} running on stdio${API_BASE_URL ? `, proxying API at ${API_BASE_URL}` : ''}`);
   }
   catch (error) {
     console.error("[ERROR] Error during server startup:", error);

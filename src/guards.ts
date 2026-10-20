@@ -49,9 +49,8 @@
  */
 
 import axios, { type AxiosRequestConfig } from 'axios';
-import https from 'https';
-import { sendWithRetry, type SendWithRetryOpts } from './httpClient.js';
-import { formatApiError } from './utils.js';
+import { sendWithRetry, httpsAgent, type SendWithRetryOpts } from './httpClient.js';
+import { formatApiError, encodeSegment } from './utils.js';
 import { callerCacheScope } from './config.js';
 
 const STANDARD_WORK_ITEM_ENUM_FIELDS = ['status', 'severity', 'priority', 'resolution'] as const;
@@ -66,6 +65,45 @@ interface CacheEntry {
 
 // Exported only for tests to reset/inspect between cases; not part of the public guard API.
 export const _optionsCache = new Map<string, CacheEntry>();
+
+/** Most entries any guard cache holds; keys include caller x item, so they would grow forever. */
+export const MAX_CACHE_ENTRIES = 5000;
+
+/**
+ * Stores a cache entry, first dropping expired entries and, beyond
+ * {@link MAX_CACHE_ENTRIES}, the oldest ones.
+ *
+ * @param cache - One of the guard caches.
+ * @param key - Cache key.
+ * @param entry - Entry with its expiry.
+ */
+function cacheSet<T extends { expiresAt: number }>(cache: Map<string, T>, key: string, entry: T): void {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const now = Date.now();
+    for (const [k, v] of cache) if (v.expiresAt <= now) cache.delete(k);
+    for (const k of cache.keys()) {
+      if (cache.size < MAX_CACHE_ENTRIES) break;
+      cache.delete(k);
+    }
+  }
+  cache.delete(key);
+  cache.set(key, entry);
+}
+
+/**
+ * Forgets the cached enum options of one Work Item. Called after a write to
+ * it: the allowed statuses depend on the workflow state it just moved to.
+ *
+ * @param projectId - Project id.
+ * @param workItemId - Work Item id.
+ */
+export function invalidateWorkItemOptions(projectId: string, workItemId: string): void {
+  const marker = `::${projectId}/${workItemId}::`;
+  for (const key of _optionsCache.keys()) if (key.includes(marker)) _optionsCache.delete(key);
+}
+
+/** Upper bound on option pages read for one field (Polarion's default page is 100). */
+const MAX_OPTION_PAGES = 20;
 
 /**
  * Extracts option ids from a `getAvailableOptions`/`getCurrentOptions`
@@ -118,22 +156,27 @@ async function fetchOptions(
   const config: AxiosRequestConfig = target.workItemId
     ? {
         method: 'GET',
-        url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId)}/workitems/${encodeURIComponent(target.workItemId)}/fields/${encodeURIComponent(field)}/actions/getAvailableOptions`,
+        url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}/fields/${encodeSegment(field)}/actions/getAvailableOptions`,
         headers: requestContext.headers,
-        httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+        httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
       }
     : {
         method: 'GET',
-        url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId)}/workitems/fields/${encodeURIComponent(field)}/actions/getAvailableOptions`,
+        url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/fields/${encodeSegment(field)}/actions/getAvailableOptions`,
         params: { type: target.type },
         headers: requestContext.headers,
-        httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+        httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
       };
 
   try {
-    const response = await sendWithRetry(config, sendOpts);
-    const options = new Set(extractOptionIds(response.data));
-    _optionsCache.set(cacheKey, { options, expiresAt: Date.now() + cacheTtlMs });
+    // Options are paged; a value on a later page must not be refused.
+    const options = new Set<string>();
+    for (let page = 1; page <= MAX_OPTION_PAGES; page++) {
+      const response = await sendWithRetry({ ...config, params: { ...config.params, 'page[number]': page } }, sendOpts);
+      for (const id of extractOptionIds(response.data)) options.add(id);
+      if (!(response.data as { links?: { next?: unknown } } | undefined)?.links?.next) break;
+    }
+    cacheSet(_optionsCache, cacheKey, { options, expiresAt: Date.now() + cacheTtlMs });
     return { options };
   } catch (error) {
     const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
@@ -347,14 +390,14 @@ export async function checkResourceCustomFieldKeys(
           method: 'GET',
           url: `${requestContext.baseUrl}${target.instancePath}/actions/getFieldsMetadata`,
           headers: requestContext.headers,
-          httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
         }
       : {
           method: 'GET',
-          url: `${requestContext.baseUrl}/projects/${encodeURIComponent(target.projectId!)}/actions/getFieldsMetadata`,
+          url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId!)}/actions/getFieldsMetadata`,
           params: { resourceType: target.resourceType, targetType: target.type ?? '~' },
           headers: requestContext.headers,
-          httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
         };
     try {
       const response = await sendWithRetry(config, sendOpts);
@@ -368,7 +411,7 @@ export async function checkResourceCustomFieldKeys(
             `invisible to the UI. Ask the user to confirm these field ids exist for this type.`,
         };
       }
-      _fieldKeyCache.set(cacheKey, { keys: fieldIds, expiresAt: Date.now() + cacheTtlMs });
+      cacheSet(_fieldKeyCache, cacheKey, { keys: fieldIds, expiresAt: Date.now() + cacheTtlMs });
     } catch (error) {
       const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
       return {
@@ -391,7 +434,7 @@ export async function checkResourceCustomFieldKeys(
       ok: false,
       reason:
         `Unknown field key(s) ${unknownKeys.join(', ')} for ${target.scopeLabel}. ` +
-        `Known custom fields: ${knownCustomFields.join(', ') || '(none)'}.`,
+        `Other field ids this type has: ${knownCustomFields.join(', ') || '(none)'}.`,
     };
   }
 
@@ -403,7 +446,6 @@ export async function checkResourceCustomFieldKeys(
 // ===========================================================================
 
 interface UserExistsCacheEntry {
-  exists: boolean;
   expiresAt: number;
 }
 
@@ -446,23 +488,19 @@ export async function checkWorkItemUserReferences(
   for (const userId of userIds) {
     const cacheKey = `${callerCacheScope()}::${requestContext.baseUrl}::${userId}`;
     const cached = _userExistsCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      if (!cached.exists) return { ok: false, reason: `User '${userId}' does not exist.` };
-      continue;
-    }
+    if (cached && cached.expiresAt > Date.now()) continue;
 
     const config: AxiosRequestConfig = {
       method: 'GET',
-      url: `${requestContext.baseUrl}/users/${encodeURIComponent(userId)}`,
+      url: `${requestContext.baseUrl}/users/${encodeSegment(userId)}`,
       headers: requestContext.headers,
-      httpsAgent: new https.Agent({ rejectUnauthorized: requestContext.rejectUnauthorized }),
+      httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
     };
     try {
       await sendWithRetry(config, sendOpts);
-      _userExistsCache.set(cacheKey, { exists: true, expiresAt: Date.now() + cacheTtlMs });
+      cacheSet(_userExistsCache, cacheKey, { expiresAt: Date.now() + cacheTtlMs });
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
-        _userExistsCache.set(cacheKey, { exists: false, expiresAt: Date.now() + cacheTtlMs });
         return { ok: false, reason: `User '${userId}' does not exist. Refusing the write.` };
       }
       const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);

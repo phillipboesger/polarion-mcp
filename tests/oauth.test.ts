@@ -150,3 +150,76 @@ test("a valid Polarion token completes the login and the issued access token aut
     await stop()
   }
 })
+
+/** Completes register -> authorize -> login and redeems the code, returning the token response. */
+async function loginTokens(base: string) {
+  const { clientId, verifier, loginId } = await beginLogin(base)
+  const submitted = await fetch(`${base}/polarion-login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ login_id: loginId, token: VALID_PAT }),
+    redirect: "manual",
+  })
+  const code = new URL(submitted.headers.get("location") as string).searchParams.get("code") as string
+  const res = await fetch(`${base}/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "authorization_code", code, client_id: clientId, code_verifier: verifier, redirect_uri: "https://client.example/callback" }),
+  })
+  return (await res.json()) as { access_token: string; scope: string }
+}
+
+test("the auth scheme is case-insensitive (RFC 7235): bearer and BEARER work like Bearer", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const { access_token } = await loginTokens(base)
+    for (const scheme of ["bearer", "BEARER", "Bearer\t"]) {
+      const res = await fetch(`${base}/mcp`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `${scheme} ${access_token}`.replace("\t ", "\t") },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } }),
+      })
+      assert.equal(res.status, 200, JSON.stringify(scheme))
+    }
+  } finally {
+    await stop()
+  }
+})
+
+test("a client that asks for no scope gets the polarion scope, not an empty one", async () => {
+  const { base, stop } = await startApp()
+  try {
+    assert.equal((await loginTokens(base)).scope, "polarion")
+  } finally {
+    await stop()
+  }
+})
+
+test("the login page cannot be framed, so its return-host warning cannot be hidden", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const registration = await fetch(`${base}/register`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client_name: "C", redirect_uris: ["https://client.example/callback"], token_endpoint_auth_method: "none" }),
+    })
+    const { client_id } = (await registration.json()) as { client_id: string }
+    const url = new URL(`${base}/authorize`)
+    for (const [k, v] of Object.entries({ response_type: "code", client_id, redirect_uri: "https://client.example/callback", code_challenge: "x".repeat(43), code_challenge_method: "S256" })) url.searchParams.set(k, v)
+    const page = await fetch(url, { redirect: "manual" })
+    assert.equal(page.headers.get("x-frame-options"), "DENY")
+    assert.match(page.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/)
+  } finally {
+    await stop()
+  }
+})
+
+test("/health does not disclose the internal Polarion URL", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const body = (await (await fetch(`${base}/health`)).json()) as Record<string, unknown>
+    assert.equal(body.status, "ok")
+    assert.equal("apiBaseUrl" in body, false)
+  } finally {
+    await stop()
+  }
+})

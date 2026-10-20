@@ -41,7 +41,53 @@ test("renderRichTextFieldsAsMarkdown passes through primitives, null, and non-ri
   assert.deepEqual(renderRichTextFieldsAsMarkdown({ id: "A-1", type: "workitems" }), { id: "A-1", type: "workitems" })
 })
 
-test("renderRichTextFieldsAsMarkdown does not crash on malformed HTML -- returns the field unchanged", () => {
-  const input = { description: { type: "text/html", value: "<div><span>unclosed" } }
-  assert.doesNotThrow(() => renderRichTextFieldsAsMarkdown(input))
+test("malformed HTML still renders, and the original value is kept untouched", () => {
+  const result = renderRichTextFieldsAsMarkdown({ description: { type: "text/html", value: "<div><span>unclosed" } }) as any
+  assert.equal(result.description.value, "<div><span>unclosed")
+  assert.match(result.description.value_markdown, /unclosed/)
+})
+
+test("Polarion Work Item cross-references keep their ids in the Markdown", () => {
+  const html = 'See <span class="polarion-rte-link" data-type="workItem" data-item-id="WI-42" data-option-id="long"></span> and ' +
+    '<span class="polarion-rte-link" data-type="workItem" data-scope="other" data-item-id="OT-7" data-option-id="short"></span>.'
+  const result = renderRichTextFieldsAsMarkdown({ description: { type: "text/html", value: html } }) as any
+  assert.match(result.description.value_markdown, /See WI-42 and other\/OT-7\./)
+})
+
+test("tables keep their rows and columns (kept as HTML inside the Markdown)", () => {
+  const html = "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"
+  const md = (renderRichTextFieldsAsMarkdown({ d: { type: "text/html", value: html } }) as any).d.value_markdown as string
+  assert.match(md, /<table>/)
+  assert.match(md, /<td>1<\/td><td>2<\/td>/)
+})
+
+test("very large or deeply nested rich text is not converted, so it cannot block the server", () => {
+  const nested = "<div>".repeat(20_000) + "x" + "</div>".repeat(20_000)
+  const started = Date.now()
+  const result = renderRichTextFieldsAsMarkdown({ d: { type: "text/html", value: nested } }) as any
+  assert.ok(Date.now() - started < 1000, `took ${Date.now() - started} ms`)
+  assert.equal(result.d.value, nested)
+  assert.equal(result.d.value_markdown, undefined)
+})
+
+test("deep inline nesting that overflows turndown's stack leaves that field unconverted, the rest of the response intact", () => {
+  // 3000 nested tags: under the conversion caps, yet turndown overflows its stack.
+  const deep = "<b>".repeat(3_000) + "x" + "</b>".repeat(3_000)
+  const result = renderRichTextFieldsAsMarkdown({ a: { type: "text/html", value: deep }, b: { type: "text/html", value: "<p>fine</p>" } }) as any
+  assert.equal(result.a.value, deep)
+  assert.equal(result.a.value_markdown, undefined)
+  assert.equal(result.b.value_markdown, "fine")
+})
+
+test("cross-reference matching stays linear on hostile input", () => {
+  const hostile = "<span ".repeat(16_000)
+  const started = Date.now()
+  renderRichTextFieldsAsMarkdown({ d: { type: "text/html", value: hostile } })
+  assert.ok(Date.now() - started < 1000, `took ${Date.now() - started} ms`)
+})
+
+test("cross-references written with single quotes or as self-closing spans keep their ids", () => {
+  const html = "See <span class='polarion-rte-link' data-item-id='WI-1' data-scope='p'></span> and <span class=\"polarion-rte-link\" data-item-id=\"WI-2\"/>."
+  const result = renderRichTextFieldsAsMarkdown({ description: { type: "text/html", value: html } }) as any
+  assert.match(result.description.value_markdown, /See p\/WI-1 and WI-2\./)
 })

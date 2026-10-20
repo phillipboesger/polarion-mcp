@@ -46,3 +46,21 @@ test("relationshipId is described as a relationship name on every relationship t
     assert.match(property.description ?? "", /relationship's name/, tool.name)
   }
 })
+
+test("the Custom GPT spec stays within GPT Action limits: at most 30 operations, descriptions of at most 300 characters", async () => {
+  const express = (await import("express")).default
+  const { createRestToolsRouter } = await import("../src/rest-api.js")
+  const app = express()
+  app.use(createRestToolsRouter({ authenticate: (_req, _res, next) => next(), serverUrl: () => "http://x", securityScheme: {}, unauthorizedDescription: "" }))
+  const server = app.listen(0)
+  await new Promise<void>((resolve) => server.once("listening", () => resolve()))
+  try {
+    const port = (server.address() as import("node:net").AddressInfo).port
+    const spec = (await (await fetch(`http://127.0.0.1:${port}/openapi-gpt.json`)).json()) as { paths: Record<string, Record<string, { description: string; summary: string }>> }
+    const operations = Object.values(spec.paths).flatMap((p) => Object.values(p))
+    assert.ok(operations.length > 0 && operations.length <= 30, `${operations.length} operations`)
+    for (const op of operations) assert.ok(op.description.length <= 300, `${op.description.length}: ${op.description.slice(0, 60)}`)
+  } finally {
+    server.close()
+  }
+})

@@ -5,8 +5,6 @@
  * - Server identification (name and version)
  * - API endpoint configuration
  * - Authentication settings
- * - Documentation resource URLs
- * - Local SDK file references
  *
  * Environment Variables:
  * - API_BASE_URL: Base URL for the Polarion REST API (must point at your own instance)
@@ -15,6 +13,9 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -26,7 +27,23 @@ dotenv.config();
  * These values identify this MCP server to AI assistants
  */
 export const SERVER_NAME = "polarion-rest-api";
-export const SERVER_VERSION = "v1";
+
+/**
+ * @returns The version in this package's package.json, found by walking up
+ *   from the compiled module (build/ and build-tests/src/ sit at different depths).
+ */
+function packageVersion(): string {
+  for (let dir = dirname(fileURLToPath(import.meta.url)); dir !== dirname(dir); dir = dirname(dir)) {
+    const file = join(dir, 'package.json');
+    if (!existsSync(file)) continue;
+    const pkg = JSON.parse(readFileSync(file, 'utf8')) as { name?: string; version?: string };
+    if (pkg.name === 'polarion-mcp' && pkg.version) return pkg.version;
+  }
+  return '0.0.0';
+}
+
+/** Reported in serverInfo and /health, so a deployment shows which build runs. */
+export const SERVER_VERSION = packageVersion();
 
 /**
  * API Base URL - configurable via environment variable
@@ -37,7 +54,8 @@ export const SERVER_VERSION = "v1";
  * You MUST set the API_BASE_URL environment variable to your own instance:
  * export API_BASE_URL="https://your-polarion-server.com/polarion/rest/v1"
  */
-export const API_BASE_URL = process.env.API_BASE_URL || "https://polarion.example.com/polarion/rest/v1";
+// No trailing slash: every request path starts with one, and "//projects" is not "/projects".
+export const API_BASE_URL = (process.env.API_BASE_URL?.trim() || "https://polarion.example.com/polarion/rest/v1").replace(/\/+$/, "");
 
 /**
  * Per-request Polarion token, set by the Streamable HTTP transport.
@@ -97,7 +115,14 @@ export function getBearerTokenForScheme(schemeName: string): string | undefined 
  * @returns A short, stable, non-reversible id of the current caller.
  */
 export function callerCacheScope(): string {
-  const token = getBearerToken();
+  return tokenScope(getBearerToken());
+}
+
+/**
+ * @param token - A Polarion token, if any.
+ * @returns A short, stable, non-reversible id of it.
+ */
+export function tokenScope(token: string | undefined): string {
   return token ? createHash('sha256').update(token).digest('hex').slice(0, 16) : 'no-token';
 }
 
@@ -131,65 +156,3 @@ export function getPolarionBaseUrl(): string {
   // Remove /rest/v1 from the end of API_BASE_URL
   return API_BASE_URL.replace(/\/rest\/v1\/?$/, '');
 }
-
-/**
- * Polarion SDK and Documentation Resources
- *
- * This object contains URLs to various Polarion documentation resources.
- * These are used by the resource handlers to provide documentation to AI assistants.
- *
- * Resource Categories:
- * - SDK_*: Software Development Kit documentation for extending Polarion
- * - DB_*: Database schema and table references
- * - REST_*: REST API guides and specifications
- * - WORK_ITEM_*: Work item configuration and field references
- * - WORKFLOW_*: Workflow scripting and automation
- * - VELOCITY_*: Wiki page customization with Velocity templates
- *
- * Note: Some URLs point to demo/testdrive instances, others to official Siemens docs
- */
-export const POLARION_RESOURCES = {
-  // SDK Documentation
-  SDK_INDEX: "https://almdemo.polarion.com/polarion/sdk/index.html",
-  SDK_JAVADOC: "https://almdemo.polarion.com/polarion/sdk/doc/javadoc/index.html",
-  SDK_RENDERING: "https://almdemo.polarion.com/polarion/sdk/doc/javadoc-rendering/index.html",
-  SDK_SCRIPTING: "https://almdemo.polarion.com/polarion/sdk/doc/scripting-api/index.html",
-  SDK_REST_DOCS: "https://testdrive.polarion.com/polarion/sdk/doc/rest/index.html",
-  SDK_REST_SPEC: "https://testdrive.polarion.com/polarion/sdk/doc/rest/polarionrest.json",
-
-  // Siemens Documentation
-  REST_USER_GUIDE: "https://docs.sw.siemens.com/en-US/doc/230235217/PL20230412292748000.polarion_help_sc.xid2134849/xid2134871",
-  WORK_ITEM_FIELDS: "https://docs.plm.automation.siemens.com/content/polarion/19.1/help/en_US/user_and_administration_help/reference/user_reference/work_items/work_item_and_index_fields.html",
-  CUSTOM_FIELD_TYPES: "https://docs.sw.siemens.com/en-US/doc/230235217/PL20190701144002440.xid1465510/xid1554316",
-  WORKFLOW_FUNCTIONS: "https://docs.plm.automation.siemens.com/content/polarion/19.1/help/en_US/user_and_administration_help/reference/administration_reference/scripted_workflow_functions_and_conditions.html",
-  VELOCITY_VARIABLES: "https://docs.plm.automation.siemens.com/content/polarion/19.1/help/en_US/user_and_administration_help/reference/administration_reference/velocity_variables_for_active_wiki_pages.html",
-
-  // PDFs and Guides
-  SCRIPTING_GUIDE: "https://testdrive.polarion.com/polarion/sdk/doc/scripting_guide_and_examples.pdf",
-  SDK_GUIDE: "https://testdrive.polarion.com/polarion/sdk/doc/sdk.pdf",
-  WIDGET_SDK: "https://testdrive.polarion.com/polarion/sdk/doc/widget-sdk.pdf",
-  RT_SDK: "https://testdrive.polarion.com/polarion/sdk/doc/rt-sdk.pdf",
-
-  // Database
-  DB_TABLES: "https://testdrive.polarion.com/polarion/sdk/doc/database/TablesReferenceIndex.html",
-  WORKITEM_SCHEMA: "https://testdrive.polarion.com/polarion/sdk/doc/database/WorkItemDBSchema.pdf"
-};
-
-/**
- * Local SDK Files (stored in sdk/ directory for offline access)
- *
- * These files are cached locally to provide:
- * - Faster access (no network requests)
- * - Offline availability
- * - Reduced load on Polarion servers
- *
- * Note: These large PDF files are managed by Git LFS (Large File Storage)
- * to avoid bloating the repository size.
- */
-export const LOCAL_SDK_FILES = {
-  ADMIN_USER_HELP: "Administrator and User Help.pdf",
-  DEPLOYMENT_GUIDE: "Deployment and Maintenance Guide.pdf",
-  FEATURE_MATRIX: "Polarion_2506_Feature Matrix.pdf",
-  REST_API_GUIDE: "REST API User Guide for Polarion.pdf",
-  SCRIPTING_GUIDE_LOCAL: "scripting_guide_and_examples.pdf"
-};

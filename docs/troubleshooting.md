@@ -20,7 +20,7 @@
 
 ## SDK PDF Not Found
 
-- Run git lfs pull to download SDK PDFs into sdk/.
+- The PDFs are not bundled; copy them into sdk/ under the names in sdk/README.md. Only present files are listed as resources.
 
 ## OpenAPI Generation Fails
 

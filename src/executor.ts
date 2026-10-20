@@ -20,24 +20,40 @@
 import { ZodError } from "zod";
 import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
-import https from 'https';
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, formatApiError, getZodSchemaFromJsonSchema } from "./utils.js";
+import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
-import { refreshPolarionConfig, getSdkDocumentation } from "./polarion.js";
 import { acquireOAuth2Token } from "./auth.js";
-import { MUTATING_METHODS, sendWithRetry, type SendWithRetryOpts } from "./httpClient.js";
+import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
 import {
   checkWorkItemsEnumFields,
   checkResourceCustomFieldKeys,
   checkWorkItemUserReferences,
   splitWorkItemId,
+  invalidateWorkItemOptions,
   type WorkItemEnumCheckTarget,
   type CustomFieldKeyCheckTarget,
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
+
+/**
+ * Sanitized -> original argument names per tool (e.g. "page_size_" -> "page[size]").
+ * tools/list advertises the sanitized names, so they are what clients send.
+ */
+const nameMapCache = new WeakMap<McpToolDefinition, Record<string, string>>();
+
+function nameMapFor(definition: McpToolDefinition): Record<string, string> {
+  let nameMap = nameMapCache.get(definition);
+  if (!nameMap) {
+    nameMap = {};
+    sanitizeInputSchema(definition.inputSchema, nameMap);
+    nameMapCache.set(definition, nameMap);
+  }
+  return nameMap;
+}
 
 // Re-exported for backward compatibility -- tests and any external code that
 // imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
@@ -48,6 +64,16 @@ export { sendWithRetry };
  * `definition` isn't one of the (small, explicit) set of tools the guard
  * covers. See `guards.ts` for what's validated and why.
  */
+/**
+ * @param item - One JSON:API resource object from a write body.
+ * @returns Its attributes; an empty object when it only writes relationships
+ *   (so user references are still checked); null when it writes neither.
+ */
+function writtenAttributes(item: any): Record<string, unknown> | null {
+  if (item?.attributes && typeof item.attributes === 'object') return item.attributes;
+  return item?.relationships && typeof item.relationships === 'object' ? {} : null;
+}
+
 function buildWorkItemEnumTargets(
   definition: McpToolDefinition,
   validatedArgs: JsonObject,
@@ -66,9 +92,9 @@ function buildWorkItemEnumTargets(
   if (method === 'patch' && definition.pathTemplate === '/projects/{projectId}/workitems/{workItemId}') {
     const projectId = readArg(validatedArgs, 'projectId', nameMap);
     const workItemId = readArg(validatedArgs, 'workItemId', nameMap);
-    const attributes = (dataItems[0] as any)?.attributes;
+    const attributes = writtenAttributes(dataItems[0]);
     const relationships = (dataItems[0] as any)?.relationships;
-    if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes || typeof attributes !== 'object') return null;
+    if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes) return null;
     return [{ projectId, workItemId, attributes, relationships }];
   }
 
@@ -99,9 +125,9 @@ function buildWorkItemEnumTargets(
     const targets: WorkItemEnumCheckTarget[] = [];
     for (const item of dataItems) {
       const id = (item as any)?.id;
-      const attributes = (item as any)?.attributes;
+      const attributes = writtenAttributes(item);
       const relationships = (item as any)?.relationships;
-      if (typeof id !== 'string' || !attributes || typeof attributes !== 'object') continue;
+      if (typeof id !== 'string' || !attributes) continue;
       const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' ? fallbackProjectId : undefined);
       if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes, relationships });
     }
@@ -176,11 +202,11 @@ const CUSTOM_FIELD_TOOL_SPECS: CustomFieldToolSpec[] = [
   { method: 'patch', pathTemplate: '/projects/{projectId}/workitems/{workItemId}', resourceType: 'workitems', mode: 'update-single', typed: true },
   {
     method: 'patch', pathTemplate: '/projects/{projectId}/workitems', resourceType: 'workitems', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
-    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/workitems/${encodeURIComponent(s[1])}`,
+    bulkInstancePath: (s) => `/projects/${encodeSegment(s[0])}/workitems/${encodeSegment(s[1])}`,
   },
   {
     method: 'patch', pathTemplate: '/all/workitems', resourceType: 'workitems', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
-    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/workitems/${encodeURIComponent(s[1])}`,
+    bulkInstancePath: (s) => `/projects/${encodeSegment(s[0])}/workitems/${encodeSegment(s[1])}`,
   },
   { method: 'post', pathTemplate: '/projects/{projectId}/spaces/{spaceId}/documents', resourceType: 'documents', mode: 'create', typed: true },
   { method: 'patch', pathTemplate: '/projects/{projectId}/spaces/{spaceId}/documents/{documentName}', resourceType: 'documents', mode: 'update-single', typed: true },
@@ -192,7 +218,7 @@ const CUSTOM_FIELD_TOOL_SPECS: CustomFieldToolSpec[] = [
   { method: 'patch', pathTemplate: '/projects/{projectId}/testruns/{testRunId}', resourceType: 'testruns', mode: 'update-single', typed: true },
   {
     method: 'patch', pathTemplate: '/projects/{projectId}/testruns', resourceType: 'testruns', mode: 'update-bulk', typed: true, bulkIdSegments: 2,
-    bulkInstancePath: (s) => `/projects/${encodeURIComponent(s[0])}/testruns/${encodeURIComponent(s[1])}`,
+    bulkInstancePath: (s) => `/projects/${encodeSegment(s[0])}/testruns/${encodeSegment(s[1])}`,
   },
   { method: 'post', pathTemplate: '/projects/{projectId}/testruns/{testRunId}/testrecords', resourceType: 'testrecords', mode: 'create', typed: false },
   {
@@ -202,7 +228,7 @@ const CUSTOM_FIELD_TOOL_SPECS: CustomFieldToolSpec[] = [
   {
     method: 'patch', pathTemplate: '/projects/{projectId}/testruns/{testRunId}/testrecords', resourceType: 'testrecords', mode: 'update-bulk', typed: false, bulkIdSegments: 5,
     bulkInstancePath: (s) =>
-      `/projects/${encodeURIComponent(s[0])}/testruns/${encodeURIComponent(s[1])}/testrecords/${encodeURIComponent(s[2])}/${encodeURIComponent(s[3])}/${encodeURIComponent(s[4])}`,
+      `/projects/${encodeSegment(s[0])}/testruns/${encodeSegment(s[1])}/testrecords/${encodeSegment(s[2])}/${encodeSegment(s[3])}/${encodeSegment(s[4])}`,
   },
 ];
 
@@ -289,7 +315,7 @@ function buildCustomFieldKeyTargets(
     let instancePath: string | undefined;
     if (spec.resourceType === 'workitems') {
       const split = splitWorkItemId(id, typeof bulkFallbackProjectId === 'string' ? bulkFallbackProjectId : undefined);
-      if (split) instancePath = `/projects/${encodeURIComponent(split.projectId)}/workitems/${encodeURIComponent(split.workItemId)}`;
+      if (split) instancePath = `/projects/${encodeSegment(split.projectId)}/workitems/${encodeSegment(split.workItemId)}`;
     } else {
       const segments = id.split('/');
       if (segments.length === spec.bulkIdSegments) instancePath = spec.bulkInstancePath!(segments);
@@ -356,6 +382,23 @@ function buildCustomFieldKeyTargets(
  *   reaches this branch, so it's left unverified/unchanged rather than
  *   guessed at).
  */
+/**
+ * Decodes a file sent as base64 (standard or URL-safe alphabet).
+ *
+ * @param value - The encoded file.
+ * @param label - Where it came from, for the error message.
+ * @returns The file bytes.
+ * @throws Error if the value is empty or not base64: Buffer.from() would
+ *   otherwise silently turn plain text into garbage bytes and upload them.
+ */
+function decodeBase64File(value: string, label: string): Buffer {
+  const compact = value.replace(/\s+/g, '');
+  if (!compact || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(compact) || compact.replace(/=+$/, '').length % 4 === 1) {
+    throw new Error(`${label} must be the file content encoded as base64`);
+  }
+  return Buffer.from(compact, compact.includes('-') || compact.includes('_') ? 'base64url' : 'base64');
+}
+
 function buildMultipartFormData(requestBody: unknown): FormData {
   let parsed: unknown = requestBody;
   if (typeof requestBody === 'string') {
@@ -372,9 +415,22 @@ function buildMultipartFormData(requestBody: unknown): FormData {
     throw new Error('requestBody for a multipart/form-data tool must decode to a JSON object of form field names');
   }
 
+  // Name each file part after its attachment, so Polarion never falls back to "file-0".
+  const fileNames: unknown[] = Array.isArray((parsed as JsonObject).resource?.data)
+    ? (parsed as JsonObject).resource.data.map((item: any) => item?.attributes?.fileName)
+    : [];
+  const partName = (index: number, fallback: string) => (typeof fileNames[index] === 'string' && fileNames[index]) || fallback;
+
   const form = new FormData();
-  for (const [key, value] of Object.entries(parsed as JsonObject)) {
-    if (value === undefined || value === null) continue;
+  for (const [key, rawValue] of Object.entries(parsed as JsonObject)) {
+    if (rawValue === undefined || rawValue === null) continue;
+    // Models mix up one file and a list of one: accept both shapes.
+    let value: unknown = rawValue;
+    if (key === 'files' && typeof value === 'string') value = [value];
+    if ((key === 'file' || key === 'content') && Array.isArray(value) && value.length === 1) value = value[0];
+    if ((key === 'files' && !Array.isArray(value)) || ((key === 'file' || key === 'content') && typeof value !== 'string')) {
+      throw new Error(`requestBody.${key} must be ${key === 'files' ? 'a list of base64-encoded files' : 'one base64-encoded file'}`);
+    }
 
     if (key === 'resource' && typeof value === 'object') {
       form.append(key, JSON.stringify(value));
@@ -385,10 +441,10 @@ function buildMultipartFormData(requestBody: unknown): FormData {
         if (typeof item !== 'string') {
           throw new Error(`requestBody.files[${index}] must be a base64-encoded string, got ${typeof item}`);
         }
-        form.append('files', Buffer.from(item, 'base64'), { filename: `file-${index}` });
+        form.append('files', decodeBase64File(item, `requestBody.files[${index}]`), { filename: partName(index, `file-${index}`) });
       });
     } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
-      form.append(key, Buffer.from(value, 'base64'), { filename: key });
+      form.append(key, decodeBase64File(value, `requestBody.${key}`), { filename: partName(0, key) });
     } else if (typeof value === 'string') {
       form.append(key, value);
     } else {
@@ -461,18 +517,6 @@ export async function executeApiTool(
   allSecuritySchemes: Record<string, any>,
   sendOpts?: SendWithRetryOpts
 ): Promise<CallToolResult> {
-  // Special handling for refresh_polarion_config tool
-  // This tool doesn't make an API call, it fetches and caches project configuration
-  if (toolName === "refresh_polarion_config") {
-    return await refreshPolarionConfig(toolArgs as { projectId: string });
-  }
-
-  // Special handling for get_sdk_documentation tool
-  // This tool serves SDK PDF files from the local sdk/ directory
-  if (toolName === "get_sdk_documentation") {
-    return await getSdkDocumentation(toolArgs as { documentId?: string });
-  }
-
   try {
     // ===== STEP 0: Strip dry_run before validation =====
     // Always stripped, regardless of whether the regenerated schema already
@@ -480,8 +524,48 @@ export async function executeApiTool(
     // transition period, and it never leaks into `validatedArgs` sent to Polarion.
     const isMutating = MUTATING_METHODS.has(definition.method.toLowerCase());
     const argsForValidation: JsonObject = (typeof toolArgs === 'object' && toolArgs !== null) ? { ...toolArgs } : {};
-    const dryRun = argsForValidation.dry_run === true;
+    // Models often send booleans as strings; an unreadable value must never
+    // fall through to the real (possibly irreversible) write.
+    const rawDryRun = argsForValidation.dry_run;
     delete argsForValidation.dry_run;
+    const dryRun = rawDryRun === true || rawDryRun === 'true' || rawDryRun === 1;
+    if (rawDryRun !== undefined && !dryRun && rawDryRun !== false && rawDryRun !== 'false' && rawDryRun !== 0) {
+      return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true };
+    }
+
+    // Validation runs against the original schema, whose keys are the
+    // original names; a sanitized name would otherwise be stripped by Zod.
+    const nameMap = nameMapFor(definition);
+    for (const [safe, original] of Object.entries(nameMap)) {
+      if (safe in argsForValidation && !(original in argsForValidation)) {
+        argsForValidation[original] = argsForValidation[safe];
+        delete argsForValidation[safe];
+      }
+    }
+    // Models send numbers as strings and numeric ids as numbers; convert the
+    // unambiguous cases for top-level parameters instead of refusing them.
+    for (const [key, prop] of Object.entries((definition.inputSchema?.properties ?? {}) as Record<string, { type?: string }>)) {
+      const value = argsForValidation[key];
+      if ((prop.type === 'number' || prop.type === 'integer') && typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value.trim())) {
+        argsForValidation[key] = Number(value);
+      } else if (prop.type === 'string' && typeof value === 'number' && Number.isFinite(value)) {
+        argsForValidation[key] = String(value);
+      }
+    }
+
+    // Zod drops unknown keys silently, so a misspelled `pageSize` would return
+    // the unpaged default while the model believes it paged. Names starting
+    // with "_" are protocol/client metadata and pass.
+    const advertisedName = (original: string): string => Object.entries(nameMap).find(([, o]) => o === original)?.[0] ?? original;
+    const knownKeys = Object.keys((definition.inputSchema?.properties ?? {}) as Record<string, unknown>);
+    const unknownKeys = Object.keys(argsForValidation).filter(key => !knownKeys.includes(key) && !key.startsWith('_'));
+    if (unknownKeys.length > 0) {
+      const valid = [...knownKeys.map(advertisedName), ...(isMutating ? ['dry_run'] : [])].join(', ');
+      return {
+        content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': unknown argument(s) ${unknownKeys.join(', ')}. Valid arguments: ${valid}` }],
+        isError: true,
+      };
+    }
 
     // ===== STEP 1: Validate Arguments =====
     // Use Zod schema to ensure arguments match expected types
@@ -492,7 +576,7 @@ export async function executeApiTool(
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
-        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${e.path.join('.')} (${e.code}): ${e.message}`).join(', ')}`;
+        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${e.code}): ${e.message}`).join(', ')}`;
         return { content: [{ type: 'text', text: validationErrorMessage }], isError: true };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -503,12 +587,9 @@ export async function executeApiTool(
     // ===== STEP 2: Prepare Request Components =====
     let urlPath = definition.pathTemplate; // e.g., "/projects/{projectId}/workitems/{workItemId}"
     const queryParams: Record<string, any> = {}; // e.g., { "page[size]": 10 }
-    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    const download = isDownloadTool(definition);
+    const headers: Record<string, string> = { 'Accept': download ? '*/*' : 'application/json' };
     let requestBodyData: any = undefined;
-
-    // Get the name map for this tool (maps sanitized keys back to original keys)
-    // This allows us to convert "page_size_" back to "page[size]"
-    const nameMap = definition.nameMap || {};
 
     // ===== STEP 3: Apply Parameters to Request =====
     // Process each parameter according to its type:
@@ -530,15 +611,20 @@ export async function executeApiTool(
         }
 
         // Skip invalid revision values (HEAD, empty string, etc.)
-        if (param.name === 'revision' && (value === '' || value === 'HEAD' || value === 'head')) {
+        if (param.in === 'query' && param.name === 'revision' && (value === '' || value === 'HEAD' || value === 'head')) {
           console.error(`[WARN] Skipping invalid revision value: '${value}'`);
           return;
         }
 
         if (param.in === 'path') {
+          // An empty segment would silently address another endpoint
+          // (getWorkItem with workItemId "" is the list call).
+          if (String(value).trim() === '') {
+            throw new Error(`Path parameter '${param.name}' must not be empty`);
+          }
           // Path parameters: Replace placeholder in URL
           // Example: "/projects/{projectId}" -> "/projects/myproject"
-          urlPath = urlPath.replace(`{${param.name}}`, encodeURIComponent(String(value)));
+          urlPath = urlPath.replace(`{${param.name}}`, encodeSegment(String(value)));
         }
         else if (param.in === 'query') {
           // Query parameters: Add to query string
@@ -573,6 +659,9 @@ export async function executeApiTool(
     // ===== STEP 4: Handle Request Body =====
     const requestBody = readArg(validatedArgs, 'requestBody', nameMap);
     let dryRunBodyPreview: unknown;
+    if (definition.requestBodyContentType === 'multipart/form-data' && typeof requestBody === 'undefined' && isMutating) {
+      throw new Error(`requestBody is required for '${toolName}': an upload needs the file and its metadata`);
+    }
     if (definition.requestBodyContentType && typeof requestBody !== 'undefined') {
       if (definition.requestBodyContentType === 'multipart/form-data') {
         // Build a real multipart body with a boundary instead of sending the raw
@@ -580,7 +669,8 @@ export async function executeApiTool(
         // Polarion's parser can't make sense of that and rejects it with a
         // content-less 400 before any JSON:API validation runs.
         const form = buildMultipartFormData(requestBody);
-        requestBodyData = form;
+        // A buffer, not the one-shot form stream: a retry must send the whole body again.
+        requestBodyData = form.getBuffer();
         Object.assign(headers, form.getHeaders());
         dryRunBodyPreview = summarizeMultipartForPreview(requestBody);
       } else {
@@ -762,42 +852,10 @@ export async function executeApiTool(
       params: queryParams, // Query string parameters
       headers: headers, // HTTP headers (including auth)
       ...(requestBodyData !== undefined && { data: requestBodyData }), // Request body (if applicable)
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: shouldRejectUnauthorized()
-      }),
+      // One byte over the cap is enough to refuse it without buffering more.
+      ...(download ? { responseType: 'arraybuffer' as const, maxContentLength: MAX_DOWNLOAD_BYTES + 1 } : {}),
+      httpsAgent: httpsAgent(shouldRejectUnauthorized()),
     };
-
-    // dry_run on a mutating tool: return a preview of the request that would
-    // be sent, without calling Polarion. GET tools ignore dry_run entirely
-    // and always execute live (there's nothing unsafe to preview).
-    if (dryRun && isMutating) {
-      const redactedHeaders = { ...headers };
-      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
-      const preview = {
-        method: config.method,
-        url: config.url,
-        headers: redactedHeaders,
-        body: dryRunBodyPreview,
-      };
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
-          }
-        ],
-        // MCP clients built on the official SDK throw if a tool that declares an
-        // outputSchema returns a non-error result without structuredContent (see
-        // Client.callTool in @modelcontextprotocol/sdk). The preview payload here
-        // is a request preview, not the tool's real output, so it can never
-        // conform to that schema -- isError is the spec-sanctioned way to signal
-        // "no structured output was produced" without violating the tool's
-        // declared contract. Only applied when it's actually required, so the
-        // (far more common) dry_run call on a tool with no outputSchema keeps its
-        // existing non-error preview behavior.
-        ...(definition.outputSchema ? { isError: true } : {}),
-      };
-    }
 
     // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
     // Three independent checks, in this order (first failure blocks the write):
@@ -836,6 +894,33 @@ export async function executeApiTool(
       }
     }
 
+    // dry_run on a mutating tool: return a preview of the request that would
+    // be sent, without writing to Polarion. Runs after the guards, so a
+    // preview never shows a write the real call would refuse. GET tools
+    // ignore dry_run entirely and always execute live (nothing unsafe to preview).
+    if (dryRun && isMutating) {
+      const redactedHeaders = { ...headers };
+      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
+      const preview = {
+        method: config.method,
+        url: axios.getUri({ url: config.url, params: config.params }),
+        headers: redactedHeaders,
+        body: dryRunBodyPreview,
+      };
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
+          }
+        ],
+        // SDK clients throw if a tool that declares an outputSchema returns a
+        // non-error result without structuredContent; the advertised schema is
+        // lenient, so the preview itself can serve as the structured content.
+        ...(definition.outputSchema ? { structuredContent: { dry_run: true, preview } } : {}),
+      };
+    }
+
     // Log request info to stderr (doesn't affect MCP output)
     // All console.error() calls go to stderr, which is for logging
     // MCP protocol messages go to stdout
@@ -843,6 +928,14 @@ export async function executeApiTool(
 
     // Execute the request with pacing + retry-with-backoff on 429/5xx
     const response = await sendWithRetry(config, sendOpts);
+    for (const target of enumTargets ?? []) {
+      if (target.workItemId) invalidateWorkItemOptions(target.projectId, target.workItemId);
+    }
+
+    if (download) {
+      const fileName = String(readArg(validatedArgs, 'attachmentId', nameMap) ?? readArg(validatedArgs, 'filename', nameMap) ?? '');
+      return downloadResult(response.data, String(response.headers['content-type'] ?? ''), requestUrl, fileName);
+    }
 
     // ===== STEP 8: Format the Response =====
     let responseText = '';
@@ -857,7 +950,9 @@ export async function executeApiTool(
     const contentType = String(response.headers['content-type'] ?? '').toLowerCase();
 
     // Handle JSON responses (most common for REST APIs)
-    if (contentType.includes('application/json') && typeof response.data === 'object' && response.data !== null) {
+    // axios parses a JSON body whatever its label, so an object is JSON even
+    // without a JSON content type.
+    if (typeof response.data === 'object' && response.data !== null && !Buffer.isBuffer(response.data)) {
       try {
         // Add a `value_markdown` sibling to every rich-text ({type:"text/html", value})
         // field so the model gets readable Markdown alongside the raw HTML, without
@@ -885,13 +980,24 @@ export async function executeApiTool(
       responseText = `(Status: ${response.status} - No body content)`;
     }
 
+    // An SSO login or proxy page answers with 200 text/html; that is not the API confirming a write.
+    if (isMutating && contentType.includes('text/html')) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Polarion answered with an HTML page (status ${response.status}) instead of the API, probably a login or proxy page. ` +
+            `The write may not have happened; check the item before retrying.\n${responseText.slice(0, 500)}`,
+        }],
+        isError: true,
+      };
+    }
+
     // ===== STEP 9: Return Formatted Response =====
-    // If this tool declared an outputSchema but the actual response didn't come back
-    // as a JSON object (empty/204, non-JSON content-type, a stringify failure, or any
-    // other shape the branches above fall through to), there's no structuredContent
-    // to honestly offer. Per the same MCP client enforcement described above, mark
-    // that as isError instead of returning a non-error result the schema can't cover.
-    const outputSchemaUnfulfilled = Boolean(definition.outputSchema) && structuredContent === undefined;
+    // A tool that declares an outputSchema must return structuredContent with a
+    // non-error result, or SDK clients throw (Client.callTool). An empty/204 or
+    // non-JSON answer to a successful call has none to offer, so it gets an empty
+    // object, which the advertised (lenient) schema accepts. isError would
+    // report a write that worked as failed and invite a duplicating retry.
     return {
       content: [
         {
@@ -899,8 +1005,7 @@ export async function executeApiTool(
           text: `API Response (Status: ${response.status}):\n${responseText}`
         }
       ],
-      ...(definition.outputSchema && structuredContent !== undefined ? { structuredContent } : {}),
-      ...(outputSchemaUnfulfilled ? { isError: true } : {}),
+      ...(definition.outputSchema ? { structuredContent: structuredContent ?? {} } : {}),
     };
 
   } catch (error: unknown) {

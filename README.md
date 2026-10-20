@@ -9,7 +9,7 @@ An open-source **Model Context Protocol** server that exposes **284 Polarion RES
 [![CI](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml)
 [![Publish Docker image](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/phillipboesger/polarion-mcp/actions/workflows/docker-publish.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
+[![Node.js >=22](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![Docker image](https://img.shields.io/badge/ghcr.io-polarion--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp)
 [![Model Context Protocol](https://img.shields.io/badge/MCP-server-6E56CF)](https://modelcontextprotocol.io)
@@ -108,7 +108,7 @@ URL: the server's public origin plus `/mcp`.
   (`com.siemens.polarion.rest.enabled=true` in `polarion.properties`).
 - A Polarion PAT per user: Polarion, *My Account > Personal Access Tokens*.
   The token carries the user's own permissions.
-- Node.js 20+ **or** Docker. From source:
+- Node.js 22+ **or** Docker. From source:
 
   ```bash
   git clone https://github.com/phillipboesger/polarion-mcp.git
@@ -407,7 +407,7 @@ npm run build
 npm run start:mcp-http # Streamable HTTP MCP server on :3000
 ```
 
-See `docs/examples.http` for ready-to-run HTTP requests and `docs/client-example.ts` for a complete Node.js client example.
+See [Usage Examples](#usage-examples) below for a Node.js client.
 
 ---
 
@@ -448,9 +448,11 @@ MCP_ALLOWED_HOSTS=your-host.com        # DNS-rebinding protection (comma-separat
 MCP_TOKEN_SECRET=...                   # min. 32 chars; keeps OAuth logins valid across restarts (keep it fixed)
 MCP_ALLOWED_REDIRECT_PREFIXES=https://claude.ai/api/mcp/auth_callback  # OAuth callbacks clients may register (set it!)
 TRUST_PROXY=loopback                   # behind a reverse proxy: rate limits per client, not per proxy
+MCP_SESSION_IDLE_MINUTES=60            # close unused MCP sessions (clients re-initialize on their own)
+MCP_MAX_SESSIONS=1000                  # cap on concurrent sessions (least recently used is dropped)
 MCP_TOOLS=getWorkItems,getWorkItem     # tool allowlist; others are neither listed nor callable
 MCP_READ_ONLY=true                     # only read-only tools
-MCP_OMIT_OUTPUT_SCHEMA=true            # halves tools/list (about 980 KB to 530 KB)
+MCP_OMIT_OUTPUT_SCHEMA=true            # shrinks tools/list from about 840 KB to 530 KB
 GPT_CLIENT_ID=polarion-gpt             # Custom GPT OAuth client (method E), with GPT_CLIENT_SECRET
 GPT_CLIENT_SECRET=...
 NODE_TLS_REJECT_UNAUTHORIZED=0         # disable SSL verification for self-signed certs
@@ -496,14 +498,14 @@ const page1 = await client.callTool({
 
 ```
 src/
-  config.ts           — API base URL, token, and resource URL constants
+  config.ts           — API base URL, token and per-request token context
   server.ts           — shared MCP server factory (transport-agnostic)
   tools.ts            — generated MCP tool definitions (284 tools)
   executor.ts         — tool call dispatcher
   mcp-http-server.ts  — Streamable HTTP MCP transport (remote clients)
   http-server.ts      — plain REST wrapper for ChatGPT Custom GPT Actions
   index.ts            — stdio entry point (local MCP clients)
-  polarion.ts         — resource and prompt handlers
+  polarion.ts         — server instructions, guide resources and prompts
   auth.ts             — authentication helpers
   utils.ts            — shared utilities
 ```
@@ -551,8 +553,8 @@ Please open an issue before submitting a larger change so we can discuss the app
 
 Releases are automated by [`.github/workflows/release.yml`](.github/workflows/release.yml):
 
-1. Bump `"version"` in `package.json` and commit it to `main`.
-2. Tag the commit and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+1. Run `npm version X.Y.Z` on `main` (bumps package.json, package-lock.json and server.json in one commit), then push.
+2. Push the tag `npm version` created: `git push origin vX.Y.Z`.
 3. The workflow builds, tests, and packages the release ZIP, then publishes a GitHub Release for the tag with notes auto-generated from the pull requests merged since the previous tag (from the start of the history for the first release).
 
 ---

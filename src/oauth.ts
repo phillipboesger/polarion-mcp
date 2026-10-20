@@ -80,6 +80,8 @@ interface PendingLogin {
 
 interface AuthorizationCode extends PendingLogin {
   polarionToken: string;
+  /** Set once the PKCE challenge was handed out; see challengeForAuthorizationCode. */
+  challenged?: boolean;
 }
 
 /** Sealed inside a refresh token. */
@@ -268,6 +270,18 @@ function escapeHtml(value: string): string {
 }
 
 /**
+ * Headers for every login page response: never cached, never framed (a
+ * framing page could hide the "sends you back to" warning).
+ *
+ * @param res - The response.
+ */
+export function setLoginPageHeaders(res: Response): void {
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Content-Security-Policy', "frame-ancestors 'none'");
+}
+
+/**
  * Renders the login page.
  *
  * One field, one button, and a link to where the token is generated — the user
@@ -448,7 +462,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
         redirectUri: params.redirectUri,
         state: params.state,
         codeChallenge: params.codeChallenge,
-        scopes: params.scopes ?? [POLARION_SCOPE],
+        // The SDK passes [] when the client asks for no scope.
+        scopes: params.scopes?.length ? params.scopes : [POLARION_SCOPE],
         resource: params.resource?.href,
       },
       res
@@ -481,7 +496,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     }
     const loginId = randomBytes(24).toString('base64url');
     this.pendingLogins.set(loginId, { ...login, expiresAt: Date.now() + PENDING_LOGIN_TTL_MS });
-    res.set('Cache-Control', 'no-store');
+    setLoginPageHeaders(res);
     res.send(renderLoginPage(loginId, this.polarionUrl, login.clientName, new URL(login.redirectUri).host));
   }
 
@@ -548,6 +563,14 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     if (!entry || entry.flow !== 'mcp' || !entry.codeChallenge || entry.expiresAt < Date.now() || entry.clientId !== client.client_id) {
       throw new InvalidGrantError('Invalid authorization code');
     }
+    // The SDK checks the verifier after this returns and calls exchangeAuthorizationCode
+    // (which consumes the code) only if it matches. A code can be challenged once, so a
+    // wrong verifier burns it instead of leaving it open for further guesses.
+    if (entry.challenged) {
+      this.codes.delete(authorizationCode);
+      throw new InvalidGrantError('Invalid authorization code');
+    }
+    entry.challenged = true;
     return entry.codeChallenge;
   }
 
@@ -567,6 +590,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     redirectUri?: string
   ): Promise<OAuthTokens> {
     const entry = this.redeem(authorizationCode, 'mcp', client.client_id);
+    // Optional: a client that sent none at /authorize was given its single registered one (SDK), so
+    // the stored value cannot tell "omitted" from "sent".
     if (redirectUri !== undefined && !safeEqual(redirectUri, entry.redirectUri)) {
       throw new InvalidGrantError('Redirect URI does not match the authorization request');
     }

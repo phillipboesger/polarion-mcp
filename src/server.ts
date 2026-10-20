@@ -25,10 +25,11 @@ import {
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { sanitizeInputSchema } from './utils.js';
-import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt } from './polarion.js';
+import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes } from './tools.js';
 import { enabledTools, omitOutputSchema } from './tool-filter.js';
 import { executeApiTool } from './executor.js';
+import { lenientOutputSchema } from './output-schema.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -39,6 +40,20 @@ import { executeApiTool } from './executor.js';
  *
  * @returns A {@link Server} ready to be connected to any MCP transport.
  */
+let listedTools: object[] | undefined;
+
+/** @returns The tools/list entries; the tool set is fixed, so they are built once. */
+function toolsForClient(): object[] {
+  listedTools ??= Array.from(enabledTools.values()).map(def => ({
+    name: def.name,
+    description: def.description,
+    inputSchema: sanitizeInputSchema(def.inputSchema),
+    ...(def.annotations ? { annotations: def.annotations } : {}),
+    ...(def.outputSchema && !omitOutputSchema ? { outputSchema: lenientOutputSchema(def.outputSchema) } : {}),
+  }));
+  return listedTools;
+}
+
 export function createPolarionServer(): Server {
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
@@ -48,30 +63,17 @@ export function createPolarionServer(): Server {
         resources: {},  // Documentation and configuration files
         prompts: {},    // Pre-configured task templates
       },
+      instructions: SERVER_INSTRUCTIONS,
     },
   );
 
   /**
    * Handler: List Available Tools.
    *
-   * Sanitizes each tool's input schema so property names are MCP-safe and
-   * records the sanitized -> original name mapping used later during execution.
+   * Sanitizes each tool's input schema so property names are MCP-safe; the
+   * executor maps the sanitized names back to the originals.
    */
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const toolsForClient = Array.from(enabledTools.values()).map(def => {
-      const nameMap = {};
-      const sanitizedSchema = sanitizeInputSchema(def.inputSchema, nameMap);
-      def.nameMap = nameMap;
-      return {
-        name: def.name,
-        description: def.description,
-        inputSchema: sanitizedSchema,
-        ...(def.annotations ? { annotations: def.annotations } : {}),
-        ...(def.outputSchema && !omitOutputSchema ? { outputSchema: def.outputSchema } : {}),
-      };
-    });
-    return { tools: toolsForClient };
-  });
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolsForClient() as any[] }));
 
   /**
    * Handler: Execute a Tool (API Call).
@@ -84,7 +86,7 @@ export function createPolarionServer(): Server {
     const toolDefinition = enabledTools.get(toolName);
     if (!toolDefinition) {
       console.error(`[ERROR] Unknown tool requested: ${toolName}`);
-      return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }] };
+      return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
     }
     return await executeApiTool(toolName, toolDefinition, toolArgs ?? {}, securitySchemes);
   });

@@ -332,10 +332,103 @@ test("protected-resource metadata is also served at the root path ChatGPT probes
   }
 })
 
-test("a bearer that is not one of this server's tokens is still passed through as a Polarion PAT", async () => {
+test("a bearer that is not one of this server's tokens is checked with Polarion and then used as a PAT", async () => {
+  polarion.reachable = true
   const { base, stop } = await startApp()
   try {
-    assert.equal((await initialize(base, "some-polarion-pat")).status, 200)
+    assert.equal((await initialize(base, freshPat())).status, 200)
+  } finally {
+    await stop()
+  }
+})
+
+test("a made-up bearer cannot open a session: Polarion's verdict decides (401 unknown, 403 forbidden, 503 unreachable)", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    assert.equal((await initialize(base, "made-up-token")).status, 401)
+    polarion.forbidden.add("forbidden-pat")
+    assert.equal((await initialize(base, "forbidden-pat")).status, 403)
+    polarion.reachable = false
+    assert.equal((await initialize(base, "any-token")).status, 503)
+    const health = (await (await fetch(`${base}/health`)).json()) as { activeSessions: number }
+    assert.equal(health.activeSessions, 0)
+  } finally {
+    polarion.reachable = true
+    await stop()
+  }
+})
+
+test("a flood of made-up bearers is cut off by the failure limiter, valid PATs are not counted", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const good = freshPat()
+    for (let i = 0; i < 60; i++) assert.equal((await initialize(base, good)).status, 200)
+    const statuses: number[] = []
+    for (let i = 0; i < 55; i++) statuses.push((await initialize(base, `garbage-${i}`)).status)
+    assert.equal(statuses.filter(status => status === 401).length, 50)
+    assert.equal(statuses.at(-1), 429)
+  } finally {
+    await stop()
+  }
+})
+
+test("a valid user with stale session ids is never counted as a failure and never locked out", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const pat = freshPat()
+    const stale = (n: number) =>
+      fetch(`${base}/mcp`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${pat}`, "mcp-session-id": `gone-${n}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: n, method: "ping" }),
+      })
+    for (let i = 0; i < 70; i++) assert.equal((await stale(i)).status, 404)
+    assert.equal((await initialize(base, pat)).status, 200)
+  } finally {
+    await stop()
+  }
+})
+
+test("a valid PAT is checked once per minute, not on every request of its session", async () => {
+  polarion.reachable = true
+  let checks = 0
+  const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => { checks++; return true } })
+  const server = app.listen(0)
+  await new Promise<void>((resolve) => server.once("listening", () => resolve()))
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  try {
+    const init = await initialize(base, "cached-pat")
+    const sid = init.headers.get("mcp-session-id") as string
+    for (let i = 0; i < 3; i++) {
+      await fetch(`${base}/mcp`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: "Bearer cached-pat", "mcp-session-id": sid },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2 + i, method: "ping" }),
+      })
+    }
+    assert.equal(checks, 1)
+  } finally {
+    await closeAllSessions()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test("an authorization code is burned by a wrong PKCE verifier", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const { client, code, verifier } = await loginForCode(base, freshPat())
+    const exchange = (codeVerifier: string) =>
+      fetch(`${base}/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "authorization_code", code, client_id: client.client_id, code_verifier: codeVerifier, redirect_uri: REDIRECT }),
+      })
+    assert.equal((await exchange("x".repeat(60))).status, 400)
+    assert.equal((await exchange(verifier)).status, 400)
   } finally {
     await stop()
   }

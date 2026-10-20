@@ -452,7 +452,6 @@ entries = entries.map((entry) => {
 
 const newMapArrayText = `[${entries.join(',')}]`;
 const out = src.slice(0, start) + newMapArrayText + src.slice(end);
-writeFileSync(filePath, out, 'utf8');
 
 console.log(`Enriched ${filePath}:`);
 console.log(`  annotations added/verified: ${annotationCount} tool(s) newly annotated`);
@@ -472,3 +471,6 @@ if (totalSkipped > 0) {
     'investigate before trusting this regeneration (see findDescriptionBounds in this file).',
   );
 }
+
+// Written only once nothing was skipped: a failed run must not leave a half-enriched file.
+writeFileSync(filePath, out, 'utf8');

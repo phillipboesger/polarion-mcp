@@ -9,12 +9,12 @@ services:
   # Main Polarion MCP Service
   - type: web
     name: polarion-mcp-server
-    env: node
+    runtime: node
     region: frankfurt # EU region (options: frankfurt, oregon, singapore)
     plan: free
 
     # Build configuration
-    buildCommand: npm ci && npm run build:http
+    buildCommand: npm ci --include=dev --ignore-scripts && npm run build:http
     startCommand: node build/index.js
 
     # Health check
@@ -28,7 +28,7 @@ services:
     envVars:
       # Node.js version
       - key: NODE_VERSION
-        value: "20.11.0"
+        value: "22"
 
       # HTTP Server port (Render will override this automatically)
       - key: HTTP_PORT

@@ -26,13 +26,6 @@
 4. The shared executor runs the underlying Polarion request.
 5. The wrapper returns a JSON response with flattened text output.
 
-## Project Configuration Workflow
-
-1. A client invokes refresh_polarion_config with a projectId.
-2. The server fetches project details, work item types, and enumerations from Polarion.
-3. The result is normalized into an in-memory project configuration object.
-4. The configuration is cached and exposed as a polarion://config/<projectId> resource.
-
 ## Regeneration Workflow
 
 1. Download openapi.json from the Polarion definition endpoint.

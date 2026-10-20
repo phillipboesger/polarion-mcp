@@ -24,12 +24,15 @@ import { enabledTools } from './tool-filter.js';
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import { createRestToolsRouter } from './rest-api.js';
+import { safeEqual } from './sealed.js';
+import { bearerCredential } from './utils.js';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.HTTP_PORT || 3000;
+// PORT is what Render and most platforms inject.
+const PORT = process.env.PORT || process.env.HTTP_PORT || 3000;
 const HTTP_API_KEY = process.env.HTTP_API_KEY;
 
 // Security check
@@ -61,9 +64,9 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
     });
   }
 
-  const [scheme, token] = authHeader.split(' ');
-  
-  if (scheme !== 'Bearer') {
+  const token = bearerCredential(authHeader);
+
+  if (!token) {
     return res.status(401).json({
       success: false,
       error: 'Invalid authentication scheme',
@@ -72,7 +75,7 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
     });
   }
 
-  if (token !== HTTP_API_KEY) {
+  if (!safeEqual(token, HTTP_API_KEY)) {
     return res.status(401).json({
       success: false,
       error: 'Invalid API key',
@@ -87,7 +90,6 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
 
 // Middleware
 app.use(cors()); // Enable CORS for Custom GPT access
-app.use(express.json({ limit: '10mb' })); // Parse JSON request bodies
 app.use(authenticateRequest); // Authenticate all requests (except health/openapi)
 
 /**
@@ -98,7 +100,6 @@ app.get('/health', (req: Request, res: Response) => {
     status: 'ok',
     server: SERVER_NAME,
     version: SERVER_VERSION,
-    apiBaseUrl: API_BASE_URL,
     timestamp: new Date().toISOString()
   });
 });
@@ -126,7 +127,8 @@ app.use((req: Request, res: Response) => {
       'GET /health',
       'GET /api/tools',
       'POST /api/tools/:toolName',
-      'GET /openapi.json'
+      'GET /openapi.json',
+      'GET /openapi-gpt.json'
     ]
   });
 });
@@ -134,7 +136,12 @@ app.use((req: Request, res: Response) => {
 /**
  * Error handler
  */
-app.use((err: Error, req: Request, res: Response, next: Function) => {
+app.use((err: Error & { status?: number }, req: Request, res: Response, next: Function) => {
+  // Malformed or oversized JSON is the caller's fault: 400/413, not a 500.
+  if (typeof err.status === 'number' && err.status >= 400 && err.status < 500) {
+    res.status(err.status).json({ error: err.status === 413 ? 'Request body too large' : 'Bad Request', message: 'The body is not valid JSON or too large' });
+    return;
+  }
   console.error('[ERROR] Unhandled error:', err);
   res.status(500).json({
     error: 'Internal server error',
@@ -149,13 +156,17 @@ const server = app.listen(PORT, () => {
   console.log(`[INFO] Polarion MCP HTTP Server v${SERVER_VERSION} running on port ${PORT}`);
   console.log(`[INFO] API Base URL: ${API_BASE_URL}`);
   console.log(`[INFO] Available tools: ${enabledTools.size}`);
-  console.log(`[INFO] Essential GPT tools: ${ESSENTIAL_GPT_TOOLS.length}`);
+  console.log(`[INFO] Essential GPT tools: ${ESSENTIAL_GPT_TOOLS.filter(name => enabledTools.has(name)).length}`);
   console.log(`[INFO] Endpoints:`);
   console.log(`       - Health: http://localhost:${PORT}/health`);
   console.log(`       - Tools:  http://localhost:${PORT}/api/tools`);
   console.log(`       - OpenAPI (Full): http://localhost:${PORT}/openapi.json`);
   console.log(`       - OpenAPI (GPT):  http://localhost:${PORT}/openapi-gpt.json`);
 });
+
+// Node closes idle connections after 5 s; a proxy that reuses one at that moment gets a 502.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
 
 /**
  * Graceful shutdown

@@ -44,14 +44,29 @@ export interface RestToolsOptions {
  * @param unauthorizedDescription - Description of the 401 response.
  * @returns The `post` operation object.
  */
-function toolOperation(name: string, unauthorizedDescription: string) {
+/**
+ * @param text - A tool description.
+ * @param max - Most characters allowed.
+ * @returns The text, cut at the last sentence or word boundary that fits.
+ */
+function shorten(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const sentence = cut.lastIndexOf('. ');
+  return sentence > max / 2 ? cut.slice(0, sentence + 1) : `${cut.slice(0, cut.lastIndexOf(' '))}…`;
+}
+
+/** Custom GPT Actions refuse operation descriptions over 300 characters. */
+const GPT_DESCRIPTION_LIMIT = 300;
+
+function toolOperation(name: string, unauthorizedDescription: string, gpt = false) {
   const def = toolDefinitionMap.get(name)!;
   const sanitizedSchema = sanitizeInputSchema(def.inputSchema, {});
   return {
     post: {
       operationId: def.name,
-      summary: def.description,
-      description: `Execute the ${def.name} operation. ${def.description}`,
+      summary: gpt ? shorten(def.description, 120) : def.description,
+      description: gpt ? shorten(def.description, GPT_DESCRIPTION_LIMIT) : `Execute the ${def.name} operation. ${def.description}`,
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -74,9 +89,14 @@ function toolOperation(name: string, unauthorizedDescription: string) {
               schema: {
                 type: 'object',
                 properties: {
-                  success: { type: 'boolean' },
+                  success: { type: 'boolean', description: 'False if the tool reported an error; the reason is in result' },
                   tool: { type: 'string' },
                   result: { type: 'string' },
+                  files: {
+                    type: 'array',
+                    description: 'Downloaded files (images, binaries), base64-encoded',
+                    items: { type: 'object', properties: { mimeType: { type: 'string' }, base64: { type: 'string' } } }
+                  },
                   timestamp: { type: 'string', format: 'date-time' }
                 }
               }
@@ -155,7 +175,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
    * POST /api/tools/:toolName
    * Body: { "arguments": { ... } }
    */
-  router.post('/api/tools/:toolName', authenticate, async (req: Request, res: Response) => {
+  router.post('/api/tools/:toolName', authenticate, express.json({ limit: '10mb' }), async (req: Request, res: Response) => {
     // Express 5 types route params as string | string[]; a single :toolName is always a string.
     const toolName = String(req.params.toolName);
     const toolArgs: JsonObject = req.body?.arguments || req.body || {};
@@ -172,11 +192,6 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
         });
       }
 
-      // Sanitize the input schema and build name mapping
-      const nameMap = {};
-      sanitizeInputSchema(toolDefinition.inputSchema, nameMap);
-      toolDefinition.nameMap = nameMap;
-
       // Execute the tool
       const result = await executeApiTool(toolName, toolDefinition, toolArgs, securitySchemes);
 
@@ -186,11 +201,18 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
         .map(item => 'text' in item ? item.text : '')
         .join('\n');
 
-      // Return result
+      // Downloaded files (MCP image / embedded resource content) as base64.
+      const files = result.content.flatMap(item => {
+        if (item.type === 'image') return [{ mimeType: item.mimeType, base64: item.data }];
+        if (item.type === 'resource' && 'blob' in item.resource) return [{ mimeType: item.resource.mimeType, base64: item.resource.blob }];
+        return [];
+      });
+
       res.json({
-        success: true,
+        success: !result.isError,
         tool: toolName,
         result: textContent,
+        ...(files.length > 0 ? { files } : {}),
         timestamp: new Date().toISOString()
       });
 
@@ -210,7 +232,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
   });
 
   /**
-   * Generate FULL OpenAPI 3.1 specification (all 210+ tools)
+   * Generate FULL OpenAPI 3.1 specification (every exposed tool)
    * This may exceed Custom GPT's 30 operation limit
    */
   router.get('/openapi.json', (req: Request, res: Response) => {
@@ -277,16 +299,8 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
    * Limited to 30 most essential operations to comply with Custom GPT limits
    */
   router.get('/openapi-gpt.json', (req: Request, res: Response) => {
-    const paths: Record<string, unknown> = {
-      '/health': {
-        get: {
-          summary: 'Health check',
-          description: 'Check if the API is running',
-          operationId: 'health',
-          responses: HEALTH_RESPONSE
-        }
-      }
-    };
+    // Tools only: a GPT Action holds at most 30 operations, /health included.
+    const paths: Record<string, unknown> = {};
 
     // Add only essential tools (max 30 for Custom GPT)
     let toolCount = 0;
@@ -296,7 +310,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
         if (!toolDefinitionMap.has(toolName)) console.error(`[WARNING] Essential tool '${toolName}' not found in toolDefinitionMap`);
         continue;
       }
-      paths[`/api/tools/${toolName}`] = toolOperation(toolName, unauthorizedDescription);
+      paths[`/api/tools/${toolName}`] = toolOperation(toolName, unauthorizedDescription, true);
       toolCount++;
     }
 

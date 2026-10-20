@@ -29,6 +29,22 @@ import type { NameMap } from './types.js';
 const INPUT_KEY_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
 
 /**
+ * Encodes one URL path segment. `encodeURIComponent` leaves "." and ".." as
+ * they are and the HTTP client then collapses them, so `deletePlan` with a
+ * plan id of ".." would send `DELETE /projects/p/` (a different endpoint).
+ *
+ * @param value - A path parameter or id.
+ * @returns The encoded segment.
+ * @throws Error for "." and "..".
+ */
+export function encodeSegment(value: string): string {
+  if (value === '.' || value === '..') {
+    throw new Error(`"${value}" is not a valid path segment`);
+  }
+  return encodeURIComponent(value);
+}
+
+/**
  * Sanitizes a property key to match MCP requirements
  *
  * This function:
@@ -162,9 +178,12 @@ export function readArg(args: Record<string, unknown>, httpParamName: string, na
  * callers can fall back to the generic JSON dump.
  *
  * @param responseData - The raw `error.response.data` from axios.
- * @returns A joined `detail`/`title` string, or `undefined`.
+ * @returns A joined `detail`/`title` string, each with the request part it
+ *   points at (`source.pointer`/`parameter`) so a bulk write shows which
+ *   item failed; or `undefined`.
  */
 export function extractJsonApiErrorDetail(responseData: unknown): string | undefined {
+  responseData = decodeBufferBody(responseData);
   if (!responseData || typeof responseData !== 'object') return undefined;
   const errors = (responseData as { errors?: unknown }).errors;
   if (!Array.isArray(errors) || errors.length === 0) return undefined;
@@ -172,12 +191,38 @@ export function extractJsonApiErrorDetail(responseData: unknown): string | undef
   const parts = errors
     .map((e) => {
       if (!e || typeof e !== 'object') return '';
-      const entry = e as { detail?: unknown; title?: unknown };
-      return String(entry.detail ?? entry.title ?? '');
+      const entry = e as { detail?: unknown; title?: unknown; source?: { pointer?: unknown; parameter?: unknown } };
+      const text = String(entry.detail ?? entry.title ?? '');
+      const at = entry.source?.pointer ?? entry.source?.parameter;
+      return text && at ? `${text} (at ${String(at)})` : text;
     })
     .filter((s) => s.length > 0);
 
   return parts.length > 0 ? parts.join('; ') : undefined;
+}
+
+/**
+ * @param data - A response body; bytes when the request asked for raw bytes.
+ * @returns The body as parsed JSON or text if it was bytes, else unchanged.
+ */
+function decodeBufferBody(data: unknown): unknown {
+  if (!Buffer.isBuffer(data) && !(data instanceof ArrayBuffer)) return data;
+  const text = Buffer.from(data as Buffer).toString('utf8');
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * @param header - An Authorization header.
+ * @returns Its Bearer credential, or undefined. The scheme is matched
+ *   case-insensitively (RFC 7235) and spaces or tabs may separate it.
+ */
+export function bearerCredential(header: string | undefined): string | undefined {
+  const value = /^Bearer[ \t]+(.+)$/i.exec(header ?? '')?.[1]?.trim();
+  return value || undefined;
 }
 
 export function formatApiError(error: AxiosError): string {
@@ -186,14 +231,16 @@ export function formatApiError(error: AxiosError): string {
   if (error.response) {
     // Server responded with an error status
     message = `API Error: Status ${error.response.status} (${error.response.statusText || 'Status text not available'}). `;
-    const responseData = error.response.data;
+    const responseData = decodeBufferBody(error.response.data);
+    // Long enough for every error of a bulk write; a raw body is cut shorter.
+    const MAX_DETAIL_LEN = 2000;
     const MAX_LEN = 200;
 
     const jsonApiDetail = extractJsonApiErrorDetail(responseData);
     if (jsonApiDetail) {
       // Polarion's actual error shape ({errors:[{status,title,detail}]}) --
       // surface the real detail instead of a truncated raw JSON dump.
-      message += `Detail: ${jsonApiDetail.substring(0, MAX_LEN)}${jsonApiDetail.length > MAX_LEN ? '...' : ''}`;
+      message += `Detail: ${jsonApiDetail.substring(0, MAX_DETAIL_LEN)}${jsonApiDetail.length > MAX_DETAIL_LEN ? '...' : ''}`;
     }
     else if (typeof responseData === 'string') {
       // Truncate long error messages
@@ -210,6 +257,9 @@ export function formatApiError(error: AxiosError): string {
     else {
       message += 'No response body received.';
     }
+  } else if (/maxContentLength/.test(error.message)) {
+    // A download over the size cap: axios aborts it without a response.
+    message = `File too large to return inline. Download it from Polarion directly${error.config?.url ? `: ${error.config.url}` : '.'}`;
   } else if (error.request) {
     // Request was made but no response received
     message = 'API Network Error: No response received from server.';
@@ -297,30 +347,65 @@ function makeNestedObjectsPermissive(schema: any, depth = 0): any {
  * @param toolName - Name of the tool (for error reporting)
  * @returns Zod schema for runtime validation
  */
+/**
+ * Rewrites `oneOf` as `anyOf`: json-schema-to-zod emits TypeScript syntax for
+ * `oneOf` that eval() cannot run (the relationship tools' bodies fell back to
+ * accept-anything). Each branch of the Polarion relationship bodies has a
+ * single property (`data` as object or array) and no `required`, so `{}`
+ * would match every branch; that one property is made required.
+ *
+ * @param schema - A JSON Schema (sub)tree.
+ * @returns A copy with `oneOf` replaced.
+ */
+function oneOfAsAnyOf(schema: any): any {
+  if (Array.isArray(schema)) return schema.map(oneOfAsAnyOf);
+  if (!schema || typeof schema !== 'object') return schema;
+  const copy: any = {};
+  for (const [key, value] of Object.entries(schema)) copy[key] = oneOfAsAnyOf(value);
+  if (Array.isArray(copy.oneOf)) {
+    copy.anyOf = copy.oneOf.map((branch: any) => {
+      const props = branch?.properties ? Object.keys(branch.properties) : [];
+      return props.length === 1 && !branch.required ? { ...branch, required: props } : branch;
+    });
+    delete copy.oneOf;
+  }
+  return copy;
+}
+
+const zodSchemaCache = new WeakMap<object, z.ZodTypeAny>();
+
+/**
+ * Compiles a tool's input schema to Zod, cached per schema object.
+ *
+ * @param jsonSchema - The tool's input schema.
+ * @returns The Zod schema.
+ * @throws Error if the schema cannot be compiled.
+ */
+export function compileZodSchema(jsonSchema: object): z.ZodTypeAny {
+  const cached = zodSchemaCache.get(jsonSchema);
+  if (cached) return cached;
+  // Nested objects (everything under e.g. requestBody) are made permissive
+  // first so dynamic data like Work Item customFields survives validation.
+  // eval is safe here: the code is generated from our own static tools.ts
+  // schemas, never from request input.
+  const zodSchema = eval(jsonSchemaToZod(oneOfAsAnyOf(makeNestedObjectsPermissive(jsonSchema))));
+  if (typeof zodSchema?.parse !== 'function') {
+    throw new Error('Eval did not produce a valid Zod schema.');
+  }
+  zodSchemaCache.set(jsonSchema, zodSchema);
+  return zodSchema as z.ZodTypeAny;
+}
+
 export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z.ZodTypeAny {
   if (typeof jsonSchema !== 'object' || jsonSchema === null) {
     // Invalid schema, return a permissive schema
     return z.object({}).passthrough();
   }
-
   try {
-    // Convert JSON Schema to Zod schema code -- nested objects (everything
-    // under e.g. requestBody) are made permissive first so dynamic data like
-    // Work Item customFields survives validation instead of being stripped.
-    const zodSchemaString = jsonSchemaToZod(makeNestedObjectsPermissive(jsonSchema));
-
-    // Evaluate the code to create actual schema
-    // This is safe because we control the input
-    const zodSchema = eval(zodSchemaString);
-
-    if (typeof zodSchema?.parse !== 'function') {
-      throw new Error('Eval did not produce a valid Zod schema.');
-    }
-
-    return zodSchema as z.ZodTypeAny;
+    return compileZodSchema(jsonSchema);
   } catch (err: any) {
+    // A test compiles every generated tool, so this only guards hand-written definitions.
     console.error(`Failed to generate/evaluate Zod schema for '${toolName}':`, err);
-    // Fall back to permissive schema that accepts anything
     return z.object({}).passthrough();
   }
 }

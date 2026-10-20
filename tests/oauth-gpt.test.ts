@@ -222,3 +222,26 @@ test("the Custom GPT token endpoint is rate-limited like the SDK's own", async (
     await stop()
   }
 })
+
+test("Custom GPT Basic credentials work even when the secret contains a raw %", async () => {
+  const { createMcpHttpApp } = await import("../src/mcp-http-server.js")
+  const { app, closeAllSessions } = createMcpHttpApp({
+    publicUrl: new URL("http://127.0.0.1"), gptClient: { clientId: "gpt", clientSecret: "gpt%secret" }, validateToken: async () => true,
+  })
+  const server = app.listen(0)
+  await new Promise<void>((resolve) => server.once("listening", () => resolve()))
+  try {
+    const port = (server.address() as import("node:net").AddressInfo).port
+    const res = await fetch(`http://127.0.0.1:${port}/gpt/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${Buffer.from("gpt:gpt%secret").toString("base64")}` },
+      body: new URLSearchParams({ grant_type: "authorization_code", code: "bogus", redirect_uri: "https://chatgpt.com/aip/g-1/oauth/callback" }),
+    })
+    const body = (await res.json()) as { error: string }
+    assert.notEqual(body.error, "invalid_client", "the client authenticated; only the bogus code is rejected")
+    assert.equal(body.error, "invalid_grant")
+  } finally {
+    await closeAllSessions()
+    server.close()
+  }
+})

@@ -10,8 +10,7 @@
 
 ## Polarion-Specific Additions
 
-- Project configuration refresh and in-memory caching with refresh_polarion_config.
-- Access to Polarion SDK and Siemens documentation as MCP resources.
+- Server instructions and offline guide resources (query syntax, write bodies, paging and fields).
 - Prompt templates for common work-item tasks.
 - Custom GPT OpenAPI subset limited to the most important operations.
 
@@ -19,7 +18,7 @@
 
 - Environment-based configuration through .env or runtime variables.
 - Support for multiple Polarion environments through separate MCP client entries.
-- Local PDF extraction from sdk/ for offline or low-friction documentation access.
+- Optional local PDF extraction from sdk/ for offline documentation access.
 - TLS override support for trusted internal instances with self-signed certificates.
 
 ## Non-Goals

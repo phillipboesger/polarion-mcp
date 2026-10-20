@@ -66,3 +66,13 @@ test("config reads explicit bearer token and trims rest path for the Polarion ba
     restoreEnv(previous)
   }
 })
+
+test("config drops trailing slashes and whitespace from API_BASE_URL, so requests never go to //projects", async () => {
+  const previous = setEnv({ API_BASE_URL: "  https://polarion.example.com/polarion/rest/v1//  " })
+  try {
+    const config = await importFreshConfig("trailing-slash")
+    assert.equal(config.API_BASE_URL, "https://polarion.example.com/polarion/rest/v1")
+  } finally {
+    restoreEnv(previous)
+  }
+})
