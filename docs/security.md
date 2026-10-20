@@ -26,6 +26,7 @@ The Streamable HTTP server does not use HTTP_API_KEY. Every request carries the 
 
 - Set MCP_ALLOWED_REDIRECT_PREFIXES when the OAuth login is enabled. Client registration is open, so without it anyone can register their own callback and send a user a genuine login link on your domain; whoever pastes their PAT there hands the resulting access to that callback. The login page names the host the login returns to, but an allowlist is the real protection.
 - Behind a reverse proxy, set TRUST_PROXY (e.g. `loopback`) so the login, token and registration rate limits count per client instead of per proxy.
+- A Polarion PAT sent directly is checked with Polarion before it may open a session (remembered for one minute), and failed checks are rate limited per client address. An invented token therefore cannot fill the session table or push real users out.
 - Narrow the tool surface server-side with MCP_TOOLS and/or MCP_READ_ONLY. A filtered tool cannot be called at all, which is a stronger guard against prompt injection than switching tools off in the client.
 
 ## TLS Handling
@@ -35,7 +36,7 @@ The Streamable HTTP server does not use HTTP_API_KEY. Every request carries the 
 
 ## Logging
 
-- Logs go to stderr; avoid logging secrets.
+- Logs go to the process's stdout/stderr (stderr only in stdio mode); never log secrets.
 
 ## read_when
 

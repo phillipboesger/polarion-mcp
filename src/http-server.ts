@@ -127,7 +127,8 @@ app.use((req: Request, res: Response) => {
       'GET /health',
       'GET /api/tools',
       'POST /api/tools/:toolName',
-      'GET /openapi.json'
+      'GET /openapi.json',
+      'GET /openapi-gpt.json'
     ]
   });
 });
@@ -155,7 +156,7 @@ const server = app.listen(PORT, () => {
   console.log(`[INFO] Polarion MCP HTTP Server v${SERVER_VERSION} running on port ${PORT}`);
   console.log(`[INFO] API Base URL: ${API_BASE_URL}`);
   console.log(`[INFO] Available tools: ${enabledTools.size}`);
-  console.log(`[INFO] Essential GPT tools: ${ESSENTIAL_GPT_TOOLS.length}`);
+  console.log(`[INFO] Essential GPT tools: ${ESSENTIAL_GPT_TOOLS.filter(name => enabledTools.has(name)).length}`);
   console.log(`[INFO] Endpoints:`);
   console.log(`       - Health: http://localhost:${PORT}/health`);
   console.log(`       - Tools:  http://localhost:${PORT}/api/tools`);

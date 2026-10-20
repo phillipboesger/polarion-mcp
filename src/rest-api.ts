@@ -232,7 +232,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
   });
 
   /**
-   * Generate FULL OpenAPI 3.1 specification (all 210+ tools)
+   * Generate FULL OpenAPI 3.1 specification (every exposed tool)
    * This may exceed Custom GPT's 30 operation limit
    */
   router.get('/openapi.json', (req: Request, res: Response) => {
