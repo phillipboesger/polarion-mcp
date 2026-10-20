@@ -427,7 +427,7 @@ test("executeApiTool omits structuredContent when the tool has no outputSchema, 
   assert.equal(result.structuredContent, undefined)
 })
 
-test("executeApiTool marks a successful call as isError when the tool declares outputSchema but the response has no usable JSON body (e.g. empty/204)", async () => {
+test("executeApiTool answers an empty/204 success with empty structuredContent when the tool declares an outputSchema (a write that worked is not an error)", async () => {
   const definition: McpToolDefinition = {
     ...emptyDefinition,
     name: "get_thing",
@@ -444,8 +444,8 @@ test("executeApiTool marks a successful call as isError when the tool declares o
   })
 
   const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 })
-  assert.equal(result.isError, true)
-  assert.equal(result.structuredContent, undefined)
+  assert.notEqual(result.isError, true)
+  assert.deepEqual(result.structuredContent, {})
 })
 
 test("executeApiTool marks a Zod argument-validation failure as isError (MCP spec: structuredContent's MUST is scoped to non-error results)", async () => {
@@ -484,7 +484,7 @@ test("executeApiTool marks a pre-write guard refusal as isError", async () => {
   assert.match((result.content[0] as { type: "text", text: string }).text, /Write refused/)
 })
 
-test("executeApiTool marks a dry_run preview as isError when the tool declares outputSchema (preview can never conform to it), but not otherwise", async () => {
+test("executeApiTool returns a dry_run preview as structuredContent when the tool declares an outputSchema, and never as an error", async () => {
   const baseDefinition: McpToolDefinition = {
     ...emptyDefinition,
     name: "create_thing",
@@ -504,7 +504,9 @@ test("executeApiTool marks a dry_run preview as isError when the tool declares o
     {},
     { httpClient, minIntervalMs: 0 },
   )
-  assert.equal(withSchema.isError, true)
+  assert.equal(withSchema.isError, undefined)
+  assert.equal((withSchema.structuredContent as any).dry_run, true)
+  assert.equal((withSchema.structuredContent as any).preview.method, "POST")
 
   const withoutSchema = await executeApiTool(
     "create_thing",
@@ -514,6 +516,7 @@ test("executeApiTool marks a dry_run preview as isError when the tool declares o
     { httpClient, minIntervalMs: 0 },
   )
   assert.equal(withoutSchema.isError, undefined)
+  assert.equal(withoutSchema.structuredContent, undefined)
 })
 
 test("executeApiTool refuses a patchWorkItem write with an invalid enum value, never sending the PATCH", async () => {

@@ -38,7 +38,6 @@ import {
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
 import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
-import { omitOutputSchema } from "./tool-filter.js";
 
 /**
  * Sanitized -> original argument names per tool (e.g. "page_size_" -> "page[size]").
@@ -915,16 +914,10 @@ export async function executeApiTool(
             text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
           }
         ],
-        // MCP clients built on the official SDK throw if a tool that declares an
-        // outputSchema returns a non-error result without structuredContent (see
-        // Client.callTool in @modelcontextprotocol/sdk). The preview payload here
-        // is a request preview, not the tool's real output, so it can never
-        // conform to that schema -- isError is the spec-sanctioned way to signal
-        // "no structured output was produced" without violating the tool's
-        // declared contract. Only applied when it's actually required, so the
-        // (far more common) dry_run call on a tool with no outputSchema keeps its
-        // existing non-error preview behavior.
-        ...(definition.outputSchema && !omitOutputSchema ? { isError: true } : {}),
+        // SDK clients throw if a tool that declares an outputSchema returns a
+        // non-error result without structuredContent; the advertised schema is
+        // lenient, so the preview itself can serve as the structured content.
+        ...(definition.outputSchema ? { structuredContent: { dry_run: true, preview } } : {}),
       };
     }
 
@@ -1000,13 +993,11 @@ export async function executeApiTool(
     }
 
     // ===== STEP 9: Return Formatted Response =====
-    // If this tool declared an outputSchema but the actual response didn't come back
-    // as a JSON object (empty/204, non-JSON content-type, a stringify failure, or any
-    // other shape the branches above fall through to), there's no structuredContent
-    // to honestly offer. Per the same MCP client enforcement described above, mark
-    // that as isError instead of returning a non-error result the schema can't cover.
-    // With MCP_OMIT_OUTPUT_SCHEMA the client never saw a schema, so nothing to violate.
-    const outputSchemaUnfulfilled = Boolean(definition.outputSchema) && !omitOutputSchema && structuredContent === undefined;
+    // A tool that declares an outputSchema must return structuredContent with a
+    // non-error result, or SDK clients throw (Client.callTool). An empty/204 or
+    // non-JSON answer to a successful call has none to offer, so it gets an empty
+    // object, which the advertised (lenient) schema accepts. isError would
+    // report a write that worked as failed and invite a duplicating retry.
     return {
       content: [
         {
@@ -1014,8 +1005,7 @@ export async function executeApiTool(
           text: `API Response (Status: ${response.status}):\n${responseText}`
         }
       ],
-      ...(definition.outputSchema && structuredContent !== undefined ? { structuredContent } : {}),
-      ...(outputSchemaUnfulfilled ? { isError: true } : {}),
+      ...(definition.outputSchema ? { structuredContent: structuredContent ?? {} } : {}),
     };
 
   } catch (error: unknown) {

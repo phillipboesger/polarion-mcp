@@ -29,6 +29,7 @@ import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPol
 import { securitySchemes } from './tools.js';
 import { enabledTools, omitOutputSchema } from './tool-filter.js';
 import { executeApiTool } from './executor.js';
+import { lenientOutputSchema } from './output-schema.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -39,15 +40,6 @@ import { executeApiTool } from './executor.js';
  *
  * @returns A {@link Server} ready to be connected to any MCP transport.
  */
-/**
- * @param schema - An output schema.
- * @returns It without `example`/`examples`, which only cost tokens (~140 KB
- *   over all tools) and play no part in validating a result.
- */
-function withoutExamples(schema: unknown): unknown {
-  return JSON.parse(JSON.stringify(schema, (key, value) => (key === 'example' || key === 'examples' ? undefined : value)));
-}
-
 let listedTools: object[] | undefined;
 
 /** @returns The tools/list entries; the tool set is fixed, so they are built once. */
@@ -57,7 +49,7 @@ function toolsForClient(): object[] {
     description: def.description,
     inputSchema: sanitizeInputSchema(def.inputSchema),
     ...(def.annotations ? { annotations: def.annotations } : {}),
-    ...(def.outputSchema && !omitOutputSchema ? { outputSchema: withoutExamples(def.outputSchema) } : {}),
+    ...(def.outputSchema && !omitOutputSchema ? { outputSchema: lenientOutputSchema(def.outputSchema) } : {}),
   }));
   return listedTools;
 }
