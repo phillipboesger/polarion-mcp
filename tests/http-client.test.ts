@@ -113,3 +113,11 @@ test("a DELETE retried after a 5xx that finds the item gone (404) counts as dele
 test("a first-attempt 404 on DELETE is still an error", async () => {
   await assert.rejects(sendWithRetry({ method: "DELETE" }, { httpClient: async () => { throw httpError(404) }, minIntervalMs: 0, postMutationDelayMs: 0 }), /fail/)
 })
+
+test("a DELETE that found nothing after a 429 retry was never processed: the 404 stays an error", async () => {
+  let calls = 0
+  await assert.rejects(sendWithRetry({ method: "DELETE" }, {
+    httpClient: async () => { calls++; throw httpError(calls === 1 ? 429 : 404) }, minIntervalMs: 0, initialBackoffMs: 1, postMutationDelayMs: 0,
+  }), /fail/)
+  assert.equal(calls, 2)
+})

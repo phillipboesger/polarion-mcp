@@ -321,7 +321,16 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * @returns Nothing; either runs the chain with the token bound or sends a 401.
    */
   // Each unknown token costs a request to Polarion: failures count, successes do not.
-  const patFailureLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false });
+  // "Successful" means Polarion accepted the PAT, whatever the MCP request then answers: a valid user
+  // with a stale session id gets a 404 and must not be counted.
+  const patFailureLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 50,
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (_req, res) => res.locals.patAccepted === true,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
   const requireBearer = (req: Request, res: Response, next: NextFunction): void => {
     const value = bearerCredential(req.get('authorization'));
@@ -355,6 +364,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     patFailureLimit(req, res, () => {
       void checkDirectPat(value).then(failure => {
         if (!failure) {
+          res.locals.patAccepted = true;
           requestBearerToken.run(value, next);
           return;
         }

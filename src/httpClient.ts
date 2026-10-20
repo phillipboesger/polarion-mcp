@@ -95,7 +95,8 @@ export interface SendWithRetryOpts {
 export async function sendWithRetry(
   config: AxiosRequestConfig,
   opts: SendWithRetryOpts = {},
-  attempt = 1
+  attempt = 1,
+  mayHaveSucceeded = false
 ): Promise<AxiosResponse> {
   const {
     httpClient = axios,
@@ -115,7 +116,7 @@ export async function sendWithRetry(
   } catch (error) {
     // The first attempt of a DELETE may have succeeded before the 5xx (a proxy
     // timeout); the retry then finds nothing. That is the outcome asked for.
-    if (attempt > 1 && method === 'delete' && axios.isAxiosError(error) && error.response?.status === 404) {
+    if (mayHaveSucceeded && method === 'delete' && axios.isAxiosError(error) && error.response?.status === 404) {
       return { ...error.response, status: 204, statusText: 'No Content (deleted by an earlier attempt)', data: undefined };
     }
     if (
@@ -133,7 +134,8 @@ export async function sendWithRetry(
         ? retryAfter * 1000
         : initialBackoffMs * 2 ** (attempt - 1);
       await new Promise((r) => setTimeout(r, wait));
-      return sendWithRetry(config, opts, attempt + 1);
+      // A 429 was rejected before any work; a 5xx may have come after the write.
+      return sendWithRetry(config, opts, attempt + 1, mayHaveSucceeded || error.response.status !== 429);
     }
     throw error;
   }

@@ -590,8 +590,9 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     redirectUri?: string
   ): Promise<OAuthTokens> {
     const entry = this.redeem(authorizationCode, 'mcp', client.client_id);
-    // Mandatory: the authorization request always carried one (RFC 6749 section 4.1.3).
-    if (redirectUri === undefined || !safeEqual(redirectUri, entry.redirectUri)) {
+    // Optional: a client that sent none at /authorize was given its single registered one (SDK), so
+    // the stored value cannot tell "omitted" from "sent".
+    if (redirectUri !== undefined && !safeEqual(redirectUri, entry.redirectUri)) {
       throw new InvalidGrantError('Redirect URI does not match the authorization request');
     }
     return this.issue(entry);

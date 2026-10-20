@@ -23,18 +23,28 @@ const CONSTRAINTS = ['format', 'enum', 'const', 'pattern', 'minimum', 'maximum',
  *   constraints, no required properties, every type nullable.
  */
 export function lenientOutputSchema(schema: unknown): unknown {
-  if (Array.isArray(schema)) return schema.map(lenientOutputSchema);
+  const loosened = loosen(schema);
+  // MCP requires the root of an outputSchema to be exactly type "object".
+  if (typeof loosened === 'object' && loosened !== null && !Array.isArray(loosened) && 'type' in loosened) {
+    (loosened as Schema).type = 'object';
+  }
+  return loosened;
+}
+
+/** Recursive part of {@link lenientOutputSchema}. */
+function loosen(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(loosen);
   if (typeof schema !== 'object' || schema === null) return schema;
   const node: Schema = {};
   for (const [key, value] of Object.entries(schema as Schema)) {
     if (CONSTRAINTS.includes(key)) continue;
     if (key === 'properties' && typeof value === 'object' && value !== null) {
-      node.properties = Object.fromEntries(Object.entries(value).map(([name, child]) => [name, lenientOutputSchema(child)]));
+      node.properties = Object.fromEntries(Object.entries(value).map(([name, child]) => [name, loosen(child)]));
     } else if (key === 'additionalProperties') {
       // false would reject the fields Polarion adds; keep a schema, drop a boolean.
-      if (typeof value === 'object') node.additionalProperties = lenientOutputSchema(value);
+      if (typeof value === 'object') node.additionalProperties = loosen(value);
     } else {
-      node[key] = lenientOutputSchema(value);
+      node[key] = loosen(value);
     }
   }
   if (typeof node.type === 'string') {

@@ -4,6 +4,10 @@ import { AjvJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/ajv
 
 import { lenientOutputSchema } from "../src/output-schema.js"
 import { toolDefinitionMap } from "../src/tools.js"
+import { ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
+import { createPolarionServer } from "../src/server.js"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 
 // The validator the SDK client uses on structuredContent.
 const validate = (schema: unknown, value: unknown) => new AjvJsonSchemaValidator().getValidator(schema as any)(value)
@@ -32,7 +36,8 @@ test("lenient output schema: an empty object and a typical Polarion body validat
 test("lenient output schema: structure is kept, only values are loosened", () => {
   const lenient = lenientOutputSchema({ type: "object", required: ["a"], additionalProperties: false, properties: { a: { type: "string", enum: ["x"], example: "x" }, list: { type: "array", items: { type: "object", properties: { n: { type: "integer" } } } } } }) as any
   assert.deepEqual(Object.keys(lenient.properties), ["a", "list"])
-  assert.deepEqual(lenient.type, ["object", "null"])
+  assert.equal(lenient.type, "object")
+  assert.deepEqual(lenient.properties.list.type, ["array", "null"])
   assert.equal("required" in lenient, false)
   assert.equal("additionalProperties" in lenient, false)
   assert.equal("enum" in lenient.properties.a, false)
@@ -47,4 +52,21 @@ test("every generated output schema still compiles after loosening", () => {
     count++
   }
   assert.ok(count >= 170)
+})
+
+test("tools/list with the loosened schemas still parses as an MCP ListToolsResult (root type must stay \"object\")", async () => {
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
+  const server = createPolarionServer()
+  await server.connect(serverSide)
+  const client = new Client({ name: "t", version: "1" })
+  await client.connect(clientSide)
+  try {
+    const listed = await client.listTools()
+    assert.ok(listed.tools.length > 200)
+    assert.equal(ListToolsResultSchema.safeParse(listed).success, true)
+    assert.ok(listed.tools.filter(t => t.outputSchema).every(t => (t.outputSchema as any).type === "object"))
+  } finally {
+    await client.close()
+    await server.close()
+  }
 })

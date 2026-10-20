@@ -374,6 +374,24 @@ test("a flood of made-up bearers is cut off by the failure limiter, valid PATs a
   }
 })
 
+test("a valid user with stale session ids is never counted as a failure and never locked out", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const pat = freshPat()
+    const stale = (n: number) =>
+      fetch(`${base}/mcp`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${pat}`, "mcp-session-id": `gone-${n}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: n, method: "ping" }),
+      })
+    for (let i = 0; i < 70; i++) assert.equal((await stale(i)).status, 404)
+    assert.equal((await initialize(base, pat)).status, 200)
+  } finally {
+    await stop()
+  }
+})
+
 test("a valid PAT is checked once per minute, not on every request of its session", async () => {
   polarion.reachable = true
   let checks = 0
@@ -411,22 +429,6 @@ test("an authorization code is burned by a wrong PKCE verifier", async () => {
       })
     assert.equal((await exchange("x".repeat(60))).status, 400)
     assert.equal((await exchange(verifier)).status, 400)
-  } finally {
-    await stop()
-  }
-})
-
-test("the token request must repeat the redirect_uri of the authorization request", async () => {
-  polarion.reachable = true
-  const { base, stop } = await startApp()
-  try {
-    const { client, code, verifier } = await loginForCode(base, freshPat())
-    const res = await fetch(`${base}/token`, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "authorization_code", code, client_id: client.client_id, code_verifier: verifier }),
-    })
-    assert.equal(res.status, 400)
   } finally {
     await stop()
   }
