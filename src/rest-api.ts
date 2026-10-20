@@ -24,6 +24,43 @@ import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import type { JsonObject } from './types.js';
 
 /**
+ * Builds the `servers` URL for the REST wrapper's OpenAPI specs.
+ *
+ * The specs are public, and a Custom GPT imports whatever URL they name, so the
+ * request's Host header (anyone can send one, a cache may keep the answer) is
+ * not trusted when the deployment knows its own address: `PUBLIC_URL`, or the
+ * `RENDER_EXTERNAL_URL` Render sets. Without either, a plain `host[:port]` is
+ * echoed (https, http for localhost) and anything else falls back to localhost.
+ *
+ * @param env - The environment to read the public URL from.
+ * @param port - The port the server listens on, for the localhost fallback.
+ * @returns A function giving the spec's server URL for a request.
+ * @throws Error if `PUBLIC_URL` is not an http(s) origin.
+ */
+export function specServerUrl(env: NodeJS.ProcessEnv, port: number): (req: Request) => string {
+  const source = env.PUBLIC_URL?.trim() ? 'PUBLIC_URL' : 'RENDER_EXTERNAL_URL';
+  const configured = env.PUBLIC_URL?.trim() || env.RENDER_EXTERNAL_URL?.trim();
+  if (configured) {
+    let url: URL;
+    try {
+      url = new URL(configured);
+    } catch {
+      throw new Error(`${source} must be an http(s) URL such as https://mcp.example.org, got "${configured}"`);
+    }
+    if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password || url.search || url.hash) {
+      throw new Error(`${source} must be an http(s) URL without credentials, query or fragment, got "${configured}"`);
+    }
+    return () => url.href.replace(/\/+$/, '');
+  }
+  return (req) => {
+    const host = req.get('host');
+    if (!host || !/^([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:\d{1,5})?$/.test(host)) return `http://localhost:${port}`;
+    const local = /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/i.test(host);
+    return `${local ? 'http' : 'https'}://${host}`;
+  };
+}
+
+/**
  * Options for {@link createRestToolsRouter}.
  */
 export interface RestToolsOptions {

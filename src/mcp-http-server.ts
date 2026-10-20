@@ -40,7 +40,7 @@ import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
 import { createPolarionServer } from './server.js';
 import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
@@ -703,6 +703,7 @@ export function startMcpHttpServer(): HttpServer {
     console.log(`[INFO] MCP endpoint: http://localhost:${port}${MCP_PATH} (send your Polarion PAT as Bearer token)`);
     console.log(`[INFO] Health:       http://localhost:${port}/health`);
     console.log(`[INFO] Proxying Polarion API at ${API_BASE_URL}`);
+    for (const warning of configurationWarnings(process.env, { needsToken: false })) console.log(`[WARN] ${warning}`);
     if (publicUrl) {
       console.log(`[INFO] OAuth login enabled at ${new URL('/authorize', publicUrl).href}`);
       if (!tokenSecret) {

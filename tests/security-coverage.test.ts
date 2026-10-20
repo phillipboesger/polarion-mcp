@@ -15,6 +15,9 @@ import { requestBearerToken } from "../src/config.js"
 import { executeApiTool } from "../src/executor.js"
 import { toolDefinitionMap, securitySchemes } from "../src/tools.js"
 
+// The generated tools need a token; a call without one is refused before it is sent.
+process.env.BEARER_TOKEN ??= "test-token"
+
 const SECRET = "proposed-tests-secret-long-enough-0123456789"
 const REDIRECT = "https://client.example/callback"
 const FAST = { minIntervalMs: 0, initialBackoffMs: 0, postMutationDelayMs: 0 }

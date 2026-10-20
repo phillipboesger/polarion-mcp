@@ -14,7 +14,7 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings } from './config.js';
 import { createPolarionServer } from './server.js';
 
 /**
@@ -33,6 +33,7 @@ async function main(): Promise<void> {
 
     // Info messages go to stderr in MCP (stdout is reserved for protocol)
     console.error(`[INFO] ${SERVER_NAME} MCP Server ${SERVER_VERSION} running on stdio${API_BASE_URL ? `, proxying API at ${API_BASE_URL}` : ''}`);
+    for (const warning of configurationWarnings(process.env, { needsToken: true })) console.error(`[WARN] ${warning}`);
   }
   catch (error) {
     console.error("[ERROR] Error during server startup:", error);

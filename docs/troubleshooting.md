@@ -4,6 +4,11 @@
 
 - HTTP_API_KEY is required. Set it in your environment before starting.
 
+## "No Polarion token is configured"
+
+- The server starts without a token so that clients can list its tools, but refuses every call until one is set. In stdio mode and for the REST wrapper set BEARER_TOKEN to a Polarion Personal Access Token (the startup log warns when it is missing); on the Streamable HTTP server send it as `Authorization: Bearer <token>`.
+- The same startup log warns when API_BASE_URL is unset and calls would go to the placeholder host.
+
 ## 401 Errors from Polarion
 
 - Verify BEARER_TOKEN is valid and not expired.
