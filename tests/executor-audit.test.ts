@@ -266,3 +266,25 @@ test("path parameters: a dot inside an id is fine", async () => {
   const { requests } = await run("getWorkItem", { projectId: "P", workItemId: "WI.1..2" })
   assert.match(String(requests[0].url), /\/projects\/P\/workitems\/WI\.1\.\.2$/)
 })
+
+test("unknown arguments: a misspelled parameter is reported with the valid names, not silently dropped", async () => {
+  const { result, requests } = await run("getWorkItems", { projectId: "P", pageSize: 5, limit: 2 })
+  assert.equal(result.isError, true)
+  const text = (result.content[0] as any).text as string
+  assert.match(text, /unknown argument\(s\) pageSize, limit/)
+  assert.match(text, /page_size_/)
+  assert.equal(requests.length, 0)
+})
+
+test("unknown arguments: underscore-prefixed client metadata and dry_run are tolerated", async () => {
+  const { result, requests } = await run("getWorkItems", { projectId: "P", _meta: { progressToken: 1 }, dry_run: false })
+  assert.notEqual(result.isError, true)
+  assert.equal(requests.length, 1)
+})
+
+test("validation errors name the advertised parameter (page_size_), not page[size]", async () => {
+  const { result } = await run("getWorkItems", { projectId: "P", page_size_: "abc" })
+  const text = (result.content[0] as any).text as string
+  assert.match(text, /page_size_ /)
+  assert.doesNotMatch(text, /page\[size\]/)
+})

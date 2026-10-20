@@ -554,6 +554,20 @@ export async function executeApiTool(
       }
     }
 
+    // Zod drops unknown keys silently, so a misspelled `pageSize` would return
+    // the unpaged default while the model believes it paged. Names starting
+    // with "_" are protocol/client metadata and pass.
+    const advertisedName = (original: string): string => Object.entries(nameMap).find(([, o]) => o === original)?.[0] ?? original;
+    const knownKeys = Object.keys((definition.inputSchema?.properties ?? {}) as Record<string, unknown>);
+    const unknownKeys = Object.keys(argsForValidation).filter(key => !knownKeys.includes(key) && !key.startsWith('_'));
+    if (unknownKeys.length > 0) {
+      const valid = [...knownKeys.map(advertisedName), ...(isMutating ? ['dry_run'] : [])].join(', ');
+      return {
+        content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': unknown argument(s) ${unknownKeys.join(', ')}. Valid arguments: ${valid}` }],
+        isError: true,
+      };
+    }
+
     // ===== STEP 1: Validate Arguments =====
     // Use Zod schema to ensure arguments match expected types
     let validatedArgs: JsonObject;
@@ -563,7 +577,7 @@ export async function executeApiTool(
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
-        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${e.path.join('.')} (${e.code}): ${e.message}`).join(', ')}`;
+        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${e.code}): ${e.message}`).join(', ')}`;
         return { content: [{ type: 'text', text: validationErrorMessage }], isError: true };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
