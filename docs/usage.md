@@ -87,6 +87,8 @@ Typical HTTP workflow:
   }
   ```
 
+- Arguments that a tool does not advertise are refused with `Invalid arguments for tool '<name>': unknown argument(s) ... Valid arguments: ...` instead of being dropped silently, so a misspelled `page_size_` can no longer pass as an unpaged call. Names starting with `_` are treated as client metadata and pass.
+- To clear a field on an update, send `null` for it, for example `"dueDate": null` inside `attributes` (Polarion answers `204`). `null` is only accepted for fields inside `attributes`; path and query arguments must still be set.
 - API error messages parse Polarion's actual JSON:API error body (`{errors: [{status, title, detail}]}`) and surface the real `detail`/`title`, instead of a truncated raw JSON dump, whenever the response is shaped that way.
 
 ## Pre-write Validation (Guards)
