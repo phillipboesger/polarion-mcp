@@ -58,7 +58,7 @@ test("filterTools: the allowlist and read-only intersect, unknown names are repo
 })
 
 test("over MCP a filtered tool is neither listed nor callable, and output schemas are left out", async () => {
-  const { app, closeAllSessions } = createMcpHttpApp()
+  const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true })
   const { base, server } = await listen(app)
   try {
     const init = await fetch(`${base}/mcp`, {

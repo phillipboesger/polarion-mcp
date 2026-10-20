@@ -163,6 +163,10 @@ const server = app.listen(PORT, () => {
   console.log(`       - OpenAPI (GPT):  http://localhost:${PORT}/openapi-gpt.json`);
 });
 
+// Node closes idle connections after 5 s; a proxy that reuses one at that moment gets a 502.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
+
 /**
  * Graceful shutdown
  */

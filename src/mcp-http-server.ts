@@ -40,9 +40,9 @@ import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, requestBearerToken, getPolarionBaseUrl, callerCacheScope } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
 import { createPolarionServer } from './server.js';
-import { PolarionOAuthProvider, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
 import { bearerCredential } from './utils.js';
@@ -175,6 +175,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   // Parsed per route, after authentication, so anonymous callers cannot make
   // the server parse 10 MB bodies.
   const jsonBody = express.json({ limit: '10mb' });
+  const checkToken: TokenValidator = validateToken ?? validatePolarionToken;
   const sessionIdleMs = options.sessionIdleMs ?? DEFAULT_SESSION_IDLE_MS;
   const maxSessions = options.maxSessions ?? DEFAULT_MAX_SESSIONS;
 
@@ -239,7 +240,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
 
   // OAuth login, for clients that cannot be handed a token by hand.
   const sealer = publicUrl ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url')) : undefined;
-  const oauth = publicUrl && sealer ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, validateToken, allowedRedirectUris) : undefined;
+  const oauth = publicUrl && sealer ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris) : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
   /**
@@ -319,6 +320,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * @param next - Next middleware in the chain.
    * @returns Nothing; either runs the chain with the token bound or sends a 401.
    */
+  // Each unknown token costs a request to Polarion: failures count, successes do not.
+  const patFailureLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false });
+
   const requireBearer = (req: Request, res: Response, next: NextFunction): void => {
     const value = bearerCredential(req.get('authorization'));
     if (!value) {
@@ -339,7 +343,49 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       requestBearerToken.run(pat, next);
       return;
     }
-    requestBearerToken.run(value, next);
+    // A Polarion PAT sent directly. Only a token Polarion accepts may open a
+    // session: otherwise anyone could fill the session table with made-up
+    // tokens and push every real user's session out.
+    const sessionId = req.header('mcp-session-id');
+    const session = sessionId ? sessions.get(sessionId) : undefined;
+    if (session && session.owner === tokenScope(value)) {
+      requestBearerToken.run(value, next);
+      return;
+    }
+    patFailureLimit(req, res, () => {
+      void checkDirectPat(value).then(failure => {
+        if (!failure) {
+          requestBearerToken.run(value, next);
+          return;
+        }
+        res.status(failure.status).json(jsonRpcError(failure.message));
+      }).catch(() => {
+        res.status(503).json(jsonRpcError('Polarion could not be reached to check the token. Try again in a moment.'));
+      });
+    });
+  };
+
+  /** Polarion PATs accepted in the last minute, by token hash. */
+  const acceptedPats = new Map<string, number>();
+  const PAT_CACHE_MS = 60_000;
+
+  /**
+   * @param pat - A Polarion PAT sent as the Bearer token.
+   * @returns Undefined if Polarion accepts it, else the status and message to answer with.
+   */
+  const checkDirectPat = async (pat: string): Promise<{ status: number; message: string } | undefined> => {
+    const key = tokenScope(pat);
+    const now = Date.now();
+    if ((acceptedPats.get(key) ?? 0) > now) return undefined;
+    const check = await checkToken(pat);
+    if (check === true) {
+      if (acceptedPats.size >= 1000) acceptedPats.clear();
+      acceptedPats.set(key, now + PAT_CACHE_MS);
+      return undefined;
+    }
+    if (check === 'unavailable') return { status: 503, message: 'Polarion could not be reached to check the token. Try again in a moment.' };
+    if (check === 'forbidden') return { status: 403, message: 'Polarion recognized the token but denied access. Ask your Polarion administrator.' };
+    return { status: 401, message: 'Unauthorized: Polarion did not accept this token' };
   };
 
   if (oauth && publicUrl && gptClient) {
@@ -670,6 +716,10 @@ export function startMcpHttpServer(): HttpServer {
       console.log('[WARN] DNS-rebinding protection is OFF. Set MCP_ALLOWED_HOSTS to enable it.');
     }
   });
+
+  // Node closes idle connections after 5 s; a proxy that reuses one at that moment gets a 502.
+  httpServer.keepAliveTimeout = 65_000;
+  httpServer.headersTimeout = 66_000;
 
   const shutdown = () => {
     console.log('\n[INFO] Shutting down MCP Streamable HTTP server...');

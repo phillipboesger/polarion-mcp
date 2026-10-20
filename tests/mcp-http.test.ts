@@ -30,7 +30,7 @@ const MCP_HEADERS: Record<string, string> = {
  * teardown helpers.
  */
 async function startApp() {
-  const { app, closeAllSessions } = createMcpHttpApp()
+  const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true })
   const server = app.listen(0)
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const { port } = server.address() as AddressInfo

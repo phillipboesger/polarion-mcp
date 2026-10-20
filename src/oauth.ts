@@ -80,6 +80,8 @@ interface PendingLogin {
 
 interface AuthorizationCode extends PendingLogin {
   polarionToken: string;
+  /** Set once the PKCE challenge was handed out; see challengeForAuthorizationCode. */
+  challenged?: boolean;
 }
 
 /** Sealed inside a refresh token. */
@@ -561,6 +563,14 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     if (!entry || entry.flow !== 'mcp' || !entry.codeChallenge || entry.expiresAt < Date.now() || entry.clientId !== client.client_id) {
       throw new InvalidGrantError('Invalid authorization code');
     }
+    // The SDK checks the verifier after this returns and calls exchangeAuthorizationCode
+    // (which consumes the code) only if it matches. A code can be challenged once, so a
+    // wrong verifier burns it instead of leaving it open for further guesses.
+    if (entry.challenged) {
+      this.codes.delete(authorizationCode);
+      throw new InvalidGrantError('Invalid authorization code');
+    }
+    entry.challenged = true;
     return entry.codeChallenge;
   }
 
@@ -580,7 +590,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     redirectUri?: string
   ): Promise<OAuthTokens> {
     const entry = this.redeem(authorizationCode, 'mcp', client.client_id);
-    if (redirectUri !== undefined && !safeEqual(redirectUri, entry.redirectUri)) {
+    // Mandatory: the authorization request always carried one (RFC 6749 section 4.1.3).
+    if (redirectUri === undefined || !safeEqual(redirectUri, entry.redirectUri)) {
       throw new InvalidGrantError('Redirect URI does not match the authorization request');
     }
     return this.issue(entry);

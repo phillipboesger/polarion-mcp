@@ -115,7 +115,14 @@ export function getBearerTokenForScheme(schemeName: string): string | undefined 
  * @returns A short, stable, non-reversible id of the current caller.
  */
 export function callerCacheScope(): string {
-  const token = getBearerToken();
+  return tokenScope(getBearerToken());
+}
+
+/**
+ * @param token - A Polarion token, if any.
+ * @returns A short, stable, non-reversible id of it.
+ */
+export function tokenScope(token: string | undefined): string {
   return token ? createHash('sha256').update(token).digest('hex').slice(0, 16) : 'no-token';
 }
 
