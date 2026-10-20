@@ -252,6 +252,31 @@ test("executeApiTool returns validation errors before making an API request", as
   }
 })
 
+test("a wrong type inside attributes still names the expected type although null is also allowed", async () => {
+  const definition: McpToolDefinition = {
+    ...emptyDefinition,
+    name: "patch_item",
+    method: "patch",
+    inputSchema: {
+      type: "object",
+      properties: {
+        requestBody: {
+          type: "object",
+          properties: { data: { type: "object", properties: { attributes: { type: "object", properties: { dueDate: { type: "string" } } } } } },
+        },
+      },
+    },
+  }
+  const result = await executeApiTool("patch_item", definition, { requestBody: { data: { attributes: { dueDate: 5 } } } }, {})
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.match(message.text, /requestBody\.data\.attributes\.dueDate/)
+    assert.match(message.text, /Expected string, received number/)
+    assert.doesNotMatch(message.text, /invalid_union/)
+  }
+})
+
 test("executeApiTool reports unresolved path parameters before any network request", async () => {
   const definition: McpToolDefinition = {
     ...emptyDefinition,

@@ -372,6 +372,31 @@ function oneOfAsAnyOf(schema: any): any {
   return copy;
 }
 
+/**
+ * Lets every property of a JSON:API `attributes` object be `null`. Polarion
+ * clears a field when a PATCH sends `null` for it (checked against 2606:
+ * dueDate and description are emptied), but the OpenAPI schema types them as
+ * plain string/object, so the validation would refuse the only way to clear a
+ * field. Nothing else is widened: path/query arguments stay non-null.
+ *
+ * @param schema - A JSON Schema (sub)tree.
+ * @returns A copy where each `attributes` property also accepts null.
+ */
+function nullableAttributes(schema: any): any {
+  if (Array.isArray(schema)) return schema.map(nullableAttributes);
+  if (!schema || typeof schema !== 'object') return schema;
+  const copy: any = {};
+  for (const [key, value] of Object.entries(schema)) copy[key] = nullableAttributes(value);
+  if (copy.properties?.attributes?.properties) {
+    const widened: Record<string, any> = {};
+    for (const [name, prop] of Object.entries<any>(copy.properties.attributes.properties)) {
+      widened[name] = { anyOf: [prop, { type: 'null' }] };
+    }
+    copy.properties = { ...copy.properties, attributes: { ...copy.properties.attributes, properties: widened } };
+  }
+  return copy;
+}
+
 const zodSchemaCache = new WeakMap<object, z.ZodTypeAny>();
 
 /**
@@ -388,7 +413,7 @@ export function compileZodSchema(jsonSchema: object): z.ZodTypeAny {
   // first so dynamic data like Work Item customFields survives validation.
   // eval is safe here: the code is generated from our own static tools.ts
   // schemas, never from request input.
-  const zodSchema = eval(jsonSchemaToZod(oneOfAsAnyOf(makeNestedObjectsPermissive(jsonSchema))));
+  const zodSchema = eval(jsonSchemaToZod(oneOfAsAnyOf(nullableAttributes(makeNestedObjectsPermissive(jsonSchema)))));
   if (typeof zodSchema?.parse !== 'function') {
     throw new Error('Eval did not produce a valid Zod schema.');
   }
