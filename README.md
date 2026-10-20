@@ -305,7 +305,9 @@ read the tokens.
 - **Claude.ai** (also syncs to Claude Desktop and mobile): *Settings >
   Connectors > Add custom connector*, name it, URL
   `https://mcp.example.com/mcp`, leave *OAuth Client ID/Secret* empty (the
-  client registers itself). Click *Connect*, paste your PAT on the page that
+  client registers itself). If Claude.ai offers a choice of OAuth client,
+  pick automatic (dynamic) registration: this server does not support
+  Claude's published client identity. Click *Connect*, paste your PAT on the page that
   opens, click *Connect* again. On Team/Enterprise plans an owner may have to
   add the connector for the organization first.
 - **Claude Code**: `claude mcp add --transport http polarion https://mcp.example.com/mcp`,
@@ -422,8 +424,6 @@ See `docs/examples.http` for ready-to-run HTTP requests and `docs/client-example
 | `postWorkItems` | Create new work items |
 | `patchWorkItem` | Update an existing work item |
 
-All tools accept an optional `rawPath` parameter to override REST endpoint paths without code changes — useful when your Polarion version uses non-standard paths.
-
 The full list is generated from `src/tools.ts` via `npm run generate-tools`.
 
 ---
@@ -446,6 +446,11 @@ MCP_HTTP_HOST=127.0.0.1                # bind address (default 0.0.0.0); use loo
 MCP_PUBLIC_URL=https://mcp.example.com # public HTTPS origin (no path); enables the OAuth login page
 MCP_ALLOWED_HOSTS=your-host.com        # DNS-rebinding protection (comma-separated)
 MCP_TOKEN_SECRET=...                   # min. 32 chars; keeps OAuth logins valid across restarts (keep it fixed)
+MCP_ALLOWED_REDIRECT_PREFIXES=https://claude.ai/api/mcp/auth_callback  # OAuth callbacks clients may register (set it!)
+TRUST_PROXY=loopback                   # behind a reverse proxy: rate limits per client, not per proxy
+MCP_TOOLS=getWorkItems,getWorkItem     # tool allowlist; others are neither listed nor callable
+MCP_READ_ONLY=true                     # only read-only tools
+MCP_OMIT_OUTPUT_SCHEMA=true            # halves tools/list (about 980 KB to 530 KB)
 GPT_CLIENT_ID=polarion-gpt             # Custom GPT OAuth client (method E), with GPT_CLIENT_SECRET
 GPT_CLIENT_SECRET=...
 NODE_TLS_REJECT_UNAUTHORIZED=0         # disable SSL verification for self-signed certs
@@ -506,7 +511,7 @@ src/
 **Design notes:**
 
 - Tools are auto-generated from the Polarion OpenAPI spec via `npm run regenerate`.
-- REST paths may differ across Polarion versions. Every tool supports `rawPath` to override endpoints without code edits.
+- REST paths may differ across Polarion versions; regenerate the tools from your instance's OpenAPI spec (`npm run regenerate`).
 - No caching by design. Retries only on 429/5xx with short backoff.
 - Bearer token is automatically sanitized from all logs and error messages.
 
@@ -517,6 +522,8 @@ src/
 - **No stored credentials in HTTP mode** — the server keeps no Polarion token of its own; every `/mcp` request carries the caller's own Polarion PAT, or an access token from the OAuth login that carries the PAT encrypted under `MCP_TOKEN_SECRET` (the client cannot read it), and Polarion authorizes each call under that user
 - **Serve it over TLS** — the PAT travels in the request header; terminate TLS in front of the server and bind the plaintext port to loopback (`MCP_HTTP_HOST=127.0.0.1`)
 - **DNS-rebinding protection** — optional `MCP_ALLOWED_HOSTS` allow-list validates the `Host` header on every request
+- **OAuth redirect allowlist** — client registration is open; `MCP_ALLOWED_REDIRECT_PREFIXES` limits which callbacks may receive a login, so nobody can phish a PAT through a genuine login link on your domain
+- **Server-side tool filter** — `MCP_TOOLS` / `MCP_READ_ONLY` remove tools entirely (not listed, not callable)
 - **No Secrets in Logs** — tokens are automatically removed from all log output and error messages
 
 ---

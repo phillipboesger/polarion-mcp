@@ -4,16 +4,18 @@ import type { AddressInfo } from "node:net"
 import { createHash, randomBytes } from "node:crypto"
 
 import { createMcpHttpApp } from "../src/mcp-http-server.js"
+import type { TokenCheck } from "../src/oauth.js"
 
 const PUBLIC_URL = "http://127.0.0.1"
 const SECRET = "a-test-token-secret-that-is-long-enough-0123456789"
 const REDIRECT = "https://client.example/callback"
 
 /** Polarion stand-in: which PATs it accepts, and whether it is reachable at all. */
-const polarion = { accepted: new Set<string>(), reachable: true }
+const polarion = { accepted: new Set<string>(), forbidden: new Set<string>(), reachable: true }
 
-async function validateToken(token: string): Promise<boolean | "unavailable"> {
+async function validateToken(token: string): Promise<TokenCheck> {
   if (!polarion.reachable) return "unavailable"
+  if (polarion.forbidden.has(token)) return "forbidden"
   return polarion.accepted.has(token)
 }
 
@@ -365,6 +367,66 @@ test("the login form is rate-limited, since every attempt checks a PAT against P
       })).status
     }
     assert.equal(last, 429)
+  } finally {
+    await stop()
+  }
+})
+
+/** Opens the login page for a fresh client and submits `token`, returning the raw response. */
+async function submitLogin(base: string, token: string) {
+  const { client_id } = await register(base)
+  const authorize = new URL(`${base}/authorize`)
+  authorize.searchParams.set("response_type", "code")
+  authorize.searchParams.set("client_id", client_id)
+  authorize.searchParams.set("redirect_uri", REDIRECT)
+  authorize.searchParams.set("code_challenge", createHash("sha256").update("v").digest("base64url"))
+  authorize.searchParams.set("code_challenge_method", "S256")
+  const page = await fetch(authorize, { redirect: "manual" })
+  const loginId = /name="login_id" value="([^"]+)"/.exec(await page.text())?.[1] as string
+  return fetch(`${base}/polarion-login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ login_id: loginId, token }),
+    redirect: "manual",
+  })
+}
+
+test("a token Polarion knows but denies (403) gets its own message, not 'did not accept'", async () => {
+  const pat = `pat-${randomBytes(8).toString("hex")}`
+  polarion.forbidden.add(pat)
+  const { base, stop } = await startApp()
+  try {
+    const res = await submitLogin(base, pat)
+    assert.equal(res.status, 400)
+    const html = await res.text()
+    assert.match(html, /HTTP 403/)
+    assert.match(html, /administrator/)
+    assert.doesNotMatch(html, /did not accept/)
+  } finally {
+    await stop()
+  }
+})
+
+test("whitespace and line breaks picked up while copying a PAT are removed, not only at the edges", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp()
+  try {
+    const broken = ` ${pat.slice(0, 6)}\r\n${pat.slice(6, 10)} ${pat.slice(10)}\n`
+    assert.equal((await submitLogin(base, broken)).status, 302)
+  } finally {
+    await stop()
+  }
+})
+
+test("a PAT that turns 403 ends the session at the next refresh with invalid_grant", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp()
+  try {
+    const { client, tokens } = await login(base, pat)
+    polarion.forbidden.add(pat)
+    const res = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(res.status, 400)
+    assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
   } finally {
     await stop()
   }

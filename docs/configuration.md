@@ -17,12 +17,17 @@
 - GPT_CLIENT_ID / GPT_CLIENT_SECRET: Enable per-user OAuth for ChatGPT Custom GPT Actions on the Streamable HTTP MCP server (needs MCP_PUBLIC_URL). Enter the same values in the GPT editor; endpoints are `/gpt/authorize` and `/gpt/token`.
 - MCP_HTTP_HOST: Optional bind address for the MCP HTTP server (default 0.0.0.0). Set it to 127.0.0.1 when a TLS reverse proxy sits in front, so the plaintext port that carries client PATs is not reachable from outside.
 - MCP_ALLOWED_HOSTS: Optional comma-separated Host allow-list; setting it enables DNS-rebinding protection for the MCP HTTP server.
+- MCP_ALLOWED_REDIRECT_PREFIXES: Optional comma-separated allowlist of OAuth redirect URIs that clients may register (MCP HTTP server with OAuth). An entry ending in `/` is a prefix, any other must match exactly; loopback entries such as `http://localhost/callback` match on any port. Unset, any client may register any redirect URI, so anyone can send your users a genuine login link that hands their Polarion access to a callback of their choosing. Set it for every production deployment, e.g. `https://claude.ai/api/mcp/auth_callback`. A refused registration is logged with its redirect URIs. Registrations issued before it was set stop working if their redirect URIs are not on the list.
+- TRUST_PROXY: Express `trust proxy` setting for the MCP HTTP server behind a reverse proxy: `loopback` for a proxy on the same host, a hop count such as `1`, or a comma-separated list of proxy addresses. Without it, every request behind the proxy shares one rate-limit counter (login, token, registration), so one client can lock everyone out. `true` is refused: it would trust an X-Forwarded-For sent by anyone.
+- MCP_TOOLS: Optional comma-separated allowlist of tool names. Other tools are neither listed nor callable, over MCP or the REST wrapper. Unknown names are logged at startup.
+- MCP_READ_ONLY: `true` keeps only tools annotated `readOnlyHint: true` (combined with MCP_TOOLS, both must match).
+- MCP_OMIT_OUTPUT_SCHEMA: `true` leaves output schemas out of tools/list, which roughly halves its size (about 980 KB to 530 KB for all tools). Results still carry structured content.
 - LOG_LEVEL: Reserved for logging configuration (informational only).
 
 ## Minimal Configuration by Mode
 
 - MCP stdio mode requires API_BASE_URL and BEARER_TOKEN.
-- Streamable HTTP MCP mode (Claude.ai, ChatGPT) requires only API_BASE_URL, and optionally MCP_HTTP_PORT / MCP_HTTP_HOST / MCP_ALLOWED_HOSTS. Each client authenticates with its own Polarion PAT as the Bearer token of every `/mcp` request. For the OAuth login add MCP_PUBLIC_URL and MCP_TOKEN_SECRET; for Custom GPT OAuth also GPT_CLIENT_ID and GPT_CLIENT_SECRET.
+- Streamable HTTP MCP mode (Claude.ai, ChatGPT) requires only API_BASE_URL, and optionally MCP_HTTP_PORT / MCP_HTTP_HOST / MCP_ALLOWED_HOSTS. Each client authenticates with its own Polarion PAT as the Bearer token of every `/mcp` request. For the OAuth login add MCP_PUBLIC_URL, MCP_TOKEN_SECRET and MCP_ALLOWED_REDIRECT_PREFIXES; behind a reverse proxy also TRUST_PROXY; for Custom GPT OAuth also GPT_CLIENT_ID and GPT_CLIENT_SECRET. HTTP_API_KEY does not apply to this server.
 - REST HTTP mode (ChatGPT) requires API_BASE_URL, BEARER_TOKEN, HTTP_API_KEY, and optionally HTTP_PORT.
 
 ## Token Storage Guidance

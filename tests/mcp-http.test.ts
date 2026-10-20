@@ -117,3 +117,52 @@ test("initialize establishes a session and tools/list returns the generated tool
     await stop()
   }
 })
+
+test("an unknown session id gets 404 on POST, GET and DELETE, so the client re-initializes", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const headers = { ...MCP_HEADERS, authorization: `Bearer ${TOKEN}`, "mcp-session-id": "gone-after-restart" }
+    const post = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    })
+    assert.equal(post.status, 404)
+    assert.equal((await post.json() as any).error.message, "Session not found")
+    assert.equal((await fetch(`${base}/mcp`, { method: "GET", headers })).status, 404)
+    assert.equal((await fetch(`${base}/mcp`, { method: "DELETE", headers })).status, 404)
+  } finally {
+    await stop()
+  }
+})
+
+test("a request without a session id that is not initialize stays a 400", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const headers = { ...MCP_HEADERS, authorization: `Bearer ${TOKEN}` }
+    const post = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    })
+    assert.equal(post.status, 400)
+    assert.equal((await fetch(`${base}/mcp`, { method: "GET", headers })).status, 400)
+    assert.equal((await fetch(`${base}/mcp`, { method: "DELETE", headers })).status, 400)
+  } finally {
+    await stop()
+  }
+})
+
+test("an unknown session id without a Bearer token is still a 401, not a session probe", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const res = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: { ...MCP_HEADERS, "mcp-session-id": "gone-after-restart" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    })
+    assert.equal(res.status, 401)
+  } finally {
+    await stop()
+  }
+})
