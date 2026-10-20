@@ -151,6 +151,7 @@ Placeholders: enumeration values are option ids, which are project-specific (pri
 {"data": {"type": "workitems", "id": "PROJECT/WI-123", "attributes": {"title": "New title"}}}
 \`\`\`
 Send only the fields that change. The \`id\` is the composite "PROJECT/WI-123".
+To empty a field, send \`null\` for it (for example \`"dueDate": null\`).
 Relationships in a PATCH replace the whole set: to add an assignee, send the existing ones too.
 
 ## Change status

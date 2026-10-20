@@ -17,7 +17,7 @@
  * - Security Schemes: Authentication methods (Bearer, OAuth2, API Key, Basic Auth)
  */
 
-import { ZodError } from "zod";
+import { ZodError, type ZodIssue } from "zod";
 import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -491,6 +491,18 @@ function summarizeMultipartForPreview(requestBody: unknown): unknown {
 }
 
 /**
+ * Attributes also accept null (see nullableAttributes), which turns their type
+ * error into a union error; report the original branch's message instead.
+ */
+function issueBranch(issue: ZodIssue): ZodIssue | undefined {
+  if (issue.code !== 'invalid_union') return undefined;
+  const last = issue.unionErrors.at(-1)?.issues[0];
+  return last?.code === 'invalid_type' && last.expected === 'null' ? issue.unionErrors[0]?.issues[0] : undefined;
+}
+const issueCode = (issue: ZodIssue): string => issueBranch(issue)?.code ?? issue.code;
+const issueMessage = (issue: ZodIssue): string => issueBranch(issue)?.message ?? issue.message;
+
+/**
  * Execute an API tool (main entry point for API operations)
  *
  * This is the main orchestrator function that:
@@ -576,7 +588,7 @@ export async function executeApiTool(
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
-        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${e.code}): ${e.message}`).join(', ')}`;
+        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${issueCode(e)}): ${issueMessage(e)}`).join(', ')}`;
         return { content: [{ type: 'text', text: validationErrorMessage }], isError: true };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);

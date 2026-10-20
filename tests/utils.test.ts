@@ -248,3 +248,46 @@ test("formatApiError reports a download over the size cap as too large, not as a
   assert.match(message, /x\/content/)
   assert.doesNotMatch(message, /Network Error/)
 })
+
+test("getZodSchemaFromJsonSchema lets null clear a field on a JSON:API update (verified against Polarion 2606: PATCH with null empties dueDate and description)", () => {
+  const schema = getZodSchemaFromJsonSchema(
+    {
+      type: "object",
+      properties: {
+        page_size_: { type: "integer" },
+        requestBody: {
+          type: "object",
+          properties: {
+            data: {
+              type: "object",
+              properties: {
+                type: { type: "string" },
+                attributes: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    dueDate: { type: "string", format: "date" },
+                    description: { type: "object", properties: { type: { type: "string" }, value: { type: "string" } } },
+                    hyperlinks: { type: "array", items: { type: "object" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "patchWorkItem",
+  )
+  const body = (attributes: unknown) => ({ requestBody: { data: { type: "workitems", attributes } } })
+
+  for (const attrs of [{ dueDate: null }, { description: null }, { hyperlinks: null }, { title: null }, { custom: null }]) {
+    assert.doesNotThrow(() => schema.parse(body(attrs)), JSON.stringify(attrs))
+  }
+  // Wrong types stay rejected: null is the only addition.
+  assert.throws(() => schema.parse(body({ dueDate: 5 })))
+  assert.throws(() => schema.parse(body({ description: "text" })))
+  // Only attributes are widened: a null path/query argument is still refused.
+  assert.throws(() => schema.parse({ page_size_: null }))
+  assert.throws(() => schema.parse({ requestBody: { data: { type: null } } }))
+})
