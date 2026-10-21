@@ -1,0 +1,138 @@
+name: Live Polarion
+
+# Runs the built server against a real Polarion (a throwaway container started
+# from ghcr.io/phillipboesger/polarion-docker). The unit tests stub Polarion, so
+# only this job can show what Polarion really answers. It takes about 15 minutes
+# because Polarion has to boot, so it runs for changes to the server and not for
+# docs.
+#
+# The image is private. Pulling it needs one of:
+#   - the secret GHCR_PULL_TOKEN (a token with read:packages), or
+#   - this repository added under "Manage Actions access" of the package,
+#     in which case the workflow's own GITHUB_TOKEN is enough.
+# Pull requests from forks never receive secrets, so the job is skipped for them.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/live/**"
+      - "scripts/live/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/live-polarion.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/live/**"
+      - "scripts/live/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/live-polarion.yml"
+  schedule:
+    # Monday 05:00 UTC: catches a changed Polarion image without a code change.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: live-polarion-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live:
+    name: Polarion ${{ matrix.polarion }}
+    # Fork PRs have no access to the registry credentials.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pin the tag: ":latest" follows the newest release and would change under us.
+        polarion: ["2506", "2606"]
+    env:
+      IMAGE: ghcr.io/phillipboesger/polarion-docker:v${{ matrix.polarion }}
+      POLARION_URL: http://localhost:8080
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install and build
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_PULL_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Start Polarion
+        run: |
+          docker pull "$IMAGE"
+          docker run -d --name polarion --platform linux/amd64 \
+            -p 8080:80 --memory 8g --shm-size=256m \
+            -e JAVA_OPTS="-Xmx3g -Xms1g" \
+            "$IMAGE"
+
+      - name: Wait for Polarion and activate the trial
+        run: |
+          fail() { echo "::error::$1"; docker logs polarion --tail 100 || true; docker exec polarion sh -c 'tail -n 300 /var/log/polarion/polarion.log' || true; exit 1; }
+
+          # The activation page answers 200 once the web application is up.
+          for _ in $(seq 1 120); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/")" = "200" ] && break
+            [ "$(docker inspect -f '{{.State.Running}}' polarion)" = "true" ] || fail "container stopped"
+            sleep 10
+          done
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/")" = "200" ] || fail "Polarion did not come up in 20 minutes"
+
+          curl -fsS -X POST "$POLARION_URL/polarion/activate/entry" \
+            -H "Content-Type: application/x-www-form-urlencoded" --data "trial=true" | tee /dev/stderr | grep -q '"activated":true' \
+            || fail "trial activation failed"
+
+          # REST answers 401 without a token once the repository is ready.
+          for _ in $(seq 1 60); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/rest/v1/projects")" = "401" ] && exit 0
+            sleep 10
+          done
+          fail "the REST API did not come up"
+
+      - name: Create a personal access token
+        # Polarion has no API for this. The script drives the token page of the UI;
+        # Playwright is installed next to a copy of it, not into this package.
+        run: |
+          dir="$RUNNER_TEMP/pat"
+          mkdir -p "$dir"
+          cp scripts/live/create-pat.mjs "$dir/"
+          cd "$dir"
+          npm init -y >/dev/null
+          npm install --silent playwright@1.52.0
+          npx playwright install --with-deps chromium
+          PAT=$(node create-pat.mjs)
+          echo "::add-mask::$PAT"
+          echo "LIVE_PAT=$PAT" >> "$GITHUB_ENV"
+
+      - name: Run the live suite
+        run: npm run test:live
+        env:
+          LIVE_API_BASE_URL: ${{ env.POLARION_URL }}/polarion/rest/v1
+
+      - name: Polarion log on failure
+        if: failure()
+        run: |
+          docker logs polarion --tail 100 || true
+          docker exec polarion sh -c 'tail -n 400 /var/log/polarion/polarion.log' || true
