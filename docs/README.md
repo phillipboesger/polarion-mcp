@@ -17,6 +17,7 @@ This directory contains the full repository documentation. Start here and follow
 - Security: [security.md](./security.md)
 - Resources and prompts: [resources-and-prompts.md](./resources-and-prompts.md)
 - Troubleshooting: [troubleshooting.md](./troubleshooting.md)
+- Live tests against a real Polarion: [live-tests.md](./live-tests.md)
 - Polarion version support and upgrades: [polarion-versioning.md](./polarion-versioning.md)
 - Worked end-to-end example: [example-task.md](./example-task.md)
 - Contributing guide: [../.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md)
