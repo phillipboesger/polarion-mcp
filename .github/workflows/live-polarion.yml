@@ -2,15 +2,15 @@ name: Live Polarion
 
 # Runs the built server against a real Polarion (a throwaway container started
 # from ghcr.io/phillipboesger/polarion-docker). The unit tests stub Polarion, so
-# only this job can show what Polarion really answers. It takes about 15 minutes
+# only this job can show what Polarion really answers. It takes about 10 minutes
 # because Polarion has to boot, so it runs for changes to the server and not for
 # docs.
 #
-# The image is private. Pulling it needs one of:
-#   - the secret GHCR_PULL_TOKEN (a token with read:packages), or
-#   - this repository added under "Manage Actions access" of the package,
-#     in which case the workflow's own GITHUB_TOKEN is enough.
-# Pull requests from forks never receive secrets, so the job is skipped for them.
+# The image is private. The package grants this repository read access
+# ("Manage Actions access" in the package settings), so the workflow's own
+# short-lived GITHUB_TOKEN is enough and no long-lived secret exists.
+# Pull requests from forks and from Dependabot get no such access; the job is
+# skipped for them.
 
 on:
   push:
@@ -41,13 +41,14 @@ permissions:
 
 concurrency:
   group: live-polarion-${{ github.ref }}
-  cancel-in-progress: true
+  # Only superseded PR runs are cancelled; a main push or the weekly run must finish to leave a result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   live:
     name: Polarion ${{ matrix.polarion }}
-    # Fork PRs have no access to the registry credentials.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Fork and Dependabot PRs get a read-only token without package access.
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -61,6 +62,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -78,7 +81,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_PULL_TOKEN || secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start Polarion
         run: |

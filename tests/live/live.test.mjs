@@ -35,6 +35,7 @@ describe("stdio server against Polarion", () => {
   });
 
   after(async () => {
+    if (!client) return;
     for (const id of created) {
       await call(client, "deleteWorkItems", { projectId: PROJECT, requestBody: { data: [{ type: "workitems", id: `${PROJECT}/${id}` }] } });
     }

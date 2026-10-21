@@ -9,9 +9,9 @@
 
 ## In CI
 
-`.github/workflows/live-polarion.yml` starts `ghcr.io/phillipboesger/polarion-docker` (2506 and 2606), activates the 30-day trial, creates a personal access token through the web UI and runs the suite. It runs on pull requests and pushes that touch the server, weekly on Mondays, and on demand. A run takes about 15 minutes, almost all of it Polarion booting.
+`.github/workflows/live-polarion.yml` starts `ghcr.io/phillipboesger/polarion-docker` (2506 and 2606), activates the 30-day trial, creates a personal access token through the web UI and runs the suite. It runs on pull requests and pushes that touch the server, weekly on Mondays, and on demand. A run takes about 10 minutes, almost all of it Polarion booting.
 
-The image is private. The workflow logs in with the secret `GHCR_PULL_TOKEN` (a token with `read:packages`) and falls back to the workflow's own token, which works once this repository is listed under "Manage Actions access" of the package.
+The image is private. The package lists this repository under "Manage Actions access", so the workflow's own `GITHUB_TOKEN` can pull it and no stored secret is needed. Pull requests from forks and from Dependabot do not get that access and skip the job.
 
 ## Locally
 
