@@ -237,10 +237,11 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
 
   /**
    * @param uris - A client's redirect URIs.
-   * @returns True if every one is allowed.
+   * @returns True if there is at least one and every one is allowed. A client
+   *   without a callback cannot complete a login, so it is not worth a registration.
    */
   private redirectsAllowed(uris: readonly string[]): boolean {
-    return uris.every(uri => isRedirectAllowed(String(uri), this.redirectAllowlist));
+    return uris.length > 0 && uris.every(uri => isRedirectAllowed(String(uri), this.redirectAllowlist));
   }
 
   /**

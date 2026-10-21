@@ -125,3 +125,19 @@ test("the login page names the host the login hands its result to", async () => 
     await stop()
   }
 })
+
+test("a registration without any redirect URI is refused, with or without an allowlist", async () => {
+  for (const allowlist of [undefined, [CLAUDE]]) {
+    const { base, stop } = await startApp(allowlist)
+    try {
+      const res = await fetch(`${base}/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ client_name: "No callback", redirect_uris: [], token_endpoint_auth_method: "none" }),
+      })
+      assert.equal(res.status, 400)
+    } finally {
+      await stop()
+    }
+  }
+})
