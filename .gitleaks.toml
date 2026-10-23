@@ -1,0 +1,10 @@
+# Throwaway values used only by tests; none of them is a real credential.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test-only TLS fixtures and fixed token secrets"
+paths = [
+  '''tests/fixtures/cimd-test-(key|cert)\.pem''',
+  '''tests/[A-Za-z0-9_./-]+\.test\.ts''',
+]
