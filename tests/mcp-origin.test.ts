@@ -123,6 +123,21 @@ test("an explicitly configured request host origin can submit the OAuth login fo
   }
 })
 
+test("a request Host that is not configured does not make its Origin same-origin", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const evilHostOrigin = `http://${new URL(base).host}`
+    const res = await fetch(`${base}/polarion-login`, {
+      method: "POST",
+      headers: { origin: evilHostOrigin, "content-type": "application/x-www-form-urlencoded" },
+      body: "login_id=none&token=pat",
+    })
+    assert.equal(res.status, 403)
+  } finally {
+    await stop()
+  }
+})
+
 test("an allowed Origin gets CORS access and the MCP response headers are exposed", async () => {
   const origin = "https://trusted.example"
   const { base, stop } = await startApp([origin])
@@ -226,6 +241,105 @@ test("GPT token limits are isolated by trusted client IP and still cap one IP", 
   }
 })
 
+test("600 successful Custom GPT refreshes from one trusted IP do not hit token ceilings", async () => {
+  const { app, closeAllSessions } = createMcpHttpApp({
+    publicUrl: new URL("http://127.0.0.1"),
+    gptClient: { clientId: "gpt-client", clientSecret: "gpt-secret" },
+    validateToken: async () => true,
+    trustProxy: "loopback",
+  })
+  const server = app.listen(0)
+  await new Promise<void>((resolve) => server.once("listening", resolve))
+  const { port } = server.address() as AddressInfo
+  const base = `http://127.0.0.1:${port}`
+  try {
+    const authorize = new URL(`${base}/gpt/authorize`)
+    authorize.search = new URLSearchParams({
+      response_type: "code",
+      client_id: "gpt-client",
+      redirect_uri: "https://chatgpt.com/aip/g-1/oauth/callback",
+      state: "gpt-refresh-state",
+    }).toString()
+    const loginPage = await fetch(authorize)
+    assert.equal(loginPage.status, 200)
+    const loginId = /name="login_id" value="([^"]+)"/.exec(await loginPage.text())?.[1]
+    assert.ok(loginId)
+    const login = await fetch(`${base}/polarion-login`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ login_id: loginId, token: "valid-pat-for-gpt-refresh" }),
+      redirect: "manual",
+    })
+    assert.equal(login.status, 302)
+    const code = new URL(login.headers.get("location") as string).searchParams.get("code")
+    assert.ok(code)
+    const tokenResponse = await fetch(`${base}/gpt/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: "gpt-client",
+        client_secret: "gpt-secret",
+        code,
+        redirect_uri: "https://chatgpt.com/aip/g-1/oauth/callback",
+      }),
+    })
+    assert.equal(tokenResponse.status, 200)
+    let refreshToken = (await tokenResponse.json() as { refresh_token: string }).refresh_token
+    for (let i = 0; i < 600; i++) {
+      const response = await fetch(`${base}/gpt/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "203.0.113.12" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: "gpt-client",
+          client_secret: "gpt-secret",
+          refresh_token: refreshToken,
+        }),
+      })
+      assert.equal(response.status, 200, `successful GPT refresh ${i + 1}`)
+      refreshToken = (await response.json() as { refresh_token: string }).refresh_token
+    }
+  } finally {
+    await closeAllSessions()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test("Custom GPT token failures hit the per-IP ceiling after 500 and spare another IP", async () => {
+  const { app, closeAllSessions } = createMcpHttpApp({
+    publicUrl: new URL("http://127.0.0.1"),
+    gptClient: { clientId: "gpt-client", clientSecret: "gpt-secret" },
+    validateToken: async () => true,
+    trustProxy: "loopback",
+  })
+  const server = app.listen(0)
+  await new Promise<void>((resolve) => server.once("listening", resolve))
+  const { port } = server.address() as AddressInfo
+  const base = `http://127.0.0.1:${port}`
+  const post = (ip: string, clientId: string) => fetch(`${base}/gpt/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": ip },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: clientId,
+      client_secret: "invalid-secret",
+      code: "bad",
+      redirect_uri: "https://chatgpt.com/aip/g-1/oauth/callback",
+    }),
+  })
+  try {
+    for (let i = 0; i < 500; i++) {
+      assert.equal((await post("203.0.113.13", `gpt-client-${i}`)).status, 401)
+    }
+    assert.equal((await post("203.0.113.13", "gpt-client-500")).status, 429)
+    assert.equal((await post("203.0.113.14", "gpt-client-other-ip")).status, 401)
+  } finally {
+    await closeAllSessions()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
 test("OAuth token rate-limit keys hash IP and client id into a fixed-length value", () => {
   const short = tokenRateLimitKey("203.0.113.1", "client-a")
   const long = tokenRateLimitKey("203.0.113.1", "x".repeat(100_000))
@@ -249,15 +363,24 @@ test("distinct OAuth client ids from one IP hit the per-IP token ceiling", async
       body: new URLSearchParams({ grant_type: "authorization_code", client_id: clientId, code: "bad" }),
     })
     let response: Response | undefined
-    for (let i = 0; i < 501; i++) response = await post(`client-${i}`)
-    assert.equal(response?.status, 429)
+    // Trust the forwarded address so the test exercises the configured client IP, not loopback.
+    for (let i = 0; i < 500; i++) {
+      response = await post(`client-${i}`)
+      assert.equal(response.status, 400, `failing attempt ${i + 1} must reach OAuth validation`)
+    }
+    assert.equal((await post("client-500")).status, 429)
+    assert.equal((await fetch(`${base}/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "203.0.113.10" },
+      body: new URLSearchParams({ grant_type: "authorization_code", client_id: "different-ip-client", code: "bad" }),
+    })).status, 400)
   } finally {
     await stop()
   }
 })
 
-test("public OAuth startup warns when no trusted proxy is configured", async () => {
-  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "TRUST_PROXY"] as const
+test("public OAuth startup warns when no trusted proxy is configured and reads the token IP limit", async () => {
+  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_RATE_LIMIT_TOKEN_IP", "TRUST_PROXY"] as const
   const previous = new Map(envKeys.map(key => [key, process.env[key]]))
   const warnings: string[] = []
   const originalLog = console.log
@@ -268,11 +391,20 @@ test("public OAuth startup warns when no trusted proxy is configured", async () 
     process.env.MCP_PUBLIC_URL = "https://mcp.example"
     process.env.MCP_TOKEN_SECRET = "a-secret-long-enough-for-startup-warning-test"
     process.env.MCP_ALLOWED_REDIRECT_PREFIXES = "https://claude.ai/api/mcp/auth_callback"
+    process.env.MCP_RATE_LIMIT_TOKEN_IP = "1"
     delete process.env.TRUST_PROXY
     console.log = () => undefined
     server = startMcpHttpServer({ logger: { warn: message => warnings.push(message) } })
     await new Promise<void>((resolve) => server?.once("listening", resolve))
     assert.ok(warnings.some(message => /shared IP|shared egress|TRUST_PROXY/i.test(message)))
+    const { port } = server?.address() as AddressInfo
+    const post = (clientId: string) => fetch(`http://127.0.0.1:${port}/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "authorization_code", client_id: clientId, code: "bad" }),
+    })
+    assert.equal((await post("startup-cap-a")).status, 400)
+    assert.equal((await post("startup-cap-b")).status, 429)
   } finally {
     console.log = originalLog
     if (server?.listening) await new Promise<void>((resolve) => server?.close(() => resolve()))
