@@ -35,7 +35,7 @@ Mutating tools accept `dry_run: true`. This validates and prepares the request, 
 
 `MCP_MAX_RESPONSE_CHARS` sets the maximum text content length for tool responses; the default is 100,000 characters. The text representation may be truncated, while `structuredContent` remains complete. See [configuration.md](./configuration.md) for the setting.
 
-Successful responses preserve Polarion rich-text values and add `value_markdown` for HTML rich-text fields. Write guards fail closed when supported enum, custom-field key, or Work Item user-reference validation cannot confirm a value. See [Features](./features.md) for coverage details.
+Read tools accept `response_format: "concise" | "detailed"`. It defaults to `detailed`, which preserves the complete response. `concise` drops rich-text HTML when a `value_markdown` sibling exists, removes JSON:API links and metadata except `links.next` and `meta.totalCount`, and applies a small default sparse fieldset to large list tools when `fields` is omitted. Any caller-supplied `fields` value is preserved. Successful responses add `value_markdown` for HTML rich-text fields. Write guards fail closed when supported enum, custom-field key, or Work Item user-reference validation cannot confirm a value. See [Features](./features.md) for coverage details.
 
 ## Quality checks
 

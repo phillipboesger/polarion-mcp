@@ -17,7 +17,17 @@ for (const line of report.split(/\r?\n/)) {
   }
 }
 
-const targets = ['src/oauth.ts', 'src/cimd.ts', 'src/sealed.ts', 'src/guards.ts', 'src/tool-filter.ts', 'src/virtual-tools.ts', 'src/extensions.ts']
+// One module per line so parallel feature branches merge without conflicts.
+const targets = [
+  'src/oauth.ts',
+  'src/cimd.ts',
+  'src/sealed.ts',
+  'src/guards.ts',
+  'src/tool-filter.ts',
+  'src/virtual-tools.ts',
+  'src/extensions.ts',
+  'src/shaping.ts',
+]
 const sourceFiles = [...files].filter(([file]) => file.startsWith('src/') && file !== 'src/tools.ts')
 if (sourceFiles.length === 0) throw new Error('coverage/lcov.info contains no eligible src/*.ts files')
 

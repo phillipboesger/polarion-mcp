@@ -1,0 +1,38 @@
+/** Hand-written argument examples and explicit tool-selection guidance. */
+export const TOOL_EXAMPLES = {
+  getWorkItems: [{ projectId: "myproject", query: "type:requirement AND status:open", fields: { workitems: "id,title,status" }, "page[size]": 25 }],
+  getAllWorkItems: [{ query: "type:requirement", fields: { workitems: "id,title" }, "page[size]": 25 }],
+  getWorkItem: [{ projectId: "myproject", workItemId: "WI-123", fields: { workitems: "id,title,description" } }],
+  postWorkItems: [{ projectId: "myproject", requestBody: { data: [{ type: "workitems", attributes: { type: "requirement", title: "New requirement" } }] } }],
+  patchWorkItem: [{ projectId: "myproject", workItemId: "WI-123", requestBody: { data: { type: "workitems", id: "WI-123", attributes: { title: "Updated title" } } } }],
+  patchWorkItems: [{ projectId: "myproject", requestBody: { data: [{ type: "workitems", id: "WI-123", attributes: { status: "inprogress" } }] } }],
+  patchAllWorkItems: [{ requestBody: { data: [{ type: "workitems", id: "myproject/WI-123", attributes: { status: "inprogress" } }] } }],
+  getDocuments: [{ projectId: "myproject", query: "title:Plan", "page[size]": 20 }],
+  getAllDocuments: [{ query: "title:Plan", "page[size]": 20 }],
+  getDocument: [{ projectId: "myproject", spaceId: "_default", documentName: "requirements", fields: { documents: "id,title,homePageContent" } }],
+  postDocuments: [{ projectId: "myproject", spaceId: "_default", requestBody: { data: [{ type: "documents", attributes: { title: "Requirements" } }] } }],
+  patchDocument: [{ projectId: "myproject", spaceId: "_default", documentName: "requirements", requestBody: { data: { type: "documents", id: "requirements", attributes: { title: "Updated requirements" } } } }],
+  getTestRuns: [{ projectId: "myproject", query: "status:inprogress", "page[size]": 20 }],
+  getTestRun: [{ projectId: "myproject", testRunId: "Regression-2026-10" }],
+  postTestRuns: [{ projectId: "myproject", requestBody: { data: [{ type: "testruns", attributes: { id: "Regression-2026-10", title: "Regression" } }] } }],
+  getUsers: [{ query: "name:Smith", "page[size]": 20 }],
+  getProjects: [{ query: "active:true", "page[size]": 20 }],
+  getProjectEnumeration: [{ projectId: "myproject", enumContext: "workitems", enumName: "status", targetType: "requirement" }],
+  getWorkItemsRelationships: [{ projectId: "myproject", workItemId: "WI-123", relationshipId: "linkedWorkItems", "page[size]": 50 }],
+  getJob: [{ jobId: "job-123" }],
+};
+
+export const TOOL_DISAMBIGUATION = {
+  getWorkItems: "Use getWorkItems when you need matching Work Items in one project; use getAllWorkItems when the search must span every project.",
+  getAllWorkItems: "Use getAllWorkItems when the search must span every project; use getWorkItems when you know the project and want a project-scoped result.",
+  getDocuments: "Use getDocuments when listing Documents in one project; use getAllDocuments to search across projects.",
+  getAllDocuments: "Use getAllDocuments to search Documents across projects; use getDocuments when listing within one project and getDocument when you know the Document name and need one result.",
+  patchWorkItem: "Use patchWorkItem to update one Work Item by its project and ID; use patchWorkItems for a project-scoped batch and patchAllWorkItems for a cross-project batch.",
+  patchWorkItems: "Use patchWorkItems to update a batch within one project; use patchWorkItem for one known ID and patchAllWorkItems when the batch spans projects.",
+  patchAllWorkItems: "Use patchAllWorkItems for a batch spanning projects; use patchWorkItems for a batch in one project and patchWorkItem for one known item.",
+  getDocument: "Use getDocument to read one Document by name; use getAllDocuments to search a collection across projects.",
+  getComments: "Use getComments for comments on a Work Item; use getDocumentComments for comments on a Document.",
+  getDocumentComments: "Use getDocumentComments for comments on a Document; use getComments for comments on a Work Item.",
+  getGlobalEnumeration: "Use getGlobalEnumeration for global enumeration values; use getProjectEnumeration for values configured in one project.",
+  getProjectEnumeration: "Use getProjectEnumeration for values configured in one project; use getGlobalEnumeration for global enumeration values.",
+};

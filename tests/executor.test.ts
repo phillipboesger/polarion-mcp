@@ -426,6 +426,49 @@ test("executeApiTool renders text/html rich-text fields as Markdown alongside th
   }
 })
 
+test("detailed remains the byte-identical default while concise shapes the body and uses list defaults", async () => {
+  const body = {
+    links: { self: "/items?page=1", next: "/items?page=2" }, meta: { totalCount: 1, trace: "noise" },
+    data: [{ type: "workitems", id: "WI-1", links: { self: "/items/WI-1" }, attributes: {
+      title: "Example", description: { type: "text/html", value: "<p>Hello</p>", value_markdown: "Hello" },
+    } }],
+  }
+  const definition: McpToolDefinition = {
+    ...emptyDefinition, name: "getWorkItems", method: "get", pathTemplate: "/projects/{projectId}/workitems",
+    executionParameters: [{ name: "projectId", in: "path" }, { name: "fields", in: "query" }],
+    inputSchema: { type: "object", properties: {
+      projectId: { type: "string" }, fields: { type: "object", additionalProperties: { type: "string" } },
+      response_format: { type: "string", enum: ["concise", "detailed"], default: "detailed" },
+    }, required: ["projectId"] },
+    outputSchema: { type: "object", properties: {} },
+  }
+  const requestUrls: string[] = []
+  const requestParams: Record<string, unknown>[] = []
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    requestUrls.push(String(config.url))
+    requestParams.push((config.params ?? {}) as Record<string, unknown>)
+    return { data: body, status: 200, statusText: "OK", headers: { "content-type": "application/json" }, config: config as any }
+  }
+
+  const detailed = await executeApiTool("getWorkItems", definition, { projectId: "demo" }, {}, { httpClient, minIntervalMs: 0 })
+  assert.equal((detailed.content[0] as { text: string }).text, `API Response (Status: 200):\n${JSON.stringify({
+    ...body, data: [{ ...body.data[0], attributes: { title: "Example", description: { type: "text/html", value: "<p>Hello</p>", value_markdown: "Hello" } } }],
+  })}`)
+  assert.deepEqual(detailed.structuredContent, {
+    ...body, data: [{ ...body.data[0], attributes: { title: "Example", description: { type: "text/html", value: "<p>Hello</p>", value_markdown: "Hello" } } }],
+  })
+  assert.doesNotMatch(requestUrls[0], /fields\[/)
+
+  const concise = await executeApiTool("getWorkItems", definition, { projectId: "demo", response_format: "concise" }, {}, { httpClient, minIntervalMs: 0 })
+  const expected = { links: { next: "/items?page=2" }, meta: { totalCount: 1 }, data: [{ type: "workitems", id: "WI-1", attributes: { title: "Example", description: { type: "text/html", value_markdown: "Hello" } } }] }
+  assert.equal((concise.content[0] as { text: string }).text, `API Response (Status: 200):\n${JSON.stringify(expected)}`)
+  assert.deepEqual(concise.structuredContent, expected)
+  assert.deepEqual(requestParams[1], { "fields[workitems]": "id,title,type,status,updated,assignee,priority,severity" })
+
+  await executeApiTool("getWorkItems", definition, { projectId: "demo", response_format: "concise", fields: { workitems: "id,title" } }, {}, { httpClient, minIntervalMs: 0 })
+  assert.deepEqual(requestParams[2], { "fields[workitems]": "id,title" })
+})
+
 test("executeApiTool treats an HTML page as an error only for JSON-declared tools", async () => {
   const html = "<!doctype html><html><body>Login</body></html>"
   const httpClient = async (): Promise<AxiosResponse> => ({ data: html, status: 200, statusText: "OK", headers: { "content-type": "text/html" }, config: {} as any })
@@ -463,12 +506,12 @@ test("executeApiTool includes structuredContent matching the JSON body when the 
 test("executeApiTool compacts JSON text and caps it while preserving schema-valid structuredContent", async () => {
   const definition: McpToolDefinition = {
     ...emptyDefinition, name: "get_thing", method: "get", pathTemplate: "/things/1",
-    inputSchema: { type: "object", properties: { fields: { type: "string" }, "page[size]": { type: "number" } } },
+    inputSchema: { type: "object", properties: { fields: { type: "string" }, "page[size]": { type: "number" }, response_format: { type: "string", enum: ["concise", "detailed"] } } },
     outputSchema: { type: "object", properties: { data: { type: "object", additionalProperties: true } } },
   }
   const body = { data: { description: "x".repeat(211_000) } }
   const httpClient = async (): Promise<AxiosResponse> => ({ data: body, status: 200, statusText: "OK", headers: { "content-type": "application/json" }, config: {} as any })
-  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 }, 1_000)
+  const result = await executeApiTool("get_thing", definition, { response_format: "concise" }, {}, { httpClient, minIntervalMs: 0 }, 1_000)
   const message = result.content[0]
   assert.equal(message.type, "text")
   if (message.type === "text") {

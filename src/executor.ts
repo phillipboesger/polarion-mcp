@@ -37,6 +37,7 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+import { conciseDefaultFields, isConciseResponseFormat, shapeConciseResponse } from "./shaping.js";
 import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
 
 /**
@@ -641,6 +642,12 @@ export async function executeApiTool(
       }
     }
 
+    const conciseResponse = !isMutating && isConciseResponseFormat(validatedArgs);
+    if (conciseResponse && validatedArgs.fields === undefined) {
+      const defaultFields = conciseDefaultFields(toolName);
+      if (defaultFields) validatedArgs.fields = defaultFields;
+    }
+
     // ===== STEP 2: Prepare Request Components =====
     let urlPath = definition.pathTemplate; // e.g., "/projects/{projectId}/workitems/{workItemId}"
     const queryParams: Record<string, any> = {}; // e.g., { "page[size]": 10 }
@@ -1025,7 +1032,8 @@ export async function executeApiTool(
         // Add a `value_markdown` sibling to every rich-text ({type:"text/html", value})
         // field so the model gets readable Markdown alongside the raw HTML, without
         // losing or altering anything in the original response.
-        const renderedData = renderRichTextFieldsAsMarkdown(response.data);
+        const markdownData = renderRichTextFieldsAsMarkdown(response.data);
+        const renderedData = conciseResponse ? shapeConciseResponse(markdownData) : markdownData;
         responseText = JSON.stringify(renderedData);
         // Safe: this branch already checked `response.data` is a non-null object,
         // and renderRichTextFieldsAsMarkdown preserves the top-level shape.

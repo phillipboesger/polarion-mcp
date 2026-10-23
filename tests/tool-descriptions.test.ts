@@ -41,6 +41,36 @@ test("curated leads keep the generated notes that follow them", () => {
   assert.match(approvals.description, / Cardinality: targets the full collection/)
 })
 
+test("curated JSON argument examples use declared parameters", () => {
+  const curated = [...toolDefinitionMap.values()].filter(tool => tool.description.includes("Examples:"))
+  assert.equal(curated.length, 20, `expected examples for the top 20 tools, found ${curated.length}`)
+  for (const tool of curated) {
+    const section = tool.description.split("Examples:")[1]?.split(" Selection:")[0] ?? ""
+    const exampleText = section.trim().replace(/\.$/, "")
+    const examples = exampleText.split(" or ")
+    assert.ok(examples.length > 0 && examples[0], `${tool.name} has an Examples marker without JSON arguments`)
+    for (const json of examples) {
+      const args = JSON.parse(json) as Record<string, unknown>
+      for (const key of Object.keys(args)) assert.ok(key in (tool.inputSchema.properties ?? {}), `${tool.name} example uses undeclared parameter ${key}`)
+    }
+  }
+})
+
+test("confusable tool guidance cross-references both members of each pair", () => {
+  const pairs = [
+    ["getWorkItems", "getAllWorkItems"], ["getDocuments", "getAllDocuments"], ["getDocument", "getAllDocuments"],
+    ["patchWorkItem", "patchWorkItems"], ["patchWorkItems", "patchAllWorkItems"],
+    ["getComments", "getDocumentComments"], ["getGlobalEnumeration", "getProjectEnumeration"],
+  ]
+  for (const [leftName, rightName] of pairs) {
+    const left = toolDefinitionMap.get(leftName)
+    const right = toolDefinitionMap.get(rightName)
+    assert.ok(left && right, `${leftName}/${rightName} must exist`)
+    assert.ok(left.description.includes(rightName), `${leftName} must refer to ${rightName}`)
+    assert.ok(right.description.includes(leftName), `${rightName} must refer to ${leftName}`)
+  }
+})
+
 test("relationshipId is described as a relationship name on every relationship tool", () => {
   const relationshipTools = [...toolDefinitionMap.values()].filter((tool) => tool.pathTemplate.endsWith("/relationships/{relationshipId}"))
   assert.ok(relationshipTools.length > 0)

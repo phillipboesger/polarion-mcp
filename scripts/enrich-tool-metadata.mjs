@@ -58,6 +58,7 @@ import {
   correctedAnnotations,
 } from './lib/entry-utils.mjs';
 import { TOOL_GUIDANCE } from './lib/tool-guidance.mjs';
+import { TOOL_DISAMBIGUATION, TOOL_EXAMPLES } from './lib/tool-examples.mjs';
 
 const filePath = process.argv[2] || 'src/tools.ts';
 
@@ -166,6 +167,8 @@ const SCOPE_MARKER = 'Scope:';
 const CARDINALITY_MARKER = 'Cardinality:';
 const EFFECT_MARKER = 'Effect:';
 const TIP_MARKER = 'Tip:';
+const EXAMPLES_MARKER = 'Examples:';
+const DISAMBIGUATION_MARKER = 'Selection:';
 
 /**
  * Replaces parameter descriptions with the rich text from
@@ -277,7 +280,7 @@ function upsertNote(entry, marker, note) {
   const text = entry.slice(bounds.contentStart, bounds.contentEnd);
   const at = text.indexOf(marker);
   if (at < 0) return appendNote(entry, marker, note);
-  const nextMarkers = [SCOPE_MARKER, CARDINALITY_MARKER, EFFECT_MARKER, TIP_MARKER]
+  const nextMarkers = [SCOPE_MARKER, CARDINALITY_MARKER, EFFECT_MARKER, TIP_MARKER, EXAMPLES_MARKER, DISAMBIGUATION_MARKER]
     .map(value => text.indexOf(value, at + marker.length)).filter(value => value >= 0);
   const end = nextMarkers.length ? nextMarkers.reduce((a, b) => Math.min(a, b)) : text.length;
   const replacement = `${note}${end === text.length ? '' : ' '}`;
@@ -299,7 +302,7 @@ function replaceLead(entry, lead) {
   if (!bounds) return { entry, skipped: true };
   const { contentStart, contentEnd } = bounds;
   const text = entry.slice(contentStart, contentEnd);
-  const markerAt = [SCOPE_MARKER, CARDINALITY_MARKER, EFFECT_MARKER, TIP_MARKER]
+  const markerAt = [SCOPE_MARKER, CARDINALITY_MARKER, EFFECT_MARKER, TIP_MARKER, EXAMPLES_MARKER, DISAMBIGUATION_MARKER]
     .map((marker) => text.indexOf(` ${marker}`))
     .filter((i) => i >= 0);
   const leadEnd = markerAt.length ? Math.min(...markerAt) : text.length;
@@ -467,6 +470,30 @@ entries = entries.map((entry) => {
   return result.entry;
 });
 
+let exampleNoteCount = 0;
+let exampleNoteSkipped = 0;
+entries = entries.map((entry, i) => {
+  const name = names[i];
+  const examples = TOOL_EXAMPLES[name];
+  const selection = TOOL_DISAMBIGUATION[name];
+  if (!examples && !selection) return entry;
+  let updated = entry;
+  if (examples?.length) {
+    const note = `Examples: ${examples.map((args) => JSON.stringify(args)).join(' or ')}.`;
+    const result = upsertNote(updated, EXAMPLES_MARKER, note);
+    if (result.skipped) exampleNoteSkipped++;
+    else if (result.entry !== updated) exampleNoteCount++;
+    updated = result.entry;
+  }
+  if (selection) {
+    const result = upsertNote(updated, DISAMBIGUATION_MARKER, `Selection: ${selection}`);
+    if (result.skipped) exampleNoteSkipped++;
+    else if (result.entry !== updated) exampleNoteCount++;
+    updated = result.entry;
+  }
+  return updated;
+});
+
 const newMapArrayText = `[${entries.join(',')}]`;
 const out = src.slice(0, start) + newMapArrayText + src.slice(end);
 
@@ -480,8 +507,9 @@ console.log(`  parameter descriptions enriched: ${paramEnrichedCount}${paramEnri
 console.log(`  effect notes added: ${effectNoteCount}${effectNoteSkipped ? ` (${effectNoteSkipped} SKIPPED -- unexpected description shape or unreadable inputSchema)` : ''}`);
 console.log(`  curated lead descriptions applied: ${leadCount}${leadSkipped ? ` (${leadSkipped} SKIPPED -- unexpected description shape)` : ''}`);
 console.log(`  dry_run tips added: ${dryRunTipCount}${dryRunTipSkipped ? ` (${dryRunTipSkipped} SKIPPED -- unexpected description shape or unreadable inputSchema)` : ''}`);
+console.log(`  example/selection notes added: ${exampleNoteCount}${exampleNoteSkipped ? ` (${exampleNoteSkipped} SKIPPED -- unexpected description shape)` : ''}`);
 
-const totalSkipped = leadSkipped + scopeNoteSkipped + cardinalityNoteSkipped + paramEnrichedSchemaFailed + effectNoteSkipped + dryRunTipSkipped;
+const totalSkipped = leadSkipped + scopeNoteSkipped + cardinalityNoteSkipped + paramEnrichedSchemaFailed + effectNoteSkipped + dryRunTipSkipped + exampleNoteSkipped;
 if (totalSkipped > 0) {
   throw new Error(
     `${totalSkipped} note(s) were skipped due to an unexpected description shape -- ` +
