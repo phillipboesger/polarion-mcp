@@ -28,6 +28,7 @@ import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, Inv
 import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
+import { fetchClientMetadata, parseClientIdentifierUrl, type CimdClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, safeEqual } from './sealed.js';
 
 /** Scope advertised by this server; the PAT itself carries the real permissions. */
@@ -208,6 +209,15 @@ export function parseRedirectAllowlist(value: string | undefined, presets: reado
   return entries;
 }
 
+/** @returns Whether this identifier uses CIMD's HTTPS URL form. */
+export function isCimdClientIdentifier(clientId: string): boolean {
+  try {
+    return new URL(clientId).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param url - A parsed URL; modified in place.
  * @returns The URL, without its port if it is a loopback one.
@@ -255,15 +265,40 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
   /**
    * @param sealer - Seals and opens client ids.
    * @param redirectAllowlist - Allowed redirect URIs; empty allows any.
+   * @param cimdEnabled - Whether HTTPS client identifier URLs may be fetched.
+   * @param metadataFetcher - SSRF-guarded client metadata fetcher.
    */
-  constructor(private readonly sealer: Sealer, private readonly redirectAllowlist: readonly string[]) {}
+  constructor(
+    private readonly sealer: Sealer,
+    private readonly redirectAllowlist: readonly string[],
+    private readonly cimdEnabled = false,
+    private readonly metadataFetcher: CimdMetadataFetcher = fetchClientMetadata
+  ) {}
 
   /**
    * @param clientId - The client id handed out at registration.
    * @returns The registered client, or undefined if this server never issued
    *   it or its redirect URIs are no longer allowed.
    */
-  getClient(clientId: string): OAuthClientInformationFull | undefined {
+  async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
+    if (isCimdClientIdentifier(clientId)) {
+      if (!this.cimdEnabled) return undefined;
+      try {
+        parseClientIdentifierUrl(clientId);
+        const metadata: CimdClientMetadata = await this.metadataFetcher(clientId);
+        if (metadata.client_id !== clientId || !this.redirectsAllowed(metadata.redirect_uris)) return undefined;
+        return {
+          client_id: clientId,
+          client_id_issued_at: 0,
+          redirect_uris: metadata.redirect_uris,
+          token_endpoint_auth_method: 'none',
+          ...(metadata.client_name ? { client_name: metadata.client_name } : {}),
+        };
+      } catch {
+        // A failed or invalid metadata fetch is an invalid client, not a server error.
+        return undefined;
+      }
+    }
     const client = this.sealer.open<SealedClient>('c', clientId);
     // A sealed registration never expires, so one issued before the allowlist was set is checked again here.
     if (!client || !this.redirectsAllowed(client.redirect_uris)) return undefined;
@@ -494,6 +529,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param redirectAllowlist - Redirect URIs registered clients may use; empty allows any.
    * @param refreshTokenTtlSeconds - Sliding refresh-token lifetime in seconds.
    * @param resourceAudience - Canonical protected-resource URL for issued tokens.
+   * @param cimdEnabled - Whether HTTPS client identifier URLs may be fetched.
+   * @param metadataFetcher - SSRF-guarded metadata fetcher; injectable for tests.
    */
   constructor(
     private readonly polarionUrl: string,
@@ -501,9 +538,11 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     private readonly validateToken: TokenValidator = validatePolarionToken,
     redirectAllowlist: readonly string[] = [],
     private readonly refreshTokenTtlSeconds = DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
-    private readonly resourceAudience?: string
+    private readonly resourceAudience?: string,
+    cimdEnabled = false,
+    metadataFetcher: CimdMetadataFetcher = fetchClientMetadata
   ) {
-    this.clients = new SealedClientsStore(sealer, redirectAllowlist);
+    this.clients = new SealedClientsStore(sealer, redirectAllowlist, cimdEnabled, metadataFetcher);
   }
 
   /** @returns The registry of dynamically registered MCP clients. */

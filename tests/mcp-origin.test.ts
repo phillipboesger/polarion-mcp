@@ -437,3 +437,34 @@ test("public OAuth startup warns when no trusted proxy is configured, ignores un
     }
   }
 })
+
+test("MCP_CIMD_ENABLED is read in the start function and exposed in OAuth discovery", async () => {
+  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_CIMD_ENABLED", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_ALLOWED_REDIRECT_PRESETS"] as const
+  const previous = new Map(envKeys.map(key => [key, process.env[key]]))
+  const originalLog = console.log
+  let server: ReturnType<typeof startMcpHttpServer> | undefined
+  try {
+    process.env.MCP_HTTP_PORT = "0"
+    process.env.MCP_HTTP_HOST = "127.0.0.1"
+    process.env.MCP_PUBLIC_URL = "https://mcp.example"
+    process.env.MCP_TOKEN_SECRET = "a-secret-long-enough-for-cimd-env-test"
+    process.env.MCP_CIMD_ENABLED = "true"
+    process.env.MCP_ALLOWED_REDIRECT_PREFIXES = ""
+    process.env.MCP_ALLOWED_REDIRECT_PRESETS = ""
+    console.log = () => undefined
+    server = startMcpHttpServer({ logger: { warn: () => undefined } })
+    await new Promise<void>(resolve => server?.once("listening", resolve))
+    const { port } = server.address() as AddressInfo
+    const discovery = await fetch(`http://127.0.0.1:${port}/.well-known/oauth-authorization-server`)
+    assert.equal(discovery.status, 200)
+    assert.equal((await discovery.json() as { client_id_metadata_document_supported?: boolean }).client_id_metadata_document_supported, true)
+  } finally {
+    console.log = originalLog
+    if (server?.listening) await new Promise<void>(resolve => server?.close(() => resolve()))
+    for (const key of envKeys) {
+      const value = previous.get(key)
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
