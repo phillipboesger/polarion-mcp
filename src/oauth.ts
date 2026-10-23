@@ -492,7 +492,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
         state: params.state,
         codeChallenge: params.codeChallenge,
         // The SDK passes [] when the client asks for no scope.
-        scopes: params.scopes?.length ? params.scopes : [POLARION_SCOPE],
+        scopes: params.scopes?.length ? params.scopes.filter(scope => scope === POLARION_SCOPE) : [POLARION_SCOPE],
         resource: params.resource?.href,
       },
       res

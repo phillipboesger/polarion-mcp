@@ -26,7 +26,7 @@
  * subsequent requests.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { Server as HttpServer } from 'node:http';
@@ -280,12 +280,34 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     // The SDK token endpoint only reads client credentials from the body;
     // move HTTP Basic credentials there so client_secret_basic clients work.
     // The SDK's own urlencoded parser then sees a consumed stream and keeps this body.
-    app.post('/token', express.urlencoded({ extended: false }), (req: Request, _res: Response, next: NextFunction) => {
+    app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response, next: NextFunction) => {
       const basic = basicCredentials(req.get('authorization'));
-      if (basic) req.body = { ...req.body, client_id: basic.clientId, client_secret: basic.clientSecret };
+      if (basic) {
+        const client = await oauth.clientsStore.getClient(basic.clientId);
+        const matches = constantTimeSecretEqual(basic.clientSecret, client?.client_secret ?? '');
+        if (!client || client.token_endpoint_auth_method !== 'client_secret_basic' || !matches) {
+          res.set('WWW-Authenticate', 'Basic realm="MCP OAuth"');
+          res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
+          return;
+        }
+        req.body = { ...req.body, client_id: basic.clientId, client_secret: basic.clientSecret };
+      }
       next();
     });
-
+    // The SDK metadata omits Basic even though the token shim supports it; augment its JSON response.
+    app.use('/.well-known/oauth-authorization-server', (_req: Request, res: Response, next: NextFunction) => {
+      const sendJson = res.json.bind(res);
+      res.json = ((body: unknown) => {
+        if (body && typeof body === 'object' && 'token_endpoint_auth_methods_supported' in body) {
+          const methods = body.token_endpoint_auth_methods_supported;
+          if (Array.isArray(methods)) {
+            body = { ...body, token_endpoint_auth_methods_supported: [...new Set([...methods, 'client_secret_basic'])] };
+          }
+        }
+        return sendJson(body);
+      }) as Response['json'];
+      next();
+    });
     app.use(
       mcpAuthRouter({
         provider: oauth,
@@ -439,6 +461,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
           res.locals.patAccepted = true;
           requestBearerToken.run(value, next);
           return;
+        }
+        if (failure.status === 401 && resourceMetadataUrl) {
+          res.set('WWW-Authenticate', bearerChallenge('The access token is invalid or expired'));
         }
         res.status(failure.status).json(jsonRpcError(failure.message));
       }).catch(() => {
@@ -711,6 +736,13 @@ function mountCustomGpt(
     },
     unauthorizedDescription: 'Not logged in, or the login expired',
   }));
+}
+
+/** Compares secrets through fixed-size digests so timingSafeEqual always sees equal-length input. */
+function constantTimeSecretEqual(actual: string, expected: string): boolean {
+  const actualDigest = createHash('sha256').update(actual).digest();
+  const expectedDigest = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(actualDigest, expectedDigest);
 }
 
 /**

@@ -477,7 +477,45 @@ test("protected-resource metadata is also served at the root path ChatGPT probes
     const root = await fetch(`${base}/.well-known/oauth-protected-resource`)
     const scoped = await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)
     assert.equal(root.status, 200)
-    assert.deepEqual(await root.json(), await scoped.json())
+    const rootMetadata = await root.json() as { resource: string }
+    const pathMetadata = await scoped.json() as { resource: string }
+    assert.equal(rootMetadata.resource, `${PUBLIC_URL}/mcp`)
+    assert.equal(pathMetadata.resource, `${PUBLIC_URL}/mcp`)
+    assert.deepEqual(rootMetadata, pathMetadata)
+  } finally {
+    await stop()
+  }
+})
+
+test("authorization-server metadata advertises client_secret_basic supported by the token shim", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const res = await fetch(`${base}/.well-known/oauth-authorization-server`)
+    assert.equal(res.status, 200)
+    const metadata = await res.json() as { token_endpoint_auth_methods_supported: string[] }
+    assert.ok(metadata.token_endpoint_auth_methods_supported.includes("client_secret_basic"))
+  } finally {
+    await stop()
+  }
+})
+
+test("invalid Basic client credentials return 401 and a Basic challenge from /token", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp()
+  try {
+    const client = await register(base, { token_endpoint_auth_method: "client_secret_basic" })
+    const { code, verifier } = await loginForCode(base, pat, client)
+    const res = await fetch(`${base}/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: `Basic ${Buffer.from(`${client.client_id}:wrong`).toString("base64")}`,
+      },
+      body: new URLSearchParams({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    })
+    assert.equal(res.status, 401)
+    assert.equal(((await res.json()) as { error: string }).error, "invalid_client")
+    assert.match(res.headers.get("www-authenticate") ?? "", /^Basic\b/)
   } finally {
     await stop()
   }
