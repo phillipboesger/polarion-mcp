@@ -40,10 +40,15 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
+      // Same dynamic-payload rationale: the OpenAPI-driven executor handles untyped JSON:API bodies.
       '@typescript-eslint/no-explicit-any': 'off',
+      // Handlers keep async signatures for interface symmetry (Express/MCP callbacks); no await needed.
       '@typescript-eslint/require-await': 'off',
+      // Assertions on JSON payloads are kept explicit for readability; revisit with the typed-client work.
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      // String(unknown) is used deliberately for error and header formatting.
       '@typescript-eslint/no-base-to-string': 'off',
+      // Express's error-handler signature uses Function; changing it is out of scope for the gate.
       '@typescript-eslint/no-unsafe-function-type': 'off',
     },
   },

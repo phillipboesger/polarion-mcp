@@ -39,6 +39,8 @@ jobs:
       # GITLEAKS_LICENSE depending on their Gitleaks plan.
       - name: Scan for leaked secrets
         uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   npm-audit:
     name: Production dependency audit
