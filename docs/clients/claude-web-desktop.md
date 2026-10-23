@@ -36,9 +36,9 @@ Use the narrow **work-items and documents** selection: set the endpoint to `http
 
 Client-specific notes:
 
-- Remote connectors are added in Settings > Connectors; Claude Desktop remote servers are not configured in claude_desktop_config.json.
-- OAuth accepts DCR; custom client ID/secret can be supplied when DCR is unavailable.
-- SSE is supported but may be deprecated.
+- Remote connectors are added in Settings > Connectors (unverified UI path, check the vendor docs); Claude Desktop remote servers are not configured in claude_desktop_config.json.
+- OAuth uses dynamic client registration (DCR); this server also supports CIMD when `MCP_CIMD_ENABLED=true`. A pre-registered client ID/secret is not configurable for this client in polarion-mcp.
+- Transport: Streamable HTTP. SSE support on the client side is unverified (check the vendor docs).
 
 ## Verify the connection
 

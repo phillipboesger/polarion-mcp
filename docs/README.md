@@ -9,21 +9,21 @@ Choose a client guide for its connection and authentication steps:
 | Client | Guide |
 |---|---|
 | Claude.ai / Claude Desktop (custom connectors) | [Setup](clients/claude-web-desktop.md) |
-| Claude Code | [Setup](clients/claude-code.md) |
-| Claude API MCP connector | [Setup](clients/claude-api.md) |
-| ChatGPT connectors / Apps | [Setup](clients/chatgpt-apps.md) |
-| Custom GPT (Actions) | [Setup](clients/custom-gpt.md) |
+| Claude Code (unverified) | [Setup](clients/claude-code.md) |
+| Claude API MCP connector (unverified) | [Setup](clients/claude-api.md) |
+| ChatGPT connectors / Apps (unverified) | [Setup](clients/chatgpt-apps.md) |
+| Custom GPT (Actions) (unverified) | [Setup](clients/custom-gpt.md) |
 | OpenAI Responses API / Agents SDK | [Setup](clients/openai-api.md) |
-| Codex CLI | [Setup](clients/codex-cli.md) |
+| Codex CLI (unverified) | [Setup](clients/codex-cli.md) |
 | VS Code Copilot | [Setup](clients/vscode-copilot.md) |
 | Microsoft Copilot Studio | [Setup](clients/copilot-studio.md) |
 | Cursor | [Setup](clients/cursor.md) |
-| Windsurf | [Setup](clients/windsurf.md) |
-| JetBrains AI Assistant | [Setup](clients/jetbrains-ai.md) |
-| Gemini CLI | [Setup](clients/gemini-cli.md) |
-| Zed | [Setup](clients/zed.md) |
-| Cline | [Setup](clients/cline.md) |
-| n8n | [Setup](clients/n8n.md) |
+| Windsurf (unverified) | [Setup](clients/windsurf.md) |
+| JetBrains AI Assistant (unverified) | [Setup](clients/jetbrains-ai.md) |
+| Gemini CLI (unverified) | [Setup](clients/gemini-cli.md) |
+| Zed (unverified) | [Setup](clients/zed.md) |
+| Cline (unverified) | [Setup](clients/cline.md) |
+| n8n (unverified) | [Setup](clients/n8n.md) |
 
 ## Guides
 
