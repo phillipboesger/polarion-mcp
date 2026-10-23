@@ -18,10 +18,15 @@ Resource templates provide read-only live views for a project, a Work Item withi
 
 ## Prompts
 
-The server provides three guided prompts:
+The server provides eight guided prompts:
 
 - `create-work-item`: reads field metadata and enum options, then previews a create request before execution.
 - `search-work-items`: builds a Lucene query and pages through results.
 - `update-work-item`: reads the item, checks options, previews the update, applies it, and confirms the result.
+- `review_requirements`: reviews requirement quality and testability without modifying the item.
+- `trace_gap_analysis`: checks linked Work Items and reports traceability gaps.
+- `release_readiness_summary`: summarizes open work and evidence for a project.
+- `test_coverage_report`: groups requirements by linked test coverage.
+- `triage_new_work_items`: reviews recent items and suggests next actions without changing them.
 
 The prompt templates use the real tools in `src/tools.ts`, including `getProjectFieldsMetadata`, `getAvailableEnumOptionsForWorkItemType`, and `getWorkItem`.

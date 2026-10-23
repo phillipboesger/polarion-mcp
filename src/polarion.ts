@@ -244,6 +244,11 @@ const PROMPT_CORE_TOOLS: Record<string, string[]> = {
   'create-work-item': ['postWorkItems'],
   'search-work-items': ['getWorkItems'],
   'update-work-item': ['getWorkItem', 'patchWorkItem'],
+  'review_requirements': ['getWorkItems', 'getWorkItem', 'getProjectFieldsMetadata'],
+  'trace_gap_analysis': ['getWorkItem', 'getLinkedWorkItems'],
+  'release_readiness_summary': ['getWorkItems', 'getWorkflowActionsForWorkItem'],
+  'test_coverage_report': ['getWorkItems', 'getLinkedWorkItems'],
+  'triage_new_work_items': ['getWorkItems', 'getWorkItem', 'getProjectFieldsMetadata'],
 };
 
 /**
@@ -275,6 +280,17 @@ function allPrompts() {
         { name: 'workItemId', description: 'The Work Item ID', required: true },
       ],
     },
+    ...[
+      ['review_requirements', 'Review requirements for clarity, atomicity, and testability', ['projectId', 'workItemId']],
+      ['trace_gap_analysis', 'Inspect trace links and identify unlinked or weakly linked requirements', ['projectId', 'workItemId']],
+      ['release_readiness_summary', 'Summarize open work and workflow readiness for a release', ['projectId']],
+      ['test_coverage_report', 'Report requirement coverage by linked test Work Items', ['projectId']],
+      ['triage_new_work_items', 'Triage recent Work Items in a project', ['projectId']],
+    ].map(([name, description, required]) => ({
+      name: name as string,
+      description: description as string,
+      arguments: (required as string[]).map(arg => ({ name: arg, description: arg === 'projectId' ? 'Polarion project ID' : 'Work Item ID', required: true })),
+    })),
   ];
 }
 
@@ -339,6 +355,27 @@ export function getPolarionPrompt(name: string, args?: Record<string, unknown>, 
 3. For enumeration fields, check the allowed option ids with getAvailableEnumOptionsForWorkItemType.
 4. Call patchWorkItem with only the changed fields (body shape: resource polarion://guide/writing) and dry_run: true, show me the preview, then apply it.
 5. Call getWorkItem again and confirm the change.`);
+  }
+
+  if (name === 'review_requirements') {
+    const projectId = required('projectId'); const workItemId = required('workItemId');
+    return prompt(`Review requirement ${workItemId}`, `Review Work Item "${workItemId}" in project "${projectId}". Call getWorkItem and getProjectFieldsMetadata to confirm its type and fields. Assess whether the requirement is atomic, unambiguous, feasible, necessary, and testable (INVEST); rewrite unclear statements in EARS form where appropriate. Identify missing rationale, measurable acceptance criteria, and verification method. Do not modify the item; return findings and a proposed revision.`);
+  }
+  if (name === 'trace_gap_analysis') {
+    const projectId = required('projectId'); const workItemId = required('workItemId');
+    return prompt(`Traceability analysis for ${workItemId}`, `Analyze Work Item "${workItemId}" in project "${projectId}". Call getWorkItem and getLinkedWorkItems. Report upstream and downstream links, missing parent or source links, requirements without verification links, suspicious links, and concrete follow-up actions. Do not create or modify links.`);
+  }
+  if (name === 'release_readiness_summary') {
+    const projectId = required('projectId');
+    return prompt(`Release readiness for ${projectId}`, `Prepare a release readiness summary for project "${projectId}". Use getWorkItems with a Lucene query to inspect open and blocked requirements, defects, and test Work Items. Use getWorkflowActionsForWorkItem when a specific status transition needs confirmation. Summarize evidence, unresolved blockers, ownership gaps, and decisions needed. State the query and avoid claiming readiness without evidence.`);
+  }
+  if (name === 'test_coverage_report') {
+    const projectId = required('projectId');
+    return prompt(`Test coverage for ${projectId}`, `Report test coverage for project "${projectId}". Use getWorkItems to find requirements and test Work Items, then getLinkedWorkItems on relevant requirements. Group requirements by linked test coverage, no link, and ambiguous link. Include the query and list IDs for gaps; do not infer coverage from titles alone.`);
+  }
+  if (name === 'triage_new_work_items') {
+    const projectId = required('projectId');
+    return prompt(`Triage new Work Items in ${projectId}`, `Triage newly created Work Items in project "${projectId}". Use getWorkItems with a Lucene query and recent date filter, and getProjectFieldsMetadata to confirm available fields. For each candidate, summarize type, urgency, missing information, duplicates or related items, and a suggested next action. Do not change priority, status, or assignment.`);
   }
 
   throw new Error(`Unknown prompt: ${name}`);

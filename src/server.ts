@@ -408,14 +408,14 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    */
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;
-    if (uri.startsWith('polarion://project/')) return await readProjectResource(uri, clientTools, extensions, options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
+    if (uri.startsWith('polarion://project/')) return await readProjectResource(uri, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, server });
     return await readPolarionResource(request.params.uri);
   });
 
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [
     ...(clientTools.has('getWorkItem') ? [{ uriTemplate: 'polarion://project/{projectId}/workitem/{workItemId}', name: 'Polarion Work Item', mimeType: 'text/markdown' }] : []),
     ...(clientTools.has('getDocument') ? [{ uriTemplate: 'polarion://project/{projectId}/document/{spaceId}/{documentName}', name: 'Polarion Document', mimeType: 'text/markdown' }] : []),
-    { uriTemplate: 'polarion://project/{projectId}', name: 'Polarion project', mimeType: 'text/markdown' },
+    ...(clientTools.has('getProject') ? [{ uriTemplate: 'polarion://project/{projectId}', name: 'Polarion project', mimeType: 'text/markdown' }] : []),
   ] }));
 
   /**
@@ -487,20 +487,14 @@ function extractCompletionValues(value: unknown, argument: string): string[] {
 }
 
 const MAX_DYNAMIC_RESOURCE_CHARS = 100_000;
-async function readProjectResource(uri: string, tools: ToolCallPipelineOptions['clientTools'], extensions: PolarionExtensions, maxResponseChars: number) {
+async function readProjectResource(uri: string, pipelineOptions: ToolCallPipelineOptions) {
   let match = /^polarion:\/\/project\/([^/]+)\/workitem\/([^/]+)$/.exec(uri);
   let name: string; let args: Record<string, unknown>;
   if (match) { name = 'getWorkItem'; args = { projectId: decodeURIComponent(match[1]), workItemId: decodeURIComponent(match[2]) }; }
   else if ((match = /^polarion:\/\/project\/([^/]+)\/document\/([^/]+)\/([^/]+)$/.exec(uri))) { name = 'getDocument'; args = { projectId: decodeURIComponent(match[1]), spaceId: decodeURIComponent(match[2]), documentName: decodeURIComponent(match[3]) }; }
   else if ((match = /^polarion:\/\/project\/([^/]+)$/.exec(uri))) { name = 'getProject'; args = { projectId: decodeURIComponent(match[1]) }; }
   else throw new Error(`Invalid Polarion resource URI: ${uri}`);
-  const definition = tools.get(name);
-  if (!definition) throw new Error(`Resource access requires enabled tool ${name}`);
-  const bearerToken = getBearerToken();
-  const userScope = tokenScope(bearerToken);
-  const principal = await extensions.authProvider.validateRequest({ bearerToken, userScope });
-  const resolved = await extensions.instanceResolver.resolve(principal);
-  const result = await executeApiTool(name, definition, args, securitySchemes, undefined, maxResponseChars, resolved.apiBaseUrl);
+  const result = await callToolPipeline(name, args, pipelineOptions);
   if (result.isError) throw new Error(result.content.map(item => item.type === 'text' ? item.text : '').join('\n'));
   let data: unknown = result.structuredContent;
   if (!data) { const text = result.content.find(item => item.type === 'text'); if (text?.type === 'text') { try { data = JSON.parse(text.text); } catch { data = text.text; } } }

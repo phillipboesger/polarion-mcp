@@ -45,6 +45,7 @@ Choose a client guide for its connection and authentication steps:
 | [Sonar quality](quality/sonar.md) | Sonar analysis configuration and quality results. |
 | [Repository overview](repository-overview.md) | Repository layout and development entry points. |
 | [Resources and prompts](resources-and-prompts.md) | MCP resources, live resource templates, and prompts. |
+| [Polarion Claude Code plugin](../plugin/README.md) | MCP server configuration and three workflow skills. |
 | [Security](security.md) | Authentication, authorization, and security controls. |
 | [Troubleshooting](troubleshooting.md) | Common setup and runtime issues. |
 | [Usage](usage.md) | Calling tools and using the server. |

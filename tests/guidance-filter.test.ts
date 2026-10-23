@@ -19,7 +19,7 @@ async function everythingTold(enabled: Set<string>): Promise<string> {
 }
 
 test("with every tool exposed nothing is pruned", async () => {
-  assert.equal(getPolarionPrompts(all).length, 3)
+  assert.equal(getPolarionPrompts(all).length, 8)
   assert.match(serverInstructions(all), /workflowAction on patchWorkItem/)
   assert.ok(listPolarionResources(all).some(r => r.uri === "polarion://guide/writing"))
 })
@@ -31,7 +31,7 @@ test("read-only and small deployments are never pointed at a tool they do not ha
 test("read-only: no write guide, no write prompts, no dry_run advice", async () => {
   assert.equal(listPolarionResources(readOnly).some(r => r.uri === "polarion://guide/writing"), false)
   await assert.rejects(readPolarionResource("polarion://guide/writing", readOnly), /Unknown resource/)
-  assert.deepEqual(getPolarionPrompts(readOnly).map(p => p.name), ["search-work-items"])
+  assert.deepEqual(getPolarionPrompts(readOnly).map(p => p.name), ["search-work-items", "review_requirements", "trace_gap_analysis", "release_readiness_summary", "test_coverage_report", "triage_new_work_items"])
   assert.throws(() => getPolarionPrompt("create-work-item", { projectId: "P" }, readOnly), /needs tools/)
   assert.doesNotMatch(serverInstructions(readOnly), /dry_run|guide\/writing/)
 })
