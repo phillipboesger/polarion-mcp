@@ -49,8 +49,11 @@ test("a failed check logs status and Polarion's detail, never the token", async 
 
 test("a 403 log names the called URL and flags an answer that is not a Polarion error", async () => {
   const { log } = await check(`${SECRET_PAT}unlicensed`)
-  assert.match(log, /\[GET http:\/\/127\.0\.0\.1:\d+\/polarion\/rest\/v1\/projects\]/)
+  assert.match(log, /\[GET http:\/\/127\.0\.0\.1:\d+\/polarion\/rest\/v1\/projects;/)
   assert.doesNotMatch(log, /not a Polarion REST error body/)
   const { log: proxied } = await check(`${SECRET_PAT}proxy`)
   assert.match(proxied, /not a Polarion REST error body/)
+  assert.doesNotMatch(proxied, new RegExp(SECRET_PAT))
+  assert.match(log, /rest\.enabled=true/)
+  assert.doesNotMatch((await check(`${SECRET_PAT}revoked`)).log, /\[GET /, "the hint is 403-only")
 })
