@@ -260,6 +260,29 @@ test("a write answered with an HTML page (login or proxy) is an error, not a suc
   assert.match((result.content[0] as any).text, /HTML/)
 })
 
+test("a read answered with an HTML login page is an error with API configuration guidance", async () => {
+  const { result } = await run("getWorkItem", { projectId: "P", workItemId: "W-1" }, () => ({
+    headers: { "content-type": "text/html" }, data: "<html>login</html>",
+  }))
+  assert.equal(result.isError, true)
+  assert.match((result.content[0] as any).text, /login\/SSO page returned, check API_BASE_URL\/token/)
+})
+
+test("multipart tools accept an object requestBody and build the expected file parts", async () => {
+  const body = {
+    resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "notes.txt" } }] },
+    files: [Buffer.from("hello").toString("base64")],
+  }
+  const { result, requests } = await run("postWorkItemAttachments", { projectId: "P", workItemId: "W-1", requestBody: body })
+  assert.notEqual(result.isError, true, JSON.stringify(result.content))
+  const form = requests[0].data as Buffer
+  const multipart = form.toString("utf8")
+  assert.match(String(requests[0].headers?.["content-type"]), /^multipart\/form-data; boundary=/)
+  assert.match(multipart, /name="resource"/)
+  assert.match(multipart, /filename="notes.txt"/)
+  assert.match(multipart, /hello/)
+})
+
 test("a JSON body without a JSON content type is still read as JSON, not [object Object]", async () => {
   const { result } = await run("getWorkItem", { projectId: "P", workItemId: "W-1" }, () => ({ headers: {}, data: { data: { id: "P/W-1" } } }))
   assert.doesNotMatch((result.content[0] as any).text, /object Object/)

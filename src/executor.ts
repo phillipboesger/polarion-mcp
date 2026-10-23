@@ -559,6 +559,10 @@ export async function executeApiTool(
     // transition period, and it never leaks into `validatedArgs` sent to Polarion.
     const isMutating = MUTATING_METHODS.has(definition.method.toLowerCase());
     const argsForValidation: JsonObject = (typeof toolArgs === 'object' && toolArgs !== null) ? { ...toolArgs } : {};
+    if (definition.requestBodyContentType?.toLowerCase().startsWith('multipart/form-data')
+      && argsForValidation.requestBody && typeof argsForValidation.requestBody === 'object' && !Array.isArray(argsForValidation.requestBody)) {
+      argsForValidation.requestBody = JSON.stringify(argsForValidation.requestBody);
+    }
     // Models often send booleans as strings; an unreadable value must never
     // fall through to the real (possibly irreversible) write.
     const rawDryRun = argsForValidation.dry_run;
@@ -1025,13 +1029,13 @@ export async function executeApiTool(
       responseText = `(Status: ${response.status} - No body content)`;
     }
 
-    // An SSO login or proxy page answers with 200 text/html; that is not the API confirming a write.
-    if (isMutating && contentType.includes('text/html')) {
+    // A login or proxy page can answer with 200 text/html for reads as well as writes.
+    if (contentType.includes('text/html')) {
       return {
         content: [{
           type: 'text',
-          text: `Polarion answered with an HTML page (status ${response.status}) instead of the API, probably a login or proxy page. ` +
-            `The write may not have happened; check the item before retrying.\n${responseText.slice(0, 500)}`,
+          text: `A login/SSO page returned, check API_BASE_URL/token. Polarion answered with HTML (status ${response.status}) instead of the API.` +
+            (isMutating ? ' The write may not have happened; check the item before retrying.' : '') + `\n${responseText.slice(0, 500)}`,
         }],
         isError: true,
       };
