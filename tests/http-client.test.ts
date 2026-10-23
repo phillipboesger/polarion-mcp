@@ -34,9 +34,15 @@ test("a POST is retried on 429: the request was rejected, not processed", async 
 test("a PATCH is not retried on a 5xx either, a GET and a DELETE are", async () => {
   for (const [method, expected] of [["PATCH", 1], ["GET", 2], ["DELETE", 2]] as const) {
     let calls = 0
-    await sendWithRetry({ method }, {
+    const request = sendWithRetry({ method }, {
       httpClient: async (c) => { calls++; if (calls === 1) throw httpError(503); return ok(c) }, minIntervalMs: 0, initialBackoffMs: 1, postMutationDelayMs: 0,
-    }).catch(() => undefined)
+    })
+    if (method === "PATCH") {
+      await assert.rejects(request, /fail/)
+    } else {
+      const response = await request
+      assert.equal(response.status, 200, `${method} should retry and succeed`)
+    }
     assert.equal(calls, expected, method)
   }
 })

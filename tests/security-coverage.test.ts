@@ -13,6 +13,7 @@ import { httpsAgent } from "../src/httpClient.js"
 import { checkResourceCustomFieldKeys, checkWorkItemUserReferences, _fieldKeyCache, _userExistsCache } from "../src/guards.js"
 import { requestBearerToken } from "../src/config.js"
 import { executeApiTool } from "../src/executor.js"
+import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js"
 import { toolDefinitionMap, securitySchemes } from "../src/tools.js"
 
 // The generated tools need a token; a call without one is refused before it is sent.
@@ -44,6 +45,23 @@ async function codeFor(base: string, clientId: string) {
   return { code: new URL(done.headers.get("location") as string).searchParams.get("code") as string, verifier }
 }
 
+async function directMcpCode(provider: PolarionOAuthProvider, client: OAuthClientInformationFull, codeChallenge?: string) {
+  let loginId = ""
+  await provider.authorize(client, {
+    redirectUri: REDIRECT,
+    state: "direct-state",
+    codeChallenge,
+    scopes: [],
+  } as never, {
+    set() {},
+    send(html: string) { loginId = /name="login_id" value="([^"]+)"/.exec(html)![1] },
+  } as never)
+  const completed = await provider.completeLogin(loginId, "pat")
+  assert.equal(completed.ok, true)
+  if (!completed.ok) throw new Error("direct login should issue an authorization code")
+  return new URL(completed.redirectTo).searchParams.get("code") as string
+}
+
 const exchange = (base: string, body: Record<string, string>) =>
   fetch(`${base}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", redirect_uri: REDIRECT, ...body }) })
 
@@ -57,6 +75,44 @@ test("a code issued to client A cannot be redeemed by client B, even with A's ve
     assert.equal(res.status, 400)
     assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
   } finally { await stop() }
+})
+
+test("the PKCE challenge lookup independently enforces client, flow, expiry, and challenge binding", async () => {
+  const provider = new PolarionOAuthProvider("https://p", new Sealer(SECRET), async () => true)
+  const registration = {
+    client_name: "direct client",
+    redirect_uris: [REDIRECT],
+    token_endpoint_auth_method: "none" as const,
+    grant_types: ["authorization_code"],
+    response_types: ["code"],
+  }
+  const client = await provider.clientsStore.registerClient!(registration)
+  const otherClient = await provider.clientsStore.registerClient!({ ...registration, client_name: "other client" })
+  const challenge = createHash("sha256").update("verifier").digest("base64url")
+
+  const wrongClientCode = await directMcpCode(provider, client, challenge)
+  await assert.rejects(provider.challengeForAuthorizationCode(otherClient, wrongClientCode), /Invalid authorization code/)
+  assert.equal(await provider.challengeForAuthorizationCode(client, wrongClientCode), challenge, "a rejected client must not consume the code")
+
+  const noChallengeCode = await directMcpCode(provider, client)
+  await assert.rejects(provider.challengeForAuthorizationCode(client, noChallengeCode), /Invalid authorization code/)
+
+  let gptLoginId = ""
+  provider.authorizeGpt("gpt", "https://chatgpt.com/aip/g-x/oauth/callback", "s", {
+    set() {}, send(html: string) { gptLoginId = /name="login_id" value="([^"]+)"/.exec(html)![1] },
+  } as never)
+  const gptLogin = await provider.completeLogin(gptLoginId, "pat")
+  assert.equal(gptLogin.ok, true)
+  if (!gptLogin.ok) throw new Error("GPT login should issue an authorization code")
+  const gptCode = new URL(gptLogin.redirectTo).searchParams.get("code") as string
+  await assert.rejects(provider.challengeForAuthorizationCode(client, gptCode), /Invalid authorization code/)
+
+  mock.timers.enable({ apis: ["Date"], now: Date.now() })
+  try {
+    const expiredCode = await directMcpCode(provider, client, challenge)
+    mock.timers.tick(61_000)
+    await assert.rejects(provider.challengeForAuthorizationCode(client, expiredCode), /Invalid authorization code/)
+  } finally { mock.timers.reset() }
 })
 
 test("the MCP token endpoint refuses a redirect_uri other than the one the login started with", async () => {
@@ -82,13 +138,48 @@ test("an authorization code expires after 60 s", async () => {
 
 test("a login page left open past 10 minutes can no longer be completed", async () => {
   const provider = new PolarionOAuthProvider("https://p", new Sealer(SECRET), async () => true)
-  let loginId = ""
+  const loginIds: string[] = []
   mock.timers.enable({ apis: ["Date"], now: Date.now() })
   try {
-    provider.authorizeGpt("gpt", "https://chatgpt.com/aip/g-x/oauth/callback", "s", { set() {}, send(h: string) { loginId = /name="login_id" value="([^"]+)"/.exec(h)![1] } } as never)
-    mock.timers.tick(10 * 60 * 1000 + 1)
-    assert.equal((await provider.completeLogin(loginId, "pat")).ok, false)
+    const response = { set() {}, send(h: string) { loginIds.push(/name="login_id" value="([^"]+)"/.exec(h)![1]) } }
+    provider.authorizeGpt("gpt", "https://chatgpt.com/aip/g-x/oauth/callback", "s", response as never)
+    provider.authorizeGpt("gpt", "https://chatgpt.com/aip/g-x/oauth/callback", "s", response as never)
+    mock.timers.tick(9 * 60 * 1000)
+    assert.equal((await provider.completeLogin(loginIds[0], "pat")).ok, true, "a live login remains usable within its TTL")
+    mock.timers.tick(60 * 1000 + 1)
+    assert.equal((await provider.completeLogin(loginIds[1], "pat")).ok, false, "an expired login is rejected")
   } finally { mock.timers.reset() }
+})
+
+test("a Polarion outage preserves the pending login and never redirects with an unverified token", async () => {
+  const { base, stop } = await startApp({ validateToken: async () => "unavailable" })
+  try {
+    const client = await register(base)
+    const authorizeUrl = new URL(`${base}/authorize`)
+    for (const [key, value] of Object.entries({
+      response_type: "code",
+      client_id: client.client_id,
+      redirect_uri: REDIRECT,
+      code_challenge: createHash("sha256").update("verifier").digest("base64url"),
+      code_challenge_method: "S256",
+      state: "outage-state",
+    })) authorizeUrl.searchParams.set(key, value)
+    const page = await (await fetch(authorizeUrl)).text()
+    const loginId = /name="login_id" value="([^"]+)"/.exec(page)?.[1]
+    assert.ok(loginId)
+
+    const result = await fetch(`${base}/polarion-login`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ login_id: loginId as string, token: "pat" }),
+      redirect: "manual",
+    })
+    assert.equal(result.status, 400)
+    assert.equal(result.headers.get("location"), null)
+    const retryPage = await result.text()
+    assert.match(retryPage, /Polarion could not be reached to check the token/)
+    assert.match(retryPage, new RegExp(`name="login_id" value="${loginId}"`))
+  } finally { await stop() }
 })
 
 test("a sealed value relabelled to another kind does not open (kind is bound as AAD)", () => {
@@ -119,9 +210,25 @@ test("one client's derived secret does not authenticate another client", async (
 })
 
 test("client_name is HTML-escaped on the login page", () => {
-  const html = renderLoginPage("id", "https://p", `<img src=x onerror=alert(1)>`, "h")
+  const html = renderLoginPage("id", "https://p", `<img src=x onerror=alert(1)> & "quoted" 'single'`, "h")
   assert.doesNotMatch(html, /<img src=x/)
-  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/)
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt; &amp; &quot;quoted&quot; &#39;single&#39;/)
+})
+
+test("an empty copied PAT stays on the login page without calling Polarion", async () => {
+  let checks = 0
+  const provider = new PolarionOAuthProvider("https://p", new Sealer(SECRET), async () => { checks++; return true })
+  let loginId = ""
+  provider.authorizeGpt("gpt", "https://chatgpt.com/aip/g-x/oauth/callback", "s", {
+    set() {}, send(html: string) { loginId = /name="login_id" value="([^"]+)"/.exec(html)![1] },
+  } as never)
+  const result = await provider.completeLogin(loginId, " \n\t ")
+  assert.equal(result.ok, false)
+  if (!result.ok) {
+    assert.match(result.reason, /Enter your Polarion Personal Access Token/)
+    assert.ok(result.pending, "a blank token must leave the login retryable")
+  }
+  assert.equal(checks, 0, "empty credentials must never reach the token validator")
 })
 
 test("the GPT authorize endpoint refuses callbacks with a query, a port, or plain http", async () => {

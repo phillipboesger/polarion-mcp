@@ -76,6 +76,12 @@ test("loopback entries allow any port (RFC 8252), other hosts do not", () => {
   assert.equal(isRedirectAllowed("http://127.0.0.1:5000/oauth/cb", list), true)
   assert.equal(isRedirectAllowed("http://localhost:5000/oauth/cb", list), false)
   assert.equal(isRedirectAllowed("https://claude.ai:8443/api/mcp/auth_callback", parseRedirectAllowlist(CLAUDE)), false)
+
+  const loopbackPrefix = parseRedirectAllowlist("http://localhost:33418/oauth/")
+  assert.deepEqual(loopbackPrefix, ["http://localhost/oauth/"])
+  assert.equal(isRedirectAllowed("http://localhost:5000/oauth/cb", loopbackPrefix), true)
+  const externalPrefix = parseRedirectAllowlist("https://claude.ai/api/mcp/")
+  assert.equal(isRedirectAllowed("https://claude.ai:8443/api/mcp/auth_callback", externalPrefix), false)
 })
 
 test("an allowlist entry that is not an absolute URL fails at startup", () => {
@@ -94,13 +100,37 @@ test("with an allowlist, registering a foreign redirect URI is refused and an al
   }
 })
 
+test("registration rejects a client if any redirect URI falls outside the allowlist", async () => {
+  const { base, stop } = await startApp(parseRedirectAllowlist(CLAUDE))
+  try {
+    const response = await fetch(`${base}/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client_name: "Some Client", redirect_uris: [CLAUDE, "https://attacker.example/callback"], token_endpoint_auth_method: "none" }),
+    })
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as { error: string }).error, "invalid_client_metadata")
+  } finally {
+    await stop()
+  }
+})
+
 test("a registration issued before the allowlist was set stops working once it is", async () => {
   const open = await startApp()
   let clientId: string
   try {
     const res = await register(open.base, "https://attacker.example/callback")
-    clientId = ((await res.json()) as { client_id: string }).client_id
-    assert.equal((await authorize(open.base, clientId, "https://attacker.example/callback")).status, 200)
+    assert.equal(res.status, 201)
+    const registration = (await res.json()) as { client_id: string }
+    assert.ok(registration.client_id)
+    clientId = registration.client_id
+    const authorizeResponse = await authorize(open.base, clientId, "https://attacker.example/callback")
+    assert.equal(authorizeResponse.status, 200)
+    assert.match(authorizeResponse.headers.get("content-type") ?? "", /text\/html/)
+    assert.match(authorizeResponse.headers.get("cache-control") ?? "", /no-store/)
+    const loginPage = await authorizeResponse.text()
+    assert.match(loginPage, /name="login_id" value="[^"]+"/)
+    assert.match(loginPage, /attacker\.example/)
   } finally {
     await open.stop()
   }

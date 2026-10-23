@@ -108,6 +108,13 @@ test("splitWorkItemId falls back to fallbackProjectId when there's no separator"
   assert.equal(splitWorkItemId("PROJ-1"), null, "no fallback and no separator -- can't resolve")
 })
 
+test("splitWorkItemId treats a leading or trailing slash as malformed", () => {
+  assert.deepEqual(splitWorkItemId("/PROJ-1", "FALLBACK"), { projectId: "FALLBACK", workItemId: "/PROJ-1" })
+  assert.deepEqual(splitWorkItemId("PROJ/", "FALLBACK"), { projectId: "FALLBACK", workItemId: "PROJ/" })
+  assert.equal(splitWorkItemId("/PROJ-1"), null)
+  assert.equal(splitWorkItemId("PROJ/"), null)
+})
+
 test("checkWorkItemsEnumFields resolves a new item's options by type (postWorkItems shape)", async () => {
   _optionsCache.clear()
   const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
@@ -161,6 +168,57 @@ function fieldsMetadataResponse(ids: string[]): AxiosResponse {
 function wiCreateTarget(attributes: Record<string, unknown>, type = "task"): CustomFieldKeyCheckTarget {
   return { resourceType: "workitems", projectId: "PROJ", type, attributes, scopeLabel: `a new '${type}' Work Item in PROJ` }
 }
+
+test("every generated standard attribute key skips custom-field lookup for its resource", async () => {
+  // Keep these aligned with the generated write-tool schemas. If one is lost
+  // from the guard's standard-field table, it becomes an unchecked lookup.
+  const standardFields: Record<string, string[]> = {
+    workitems: ["type", "title", "status", "severity", "priority", "resolution", "description", "dueDate", "hyperlinks", "initialEstimate", "remainingEstimate", "resolvedOn", "timeSpent"],
+    documents: ["autoSuspect", "homePageContent", "moduleName", "outlineNumbering", "renderingLayouts", "status", "structureLinkRole", "title", "type", "usesOutlineNumbering"],
+    plans: ["allowedTypes", "calculationType", "capacity", "color", "defaultEstimate", "description", "dueDate", "estimationField", "finishedOn", "homePageContent", "id", "isTemplate", "name", "previousTimeSpent", "prioritizationField", "sortOrder", "startDate", "startedOn", "status", "useReportFromTemplate"],
+    collections: ["description", "id", "name"],
+    testruns: ["finishedOn", "groupId", "homePageContent", "id", "idPrefix", "isTemplate", "keepInHistory", "query", "selectTestCasesBy", "status", "title", "type", "useReportFromTemplate"],
+    testrecords: ["comment", "duration", "executed", "result", "testCaseRevision"],
+  }
+  const httpClient = async (): Promise<AxiosResponse> => {
+    throw new Error("standard attributes must not trigger a metadata lookup")
+  }
+  for (const [resourceType, fields] of Object.entries(standardFields)) {
+    for (const field of fields) {
+      const result = await checkResourceCustomFieldKeys({
+        resourceType,
+        projectId: "PROJ",
+        attributes: { [field]: "value" },
+        scopeLabel: `${resourceType} resource`,
+      }, requestContext, { ...sendOpts, httpClient })
+      assert.deepEqual(result, { ok: true }, `${resourceType}.${field}`)
+    }
+  }
+})
+
+test("custom-field guard fails closed for unknown resource types and unresolved targets", async () => {
+  let calls = 0
+  const httpClient = async (): Promise<AxiosResponse> => { calls++; return fieldsMetadataResponse(["customKey"]) }
+  const unknown = await checkResourceCustomFieldKeys({
+    resourceType: "unknown", projectId: "PROJ", attributes: { customKey: "x" }, scopeLabel: "unknown resource",
+  }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(unknown.ok, false)
+  if (!unknown.ok) assert.match(unknown.reason, /unknown resourceType/)
+
+  const unresolved = await checkResourceCustomFieldKeys({
+    resourceType: "workitems", projectId: "PROJ", attributes: { customKey: "x" }, scopeLabel: "unresolved resource", unresolvedReason: "missing work item id",
+  }, requestContext, { ...sendOpts, httpClient })
+  assert.deepEqual(unresolved, { ok: false, reason: "missing work item id" })
+  assert.equal(calls, 0, "neither invalid target should reach Polarion")
+})
+
+test("malformed field metadata refuses a custom-field write", async () => {
+  _fieldKeyCache.clear()
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: { data: [] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkResourceCustomFieldKeys(wiCreateTarget({ customKey: "x" }), requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.match(result.reason, /returned no fields.*Refusing the write/)
+})
 
 test("checkResourceCustomFieldKeys skips validation when every attribute key is standard", async () => {
   const httpClient = async (): Promise<AxiosResponse> => {

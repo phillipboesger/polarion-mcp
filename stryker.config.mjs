@@ -1,11 +1,11 @@
 const projects = {
   oauth: {
     mutate: ['build-tests/src/oauth.js'],
-    command: 'node --test --test-concurrency=1 build-tests/tests/oauth*.test.js build-tests/tests/mcp-http.test.js build-tests/tests/mcp-sessions.test.js build-tests/tests/token-check.test.js build-tests/tests/security-coverage.test.js',
+    command: 'node --test --test-concurrency=1 build-tests/tests/oauth*.test.js build-tests/tests/mcp-http.test.js build-tests/tests/token-check.test.js build-tests/tests/security-coverage.test.js',
   },
   sealed: {
     mutate: ['build-tests/src/sealed.js'],
-    command: 'node --test --test-concurrency=1 build-tests/tests/security-coverage.test.js',
+    command: 'node --test --test-concurrency=1 build-tests/tests/sealed.test.js build-tests/tests/security-coverage.test.js',
   },
   guards: {
     mutate: ['build-tests/src/guards.js'],
@@ -36,6 +36,7 @@ export default {
   coverageAnalysis: 'off',
   concurrency: 4,
   timeoutMS: 20_000,
+  thresholds: { break: 75 },
   dryRunTimeoutMinutes: 2,
   incremental: true,
   incrementalFile: `reports/mutation/${moduleName}-incremental.json`,

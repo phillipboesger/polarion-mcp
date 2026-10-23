@@ -48,7 +48,9 @@ test("parseToolFilter: unset means no filter", () => {
 })
 
 test("filterTools: no filter keeps every tool", () => {
-  assert.equal(filterTools(toolDefinitionMap, {}).tools.size, toolDefinitionMap.size)
+  const result = filterTools(toolDefinitionMap, {})
+  assert.equal(result.tools.size, toolDefinitionMap.size)
+  assert.deepEqual(result.unknown, [])
 })
 
 test("filterTools: read-only keeps exactly the readOnlyHint tools", () => {
@@ -63,6 +65,33 @@ test("filterTools: the allowlist and read-only intersect, unknown names are repo
   assert.deepEqual([...tools.keys()].sort(), ["getWorkItem", "getWorkItems"])
   assert.deepEqual(unknown, ["noSuchTool"])
   assert.deepEqual(filterTools(toolDefinitionMap, { allow: [] }).tools.size, 0)
+})
+
+test("filterTools treats missing annotations as non-read-only and reports only unknown allowlist names", () => {
+  const readOnly = [...toolDefinitionMap.values()].find((def) => def.annotations?.readOnlyHint === true)
+  const write = [...toolDefinitionMap.values()].find((def) => def.annotations?.readOnlyHint !== true)
+  assert.ok(readOnly && write, "generated tools should include read and write definitions")
+  const unannotated = { ...readOnly, annotations: undefined }
+  const fixture = new Map([
+    ["reader", readOnly],
+    ["writer", write],
+    ["unannotated", unannotated],
+  ])
+
+  const filtered = filterTools(fixture, { allow: ["reader", "writer", "unannotated", "missing", "missing"], readOnly: true })
+  assert.deepEqual([...filtered.tools.keys()], ["reader"])
+  assert.deepEqual(filtered.unknown, ["missing", "missing"])
+})
+
+test("parseToolFilter trims flags and preserves the empty-list versus unset distinction", () => {
+  assert.equal(parseFlag("FLAG", "  YeS  "), true)
+  assert.equal(parseFlag("FLAG", "  OFF  "), false)
+  assert.deepEqual(parseToolFilter({ MCP_TOOLS: "  alpha, beta  " }).allow, ["alpha", "beta"])
+  assert.equal(parseToolFilter({ MCP_TOOLS: "   " }).allow, undefined)
+  assert.throws(() => parseToolFilter({ MCP_TOOLS: " , , " }), /lists no tool names/)
+  for (const value of ["enabled-on", "maybeon", "off-ish", "disabled-off"]) {
+    assert.throws(() => parseFlag("FLAG", value), /must be true or false/, value)
+  }
 })
 
 test("over MCP a filtered tool is neither listed nor callable, and output schemas are left out", async () => {
@@ -122,8 +151,12 @@ test("startup fails loudly when the filter leaves no tools or a flag is invalid"
   const typo = load({ MCP_TOOLS: "getWorkItemz" })
   assert.notEqual(typo.status, 0)
   assert.match(typo.stderr, /leaves no tools/)
+  assert.match(typo.stderr, /MCP_TOOLS names unknown tools, ignored: getWorkItemz/)
   const badFlag = load({ MCP_READ_ONLY: "on-ish" })
   assert.notEqual(badFlag.status, 0)
   assert.match(badFlag.stderr, /MCP_READ_ONLY must be true or false/)
   assert.equal(load({ MCP_TOOLS: "getWorkItem", MCP_OMIT_OUTPUT_SCHEMA: "1" }).stdout.trim(), "1")
+  const partial = load({ MCP_TOOLS: "getWorkItem" })
+  assert.equal(partial.status, 0)
+  assert.match(partial.stderr, /Tool filter: 1\/\d+ tools enabled/)
 })

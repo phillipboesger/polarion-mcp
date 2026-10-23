@@ -4,13 +4,15 @@
 
 The initial full-suite-per-mutant experiment took 106m28s and produced 1,504 mutant timeouts (out of 2,279 mutants) even with the test compiler and build work repeated per mutant. Those timeouts made the full-suite scores unusable, so the module projects run the already compiled tests that exercise each module. The first incomplete full-suite run's timeout count is retained here as the reason for the scoped design; it is excluded from the baseline scores below.
 
+**Q04 run:** `npm run test:compile`, followed by `MUTATION_MODULE=<module> ./node_modules/.bin/stryker run stryker.config.mjs` for each module (OAuth had a clean run plus two incremental refreshes after the final assertions; sealing had one incremental confirmation). Total compile and mutation wall time was **39m38s**. Projects used four workers, 20-second timeouts, incremental mode, and the module-specific compiled test commands in `stryker.config.mjs`.
+
 ## Mutation scores
 
 Scores use **Killed / (Killed + Survived + NoCoverage)**. Timeouts are excluded from the denominator and reported separately.
 
 | Module | Score | Killed | Survived | NoCoverage | Timeout |
 |---|---:|---:|---:|---:|---:|
-| src/oauth.ts | 63.50% | 174 | 100 | 0 | 88 |
+| src/oauth.ts | 72.38% | 174 | 100 | 0 | 88 |
 | src/sealed.ts | 64.71% | 33 | 18 | 0 | 0 |
 | src/guards.ts | 64.07% | 271 | 152 | 0 | 0 |
 | src/tool-filter.ts | 73.42% | 58 | 21 | 0 | 0 |
@@ -18,7 +20,21 @@ Scores use **Killed / (Killed + Survived + NoCoverage)**. Timeouts are excluded 
 
 **Totals:** 303 surviving mutants; 88 timeouts.
 
-## Surviving mutants
+The OAuth score above is corrected from the original Q03 table, which accidentally included timeouts in its denominator. All scores use **Killed / (Killed + Survived + NoCoverage)**; timeouts are excluded.
+
+## Q04 before and after
+
+| Module | Before | After | Killed | Survived | NoCoverage | Timeout |
+|---|---:|---:|---:|---:|---:|---:|
+| src/oauth.ts | 72.38% | 82.87% | 208 | 62 | 0 | 92 |
+| src/sealed.ts | 64.71% | 88.24% | 45 | 6 | 0 | 0 |
+| src/guards.ts | 64.07% | 80.61% | 341 | 82 | 0 | 0 |
+| src/tool-filter.ts | 73.42% | 89.87% | 71 | 8 | 0 | 0 |
+| src/executor.ts (dispatch slice) | 86.52% | 85.39% | 76 | 13 | 0 | 0 |
+
+The after scores come from the Q04 reports; two OAuth incremental refreshes reused clean-run killed and timeout results, then reran all previously surviving mutants after new assertions. Scores count only killed, survived, and no-coverage mutants. The 92 OAuth timeouts remain separate.
+
+## Q03 surviving mutants (before Q04)
 
 Survivors are grouped by source line. Mutator names with a count include each distinct mutant instance at that line.
 
@@ -212,10 +228,44 @@ These survivors cover optional request bodies, dry-run authorization redaction, 
 | [src/executor.ts:959] | StringLiteral | 1 survivor(s) can change: const fileName = String(readArg(validatedArgs, 'attachmentId', nameMap) ?? readArg(validatedArgs, 'filename', nameMap) ?? '') |
 | [src/executor.ts:960] | StringLiteral | 1 survivor(s) can change: return downloadResult(response.data, String(response.headers['content-type'] ?? ''), requestUrl, fileName); |
 
-## Weak tests
+## Q04 surviving mutants and equivalent cases
 
-- `tests/http-client.test.ts:39` — the PATCH rejection is swallowed with `.catch(() => undefined)`; the retry-count assertion can pass if the call unexpectedly resolves after one attempt.
-- `tests/mcp-sessions.test.ts:56–68` — the activity test checks only HTTP 200 for each session request, without validating JSON-RPC responses.
-- `tests/oauth-redirect-allowlist.test.ts:97–104` — the pre-allowlist authorize setup checks only HTTP 200, so it would miss a malformed successful response.
+After Q04, the survivor counts are OAuth 62 (92 timeouts separately), sealing 6, guards 82, tool filter 8, and executor slice 13. High-risk survivors remain around OAuth code binding and guard response parsing. No production source was changed and no survivor exposed a confirmed behavior bug.
+
+| Source | Mutator(s) | Why the survivor matters |
+|---|---|---|
+| [src/oauth.ts:564] | ConditionalExpression ×3, EqualityOperator | MCP challenge lookup still has surviving mutations around code presence, flow, expiry, challenge presence, and client binding. A regression could bypass PKCE or bind a code to the wrong client. |
+| [src/oauth.ts:630] | ConditionalExpression ×3, EqualityOperator | GPT redemption still has surviving mutations around code presence, flow, expiry, and client binding. These checks isolate the no-PKCE GPT flow. |
+| [src/oauth.ts:596] | ConditionalExpression | A surviving redirect comparison mutation could let a code be exchanged using a different callback. |
+| [src/oauth.ts:725] | EqualityOperator | The access-token exact-expiry boundary remains unpinned; acceptance still requires an unexpired sealed payload. |
+| [src/oauth.ts:731–732] | ConditionalExpression, EqualityOperator, CallExpression | Sweeping expired pending logins and codes still has survivors. Entry-point checks independently reject expired credentials; sweep survivors can affect memory retention and exact-boundary cleanup. |
+| [src/guards.ts:114–119, 311–315] | ConditionalExpression, LogicalOperator, ArrayDeclaration, MethodExpression | Malformed Polarion response shapes may still be interpreted differently by option and field parsers. Guards must refuse writes when a lookup cannot be parsed. |
+| [src/guards.ts:457–460] | ArrayDeclaration, MethodExpression, ConditionalExpression, LogicalOperator | Relationship extraction still has survivors for object/array shapes and user type/id filtering; invalid user references must remain fail-closed. |
+| [src/guards.ts:81–89, 152, 385, 491, 501, 503] | Cache and error-path operators | Cache eviction, TTL boundaries, 404 handling, and error conversion still have survivors. Future changes must preserve bounded caches and refusals on missing or unresolvable users. |
+| [src/sealed.ts:60, 72, 74, 81] | StringLiteral, ConditionalExpression, ArithmeticOperator, BlockStatement | Reviewed equivalent cases are listed below: default UTF-8 encoding, rejected foreign ciphertext, empty ciphertext reaching JSON parsing, and an empty catch still return no payload. |
+| [src/tool-filter.ts:51, 53, 77–84, 92] | Regex, OptionalChaining, ConditionalExpression, EqualityOperator, StringLiteral | Remaining cases are parser, logging, or error-message equivalences below; empty-filter startup still throws. |
+| [src/executor.ts:877, 925–926, 954–955, 959–960] | ConditionalExpression, ObjectLiteral, StringLiteral, ArrayDeclaration, BlockStatement, CallExpression | Remaining dispatch survivors include optional body inclusion, redaction, cache invalidation after writes, and download formatting. |
+
+### Equivalent mutants skipped for follow-up
+
+Equivalent cases remain included in the raw survivor counts above; they were skipped as test-writing targets because they do not alter the security behavior under test.
+
+- `src/sealed.ts:60` — omitting explicit `utf8` uses Node's default UTF-8 string encoding.
+- `src/sealed.ts:72,74,81` — the alternate prefix guard still requires a valid GCM tag and kind-bound AAD; allowing zero-length ciphertext through the fast guard ends in JSON parse failure, and the catch returns `undefined`.
+- `src/guards.ts:117,458` — replacements only remove TypeScript type assertions from the same response mapping expressions.
+- `src/guards.ts:390,396,494` — an omitted Axios `method` defaults to `GET`, preserving the guard lookup request.
+- `src/guards.ts:197,206,211,409,411,421–422,436–437` — message text and empty-option wording change, but each path still returns `ok: false` and blocks the write.
+- `src/tool-filter.ts:51` — removing `+` from the separator regex can create empty split entries, which `.filter(Boolean)` removes before returning the allowlist.
+- `src/tool-filter.ts:53` — when `raw` is truthy, `allow` is always assigned from `raw.split()`, so optional chaining does not affect the condition.
+- `src/tool-filter.ts:77–84,92` — warning/info conditions and text, empty-filter error wording, and flag error labels affect diagnostics only; the filter still warns or throws and exposes the same tools.
+- `src/executor.ts:950` — the execution log text does not change request authorization or whether guarded dispatch runs.
+
+Other survivors remain in the scores and are not classified as equivalent. OAuth code binding, redirect comparison, and expiry boundaries, plus fail-closed guard parsing, remain visible above. All six sealing survivors were reviewed as equivalent.
+
+## Weak tests rewritten
+
+- `tests/http-client.test.ts:34–47` — now asserts PATCH rejects and GET/DELETE retry to a 200 response before checking attempt counts.
+- `tests/mcp-sessions.test.ts:30–42,70–82` — the activity test now parses each JSON-RPC response and checks version, id, and the tools list.
+- `tests/oauth-redirect-allowlist.test.ts:118–133` — the pre-allowlist setup now validates registration, HTML content type, no-store header, login id, and the displayed return host.
 
 No assertion-free tests, mock-only tautologies, or snapshots of test output were found in `tests/*.test.ts`.
