@@ -136,7 +136,7 @@ app.use((req: Request, res: Response) => {
 /**
  * Error handler
  */
-app.use((err: Error & { status?: number }, req: Request, res: Response, next: Function) => {
+app.use((err: Error & { status?: number }, req: Request, res: Response, _next: Function) => {
   // Malformed or oversized JSON is the caller's fault: 400/413, not a 500.
   if (typeof err.status === 'number' && err.status >= 400 && err.status < 500) {
     res.status(err.status).json({ error: err.status === 413 ? 'Request body too large' : 'Bad Request', message: 'The body is not valid JSON or too large' });

@@ -55,7 +55,8 @@ const MAX_CONVERTIBLE_TAGS = 5_000;
 function isConvertible(html: string): boolean {
   if (html.length > MAX_CONVERTIBLE_LENGTH) return false;
   let tags = 0;
-  for (const _ of html.matchAll(/<[a-z]/gi)) {
+  const matches = html.matchAll(/<[a-z]/gi);
+  while (!matches.next().done) {
     if (++tags > MAX_CONVERTIBLE_TAGS) return false;
   }
   return true;

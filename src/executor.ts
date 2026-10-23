@@ -23,7 +23,7 @@ import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
-import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
+import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
 import {
@@ -700,7 +700,7 @@ export async function executeApiTool(
     // We try each requirement group until we find one where all schemes are available
     const appliedSecurity = definition.securityRequirements?.find(req => {
       // Check if all schemes in this requirement are available
-      return Object.entries(req).every(([schemeName, scopesArray]) => {
+      return Object.entries(req).every(([schemeName, _scopesArray]) => {
         const scheme = allSecuritySchemes[schemeName];
         if (!scheme) return false;
 
@@ -984,7 +984,7 @@ export async function executeApiTool(
         // Safe: this branch already checked `response.data` is a non-null object,
         // and renderRichTextFieldsAsMarkdown preserves the top-level shape.
         structuredContent = renderedData as JsonObject;
-      } catch (e) {
+      } catch {
         responseText = "[Stringify Error]";
       }
     }

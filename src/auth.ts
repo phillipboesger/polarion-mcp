@@ -87,7 +87,7 @@ export async function acquireOAuth2Token(schemeName: string, scheme: any): Promi
 
     // Prepare the token request
     // OAuth2 token requests use application/x-www-form-urlencoded format
-    let formData = new URLSearchParams();
+    const formData = new URLSearchParams();
     formData.append('grant_type', 'client_credentials');
 
     // Add scopes if specified
