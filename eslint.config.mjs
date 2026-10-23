@@ -6,6 +6,8 @@ export default tseslint.config(
   {
     ignores: [
       'build/**',
+      'coverage/**',
+      'tests/fixtures/**',
       'build-tests/**',
       'dist-stage/**',
       '_verify/**',

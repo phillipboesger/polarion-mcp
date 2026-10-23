@@ -86,7 +86,6 @@ function checker(root) {
   }
   for (const [name, line] of documented) {
     if (name.endsWith('_<SCHEME>')) {
-      const prefix = name.slice(0, -'<SCHEME>'.length);
       if (!sourceFamilies.has(name)) add('env', 'docs/configuration.md', line, `${name} is documented but no matching source env family was found`);
     } else if (!sourceEnv.has(name) && !INTERNAL_ENV_IGNORES.has(name)) add('env', 'docs/configuration.md', line, `${name} is documented but not read`);
   }
@@ -152,7 +151,7 @@ function checker(root) {
     const headings = slugsFor(text);
     const targets = new Set(headings.map(h => h.slug));
     for (const m of text.matchAll(/(?<!!)\[[^\]]*\]\(([^)]+)\)/g)) {
-      let target = m[1].trim().replace(/^<|>$/g, '').split(/\s+/)[0];
+      const target = m[1].trim().replace(/^<|>$/g, '').split(/\s+/)[0];
       if (!target || /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(target)) continue;
       const hashAt = target.indexOf('#'); const fragment = hashAt >= 0 ? decodeURIComponent(target.slice(hashAt + 1)) : '';
       const page = hashAt >= 0 ? target.slice(0, hashAt) : target;
