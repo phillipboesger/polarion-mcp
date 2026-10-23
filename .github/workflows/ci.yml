@@ -279,7 +279,7 @@ jobs:
         run: npm run lint
 
   docs:
-    name: Documentation consistency (report mode)
+    name: Documentation consistency
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -295,4 +295,4 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Check documentation
-        run: npm run check:docs
+        run: npm run check:docs:strict
