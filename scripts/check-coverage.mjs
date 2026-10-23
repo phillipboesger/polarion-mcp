@@ -33,10 +33,12 @@ const targets = [
   'src/telemetry.ts',
   'src/pagination.ts',
   'src/composite-tools.ts',
+  'src/composite-search.ts',
   'src/composite-utils.ts',
   'src/composite-jobs.ts',
   'src/composite-trace.ts',
   'src/composite-documents.ts',
+  'src/metadata-cache.ts',
 ]
 const sourceFiles = [...files].filter(([file]) => file.startsWith('src/') && file !== 'src/tools.ts')
 if (sourceFiles.length === 0) throw new Error('coverage/lcov.info contains no eligible src/*.ts files')

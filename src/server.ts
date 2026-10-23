@@ -21,6 +21,7 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
+  CompleteRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
@@ -32,8 +33,9 @@ import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS, capToolResponseText } from 
 import { lenientOutputSchema } from './output-schema.js';
 import { listVirtualTools, discoverVirtualTools, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
-import { API_BASE_URL, getBearerToken, tokenScope } from './config.js';
+import { API_BASE_URL, getBearerToken, tokenScope, callerCacheScope } from './config.js';
 import { parseToolFilter } from './tool-filter.js';
+import { MetadataCache, type MetadataKind } from './metadata-cache.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
@@ -299,6 +301,8 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
+  const completionsEnabled = /^(1|true|yes|on)$/i.test(process.env.MCP_COMPLETIONS ?? '');
+  const metadataCache = new MetadataCache();
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
@@ -306,6 +310,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
         tools: {},      // API operations (GET, POST, PATCH, DELETE endpoints)
         resources: {},  // Documentation and configuration files
         prompts: {},    // Pre-configured task templates
+        ...(completionsEnabled ? { completions: {} } : {}),
       },
       instructions: SERVER_INSTRUCTIONS,
     },
@@ -386,5 +391,49 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     return getPolarionPrompt(name, args);
   });
 
+  if (completionsEnabled) server.setRequestHandler(CompleteRequestSchema, async request => {
+    const { argument, context } = request.params;
+    const projectId = context?.arguments?.projectId ?? '';
+    const scope = callerCacheScope();
+    const kind: MetadataKind | undefined = argument.name === 'projectId' ? 'projects'
+      : argument.name === 'workItemType' || argument.name === 'type' ? 'work-item-types'
+      : argument.name === 'status' ? 'statuses' : argument.name === 'user' || argument.name === 'assignee' ? 'users' : undefined;
+    let values: string[] = [];
+    try {
+      if (kind) {
+        const cached = metadataCache.get(apiBaseUrl, scope, kind, projectId);
+        if (cached) values = cached;
+        else {
+          const tool = kind === 'projects' ? 'getProjects' : kind === 'users' ? 'getUsers' : kind === 'work-item-types' ? 'getProjectFieldsMetadata' : 'getAvailableEnumOptionsForWorkItemType';
+          const args: Record<string, unknown> = kind === 'work-item-types' ? { projectId, resourceType: 'workitems' }
+            : kind === 'statuses' ? { projectId, workItemType: context?.arguments?.workItemType ?? 'requirement', fieldId: 'status' } : {};
+          const result = await callToolPipeline(tool, args, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger });
+          const raw = result.structuredContent ?? result.content?.map(item => item.type === 'text' ? item.text : '').join(' ') ?? '';
+          let parsed: unknown = raw;
+          if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = raw; } }
+          values = extractCompletionValues(parsed, argument.name);
+          metadataCache.set(apiBaseUrl, scope, kind, values, projectId);
+        }
+      }
+    } catch { values = []; }
+    const prefix = argument.value.toLowerCase();
+    const matches = [...new Set(values)].filter(value => value.toLowerCase().includes(prefix)).slice(0, 100);
+    return { completion: { values: matches, total: matches.length, isIncomplete: false } };
+  });
+
   return server;
+}
+
+function extractCompletionValues(value: unknown, argument: string): string[] {
+  const fields = argument === 'projectId' ? ['id'] : ['id', 'name', 'label', 'value'];
+  const found = new Set<string>();
+  const walk = (item: unknown) => {
+    if (Array.isArray(item)) { item.forEach(walk); return; }
+    if (!item || typeof item !== 'object') return;
+    const record = item as Record<string, unknown>;
+    for (const field of fields) if (typeof record[field] === 'string' && (field !== 'id' || record.type !== undefined || argument === 'projectId')) found.add(record[field] as string);
+    Object.values(record).forEach(walk);
+  };
+  walk(value);
+  return [...found];
 }
