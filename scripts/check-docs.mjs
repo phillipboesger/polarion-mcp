@@ -215,10 +215,15 @@ function checker(root) {
     if (!valid) add('clients', 'docs/clients.json', 1, 'expected {"clients":[{"name":"..."}]}');
     else for (const file of markdown) {
       const text = contents.get(file);
-      for (const row of text.matchAll(/^\|\s*([^|]+?)\s*\|([^\n]*)$/gm)) {
-        const first = row[1].trim();
-        if (/client/i.test(text.slice(0, row.index).split('\n').slice(-4).join('\n')) && !/^[-: ]+$/.test(first) && !/^(client|name)$/i.test(first) && !listed.has(first)) add('clients', file, lineAt(text, row.index), `client table references unlisted client ${first}`);
-      }
+      // Only tables whose header's first cell is "Client"/"MCP client" are client matrices.
+      let inClientTable = false;
+      text.split('\n').forEach((line, i) => {
+        const cells = line.match(/^\|\s*([^|]+?)\s*\|/);
+        if (!cells) { inClientTable = false; return; }
+        const first = cells[1].trim();
+        if (/^(mcp )?clients?$/i.test(first)) { inClientTable = true; return; }
+        if (inClientTable && !/^[-: ]+$/.test(first) && !listed.has(first)) add('clients', file, i + 1, `client table references unlisted client ${first}`);
+      });
     }
   }
   return findings;
