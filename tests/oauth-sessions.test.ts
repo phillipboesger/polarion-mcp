@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import type { AddressInfo } from "node:net"
 import { createHash, randomBytes } from "node:crypto"
 
-import { createMcpHttpApp } from "../src/mcp-http-server.js"
+import { createMcpHttpApp, patFailureRateLimitKey } from "../src/mcp-http-server.js"
 import type { TokenCheck } from "../src/oauth.js"
 
 const PUBLIC_URL = "http://127.0.0.1"
@@ -369,12 +369,63 @@ test("a flood of made-up bearers is cut off by the failure limiter, valid PATs a
     const good = freshPat()
     for (let i = 0; i < 60; i++) assert.equal((await initialize(base, good)).status, 200)
     const statuses: number[] = []
-    for (let i = 0; i < 55; i++) statuses.push((await initialize(base, `garbage-${i}`)).status)
+    for (let i = 0; i < 55; i++) statuses.push((await initialize(base, "garbage-pat")).status)
     assert.equal(statuses.filter(status => status === 401).length, 50)
     assert.equal(statuses.at(-1), 429)
   } finally {
     await stop()
   }
+})
+
+test("six OAuth clients behind one IP can each refresh without sharing a limiter bucket", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const users = await Promise.all(Array.from({ length: 6 }, async () => login(base, freshPat())))
+    const responses = await Promise.all(users.flatMap(({ client, tokens }) =>
+      Array.from({ length: 9 }, () => refresh(base, client.client_id, tokens.refresh_token))))
+    assert.ok(responses.every(response => response.status === 200), "refresh limits should be scoped to each OAuth client")
+  } finally {
+    await stop()
+  }
+})
+
+test("failed PAT attempts for one caller do not block another valid caller", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    for (let i = 0; i < 51; i++) assert.equal((await initialize(base, "bad-user-a-pat")).status, i < 50 ? 401 : 429)
+    const validPat = freshPat()
+    const response = await initialize(base, validPat)
+    assert.equal(response.status, 200)
+  } finally {
+    await stop()
+  }
+})
+
+test("the per-IP failed-PAT ceiling caps token spraying and returns JSON-RPC", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const cachedPat = freshPat()
+    assert.equal((await initialize(base, cachedPat)).status, 200)
+    let response: Response | undefined
+    for (let i = 0; i < 501; i++) response = await initialize(base, `spray-${i}`)
+    assert.equal(response?.status, 429)
+    const body = (await response?.json()) as { jsonrpc?: string; error?: { code?: number } }
+    assert.equal(body.jsonrpc, "2.0")
+    assert.equal(body.error?.code, -32000)
+    assert.equal((await initialize(base, cachedPat)).status, 200, "a cached valid PAT must bypass both failure limiters")
+  } finally {
+    await stop()
+  }
+})
+
+test("failed-PAT limiter keys contain only an IP and the truncated token hash", () => {
+  const pat = "secret-pat-must-not-appear-in-rate-limit-key"
+  const key = patFailureRateLimitKey("203.0.113.7", pat)
+  assert.match(key, /^203\.0\.113\.7:[a-f0-9]{16}$/)
+  assert.equal(key.includes(pat), false)
 })
 
 test("a valid user with stale session ids is never counted as a failure and never locked out", async () => {
