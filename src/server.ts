@@ -197,7 +197,12 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             };
           }
         }
-        outcome = result.isError ? 'error' : 'success';
+        if (/^(1|true|yes|on)$/i.test(process.env.MCP_RESOURCE_LINKS ?? '') && !result.isError) {
+        const uri = toolName === 'getWorkItem' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/workitem/${encodeURIComponent(String(args.workItemId ?? ''))}`
+          : toolName === 'getDocument' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/document/${encodeURIComponent(String(args.spaceId ?? ''))}/${encodeURIComponent(String(args.documentName ?? ''))}` : undefined;
+        if (uri) result.content.push({ type: 'resource_link', uri, name: toolName === 'getWorkItem' ? String(args.workItemId) : String(args.documentName), mimeType: 'text/markdown' });
+      }
+      outcome = result.isError ? 'error' : 'success';
       } else {
         options.logger.error(`[ERROR] Unknown tool requested: ${toolName}`);
         result = { content: [{ type: 'text', text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
@@ -231,38 +236,6 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       } else {
         await execute();
       }
-<<<<<<< HEAD
-=======
-    } else if (virtual?.name === 'call_tool') {
-      const target = String(args.name ?? '');
-      if (!options.clientTools.has(target)) result = { content: [{ type: 'text', text: `Error: Unknown or filtered tool: ${target}` }], isError: true };
-      else result = await callToolPipeline(target, (args.arguments ?? {}) as Record<string, unknown>, options);
-      outcome = result.isError ? 'error' : 'success';
-    } else if (virtual) {
-      const resolved = await options.extensions.instanceResolver.resolve(principal);
-      result = await virtual.handler(callArgs, {
-        callPolarionTool: async (name, callArgs) => {
-          const definition = options.clientTools.get(name);
-          if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
-          return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-        },
-        requestBearerToken: bearerToken,
-        userScope,
-        logger: options.logger,
-        signal: options.signal ?? new AbortController().signal,
-        reportProgress: async () => undefined,
-      });
-      outcome = result.isError ? 'error' : 'success';
-    } else if (generated) {
-      const resolved = await options.extensions.instanceResolver.resolve(principal);
-      result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-      if (/^(1|true|yes|on)$/i.test(process.env.MCP_RESOURCE_LINKS ?? '') && !result.isError) {
-        const uri = toolName === 'getWorkItem' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/workitem/${encodeURIComponent(String(args.workItemId ?? ''))}`
-          : toolName === 'getDocument' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/document/${encodeURIComponent(String(args.spaceId ?? ''))}/${encodeURIComponent(String(args.documentName ?? ''))}` : undefined;
-        if (uri) result.content.push({ type: 'resource_link', uri, name: toolName === 'getWorkItem' ? String(args.workItemId) : String(args.documentName), mimeType: 'text/markdown' });
-      }
-      outcome = result.isError ? 'error' : 'success';
->>>>>>> d507299 (feat: resource templates and resource links)
     } else {
       await execute();
     }
