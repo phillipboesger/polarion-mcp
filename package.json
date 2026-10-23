@@ -60,7 +60,8 @@
     "generate-tools": "node scripts/generate-tools.mjs .gen/src/index.ts src/tools.ts && node scripts/enrich-tool-metadata.mjs && node scripts/enrich-output-schemas.mjs",
     "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run generate-tools && npm run build && npm test",
     "update": "npm run regenerate",
-    "version": "node scripts/sync-server-json.mjs && git add server.json"
+    "version": "node scripts/sync-server-json.mjs && git add server.json",
+    "docs:site": "node scripts/render-site.mjs"
   },
   "engines": {
     "node": ">=22.0.0"

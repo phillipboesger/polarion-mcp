@@ -3,13 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>polarion-mcp · Connect your AI to Polarion</title>
-  <meta name="description" content="An open-source MCP server exposing 284 Polarion REST operations to Claude, GitHub Copilot, and ChatGPT. Built by Phillip Bösger." />
-  <link rel="preload" href="https://boesger.com/assets/fonts/geist-var.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="icon" href="https://boesger.com/assets/images/brand-icon-cyan.png" />
+  <title>Polarion MCP | Connect AI clients to Polarion</title>
+  <meta name="description" content="Open-source Model Context Protocol server for the Polarion ALM REST API, with generated tools, multiple client transports, and OAuth support." />
+  <link rel="canonical" href="https://polarion-mcp.boesger.com/" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%2312385f%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2244%22 text-anchor=%22middle%22 fill=%22%2362d6ff%22%3EP%3C/text%3E%3C/svg%3E" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://polarion-mcp.boesger.com/" />
+  <meta property="og:title" content="Polarion MCP | Connect AI clients to Polarion" />
+  <meta property="og:description" content="Open-source Model Context Protocol server for the Polarion ALM REST API." />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:url" content="https://polarion-mcp.boesger.com/" />
+  <meta name="twitter:title" content="Polarion MCP | Connect AI clients to Polarion" />
+  <meta name="twitter:description" content="Open-source Model Context Protocol server for the Polarion ALM REST API." />
   <style>
-    @font-face { font-family: 'Geist'; src: url('https://boesger.com/assets/fonts/geist-var.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
-    @font-face { font-family: 'Geist Mono'; src: url('https://boesger.com/assets/fonts/geist-mono-var.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -28,8 +34,8 @@
       --warm:       #ffc266;
       --radius:     12px;
       --radius-lg:  20px;
-      --font:       'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --mono:       'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+      --font:       -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:       ui-monospace, 'SF Mono', Menlo, monospace;
     }
 
     html { scroll-behavior: smooth; }
@@ -1173,716 +1179,229 @@ html { scroll-padding-top: 90px; }
       html { scroll-behavior: auto; }
       .nav-toggle { transition: none; }
     }
+    .hero-meta { flex-wrap: wrap; }
+    .quickstart-code { margin-top: 24px; padding: 20px; overflow-wrap: anywhere; white-space: pre-wrap; background: rgba(0,0,0,.32); border: 1px solid var(--border); border-radius: var(--radius); color: var(--accent); font-family: var(--mono); font-size: 14px; }
+    .client-card { text-align: left; min-width: 0; overflow-wrap: anywhere; }
+    .client-name { font-size: 16px; }
+    .client-status { display: inline-block; color: var(--warm); font-size: 11px; margin-bottom: 10px; }
+    .client-detail { color: var(--text-sub); font-size: 13px; margin-top: 8px; }
+    .client-detail strong { color: var(--text); }
+    .client-guide { display: inline-block; margin-top: 16px; color: var(--accent); text-decoration: none; }
+    .client-guide:hover, .section-sub a:hover { text-decoration: underline; }
+    .section-sub a { color: var(--accent); }
+    .link-grid { margin-top: 28px; }
+    .feature-link { display: block; color: var(--text); text-decoration: none; }
+    .feature-link:hover { border-color: var(--border-acc); transform: translateY(-2px); }
+    .footer-links { display: flex; gap: 18px; }
+    .footer-links a { color: var(--text-sub); text-decoration: none; }
+    @media (max-width: 900px) { nav { padding: 14px 20px; } .nav-links { gap: 2px; flex-wrap: wrap; justify-content: flex-end; } .nav-link { padding: 6px 8px; } }
+    @media (max-width: 600px) { nav { align-items: flex-start; flex-direction: column; gap: 10px; padding: 12px 16px; } .nav-links { display: flex; position: static; flex-direction: row; align-items: center; justify-content: flex-start; gap: 4px; padding: 0; border: 0; background: transparent; box-shadow: none; max-height: none; overflow: visible; } .nav-cta { padding: 6px 10px; } .hero { min-height: 80vh; padding: 150px 18px 64px; } .hero h1 { font-size: clamp(38px, 12vw, 64px); } .hero-meta { gap: 10px; } .hero-meta-sep { display: none; } .section-inner { padding-left: 18px; padding-right: 18px; } .clients-grid, .features-grid { grid-template-columns: minmax(0, 1fr); } .quickstart-code { font-size: 12px; } footer { gap: 12px; flex-wrap: wrap; } }
+
   </style>
 </head>
 <body>
-
-<canvas id="particles"></canvas>
-
-<!-- ─── NAV ─── -->
 <nav>
-  <a href="https://boesger.com" class="nav-brand">
-    <div class="nav-brand-logo">
-      <img src="https://boesger.com/assets/images/brand-icon-cyan.png" alt="Bösger Digital" />
-    </div>
-    <span><strong>Bösger</strong> Digital</span>
+  <a href="https://polarion-mcp.boesger.com/" class="nav-brand" aria-label="Polarion MCP home">
+    <span class="nav-brand-logo" aria-hidden="true">P</span>
+    <span><strong>polarion-mcp</strong></span>
   </a>
-  <button class="nav-toggle" type="button" aria-label="Open section menu" aria-expanded="false" aria-controls="section-menu">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-      <path class="menu-icon-open" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  </button>
-  <div class="nav-links" id="section-menu">
-    <a href="https://boesger.com/" class="nav-link nav-site">Home</a>
-    <a href="https://boesger.com/profile" class="nav-link nav-site">Profile</a>
-    <a href="https://boesger.com/work" class="nav-link nav-site">Projects</a>
-    <a href="https://polarion.boesger.com" class="nav-link nav-site" target="_blank" rel="noopener">Blog</a>
-    <span class="nav-sep" aria-hidden="true"></span>
-    <a href="#features" class="nav-link nav-local">Features</a>
-    <a href="#clients" class="nav-link nav-local">Clients</a>
-    <a href="#how" class="nav-link nav-local">How it works</a>
-    <a href="#install" class="nav-link nav-local">Install</a>
-    <a href="https://github.com/phillipboesger/polarion-mcp" class="nav-cta" target="_blank" rel="noopener noreferrer">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-      <span class="cta-text">View on GitHub</span>
-    </a>
+  <div class="nav-links" aria-label="Page sections">
+    <a href="#what" class="nav-link">What</a>
+    <a href="#quickstart" class="nav-link">Quickstart</a>
+    <a href="#clients" class="nav-link">Clients</a>
+    <a href="#features" class="nav-link">Features</a>
+    <a href="#auth" class="nav-link">Authentication</a>
+    <a href="#links" class="nav-link">Links</a>
+    <a href="https://github.com/phillipboesger/polarion-mcp" class="nav-cta">GitHub</a>
   </div>
 </nav>
 
-<!-- ─── HERO ─── -->
-<section class="hero">
-  <canvas id="viz-hero" class="viz-hero" aria-hidden="true"></canvas>
-  <div class="hero-badge">Open Source · MIT License</div>
-
-  <h1>polarion<span>-mcp</span></h1>
-  <p class="hero-sub">
-    Connect your AI to Polarion in minutes.<br>
-    284 REST operations. One server. Every client.
-  </p>
-
-  <div class="hero-meta">
-    <div class="hero-meta-item">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-      TypeScript
+<main>
+  <section class="hero" id="what">
+    <div class="hero-badge">Open source · MIT license</div>
+    <h1>polarion<span>-mcp</span></h1>
+    <p class="hero-sub">An open-source Model Context Protocol server for the Polarion ALM REST API. Connect AI clients to Polarion through stdio or Streamable HTTP, with a separate REST wrapper for integrations using OpenAPI actions.</p>
+    <div class="hero-meta" aria-label="Project facts">
+      <div class="hero-meta-item">284 tools</div><div class="hero-meta-sep" aria-hidden="true"></div>
+      <div class="hero-meta-item">Node.js 22+</div><div class="hero-meta-sep" aria-hidden="true"></div>
+      <div class="hero-meta-item">MIT license</div>
     </div>
-    <div class="hero-meta-sep"></div>
-    <div class="hero-meta-item">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-      Node.js 22+
-    </div>
-    <div class="hero-meta-sep"></div>
-    <div class="hero-meta-item">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Polarion REST API
-    </div>
-  </div>
+    <div class="hero-actions"><a href="#quickstart" class="btn-primary">Quickstart</a><a href="https://github.com/phillipboesger/polarion-mcp" class="btn-ghost">View on GitHub</a></div>
+  </section>
 
-  <div class="hero-actions">
-    <a href="https://github.com/phillipboesger/polarion-mcp" class="btn-primary" target="_blank" rel="noopener noreferrer">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-      Star on GitHub
-    </a>
-    <a href="https://polarion.boesger.com/polarion-mcp-server/" class="btn-ghost" target="_blank" rel="noopener noreferrer">
-      Read the Blog Post ↗
-    </a>
-  </div>
-
-  <div class="hero-install">
-    <span class="install-label">$ install</span>
-    <span class="install-cmd">claude mcp add polarion-mcp -e API_BASE_URL=... -e BEARER_TOKEN=...</span>
-    <button class="copy-btn" onclick="navigator.clipboard.writeText('claude mcp add polarion-mcp -e API_BASE_URL=... -e BEARER_TOKEN=...');this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
-  </div>
-
-  <div class="hero-scroll">
-    <span>Explore</span>
-    <div class="hero-scroll-line"></div>
-  </div>
-</section>
-
-<!-- ─── STATS ─── -->
-<div class="stats-bar">
-  <div class="stats-inner">
-    <div class="stat">
-      <span class="stat-num">284</span>
-      <span class="stat-label">REST Operations</span>
+  <section class="install-section" id="quickstart">
+    <div class="section-inner">
+      <p class="section-label">Quickstart</p>
+      <h2 class="section-heading">Connect a remote or local client</h2>
+      <p class="section-sub">For a remote MCP client, use your server's MCP URL (for example, <code>https://YOUR-SERVER/mcp</code>) and authenticate with your Polarion personal access token (PAT). OAuth login is available when enabled by the server administrator. See the <a href="README.md#client-setup">client setup guides</a>.</p>
+      <p class="section-sub">For a local stdio client, set the Polarion REST API URL and PAT in its environment, then run:</p>
+      <pre class="quickstart-code"><code>API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 BEARER_TOKEN=YOUR_POLARION_PAT npx -y polarion-mcp</code></pre>
     </div>
-    <div class="stat-sep"></div>
-    <div class="stat">
-      <span class="stat-num">5</span>
-      <span class="stat-label">AI Clients</span>
-    </div>
-    <div class="stat-sep"></div>
-    <div class="stat">
-      <span class="stat-num">3</span>
-      <span class="stat-label">Transports</span>
-    </div>
-    <div class="stat-sep"></div>
-    <div class="stat">
-      <span class="stat-num">MIT</span>
-      <span class="stat-label">License</span>
-    </div>
-  </div>
-</div>
+  </section>
 
-<!-- ─── VISUAL ─── -->
-<section class="viz-section">
-  <div class="viz-inner">
-    <div>
-      <p class="section-label">How it connects</p>
-      <h2 class="section-heading">One server between your AI and Polarion</h2>
-      <p class="section-sub">Three ways in, every Polarion object out. Your AI asks, the server turns it into the right REST call and answers with real data. Your token stays yours.</p>
-    </div>
-    <div class="viz-frame"><canvas id="viz-flow" role="img" aria-label="Three connection types flow through the MCP server to Work Items, Documents, Test Runs, Plans and Users"></canvas></div>
-  </div>
-</section>
-
-<!-- ─── DEMO ─── -->
-<section class="demo-section">
-  <div class="section-inner">
-    <div class="demo-header">
-      <p class="section-label">See it in action</p>
-      <h2 class="section-heading">Your AI, inside Polarion</h2>
-      <p class="section-sub">
-        Ask questions in plain language. Get real data from your Polarion instance in seconds — no API knowledge required.
-      </p>
-    </div>
-
-    <div class="demo-tabs">
-      <button class="demo-tab active" onclick="switchDemo('vscode', this)">
-        <span class="tab-icon">💻</span> VS Code · GitHub Copilot
-      </button>
-      <button class="demo-tab" onclick="switchDemo('cloud', this)">
-        <span class="tab-icon">☁️</span> Claude.ai · in the browser
-      </button>
-      <button class="demo-tab" onclick="switchDemo('terminal', this)">
-        <span class="tab-icon">⌨️</span> Terminal output
-      </button>
-    </div>
-
-    <div class="demo-wrap">
-      <div class="demo-panel active" id="demo-vscode">
-        <div class="mk mk-vscode" role="img" aria-label="GitHub Copilot in VS Code asks polarion-mcp for open defects and gets real Polarion work items back">
-          <div class="mk-bar"><i></i><i></i><i></i><span>reportGenerator.ts · polarion-demo · Visual Studio Code</span></div>
-          <div class="mk-body">
-            <aside class="mk-act"><b></b><b class="on"></b><b></b><b></b></aside>
-            <section class="mk-chat">
-              <div class="mk-chat-h">Copilot · Agent mode <span class="mk-ok">polarion-mcp connected</span></div>
-              <div class="mk-feed" data-play>
-                <div class="mk-msg mk-user" data-step><span data-type>Which open defects in DEMO are assigned to me?</span></div>
-                <div class="mk-tool" data-step data-pending="Running getWorkItems on polarion-mcp" data-done="Ran getWorkItems · project DEMO · 3 results"></div>
-                <div class="mk-msg mk-ai" data-step>Three open defects are assigned to you:</div>
-                <div class="mk-row" data-step data-wait="260"><b>DEMO-447</b><em class="p-crit">Critical</em><span>NullPointerException in report generator</span></div>
-                <div class="mk-row" data-step data-wait="260"><b>DEMO-421</b><em class="p-high">High</em><span>Login page crashes on Safari mobile</span></div>
-                <div class="mk-row" data-step data-wait="260"><b>DEMO-435</b><em class="p-med">Medium</em><span>Export dialog does not close after save</span></div>
-                <div class="mk-msg mk-ai" data-step>DEMO-447 matches <code>reportGenerator.ts</code>, which is open. Want me to draft a fix and link it to the work item?</div>
-              </div>
-              <div class="mk-input">Ask Copilot</div>
-            </section>
-            <section class="mk-editor">
-              <div class="mk-tabs"><span class="on">reportGenerator.ts</span><span>workItems.ts</span></div>
-<pre class="mk-code"><i>1</i><c>// Builds the defect report</c>
-<i>2</i><k>export async function</k> <f>buildReport</f>(items) {
-<i>3</i>  <k>const</k> rows = items.<f>map</f>(toRow)
-<i>4</i>  <k>return</k> rows.<f>filter</f>(r =&gt; r.total &gt; <n>0</n>)
-<i>5</i>}
-<i>6</i>
-<i>7</i><k>function</k> <f>toRow</f>(item) {
-<i class="hl">8</i><span class="hl">  <k>return</k> { id: item.id, total: item.hours.sum }</span>
-<i>9</i>}
-</pre>
-            </section>
-          </div>
-          <div class="mk-status"><span>main</span><span>polarion-mcp: 284 tools</span><span>TypeScript</span></div>
-        </div>
-      </div>
-      <div class="demo-panel" id="demo-cloud">
-        <div class="mk mk-cloud" role="img" aria-label="Claude in the browser reads and updates Polarion work items through the polarion-mcp connector">
-          <div class="mk-bar"><i></i><i></i><i></i><span class="mk-url">claude.ai</span></div>
-          <div class="mk-cbody">
-            <aside class="mk-cside">
-              <div class="mk-new">+ New chat</div>
-              <b></b><b></b><b class="s"></b><b></b>
-              <div class="mk-conn">polarion-mcp ✓</div>
-            </aside>
-            <section class="mk-cchat">
-              <div class="mk-feed" data-play>
-                <div class="mk-msg mk-user" data-step><span data-type>Which open defects block the DEMO release? Raise DEMO-447 to critical.</span></div>
-                <div class="mk-tool" data-step data-pending="Calling polarion-mcp · getWorkItems" data-done="polarion-mcp · getWorkItems · 2 blockers"></div>
-                <div class="mk-msg mk-ai" data-step>Two open defects block the release:</div>
-                <div class="mk-row" data-step data-wait="260"><b>DEMO-447</b><em class="p-high">High</em><span>NullPointerException in report generator</span></div>
-                <div class="mk-row" data-step data-wait="260"><b>DEMO-421</b><em class="p-high">High</em><span>Login page crashes on Safari mobile</span></div>
-                <div class="mk-tool" data-step data-pending="Calling polarion-mcp · patchWorkItem" data-done="polarion-mcp · patchWorkItem · DEMO-447 updated"></div>
-                <div class="mk-msg mk-ai" data-step>Done. DEMO-447 is now <em class="p-crit">Critical</em> in Polarion, under your own account.</div>
-              </div>
-              <div class="mk-input">Reply</div>
-            </section>
-          </div>
-        </div>
-      </div>
-      <div class="demo-panel demo-panel--terminal" id="demo-terminal">
-        <div class="terminal" style="margin:0;border:none;border-radius:var(--radius-lg);height:100%;display:flex;flex-direction:column;">
-          <div class="terminal-bar">
-            <div class="dot dot-r"></div>
-            <div class="dot dot-y"></div>
-            <div class="dot dot-g"></div>
-            <span class="terminal-title">polarion-mcp · tool response</span>
-          </div>
-          <div class="terminal-body" style="flex:1;overflow:auto;" data-play-lines>
-            <div><span class="t-prompt">You ›</span> <span class="t-cmd">List all open defects in the DEMO project assigned to me</span></div>
-            <div style="margin-top:12px"><span class="t-comment">// polarion-mcp calls getWorkItems</span></div>
-            <div style="margin-top:8px"><span class="t-key">project</span><span class="t-out">: </span><span class="t-str">"DEMO"</span><span class="t-out">,</span> <span class="t-key">type</span><span class="t-out">: </span><span class="t-str">"defect"</span><span class="t-out">,</span> <span class="t-key">status</span><span class="t-out">: </span><span class="t-str">"open"</span><span class="t-out">,</span> <span class="t-key">assignedTo</span><span class="t-out">: </span><span class="t-str">"me"</span></div>
-            <div style="margin-top:14px"><span class="t-val">✓ Found 3 open defects assigned to you:</span></div>
-            <div style="margin-top:10px"><span class="t-out">  DEMO-421</span><span class="t-comment"> · High     · </span><span class="t-cmd">Login page crashes on Safari mobile</span></div>
-            <div style="margin-top:5px"><span class="t-out">  DEMO-435</span><span class="t-comment"> · Medium   · </span><span class="t-cmd">Export dialog does not close after save</span></div>
-            <div style="margin-top:5px"><span class="t-out">  DEMO-447</span><span class="t-comment"> · Critical · </span><span class="t-cmd">NullPointerException in report generator</span></div>
-            <div style="margin-top:14px"><span class="t-comment">// Copilot: Want me to open DEMO-447 in Polarion and suggest a fix?</span></div>
-          </div>
-        </div>
+  <section id="clients">
+    <div class="section-inner">
+      <p class="section-label">Pick your client</p>
+      <h2 class="section-heading">Client setup guides</h2>
+      <p class="section-sub">Choose a client to see its supported transports, authentication options, and setup guide.</p>
+      <div class="clients-grid">
+        <!-- clients:start -->
+      <article class="client-card">
+        <h3 class="client-name">Claude.ai / Claude Desktop (custom connectors)</h3>
+        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
+        <a class="client-guide" href="clients/claude-web-desktop.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Claude Code</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
+        <a class="client-guide" href="clients/claude-code.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Claude API MCP connector</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · preregistered client</p>
+        <a class="client-guide" href="clients/claude-api.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">ChatGPT connectors / Apps</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> oauth dcr · cimd · preregistered client</p>
+        <a class="client-guide" href="clients/chatgpt-apps.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Custom GPT (Actions)</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> REST action</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · preregistered client</p>
+        <a class="client-guide" href="clients/custom-gpt.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">OpenAI Responses API / Agents SDK</h3>
+        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · preregistered client</p>
+        <a class="client-guide" href="clients/openai-api.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Codex CLI</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
+        <a class="client-guide" href="clients/codex-cli.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">VS Code Copilot</h3>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
+        <a class="client-guide" href="clients/vscode-copilot.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Microsoft Copilot Studio</h3>
+        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
+        <a class="client-guide" href="clients/copilot-studio.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Cursor</h3>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
+        <a class="client-guide" href="clients/cursor.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Windsurf</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
+        <a class="client-guide" href="clients/windsurf.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">JetBrains AI Assistant</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> none</p>
+        <a class="client-guide" href="clients/jetbrains-ai.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Gemini CLI</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
+        <a class="client-guide" href="clients/gemini-cli.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Zed</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
+        <a class="client-guide" href="clients/zed.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">Cline</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
+        <a class="client-guide" href="clients/cline.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+      <article class="client-card">
+        <h3 class="client-name">n8n</h3>
+        <span class="client-status">Unverified</span>
+        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP</p>
+        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
+        <a class="client-guide" href="clients/n8n.md">Setup guide <span aria-hidden="true">→</span></a>
+      </article>
+    <!-- clients:end -->
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ─── FEATURES ─── -->
-<section id="features">
-  <div class="section-inner">
-    <p class="section-label">What it does</p>
-    <h2 class="section-heading">Everything Polarion, <span class="highlight">AI-native</span></h2>
-    <p class="section-sub">
-      One MCP server that turns the entire Polarion REST API into tool calls your AI assistant can use directly.
-    </p>
-
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">🔌</div>
-        <div class="feature-title">284 REST Operations</div>
-        <p class="feature-desc">Every Polarion REST endpoint exposed as a typed tool — work items, test runs, documents, plans, users, and more. Full coverage, auto-generated from the OpenAPI spec.</p>
-        <span class="feature-tag">auto-generated</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">🤖</div>
-        <div class="feature-title">Every Major AI Client</div>
-        <p class="feature-desc">Claude Code, Claude Desktop, VS Code GitHub Copilot, ChatGPT Custom GPT, Claude.ai web — one server, five clients, three transports. Pick your stack.</p>
-        <span class="feature-tag">stdio · http · streamable</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">🐳</div>
-        <div class="feature-title">Docker-Ready</div>
-        <p class="feature-desc">Multi-transport container image with configurable entrypoints. Run locally or deploy on your own infrastructure. No cloud dependency.</p>
-        <span class="feature-tag">self-hosted</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">📚</div>
-        <div class="feature-title">SDK Documentation Access</div>
-        <p class="feature-desc">Optional Polarion SDK docs loaded as tool context. Your AI understands not just the REST API, but the Polarion programming model.</p>
-        <span class="feature-tag">in-context docs</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">🔒</div>
-        <div class="feature-title">Secure by Design</div>
-        <p class="feature-desc">Your Polarion Personal Access Token stays yours — in a gitignored .env for stdio, sent per-request for HTTP, or entered once through an OAuth login: the server stores nothing and the client only ever holds it encrypted, unreadable to anyone but the server.</p>
-        <span class="feature-tag">pat · oauth · tls</span>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">⚡</div>
-        <div class="feature-title">Cached Project Config</div>
-        <p class="feature-desc">Project-level configuration is cached on first use. Your AI stays fast even when exploring a complex Polarion instance with dozens of projects.</p>
-        <span class="feature-tag">performance</span>
+  <section id="features">
+    <div class="section-inner">
+      <p class="section-label">Features</p>
+      <h2 class="section-heading">Polarion tools for AI clients</h2>
+      <div class="features-grid">
+        <article class="feature-card"><h3 class="feature-title">284 generated tools</h3><p class="feature-desc">Tools are generated from the Polarion REST API definition.</p></article>
+        <article class="feature-card"><h3 class="feature-title">Guarded operations</h3><p class="feature-desc">Guard selected risky changes and optionally limit access to read-only or allowlisted tools.</p></article>
+        <article class="feature-card"><h3 class="feature-title">Dry run support</h3><p class="feature-desc">Preview supported guarded operations before applying a change.</p></article>
+        <article class="feature-card"><h3 class="feature-title">Markdown rendering</h3><p class="feature-desc">Render supported Polarion content as Markdown for AI clients.</p></article>
+        <article class="feature-card"><h3 class="feature-title">Toolsets</h3><p class="feature-desc">Select groups of tools to match the task and client.</p></article>
+        <article class="feature-card"><h3 class="feature-title">REST wrapper</h3><p class="feature-desc">Use the reduced OpenAPI document for action clients.</p></article>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ─── CLIENTS ─── -->
-<section id="clients">
-  <div class="section-inner">
-    <p class="section-label">Compatibility</p>
-    <h2 class="section-heading">Works with your tools</h2>
-    <p class="section-sub">One server, every client. Pick the AI assistant you already use.</p>
+  <section class="install-section" id="auth">
+    <div class="section-inner">
+      <p class="section-label">Authentication overview</p>
+      <h2 class="section-heading">Use a PAT directly or sign in with OAuth</h2>
+      <p class="section-sub">MCP clients can use a Polarion PAT directly as a bearer token, or use the server's OAuth login when enabled. OAuth lets users enter their PAT through the server login flow. The REST wrapper uses its configured server-side credentials and API key.</p>
+      <p class="section-sub">Read <a href="security.md">Authentication and security</a>, <a href="configuration.md">configuration</a>, and the individual client guides.</p>
+    </div>
+  </section>
 
-    <div class="clients-grid">
-      <div class="client-card">
-        <div class="client-icon client-icon--claude">
-          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>
-        </div>
-        <div class="client-name">Claude Code</div>
-        <div class="client-type">CLI / Agent</div>
-        <span class="client-transport">stdio</span>
-        <span class="client-transport" style="margin-left:4px;">http</span>
-      </div>
-      <div class="client-card">
-        <div class="client-icon client-icon--claude">
-          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>
-        </div>
-        <div class="client-name">Claude Desktop</div>
-        <div class="client-type">macOS / Windows</div>
-        <span class="client-transport">stdio</span>
-        <span class="client-transport" style="margin-left:4px;">oauth</span>
-      </div>
-      <div class="client-card">
-        <div class="client-icon client-icon--copilot">
-          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23.922 16.997C23.061 18.492 18.063 22.02 12 22.02 5.937 22.02.939 18.492.078 16.997A.641.641 0 0 1 0 16.741v-2.869a.883.883 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.098 10.098 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952C7.255 2.937 9.248 1.98 11.978 1.98c2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.841.841 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256Zm-11.75-5.992h-.344a4.359 4.359 0 0 1-.355.508c-.77.947-1.918 1.492-3.508 1.492-1.725 0-2.989-.359-3.782-1.259a2.137 2.137 0 0 1-.085-.104L4 11.746v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.359 4.359 0 0 1-.355-.508Zm2.328 3.25c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm-5 0c.549 0 1 .451 1 1v2c0 .549-.451 1-1 1-.549 0-1-.451-1-1v-2c0-.549.451-1 1-1Zm3.313-6.185c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"/></svg>
-        </div>
-        <div class="client-name">GitHub Copilot</div>
-        <div class="client-type">VS Code Agent Mode</div>
-        <span class="client-transport">stdio</span>
-        <span class="client-transport" style="margin-left:4px;">http</span>
-      </div>
-      <div class="client-card">
-        <div class="client-icon client-icon--openai">
-          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg>
-        </div>
-        <div class="client-name">ChatGPT</div>
-        <div class="client-type">Connector &amp; Custom GPT</div>
-        <span class="client-transport">streamable http</span>
-        <span class="client-transport" style="margin-left:4px;">oauth</span>
-      </div>
-      <div class="client-card">
-        <div class="client-icon client-icon--claude">
-          <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>
-        </div>
-        <div class="client-name">Claude.ai</div>
-        <div class="client-type">Web App</div>
-        <span class="client-transport">streamable http</span>
-        <span class="client-transport" style="margin-left:4px;">oauth</span>
+  <section id="links">
+    <div class="section-inner">
+      <p class="section-label">Links</p>
+      <h2 class="section-heading">Project documentation</h2>
+      <div class="features-grid link-grid">
+        <a class="feature-card feature-link" href="README.md">Documentation index</a>
+        <a class="feature-card feature-link" href="features.md">Features</a>
+        <a class="feature-card feature-link" href="usage.md">Usage</a>
+        <a class="feature-card feature-link" href="architecture.md">Architecture</a>
+        <a class="feature-card feature-link" href="deployment.md">Deployment</a>
+        <a class="feature-card feature-link" href="https://github.com/phillipboesger/polarion-mcp">GitHub repository</a>
       </div>
     </div>
-  </div>
-</section>
+  </section>
+</main>
 
-<!-- ─── HOW IT WORKS ─── -->
-<section class="how-section" id="how">
-  <div class="section-inner">
-    <div style="text-align:center;">
-      <p class="section-label">Setup</p>
-      <h2 class="section-heading">Up and running in 3 steps</h2>
-    </div>
-
-    <div class="how-steps">
-      <div class="how-step">
-        <div class="step-num">01</div>
-        <div class="step-title">Clone & Build</div>
-        <p class="step-desc">Clone the repo, install dependencies, and build. Takes less than two minutes.</p>
-        <span class="step-code">npm install && npm run build</span>
-      </div>
-      <div class="how-step">
-        <div class="step-num">02</div>
-        <div class="step-title">Configure</div>
-        <p class="step-desc">Add your Polarion URL and Personal Access Token. Point your AI client to the server.</p>
-        <span class="step-code">API_BASE_URL + your PAT</span>
-      </div>
-      <div class="how-step">
-        <div class="step-num">03</div>
-        <div class="step-title">Ask</div>
-        <p class="step-desc">Open your AI assistant and start querying Polarion in plain language. No API knowledge required.</p>
-        <span class="step-code">"List open defects in PROJECT"</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── INSTALL TABS ─── -->
-<section class="install-section" id="install">
-  <div class="section-inner">
-    <p class="section-label">Quick Start</p>
-    <h2 class="section-heading">Get connected</h2>
-    <p class="section-sub">Every AI client has its own way in. Pick where you work, then copy the config for your client.</p>
-
-    <div class="paths" role="list">
-      <button type="button" class="path-card is-active" data-path="local" data-tab="claude-code">
-        <span class="path-k">On your machine</span>
-        <strong>Claude Code · VS Code · Claude Desktop</strong>
-        <span class="path-d">No server to run. The client starts polarion-mcp locally with your PAT.</span>
-        <em>stdio + PAT</em>
-      </button>
-      <button type="button" class="path-card" data-path="oauth" data-tab="oauth">
-        <span class="path-k">In the browser or on your phone</span>
-        <strong>Claude.ai · Claude mobile · ChatGPT</strong>
-        <span class="path-d">These connect from the vendor's cloud, so they need a hosted server reachable from the internet. Each user signs in once with their own PAT.</span>
-        <em>HTTP + OAuth login</em>
-      </button>
-      <button type="button" class="path-card" data-path="gpt" data-tab="gpt-oauth">
-        <span class="path-k">Inside a Custom GPT</span>
-        <strong>ChatGPT Custom GPT Actions</strong>
-        <span class="path-d">Per-user OAuth login, or one shared API key for the whole GPT.</span>
-        <em>GPT Actions</em>
-      </button>
-      <button type="button" class="path-card" data-path="http" data-tab="claude-http">
-        <span class="path-k">Shared team server</span>
-        <strong>Scripts, curl, Claude Code, VS Code</strong>
-        <span class="path-d">One server without credentials. Every client sends its own PAT as a header.</span>
-        <em>HTTP + PAT header</em>
-      </button>
-    </div>
-
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('claude-code', this)">Claude Code</button>
-      <button class="tab-btn" onclick="switchTab('vscode', this)">VS Code Copilot</button>
-      <button class="tab-btn" onclick="switchTab('claude-desktop', this)">Claude Desktop</button>
-      <button class="tab-btn" onclick="switchTab('oauth', this)">Claude.ai / ChatGPT (OAuth)</button>
-      <button class="tab-btn" onclick="switchTab('gpt-oauth', this)">Custom GPT (OAuth)</button>
-      <button class="tab-btn" onclick="switchTab('claude-http', this)">HTTP + PAT header</button>
-      <button class="tab-btn" onclick="switchTab('chatgpt', this)">Custom GPT (API key)</button>
-    </div>
-
-    <div id="tab-claude-code" class="tab-content active">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('claude-code', this)">Copy</button>
-        <pre id="code-claude-code"><span style="color:#86efac">claude mcp add</span> polarion-mcp \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
-  <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">your-personal-access-token</span> \
-  -- node <span style="color:#f9a8d4">/path/to/polarion-mcp/build/index.js</span></pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">Local stdio: Claude Code starts the server itself, nothing listens on the network. <code>API_BASE_URL</code> always ends in <code>/polarion/rest/v1</code>. Create the token in Polarion under <em>My Account &rsaquo; Personal Access Tokens</em>.</p>
-    </div>
-
-    <div id="tab-vscode" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('vscode', this)">Copy</button>
-        <pre id="code-vscode"><span style="color:#6b7280">// .vscode/mcp.json (VS Code asks for the token and stores it securely)</span>
-{
-  <span style="color:#93c5fd">"inputs"</span>: [
-    { <span style="color:#93c5fd">"type"</span>: <span style="color:#fde68a">"promptString"</span>, <span style="color:#93c5fd">"id"</span>: <span style="color:#fde68a">"polarion-pat"</span>, <span style="color:#93c5fd">"description"</span>: <span style="color:#fde68a">"Polarion PAT"</span>, <span style="color:#93c5fd">"password"</span>: true }
-  ],
-  <span style="color:#93c5fd">"servers"</span>: {
-    <span style="color:#93c5fd">"polarion-mcp"</span>: {
-      <span style="color:#93c5fd">"type"</span>: <span style="color:#fde68a">"stdio"</span>,
-      <span style="color:#93c5fd">"command"</span>: <span style="color:#fde68a">"node"</span>,
-      <span style="color:#93c5fd">"args"</span>: [<span style="color:#fde68a">"/path/to/polarion-mcp/build/index.js"</span>],
-      <span style="color:#93c5fd">"env"</span>: {
-        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion/rest/v1"</span>,
-        <span style="color:#93c5fd">"BEARER_TOKEN"</span>: <span style="color:#fde68a">"${input:polarion-pat}"</span>
-      }
-    }
-  }
-}</pre>
-      </div>
-    </div>
-
-    <div id="tab-claude-desktop" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('claude-desktop', this)">Copy</button>
-        <pre id="code-claude-desktop"><span style="color:#6b7280">// claude_desktop_config.json, then restart Claude Desktop</span>
-{
-  <span style="color:#93c5fd">"mcpServers"</span>: {
-    <span style="color:#93c5fd">"polarion-mcp"</span>: {
-      <span style="color:#93c5fd">"command"</span>: <span style="color:#fde68a">"node"</span>,
-      <span style="color:#93c5fd">"args"</span>: [<span style="color:#fde68a">"/path/to/polarion-mcp/build/index.js"</span>],
-      <span style="color:#93c5fd">"env"</span>: {
-        <span style="color:#93c5fd">"API_BASE_URL"</span>: <span style="color:#fde68a">"https://your-polarion/polarion/rest/v1"</span>,
-        <span style="color:#93c5fd">"BEARER_TOKEN"</span>: <span style="color:#fde68a">"your-personal-access-token"</span>
-      }
-    }
-  }
-}</pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">No local Node? Use <code>"command": "docker"</code> with <code>"args": ["run", "--rm", "-i", "-e", "API_BASE_URL", "-e", "BEARER_TOKEN", "ghcr.io/phillipboesger/polarion-mcp:latest", "node", "build/index.js"]</code>.</p>
-    </div>
-
-    <div id="tab-oauth" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('oauth', this)">Copy</button>
-        <pre id="code-oauth"><span style="color:#86efac">docker run</span> -d --name polarion-mcp \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
-  <span style="color:#93c5fd">-e</span> MCP_PUBLIC_URL=<span style="color:#fde68a">https://mcp.yourdomain.com</span> \
-  <span style="color:#93c5fd">-e</span> MCP_TOKEN_SECRET=<span style="color:#fde68a">$(openssl rand -base64 48)</span> \
-  <span style="color:#93c5fd">-e</span> MCP_ALLOWED_HOSTS=<span style="color:#fde68a">mcp.yourdomain.com</span> \
-  <span style="color:#93c5fd">-p</span> 127.0.0.1:3000:3000 \
-  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span>
-
-<span style="color:#6b7280"># connector URL for Claude.ai and ChatGPT</span>
-<span style="color:#93c5fd">URL</span>:  <span style="color:#fde68a">https://mcp.yourdomain.com/mcp</span></pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">For clients that cannot send a custom header. Put the server behind TLS on a host reachable from the internet (Claude.ai and ChatGPT connect from their cloud, not from your network). <strong style="color:#e5e7eb;">Claude.ai:</strong> <em>Settings &rsaquo; Connectors &rsaquo; Add custom connector</em>, paste the URL, leave client ID and secret empty. <strong style="color:#e5e7eb;">ChatGPT:</strong> turn on <em>Developer mode</em> under <em>Settings &rsaquo; Security and login</em>, add a connector with the URL and OAuth. On first use each user pastes their own Polarion PAT on a login page.</p>
-      <p style="color:#9ca3af;font-size:14px;margin-top:8px;">The server stores no token: the client receives it encrypted under <code>MCP_TOKEN_SECRET</code>, which only the server can read. Access renews silently every hour and each renewal re-checks the PAT with Polarion, so a login lasts until the PAT is revoked or expires, and survives server restarts. Keep <code>MCP_TOKEN_SECRET</code> fixed; changing it logs everyone out. Reverse-proxy paths: <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/deployment.md" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;">docs/deployment.md</a>.</p>
-    </div>
-
-    <div id="tab-gpt-oauth" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('gpt-oauth', this)">Copy</button>
-        <pre id="code-gpt-oauth"><span style="color:#6b7280"># the OAuth server from the previous tab, plus a client for the GPT</span>
-<span style="color:#93c5fd">-e</span> GPT_CLIENT_ID=<span style="color:#fde68a">polarion-gpt</span> \
-<span style="color:#93c5fd">-e</span> GPT_CLIENT_SECRET=<span style="color:#fde68a">$(openssl rand -hex 32)</span>
-
-<span style="color:#6b7280"># GPT editor: Actions › Import from URL</span>
-<span style="color:#fde68a">https://mcp.yourdomain.com/openapi-gpt.json</span>
-
-<span style="color:#6b7280"># Authentication › OAuth</span>
-<span style="color:#93c5fd">Client ID</span>:          <span style="color:#fde68a">polarion-gpt</span>
-<span style="color:#93c5fd">Client Secret</span>:      <span style="color:#fde68a">the GPT_CLIENT_SECRET value</span>
-<span style="color:#93c5fd">Authorization URL</span>:  <span style="color:#fde68a">https://mcp.yourdomain.com/gpt/authorize</span>
-<span style="color:#93c5fd">Token URL</span>:          <span style="color:#fde68a">https://mcp.yourdomain.com/gpt/token</span>
-<span style="color:#93c5fd">Scope</span>:              <span style="color:#fde68a">polarion</span></pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">Each GPT user signs in once with their own Polarion PAT and then works under their own Polarion account; the login lasts as long as that PAT is valid. Either token exchange method (POST or Basic) works. Only ChatGPT's own <code>/aip/&lt;gpt-id&gt;/oauth/callback</code> addresses are accepted, so nothing needs allowlisting.</p>
-    </div>
-
-    <div id="tab-claude-http" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('claude-http', this)">Copy</button>
-        <pre id="code-claude-http"><span style="color:#86efac">docker run</span> -d --name polarion-mcp \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
-  <span style="color:#93c5fd">-p</span> 127.0.0.1:3000:3000 \
-  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span>
-
-<span style="color:#6b7280"># Claude Code, behind your TLS proxy</span>
-<span style="color:#86efac">claude mcp add</span> <span style="color:#93c5fd">--transport</span> http polarion <span style="color:#fde68a">https://mcp.yourdomain.com/mcp</span> \
-  <span style="color:#93c5fd">--header</span> <span style="color:#fde68a">"Authorization: Bearer &lt;your-polarion-pat&gt;"</span></pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">One shared server that holds no credentials; each client sends its own Polarion PAT as a header, and Polarion authorizes every call under that user. For Claude Code, VS Code Copilot (<code>"type": "http"</code> with <code>"headers"</code>), curl and scripts. Claude.ai and ChatGPT connectors cannot set a header: use the OAuth tab instead.</p>
-    </div>
-
-    <div id="tab-chatgpt" class="tab-content">
-      <div class="code-block">
-        <button class="code-copy" onclick="copyCode('chatgpt', this)">Copy</button>
-        <pre id="code-chatgpt"><span style="color:#86efac">docker run</span> -d \
-  <span style="color:#93c5fd">-e</span> API_BASE_URL=<span style="color:#fde68a">https://your-polarion/polarion/rest/v1</span> \
-  <span style="color:#93c5fd">-e</span> BEARER_TOKEN=<span style="color:#fde68a">service-account-pat</span> \
-  <span style="color:#93c5fd">-e</span> HTTP_API_KEY=<span style="color:#fde68a">$(openssl rand -hex 32)</span> \
-  <span style="color:#93c5fd">-p</span> 127.0.0.1:3000:3000 \
-  <span style="color:#f9a8d4">ghcr.io/phillipboesger/polarion-mcp:latest</span> \
-  node build/http-server.js</pre>
-      </div>
-      <p style="color:#9ca3af;font-size:14px;margin-top:12px;">A plain REST wrapper for Custom GPT Actions with one shared key: every GPT user acts as the same Polarion account. In the GPT editor import <code>https://your-host/openapi-gpt.json</code> (a 30-tool subset that fits ChatGPT's limit) and set authentication to API key, type Bearer, with the <code>HTTP_API_KEY</code> value. For per-user logins use the Custom GPT (OAuth) tab.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ─── ABOUT ─── -->
-<section class="about-section">
-  <div class="about-inner">
-    <div class="about-avatar">
-      <img src="https://boesger.com/assets/images/about-image.webp" alt="Phillip Bösger" onerror="this.style.display='none'" />
-    </div>
-    <div class="about-text">
-      <h3>Built by Phillip Bösger</h3>
-      <p class="about-role">Polarion & AI Freelancer · Bösger Digital</p>
-      <p class="about-bio">
-        8 years of Polarion, from Siemens enterprise to startup. I built polarion-mcp because I wanted my AI assistants to actually know what's happening in Polarion — not just talk about it.
-      </p>
-      <div class="about-links">
-        <a href="https://polarion.boesger.com" class="about-link" target="_blank" rel="noopener noreferrer">
-          📝 Polarion Blog
-        </a>
-        <a href="https://linkedin.com/in/phillip-boesger-90691215a" class="about-link" target="_blank" rel="noopener noreferrer">
-          💼 LinkedIn
-        </a>
-        <a href="https://github.com/phillipboesger" class="about-link" target="_blank" rel="noopener noreferrer">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── CTA ─── -->
-<section class="cta-section">
-  <div class="cta-inner">
-    <h2>Ready to connect your AI to Polarion?</h2>
-    <p>Open-source, self-hosted, and ready in minutes. No vendor lock-in.</p>
-    <div class="cta-actions">
-      <a href="https://github.com/phillipboesger/polarion-mcp" class="btn-primary" target="_blank" rel="noopener noreferrer">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-        View on GitHub
-      </a>
-      <a href="https://polarion.boesger.com" class="btn-ghost" target="_blank" rel="noopener noreferrer">
-        Read the Blog ↗
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- ─── FOOTER ─── -->
 <footer>
-  <a href="https://boesger.com" class="footer-brand">
-    <div class="footer-brand-logo">
-      <img src="https://boesger.com/assets/images/brand-icon-cyan.png" alt="Bösger Digital" />
-    </div>
-    Bösger Digital · Phillip Bösger
-  </a>
-  <div class="footer-links">
-    <a href="https://polarion.boesger.com" class="footer-link" target="_blank" rel="noopener noreferrer">Blog</a>
-    <a href="https://github.com/phillipboesger/polarion-mcp" class="footer-link" target="_blank" rel="noopener noreferrer">GitHub</a>
-    <a href="https://linkedin.com/in/phillip-boesger-90691215a" class="footer-link" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-    <a href="https://github.com/phillipboesger/polarion-mcp/tree/main/docs" class="footer-link" target="_blank" rel="noopener noreferrer">Docs</a>
-  </div>
+  <a href="https://polarion-mcp.boesger.com/" class="footer-brand">polarion-mcp</a>
+  <div class="footer-links"><a href="https://github.com/phillipboesger/polarion-mcp">GitHub</a><a href="README.md">Documentation</a></div>
   <span class="footer-copy">© 2026 Phillip Bösger</span>
 </footer>
-
-<!-- ─── SCRIPTS ─── -->
-<script>
-  // Particle canvas
-  const canvas = document.getElementById('particles');
-  const ctx = canvas.getContext('2d');
-  let W, H, stars = [], animFrame;
-
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
-
-  function initStars() {
-    stars = [];
-    const count = Math.floor((W * H) / 8000);
-    for (let i = 0; i < count; i++) {
-      stars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        r: Math.random() * 1.2 + 0.2,
-        a: Math.random(),
-        speed: Math.random() * 0.003 + 0.001,
-        phase: Math.random() * Math.PI * 2
-      });
-    }
-  }
-
-  function drawStars(t) {
-    ctx.clearRect(0, 0, W, H);
-    stars.forEach(s => {
-      const alpha = 0.3 + 0.5 * Math.sin(t * s.speed + s.phase);
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(98,214,255,${alpha})`;
-      ctx.fill();
-    });
-  }
-
-  let last = 0;
-  function loop(t) {
-    drawStars(t);
-    animFrame = requestAnimationFrame(loop);
-  }
-
-  resize(); initStars(); loop(0);
-  window.addEventListener('resize', () => { resize(); initStars(); });
-
-  // Tab switching
-  function switchDemo(id, btn) {
-    document.querySelectorAll('.demo-panel').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.demo-tab').forEach(el => el.classList.remove('active'));
-    document.getElementById('demo-' + id).classList.add('active');
-    btn.classList.add('active');
-  }
-
-  var TAB_PATH = { 'claude-code': 'local', 'vscode': 'local', 'claude-desktop': 'local', 'oauth': 'oauth', 'gpt-oauth': 'gpt', 'chatgpt': 'gpt', 'claude-http': 'http' };
-  function switchTab(id, btn) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + id).classList.add('active');
-    btn.classList.add('active');
-    document.querySelectorAll('.path-card').forEach(c => c.classList.toggle('is-active', c.dataset.path === TAB_PATH[id]));
-  }
-  document.querySelectorAll('.path-card').forEach(function (card) {
-    card.addEventListener('click', function () {
-      var btn = document.querySelector('.tab-btn[onclick*="\'' + card.dataset.tab + '\'"]');
-      if (btn) { switchTab(card.dataset.tab, btn); btn.scrollIntoView({ block: 'nearest', inline: 'center' }); }
-    });
-  });
-
-  // Code copy
-  function copyCode(id, btn) {
-    const el = document.getElementById('code-' + id);
-    navigator.clipboard.writeText(el.innerText);
-    btn.textContent = '✓ Copied';
-    setTimeout(() => btn.textContent = 'Copy', 1800);
-  }
-</script>
-
-<script src="demo.js?v=20261016a"></script>
-<script src="viz.js?v=20261016b"></script>
-
-<script>
-  (function () {
-    var toggle = document.querySelector('.nav-toggle');
-    var menu = document.getElementById('section-menu');
-    if (!toggle || !menu) return;
-    function setOpen(open) {
-      menu.classList.toggle('is-open', open);
-      toggle.setAttribute('aria-expanded', String(open));
-      toggle.setAttribute('aria-label', open ? 'Close section menu' : 'Open section menu');
-    }
-    toggle.addEventListener('click', function () {
-      setOpen(toggle.getAttribute('aria-expanded') !== 'true');
-    });
-    menu.querySelectorAll('a').forEach(function (link) {
-      link.addEventListener('click', function () { setOpen(false); });
-    });
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
-        setOpen(false);
-        toggle.focus();
-      }
-    });
-    window.addEventListener('resize', function () {
-      if (window.innerWidth > 900) setOpen(false);
-    });
-  })();
-</script>
 </body>
 </html>
