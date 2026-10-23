@@ -55,6 +55,7 @@ import {
   hasSchemaProperty,
   PARAM_DESCRIPTIONS,
   effectNoteForAnnotations,
+  correctedAnnotations,
 } from './lib/entry-utils.mjs';
 import { TOOL_GUIDANCE } from './lib/tool-guidance.mjs';
 
@@ -270,6 +271,20 @@ function appendNote(entry, marker, note) {
   return { entry: updated, skipped: false };
 }
 
+function upsertNote(entry, marker, note) {
+  const bounds = findDescriptionBounds(entry);
+  if (!bounds) return { entry, skipped: true };
+  const text = entry.slice(bounds.contentStart, bounds.contentEnd);
+  const at = text.indexOf(marker);
+  if (at < 0) return appendNote(entry, marker, note);
+  const nextMarkers = [SCOPE_MARKER, CARDINALITY_MARKER, EFFECT_MARKER, TIP_MARKER]
+    .map(value => text.indexOf(value, at + marker.length)).filter(value => value >= 0);
+  const end = nextMarkers.length ? nextMarkers.reduce((a, b) => Math.min(a, b)) : text.length;
+  const replacement = `${note}${end === text.length ? '' : ' '}`;
+  const updated = text.slice(0, at) + replacement + text.slice(end);
+  return { entry: entry.slice(0, bounds.contentStart) + updated + entry.slice(bounds.contentEnd), skipped: false };
+}
+
 /**
  * Replaces a tool description's lead -- the text before the first generated
  * note marker -- with `lead`, keeping the notes that follow it. Rewriting the
@@ -418,13 +433,15 @@ let effectNoteSkipped = 0;
 entries = entries.map((entry, i) => {
   const { has: hasWorkflowAction, ok: workflowActionOk } = hasSchemaProperty(entry, 'workflowAction');
   if (!workflowActionOk) effectNoteSkipped++; // unreadable inputSchema -- can't safely reason about this tool's effect
-  const note = effectNoteForAnnotations(methods[i], getAnnotationsField(entry), {
+  const annotations = correctedAnnotations(methods[i], getAnnotationsField(entry), {
+    name: names[i],
     pathTemplate: pathTemplates[i],
     hasWorkflowAction,
   });
+  const note = effectNoteForAnnotations(methods[i], annotations, { pathTemplate: pathTemplates[i], hasWorkflowAction });
   if (!note) return entry;
   const before = entry;
-  const result = appendNote(entry, EFFECT_MARKER, note);
+  const result = upsertNote(entry, EFFECT_MARKER, note);
   if (result.skipped) effectNoteSkipped++;
   else if (result.entry !== before) effectNoteCount++;
   return result.entry;
@@ -440,10 +457,10 @@ entries = entries.map((entry) => {
   }
   if (!hasDryRun) return entry;
   const before = entry;
-  const result = appendNote(
+  const result = upsertNote(
     entry,
     TIP_MARKER,
-    'Tip: set \\`dry_run: true\\` first to preview the exact request Polarion would receive, without changing anything. On tools with a typed output schema, this preview is returned as an error-flagged result since it is not real tool output -- read the text content regardless of that flag.',
+    'Tip: set \\`dry_run: true\\` first to validate the arguments and preview the exact request without sending it to Polarion. The executor returns this preview as normal text, and as structured content when the tool declares an output schema.',
   );
   if (result.skipped) dryRunTipSkipped++;
   else if (result.entry !== before) dryRunTipCount++;

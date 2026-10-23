@@ -38,7 +38,7 @@ function attachmentPatch(owner, listTool, contentTool) {
 }
 
 function attachmentPost(owner, patchTool, listTool) {
-  return `Uploads one or more new files as attachments of a ${owner} in a single multipart request: \`requestBody.resource.data\` holds one metadata entry (\`fileName\`, optional \`title\`) per file, and \`requestBody.files\` holds the base64-encoded file bytes in the same order (or match them via each entry's \`lid\`). Returns the created attachment IDs. Use this to add files; to change an existing attachment use \`${patchTool}\`, and to list what is already attached use \`${listTool}\`.`;
+  return `Uploads one or more new files as attachments of a ${owner} in a single multipart request: \`requestBody.resource.data\` holds one metadata entry (\`fileName\`, optional \`title\`) per file, and \`requestBody.files\` holds the base64-encoded file bytes at the same array index as each metadata entry. Returns the created attachment IDs. Use this to add files; to change an existing attachment use \`${patchTool}\`, and to list what is already attached use \`${listTool}\`.`;
 }
 
 const ENUM_FIELD_HINT = '`fieldId` must be an enumeration-typed field (e.g. `status`, `severity`, or a custom enum field).';
