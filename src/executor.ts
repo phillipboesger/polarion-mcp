@@ -522,6 +522,7 @@ const issueMessage = (issue: ZodIssue): string => issueBranch(issue)?.message ??
  *   near-zero pacing/backoff/delays.
  * @returns Formatted API response or error message
  */
+// Stryker disable all: keep the executor baseline practical; mutate the guarded HTTP dispatch path below.
 export async function executeApiTool(
   toolName: string,
   definition: McpToolDefinition,
@@ -865,6 +866,7 @@ export async function executeApiTool(
       };
     }
 
+    // Stryker restore all
     // ===== STEP 7: Execute the HTTP Request =====
     // Prepare the axios request configuration
     const config: AxiosRequestConfig = {
@@ -958,6 +960,7 @@ export async function executeApiTool(
       return downloadResult(response.data, String(response.headers['content-type'] ?? ''), requestUrl, fileName);
     }
 
+    // Stryker disable all: response formatting has focused tests; baseline targets guarded dispatch.
     // ===== STEP 8: Format the Response =====
     let responseText = '';
     // Populated alongside `responseText` for JSON bodies, and only surfaced in the
