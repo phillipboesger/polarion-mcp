@@ -95,6 +95,12 @@ function buildWorkItemEnumTargets(
     const attributes = writtenAttributes(dataItems[0]);
     const relationships = (dataItems[0] as any)?.relationships;
     if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes) return null;
+    const changeTypeTo = readArg(validatedArgs, 'changeTypeTo', nameMap);
+    // Polarion changes the workflow when this action changes an item's type.
+    // Status options therefore belong to the destination type, not the current item.
+    if (typeof changeTypeTo === 'string' && changeTypeTo) {
+      return [{ projectId, type: changeTypeTo, attributes, relationships }];
+    }
     return [{ projectId, workItemId, attributes, relationships }];
   }
 
@@ -128,8 +134,12 @@ function buildWorkItemEnumTargets(
       const attributes = writtenAttributes(item);
       const relationships = (item as any)?.relationships;
       if (typeof id !== 'string' || !attributes) continue;
-      const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' ? fallbackProjectId : undefined);
+      const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' && definition.pathTemplate !== '/all/workitems' ? fallbackProjectId : undefined);
       if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes, relationships });
+      else if (definition.pathTemplate === '/all/workitems') targets.push({
+        projectId: '', workItemId: id, attributes, relationships,
+        unresolvedReason: `Cannot resolve global patchWorkItems id '${id}': ids must include their project prefix (for example 'PROJECT/WI-1'). Refusing the write.`,
+      });
     }
     return targets.length > 0 ? targets : null;
   }
