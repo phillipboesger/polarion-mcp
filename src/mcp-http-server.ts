@@ -43,7 +43,7 @@ import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextproto
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
 import { createPolarionServer } from './server.js';
-import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, REDIRECT_PRESET_URIS, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
 import { bearerCredential } from './utils.js';
@@ -155,9 +155,12 @@ export interface McpHttpAppOptions {
   maxSessions?: number;
   /**
    * Redirect URIs dynamically registered clients may use, from
-   * {@link parseRedirectAllowlist}. Empty or unset allows any.
+   * {@link parseRedirectAllowlist}. Empty or unset allows any when no presets
+   * are configured.
    */
   allowedRedirectUris?: string[];
+  /** Named redirect allowlist presets from MCP_ALLOWED_REDIRECT_PRESETS. */
+  allowedRedirectPresets?: string[];
   /**
    * Express `trust proxy` setting, for running behind a reverse proxy: rate
    * limits then count per client (X-Forwarded-For) instead of one shared
@@ -196,6 +199,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   closeAllSessions: () => Promise<void>;
 } {
   const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris } = options;
+  const allowedPresets = parseRedirectAllowlist(undefined, options.allowedRedirectPresets);
+  const effectiveAllowedRedirectUris = [...(allowedRedirectUris ?? []), ...allowedPresets];
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   const allowedOrigins = options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
@@ -310,7 +315,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     : undefined;
   const resourceAudience = publicUrl ? new URL(MCP_PATH, publicUrl).href : undefined;
   const oauth = publicUrl && sealer
-    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience)
+    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, effectiveAllowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience)
     : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
@@ -864,6 +869,8 @@ export function parseTrustProxy(value: string | undefined): string | number | un
  * `MCP_HTTP_PORT` (or `HTTP_PORT`), `MCP_HTTP_HOST`, `MCP_ALLOWED_HOSTS`
  * (comma-separated), `TRUST_PROXY` (e.g. "loopback" behind a same-host proxy),
  * `MCP_ALLOWED_REDIRECT_PREFIXES` (comma-separated OAuth redirect URI allowlist),
+ * `MCP_ALLOWED_REDIRECT_PRESETS` (comma-separated client presets: claude, chatgpt,
+ * vscode, cursor, copilot-studio, gemini, loopback),
  * `MCP_SESSION_IDLE_MINUTES` (default 60), `MCP_MAX_SESSIONS` (default 1000). No Polarion credentials are read here — each client
  * brings its own Polarion PAT.
  *
@@ -900,9 +907,14 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
     ? configuredRefreshTokenTtl
     : 14 * 24 * 60 * 60;
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
+  const allowedRedirectPresets = (process.env.MCP_ALLOWED_REDIRECT_PRESETS ?? '').split(',').map(preset => preset.trim()).filter(Boolean);
+  const knownRedirectPresets = new Set(Object.keys(REDIRECT_PRESET_URIS));
+  for (const preset of allowedRedirectPresets) {
+    if (!knownRedirectPresets.has(preset)) (options.logger ?? console).warn(`[WARN] Ignoring unknown MCP_ALLOWED_REDIRECT_PRESETS entry: ${preset}`);
+  }
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
@@ -920,8 +932,9 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
       if (!tokenSecret) {
         console.log('[WARN] MCP_TOKEN_SECRET is not set: every login and client registration ends when the server restarts.');
       }
-      if (allowedRedirectUris.length > 0) {
-        console.log(`[INFO] OAuth redirect URIs limited to: ${allowedRedirectUris.join(', ')}`);
+      if (allowedRedirectUris.length > 0 || allowedRedirectPresets.length > 0) {
+        if (allowedRedirectUris.length > 0) console.log(`[INFO] OAuth redirect URIs limited to: ${allowedRedirectUris.join(', ')}`);
+        if (allowedRedirectPresets.length > 0) console.log(`[INFO] OAuth redirect presets configured: ${allowedRedirectPresets.join(', ')}`);
       } else {
         console.log('[WARN] MCP_ALLOWED_REDIRECT_PREFIXES is not set: any client may register any redirect URI.');
       }

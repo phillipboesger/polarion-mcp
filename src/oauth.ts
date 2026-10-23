@@ -160,19 +160,52 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
 /** Hosts whose redirect URIs may use any port (RFC 8252 section 7.3). */
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
+export type RedirectPresetName = 'claude' | 'chatgpt' | 'vscode' | 'cursor' | 'copilot-studio' | 'gemini' | 'loopback';
+
 /**
- * Parses the redirect URI allowlist (`MCP_ALLOWED_REDIRECT_PREFIXES`).
+ * Verified literal callback URIs from docs/clients.json. Entries that are
+ * generated per installation or not verified stay empty and fail closed.
+ */
+export const REDIRECT_PRESET_URIS = {
+  claude: ['https://claude.ai/api/mcp/auth_callback'],
+  chatgpt: [],
+  vscode: [],
+  cursor: ['https://www.cursor.com/agents/mcp/oauth/callback', 'http://localhost:8787/callback'],
+  'copilot-studio': [],
+  gemini: [],
+  loopback: [],
+} as const satisfies Readonly<Record<RedirectPresetName, readonly string[]>>;
+
+const LOOPBACK_PRESET = 'urn:polarion-mcp:loopback-any-port';
+const DENY_ALL_PRESET = 'urn:polarion-mcp:deny-all';
+
+/**
+ * Parses the URI allowlist and expands named redirect presets.
  *
  * @param value - Comma-separated entries. One ending in "/" is a prefix,
  *   any other must match exactly (a loopback one on any port).
- * @returns The entries, prefixes normalized; empty when unset.
+ * @param presets - Recognized client presets from `MCP_ALLOWED_REDIRECT_PRESETS`.
+ * @returns The entries, prefixes normalized; empty when both settings are unset.
  * @throws Error for an entry that is not an absolute URL.
  */
-export function parseRedirectAllowlist(value: string | undefined): string[] {
-  return (value ?? '').split(',').map(entry => entry.trim()).filter(Boolean).map(entry => {
+export function parseRedirectAllowlist(value: string | undefined, presets: readonly string[] = []): string[] {
+  const entries = (value ?? '').split(',').map(entry => entry.trim()).filter(Boolean).map(entry => {
     if (!URL.canParse(entry)) throw new Error(`Redirect URI allowlist entry is not an absolute URL: ${entry}`);
     return entry.endsWith('/') ? loopbackAnyPort(new URL(entry)).href : entry;
   });
+  const knownPresets = new Set<string>(Object.keys(REDIRECT_PRESET_URIS));
+  let hasLoopbackPreset = false;
+  for (const preset of presets) {
+    if (!knownPresets.has(preset)) continue;
+    if (preset === 'loopback') hasLoopbackPreset = true;
+    else entries.push(...REDIRECT_PRESET_URIS[preset as Exclude<RedirectPresetName, 'loopback'>]);
+  }
+  if (hasLoopbackPreset) entries.push(LOOPBACK_PRESET);
+  // A configured preset list must never accidentally turn into the historical
+  // empty-list allow-all mode, including when all names are unknown or a
+  // known client has no verified fixed callback yet.
+  if (presets.length > 0 && entries.length === 0) entries.push(DENY_ALL_PRESET);
+  return entries;
 }
 
 /**
@@ -195,8 +228,16 @@ function loopbackAnyPort(url: URL): URL {
 export function isRedirectAllowed(uri: string, allowlist: readonly string[]): boolean {
   if (allowlist.length === 0) return true;
   if (!URL.canParse(uri)) return false;
+  const parsed = new URL(uri);
   const normalized = loopbackAnyPort(new URL(uri)).href;
-  return allowlist.some(entry => (entry.endsWith('/') ? normalized.startsWith(entry) : redirectUriMatches(uri, entry)));
+  return allowlist.some(entry => {
+    if (entry === DENY_ALL_PRESET) return false;
+    if (entry === LOOPBACK_PRESET) {
+      return parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname)
+        && !parsed.username && !parsed.password && !parsed.hash;
+    }
+    return entry.endsWith('/') ? normalized.startsWith(entry) : redirectUriMatches(uri, entry);
+  });
 }
 
 /**

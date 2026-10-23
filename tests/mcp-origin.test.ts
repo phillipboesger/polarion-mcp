@@ -257,7 +257,7 @@ test("distinct OAuth client ids from one IP hit the per-IP token ceiling", async
 })
 
 test("public OAuth startup warns when no trusted proxy is configured", async () => {
-  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "TRUST_PROXY"] as const
+  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_ALLOWED_REDIRECT_PRESETS", "TRUST_PROXY"] as const
   const previous = new Map(envKeys.map(key => [key, process.env[key]]))
   const warnings: string[] = []
   const originalLog = console.log
@@ -267,12 +267,21 @@ test("public OAuth startup warns when no trusted proxy is configured", async () 
     process.env.MCP_HTTP_HOST = "127.0.0.1"
     process.env.MCP_PUBLIC_URL = "https://mcp.example"
     process.env.MCP_TOKEN_SECRET = "a-secret-long-enough-for-startup-warning-test"
-    process.env.MCP_ALLOWED_REDIRECT_PREFIXES = "https://claude.ai/api/mcp/auth_callback"
+    delete process.env.MCP_ALLOWED_REDIRECT_PREFIXES
+    process.env.MCP_ALLOWED_REDIRECT_PRESETS = "unknown-client"
     delete process.env.TRUST_PROXY
     console.log = () => undefined
     server = startMcpHttpServer({ logger: { warn: message => warnings.push(message) } })
     await new Promise<void>((resolve) => server?.once("listening", resolve))
     assert.ok(warnings.some(message => /shared IP|shared egress|TRUST_PROXY/i.test(message)))
+    assert.ok(warnings.some(message => /Ignoring unknown MCP_ALLOWED_REDIRECT_PRESETS entry: unknown-client/.test(message)))
+    const { port } = server.address() as AddressInfo
+    const registration = await fetch(`http://127.0.0.1:${port}/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client_name: "test", redirect_uris: ["https://attacker.example/callback"], token_endpoint_auth_method: "none" }),
+    })
+    assert.equal(registration.status, 400)
   } finally {
     console.log = originalLog
     if (server?.listening) await new Promise<void>((resolve) => server?.close(() => resolve()))
