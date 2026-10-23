@@ -42,7 +42,7 @@ import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextproto
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
 import { createPolarionServer } from './server.js';
-import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, validatePolarionToken, FORBIDDEN_MESSAGE, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
 import { bearerCredential } from './utils.js';
@@ -394,7 +394,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       return undefined;
     }
     if (check === 'unavailable') return { status: 503, message: 'Polarion could not be reached to check the token. Try again in a moment.' };
-    if (check === 'forbidden') return { status: 403, message: 'Polarion recognized the token but denied access. Ask your Polarion administrator.' };
+    if (check === 'forbidden') return { status: 403, message: FORBIDDEN_MESSAGE };
     return { status: 401, message: 'Unauthorized: Polarion did not accept this token' };
   };
 

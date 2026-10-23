@@ -105,6 +105,9 @@ interface AccessPayload extends RefreshPayload {
 /** Client metadata sealed into a DCR client id. */
 type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secret' | 'client_secret_expires_at'>;
 
+/** Shown to users when Polarion answers 403; the usual causes, most likely first. */
+export const FORBIDDEN_MESSAGE = 'Polarion denied access (HTTP 403). Ask your Polarion administrator to check: the REST API is enabled (com.siemens.polarion.rest.enabled=true), the token user has a license and read access to at least one project, and no proxy or firewall in front of Polarion blocks the request. A new token will not help.';
+
 /**
  * Checks a Polarion Personal Access Token by making the cheapest authenticated
  * call the REST API offers: asking for a single project.
@@ -128,7 +131,10 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
     // without it a 403 on the login page is indistinguishable from a typo.
     const detail = String(response.data?.errors?.[0]?.detail ?? response.data?.errors?.[0]?.title ?? '')
       .replace(/\s+/g, ' ').slice(0, 200);
-    console.error(`[WARN] Polarion token check failed: HTTP ${response.status}${detail ? ` - ${detail}` : ''}`);
+    // No JSON:API error body means the answer did not come from Polarion's REST
+    // service (reverse proxy, WAF, SSO filter, wrong API_BASE_URL path).
+    const hint = response.data?.errors ? '' : ' (not a Polarion REST error body: check proxy/WAF/SSO in front of Polarion and the API_BASE_URL path)';
+    console.error(`[WARN] Polarion token check failed: HTTP ${response.status}${detail ? ` - ${detail}` : ''}${hint} [GET ${API_BASE_URL}/projects]`);
     if (response.status === 401) return false;
     if (response.status === 403) return 'forbidden';
     return 'unavailable';
@@ -532,7 +538,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     if (check === 'forbidden') {
       return {
         ok: false,
-        reason: 'Polarion recognized the token but denied access (HTTP 403). Your account may lack a license or the permission to use the REST API; ask your Polarion administrator. A new token will not help.',
+        reason: FORBIDDEN_MESSAGE,
         pending: retry,
       };
     }

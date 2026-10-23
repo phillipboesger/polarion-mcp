@@ -14,6 +14,13 @@
 - Verify BEARER_TOKEN is valid and not expired.
 - Confirm API_BASE_URL points to the correct Polarion instance.
 
+## 403 Errors from Polarion
+
+- The server log shows `Polarion token check failed: HTTP 403 - ...` plus the URL it called. Polarion's own text ("you do not have the necessary permissions") means Polarion refused; a hint about a missing REST error body means a proxy, WAF or SSO filter answered instead.
+- Check `com.siemens.polarion.rest.enabled=true` in `polarion.properties` (restart Polarion afterwards).
+- The token's user needs a license and read access to at least one project; `GET <API_BASE_URL>/projects?page[size]=1` must return 200 for that user.
+- Reproduce outside the MCP server: `curl -i -H "Authorization: Bearer <PAT>" "<API_BASE_URL>/projects?page[size]=1"`. The same 403 there means the cause is on the Polarion side, not in this server.
+
 ## TLS or Certificate Errors
 
 - For self-signed certificates, set NODE_TLS_REJECT_UNAUTHORIZED=0 for trusted internal servers only.
