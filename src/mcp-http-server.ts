@@ -155,6 +155,8 @@ export interface McpHttpAppOptions {
   logFormat?: LogFormat;
   logLevel?: LogLevel;
   telemetry?: TelemetryHooks;
+  /** Enable the default confirmation policy for destructive and bulk calls. */
+  confirmDestructive?: boolean;
   /** Injected policy, audit, authentication, and instance seams. */
   extensions?: Partial<PolarionExtensions>;
   /** Polarion REST API base URL captured by the entry point. */
@@ -774,7 +776,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
+      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
@@ -1032,9 +1034,10 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const logFormat = process.env.MCP_LOG_FORMAT?.trim().toLowerCase() === 'json' ? 'json' : 'text';
   const configuredLogLevel = process.env.MCP_LOG_LEVEL?.trim().toLowerCase();
   const logLevel = ['debug', 'info', 'warn', 'error'].includes(configuredLogLevel ?? '') ? configuredLogLevel as LogLevel : 'info';
+  const confirmDestructive = process.env.MCP_CONFIRM_DESTRUCTIVE?.trim().toLowerCase() === 'true';
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, rateLimitTools, markUntrusted, logFormat, logLevel, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

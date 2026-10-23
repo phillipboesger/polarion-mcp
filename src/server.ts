@@ -72,6 +72,36 @@ interface ToolCallPipelineOptions {
   markUntrusted: boolean;
   telemetry: TelemetryHooks;
   correlationId?: string;
+  server: Server;
+}
+
+function requiresConfirmation(toolName: string, annotations: import('./types.js').McpToolAnnotations | undefined): boolean {
+  if (annotations?.readOnlyHint === true) return false;
+  return annotations?.destructiveHint === true || /^(?:delete|patchAll)/i.test(toolName) || /bulk/i.test(toolName);
+}
+
+function actionSummary(toolName: string, args: Record<string, unknown>): string {
+  const safe = JSON.stringify(args, (key, value) => /token|secret|password|authorization|pat/i.test(key) ? '[REDACTED]' : value);
+  return `${toolName} ${safe ?? '{}'}`.slice(0, 800);
+}
+
+async function requestDestructiveConfirmation(server: Server, toolName: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<'accepted' | 'declined' | 'cancelled' | 'fallback'> {
+  if (!server.getClientCapabilities()?.elicitation?.form) return args.confirm === true ? 'accepted' : 'fallback';
+  try {
+    const response = await server.elicitInput({
+      mode: 'form',
+      message: `Confirm this Polarion action: ${actionSummary(toolName, args)}`,
+      requestedSchema: {
+        type: 'object',
+        properties: { confirm: { type: 'boolean', title: 'Confirm action', description: 'Allow this Polarion tool call to proceed.' } },
+        required: ['confirm'],
+      },
+    }, { signal });
+    if (response.action === 'accept' && response.content?.confirm === true) return 'accepted';
+    return response.action === 'cancel' ? 'cancelled' : 'declined';
+  } catch {
+    return 'cancelled';
+  }
 }
 
 /** Applies auth, policy, execution, and audit once for every MCP tools/call request. */
@@ -81,13 +111,17 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
   const virtual = options.virtualTools.find(tool => tool.name === toolName);
   const generated = options.clientTools.get(toolName);
   const annotations = virtual?.annotations ?? generated?.annotations;
+  const destructive = requiresConfirmation(toolName, annotations);
   const bearerToken = getBearerToken();
+  const callArgs = { ...args };
+  delete callArgs.confirm;
   const userScope = tokenScope(bearerToken);
   let principal = { id: userScope ?? 'anonymous' } as Awaited<ReturnType<PolarionExtensions['authProvider']['validateRequest']>>;
   let outcome: 'success' | 'error' | 'denied' | 'confirmation-required' = 'error';
   let result: CallToolResult | undefined;
-  let span: ReturnType<TelemetryHooks['onSpanStart']> = undefined;
-  try { span = options.telemetry.onSpanStart({ name: 'polarion.tools.call', correlationId, tool: toolName }); } catch { span = undefined; }
+  const span = (() => {
+    try { return options.telemetry.onSpanStart({ name: 'polarion.tools.call', correlationId, tool: toolName }); } catch { return undefined; }
+  })();
   try {
     principal = await options.extensions.authProvider.validateRequest({ bearerToken, userScope });
     const retryAfter = options.rateLimiter.check(principal.id);
@@ -99,17 +133,45 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     const decision = await options.extensions.policyHook.beforeCall({
       tool: toolName, args, user: principal,
       readOnly: annotations?.readOnlyHint === true,
-      destructive: annotations?.destructiveHint === true,
+      destructive,
     });
     if (decision.action === 'deny') {
       outcome = 'denied';
       result = { content: [{ type: 'text', text: decision.reason }], isError: true };
-    } else if (decision.action === 'requireConfirmation') {
-      outcome = 'confirmation-required';
-      result = { content: [{ type: 'text', text: 'This tool call requires confirmation.' }], isError: true };
+    } else if (decision.action === 'requireConfirmation' && args.dry_run !== true) {
+      const confirmation = await requestDestructiveConfirmation(options.server, toolName, args, options.signal);
+      if (confirmation !== 'accepted') {
+        outcome = 'confirmation-required';
+        const text = confirmation === 'fallback'
+          ? 'This destructive tool requires confirmation. First repeat the call with dry_run: true to review its preview, then repeat the same call with confirm: true.'
+          : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
+        result = { content: [{ type: 'text', text }], isError: true };
+      } else if (virtual) {
+        const resolved = await options.extensions.instanceResolver.resolve(principal);
+        result = await virtual.handler(callArgs, {
+          callPolarionTool: async (name, callArgs) => {
+            const definition = options.clientTools.get(name);
+            if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
+            return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+          },
+          requestBearerToken: bearerToken,
+          userScope,
+          logger: options.logger,
+          signal: options.signal ?? new AbortController().signal,
+          reportProgress: async () => undefined,
+        });
+        outcome = result.isError ? 'error' : 'success';
+      } else if (generated) {
+        const resolved = await options.extensions.instanceResolver.resolve(principal);
+        result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+        outcome = result.isError ? 'error' : 'success';
+      } else {
+        result = { content: [{ type: 'text', text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
+        outcome = 'error';
+      }
     } else if (virtual) {
       const resolved = await options.extensions.instanceResolver.resolve(principal);
-      result = await virtual.handler(args, {
+      result = await virtual.handler(callArgs, {
         callPolarionTool: async (name, callArgs) => {
           const definition = options.clientTools.get(name);
           if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
@@ -124,7 +186,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       outcome = result.isError ? 'error' : 'success';
     } else if (generated) {
       const resolved = await options.extensions.instanceResolver.resolve(principal);
-      result = await executeApiTool(toolName, generated, args, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+      result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
       outcome = result.isError ? 'error' : 'success';
     } else {
       options.logger.error(`[ERROR] Unknown tool requested: ${toolName}`);
@@ -162,6 +224,8 @@ export interface PolarionServerOptions {
   logFormat?: LogFormat;
   logLevel?: LogLevel;
   telemetry?: TelemetryHooks;
+  /** Require policy confirmation before destructive and bulk tools. Defaults off. */
+  confirmDestructive?: boolean;
   /** Calls per user per rolling minute; zero disables the limiter. */
   rateLimitTools?: number;
   /** Clock injection for deterministic sliding-window tests. */
@@ -193,7 +257,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   if (unknown.length > 0) logger.warn(`[WARN] MCP_TOOLS names unknown tools, ignored: ${unknown.join(', ')}`);
   if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
-  const extensions = { ...createDefaultExtensions(apiBaseUrl), ...options.extensions };
+  const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
@@ -236,7 +300,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     return callToolPipeline(
       request.params.name,
       (request.params.arguments ?? {}) as Record<string, unknown>,
-      { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined) },
+      { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined), server },
     );
   });
 

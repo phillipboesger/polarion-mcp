@@ -40,7 +40,7 @@ function logSettings(env: NodeJS.ProcessEnv): { logFormat: LogFormat; logLevel: 
 async function main(): Promise<void> {
   try {
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
-    const server = createPolarionServer({ ...logSettings(process.env), maxResponseChars, rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true', apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
+    const server = createPolarionServer({ ...logSettings(process.env), maxResponseChars, rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true', confirmDestructive: process.env.MCP_CONFIRM_DESTRUCTIVE?.trim().toLowerCase() === 'true', apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
     const transport = new StdioServerTransport();
     await server.connect(transport);
 

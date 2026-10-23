@@ -19,3 +19,5 @@ See the exported interfaces in `src/extensions.ts` and `src/virtual-tools.ts` fo
 ## Telemetry hook
 
 `createPolarionServer` accepts optional `telemetry` callbacks from `src/telemetry.ts`. `onSpanStart` receives the operation name, correlation ID, and tool name; `onSpanEnd` receives the span handle plus outcome and duration. The no-op default keeps the server dependency-free. Hook failures are isolated from tool execution.
+
+The default policy hook can require destructive-call confirmation when `MCP_CONFIRM_DESTRUCTIVE=true`; supplying `extensions.policyHook` replaces it.

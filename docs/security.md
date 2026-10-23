@@ -34,6 +34,10 @@ Polarion results include a `_notice` that user-authored content is data, not ins
 
 Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts (configurable with `MCP_RATE_LIMIT_TOKEN_IP`); successful requests do not count toward token failure ceilings. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour by default (`MCP_RATE_LIMIT_REGISTER`). Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
 
+## Destructive tool confirmation
+
+`MCP_CONFIRM_DESTRUCTIVE=true` enables the default policy hook for destructive and bulk operations. Clients that advertise form elicitation receive a server-side confirmation request with a concise action summary. Other clients receive an error and must first inspect a `dry_run: true` preview, then repeat the call with `confirm: true`. The default is `false` to preserve existing deployment behavior; enterprise packages can replace the policy hook. Read-only tools do not prompt.
+
 ## Logging and telemetry
 
 Set `MCP_LOG_FORMAT=json` to emit structured tool-call records to stderr. Records include a validated or generated correlation ID, tool, outcome, duration, and timestamp. Credential-like values and the current caller token are scrubbed before writing. Keep any custom log sinks private and avoid recording tool arguments. `MCP_LOG_LEVEL` filters records.

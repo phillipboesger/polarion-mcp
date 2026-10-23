@@ -40,9 +40,9 @@ export interface PolarionExtensions {
   instanceResolver: InstanceResolver;
 }
 
-export function createDefaultExtensions(apiBaseUrl: string): PolarionExtensions {
+export function createDefaultExtensions(apiBaseUrl: string, confirmDestructive = false): PolarionExtensions {
   return {
-    policyHook: { beforeCall: () => ({ action: 'allow' }) },
+    policyHook: { beforeCall: ({ destructive, args }) => confirmDestructive && destructive && args.dry_run !== true ? { action: 'requireConfirmation' } : { action: 'allow' } },
     auditSink: { record: () => undefined },
     authProvider: { validateRequest: ({ userScope }) => ({ id: userScope ?? 'anonymous' }) },
     instanceResolver: { resolve: () => ({ apiBaseUrl }) },
