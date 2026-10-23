@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net"
 import { createHash, randomBytes } from "node:crypto"
 
 import { createMcpHttpApp, patFailureRateLimitKey } from "../src/mcp-http-server.js"
+import { Sealer } from "../src/sealed.js"
 import type { TokenCheck } from "../src/oauth.js"
 
 const PUBLIC_URL = "http://127.0.0.1"
@@ -20,11 +21,17 @@ async function validateToken(token: string): Promise<TokenCheck> {
 }
 
 /** Starts the app with the OAuth login enabled, sealing tokens with `tokenSecret`. */
-async function startApp(tokenSecret = SECRET, refreshTokenTtlSeconds?: number) {
-  const { app, closeAllSessions } = createMcpHttpApp({
-    publicUrl: new URL(PUBLIC_URL), validateToken, tokenSecret,
+async function startApp(
+  tokenSecret = SECRET,
+  refreshTokenTtlSeconds?: number,
+  publicUrl = PUBLIC_URL,
+  previousTokenSecrets: string[] = [],
+) {
+  const options = {
+    publicUrl: new URL(publicUrl), validateToken, tokenSecret, previousTokenSecrets,
     ...(refreshTokenTtlSeconds === undefined ? {} : { refreshTokenTtlSeconds }),
-  })
+  } as Parameters<typeof createMcpHttpApp>[0]
+  const { app, closeAllSessions } = createMcpHttpApp(options)
   const server = app.listen(0)
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const { port } = server.address() as AddressInfo
@@ -47,7 +54,12 @@ async function register(base: string, body: Record<string, unknown> = {}) {
 }
 
 /** Runs register → authorize → login → code, returning what the token call needs. */
-async function loginForCode(base: string, pat: string, client?: { client_id: string; client_secret?: string }) {
+async function loginForCode(
+  base: string,
+  pat: string,
+  client?: { client_id: string; client_secret?: string },
+  resource: string | null = `${PUBLIC_URL}/mcp`,
+) {
   const registered = client ?? (await register(base))
   const verifier = randomBytes(32).toString("base64url")
   const authorize = new URL(`${base}/authorize`)
@@ -57,7 +69,7 @@ async function loginForCode(base: string, pat: string, client?: { client_id: str
   authorize.searchParams.set("code_challenge", createHash("sha256").update(verifier).digest("base64url"))
   authorize.searchParams.set("code_challenge_method", "S256")
   authorize.searchParams.set("state", "s")
-  authorize.searchParams.set("resource", `${PUBLIC_URL}/mcp`)
+  if (resource !== null) authorize.searchParams.set("resource", resource)
   const page = await fetch(authorize, { redirect: "manual" })
   assert.equal(page.status, 200)
   const loginId = /name="login_id" value="([^"]+)"/.exec(await page.text())?.[1] as string
@@ -74,8 +86,8 @@ async function loginForCode(base: string, pat: string, client?: { client_id: str
 
 type Tokens = { access_token: string; refresh_token: string; expires_in: number }
 
-async function login(base: string, pat: string) {
-  const { client, code, verifier } = await loginForCode(base, pat)
+async function login(base: string, pat: string, resource: string | null = `${PUBLIC_URL}/mcp`) {
+  const { client, code, verifier } = await loginForCode(base, pat, undefined, resource)
   const res = await fetch(`${base}/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -256,6 +268,80 @@ test("a PAT revoked in Polarion ends the session at the next refresh with invali
     assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
   } finally {
     await stop()
+  }
+})
+
+test("authorization rejects a resource outside this MCP server", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const client = await register(base)
+    const authorize = new URL(`${base}/authorize`)
+    for (const [key, value] of Object.entries({
+      response_type: "code",
+      client_id: client.client_id,
+      redirect_uri: REDIRECT,
+      code_challenge: createHash("sha256").update("resource-test").digest("base64url"),
+      code_challenge_method: "S256",
+      state: "s",
+      resource: "https://foreign.example/mcp",
+    })) authorize.searchParams.set(key, value)
+    const response = await fetch(authorize, { redirect: "manual" })
+    assert.equal(response.status, 302)
+    assert.equal(new URL(response.headers.get("location") as string).searchParams.get("error"), "invalid_request")
+  } finally {
+    await stop()
+  }
+})
+
+test("OAuth tokens are audience-bound to their public URL, while omitted and trailing-slash resources work", async () => {
+  const first = await startApp(SECRET, undefined, "https://mcp-a.example")
+  const pat = freshPat()
+  try {
+    const { tokens } = await login(first.base, pat, "https://mcp-a.example/mcp/")
+    const other = await startApp(SECRET, undefined, "https://mcp-b.example")
+    try {
+      assert.equal((await initialize(other.base, tokens.access_token)).status, 401)
+    } finally {
+      await other.stop()
+    }
+    const withoutResource = await login(first.base, freshPat(), null)
+    assert.equal((await initialize(first.base, withoutResource.tokens.access_token)).status, 200)
+  } finally {
+    await first.stop()
+  }
+})
+
+test("tokens sealed for a different API base URL fail the authenticated-data check", () => {
+  const ContextSealer = Sealer as unknown as new (secret: string, aadContext: string) => Sealer
+  const issuer = new ContextSealer(SECRET, "https://polarion-a.example/polarion/rest/v1")
+  const otherDeployment = new ContextSealer(SECRET, "https://polarion-b.example/polarion/rest/v1")
+  const token = issuer.seal("a", { aud: "https://mcp.example/mcp" })
+  assert.equal(otherDeployment.open("a", token), undefined)
+})
+
+test("a previous sealing secret opens existing tokens until it is removed", async () => {
+  const oldSecret = "a-previous-server-token-secret-long-enough-1234"
+  const first = await startApp(oldSecret)
+  const { client, tokens } = await login(first.base, freshPat())
+  await first.stop()
+
+  const rotated = await startApp(SECRET, undefined, PUBLIC_URL, [oldSecret])
+  let newlySealedTokens: Tokens
+  try {
+    assert.equal((await initialize(rotated.base, tokens.access_token)).status, 200)
+    const refreshResponse = await refresh(rotated.base, client.client_id, tokens.refresh_token)
+    assert.equal(refreshResponse.status, 200)
+    newlySealedTokens = (await refreshResponse.json()) as Tokens
+  } finally {
+    await rotated.stop()
+  }
+
+  const withoutPrevious = await startApp(SECRET)
+  try {
+    assert.equal((await initialize(withoutPrevious.base, tokens.access_token)).status, 401)
+    assert.equal((await initialize(withoutPrevious.base, newlySealedTokens.access_token)).status, 200)
+  } finally {
+    await withoutPrevious.stop()
   }
 })
 

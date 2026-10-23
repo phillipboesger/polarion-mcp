@@ -24,7 +24,7 @@ import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/serv
 import type { AuthorizationParams, OAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/provider.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { InvalidClientMetadataError, InvalidGrantError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
@@ -59,6 +59,11 @@ const AUTHORIZATION_CODE_TTL_MS = 60 * 1000;
  * a cap a flood of authorize requests would grow memory for 10 minutes.
  */
 const MAX_PENDING_LOGINS = 10_000;
+
+/** Accept the RFC 8707 resource with or without its single trailing slash. */
+function normalizeResource(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
 
 /**
  * Result of asking Polarion about a PAT: accepted, rejected (401), known but
@@ -106,6 +111,8 @@ interface RefreshPayload {
   fiat: number;
   /** Expiration of this refresh token, in epoch seconds. */
   exp: number;
+  /** Canonical protected resource this token was issued for. */
+  aud: string;
 }
 
 /** Sealed inside an access token. */
@@ -263,7 +270,7 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
    */
   private withCredentials(client: SealedClient, clientId: string): OAuthClientInformationFull {
     if (client.token_endpoint_auth_method === 'none') return { ...client, client_id: clientId };
-    return { ...client, client_id: clientId, client_secret: this.sealer.derive(clientId), client_secret_expires_at: 0 };
+    return { ...client, client_id: clientId, client_secret: this.sealer.derive(clientId, clientId), client_secret_expires_at: 0 };
   }
 }
 
@@ -445,13 +452,15 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param validateToken - Token check; injectable so tests need no Polarion.
    * @param redirectAllowlist - Redirect URIs registered clients may use; empty allows any.
    * @param refreshTokenTtlSeconds - Sliding refresh-token lifetime in seconds.
+   * @param resourceAudience - Canonical protected-resource URL for issued tokens.
    */
   constructor(
     private readonly polarionUrl: string,
     private readonly sealer: Sealer,
     private readonly validateToken: TokenValidator = validatePolarionToken,
     redirectAllowlist: readonly string[] = [],
-    private readonly refreshTokenTtlSeconds = DEFAULT_REFRESH_TOKEN_TTL_SECONDS
+    private readonly refreshTokenTtlSeconds = DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+    private readonly resourceAudience?: string
   ) {
     this.clients = new SealedClientsStore(sealer, redirectAllowlist);
   }
@@ -470,6 +479,10 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param res - Response to render the login page into.
    */
   async authorize(client: OAuthClientInformationFull, params: AuthorizationParams, res: Response): Promise<void> {
+    if (params.resource && this.resourceAudience
+      && normalizeResource(params.resource.href) !== normalizeResource(this.resourceAudience)) {
+      throw new InvalidRequestError('The requested resource does not match this MCP server');
+    }
     this.beginLogin(
       {
         flow: 'mcp',
@@ -672,7 +685,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
   async refresh(clientId: string, refreshToken: string): Promise<OAuthTokens> {
     const entry = this.sealer.open<RefreshPayload>('r', refreshToken);
     const now = Math.floor(Date.now() / 1000);
-    if (!entry || entry.c !== clientId || !Number.isFinite(entry.iat) || !Number.isFinite(entry.fiat)
+    if (!entry || entry.c !== clientId || (this.resourceAudience !== undefined && entry.aud !== this.resourceAudience)
+      || !Number.isFinite(entry.iat) || !Number.isFinite(entry.fiat)
       || !Number.isFinite(entry.exp) || now >= entry.exp
       || now >= entry.fiat + REFRESH_TOKEN_FAMILY_TTL_SECONDS) {
       throw new InvalidGrantError('Invalid refresh token');
@@ -706,6 +720,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
       p: login.polarionToken,
       s: login.scopes,
       r: login.resource,
+      aud: this.resourceAudience ?? login.resource ?? '',
       iat,
       fiat,
       exp: Math.min(iat + this.refreshTokenTtlSeconds, fiat + REFRESH_TOKEN_FAMILY_TTL_SECONDS),
@@ -746,6 +761,14 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    */
   polarionTokenFor(token: string): string | undefined {
     return this.openAccessToken(token)?.p;
+  }
+
+  /**
+   * @param token - A sealed access token.
+   * @returns The protected resource this access token was issued for.
+   */
+  audienceFor(token: string): string | undefined {
+    return this.openAccessToken(token)?.aud;
   }
 
   /**

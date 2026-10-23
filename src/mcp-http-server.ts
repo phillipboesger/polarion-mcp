@@ -130,6 +130,8 @@ export interface McpHttpAppOptions {
    * restarts and instances, or every login ends. Unset, a random one is used.
    */
   tokenSecret?: string;
+  /** Older secrets tried only when opening sealed OAuth values. */
+  previousTokenSecrets?: string[];
   /** Preconfigured OAuth client for ChatGPT Custom GPT Actions; needs `publicUrl`. */
   gptClient?: { clientId: string; clientSecret: string };
   /** Token check used by the login page; injectable so tests need no Polarion. */
@@ -248,9 +250,12 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   sweep.unref();
 
   // OAuth login, for clients that cannot be handed a token by hand.
-  const sealer = publicUrl ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url')) : undefined;
+  const sealer = publicUrl
+    ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url'), API_BASE_URL, options.previousTokenSecrets)
+    : undefined;
+  const resourceAudience = publicUrl ? new URL(MCP_PATH, publicUrl).href : undefined;
   const oauth = publicUrl && sealer
-    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris, options.refreshTokenTtlSeconds)
+    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience)
     : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
@@ -404,6 +409,11 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       return;
     }
     if (oauth && isSealed(value)) {
+      if (oauth.audienceFor(value) !== resourceAudience) {
+        res.set('WWW-Authenticate', bearerChallenge('The access token is for a different resource'));
+        res.status(401).json(jsonRpcError('Unauthorized: the access token is for a different resource'));
+        return;
+      }
       const pat = oauth.polarionTokenFor(value);
       if (!pat) {
         // A 401, not a pass-through to Polarion, is what makes the client refresh or log in again.
@@ -678,7 +688,7 @@ function mountCustomGpt(
   const authenticate = (req: Request, res: Response, next: NextFunction): void => {
     const credential = bearerCredential(req.get('authorization'));
     const pat = credential ? oauth.polarionTokenFor(credential) : undefined;
-    if (!pat) {
+    if (!pat || !credential || oauth.audienceFor(credential) !== new URL(MCP_PATH, publicUrl).href) {
       res.set('WWW-Authenticate', bearerChallenge(credential ? 'The access token is invalid or expired' : undefined));
       res.status(401).json({ success: false, error: 'Authentication required', message: 'Log in through the GPT again.' });
       return;
@@ -759,6 +769,7 @@ export function startMcpHttpServer(): HttpServer {
     .filter(Boolean);
   const publicUrl = parsePublicUrl(process.env.MCP_PUBLIC_URL);
   const tokenSecret = process.env.MCP_TOKEN_SECRET || undefined;
+  const previousTokenSecrets = (process.env.MCP_TOKEN_SECRET_PREVIOUS || '').split(',').map(secret => secret.trim()).filter(Boolean);
   const gptClient = process.env.GPT_CLIENT_ID && process.env.GPT_CLIENT_SECRET
     ? { clientId: process.env.GPT_CLIENT_ID, clientSecret: process.env.GPT_CLIENT_SECRET }
     : undefined;
@@ -776,7 +787,7 @@ export function startMcpHttpServer(): HttpServer {
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

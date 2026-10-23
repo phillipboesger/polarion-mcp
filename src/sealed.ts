@@ -34,18 +34,23 @@ export function isSealed(value: string): boolean {
  * Seals and opens payloads under one server secret.
  */
 export class Sealer {
-  private readonly key: Buffer;
-  private readonly macKey: Buffer;
+  private readonly keys: Array<{ key: Buffer; macKey: Buffer }>;
 
   /**
-   * @param secret - Server secret; at least {@link MIN_SECRET_LENGTH} characters.
+   * @param secret - Current server secret; at least {@link MIN_SECRET_LENGTH} characters.
+   * @param aadContext - Deployment identity bound into every sealed value.
+   * @param previousSecrets - Older keys accepted for opening only.
    */
-  constructor(secret: string) {
-    if (secret.length < MIN_SECRET_LENGTH) {
-      throw new Error(`MCP_TOKEN_SECRET must be at least ${MIN_SECRET_LENGTH} characters long`);
+  constructor(secret: string, private readonly aadContext = '', previousSecrets: readonly string[] = []) {
+    for (const candidate of [secret, ...previousSecrets]) {
+      if (candidate.length < MIN_SECRET_LENGTH) {
+        throw new Error(`MCP_TOKEN_SECRET must be at least ${MIN_SECRET_LENGTH} characters long`);
+      }
     }
-    this.key = createHash('sha256').update(`seal:${secret}`).digest();
-    this.macKey = createHash('sha256').update(`mac:${secret}`).digest();
+    this.keys = [...new Set([secret, ...previousSecrets])].map(candidate => ({
+      key: createHash('sha256').update(`seal:${candidate}`).digest(),
+      macKey: createHash('sha256').update(`mac:${candidate}`).digest(),
+    }));
   }
 
   /**
@@ -55,8 +60,8 @@ export class Sealer {
    */
   seal(kind: SealedKind, payload: object): string {
     const iv = randomBytes(IV_BYTES);
-    const cipher = createCipheriv('aes-256-gcm', this.key, iv);
-    cipher.setAAD(Buffer.from(kind));
+    const cipher = createCipheriv('aes-256-gcm', this.keys[0].key, iv);
+    cipher.setAAD(this.aad(kind));
     const ciphertext = Buffer.concat([cipher.update(JSON.stringify(payload), 'utf8'), cipher.final()]);
     return `${SEALED_PREFIX}${kind}.${Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64url')}`;
   }
@@ -72,15 +77,11 @@ export class Sealer {
     if (!value.startsWith(head)) return undefined;
     const raw = Buffer.from(value.slice(head.length), 'base64url');
     if (raw.length <= IV_BYTES + TAG_BYTES) return undefined;
-    try {
-      const decipher = createDecipheriv('aes-256-gcm', this.key, raw.subarray(0, IV_BYTES));
-      decipher.setAAD(Buffer.from(kind));
-      decipher.setAuthTag(raw.subarray(IV_BYTES, IV_BYTES + TAG_BYTES));
-      const plain = Buffer.concat([decipher.update(raw.subarray(IV_BYTES + TAG_BYTES)), decipher.final()]);
-      return JSON.parse(plain.toString('utf8')) as T;
-    } catch {
-      return undefined;
+    for (const candidate of this.keys) {
+      const opened = this.openWithKey<T>(kind, raw, candidate.key);
+      if (opened !== undefined) return opened;
     }
+    return undefined;
   }
 
   /**
@@ -90,8 +91,33 @@ export class Sealer {
    * @param value - The public value.
    * @returns A base64url HMAC of the value.
    */
-  derive(value: string): string {
-    return createHmac('sha256', this.macKey).update(value).digest('base64url');
+  derive(value: string, sealedValue?: string): string {
+    const key = sealedValue ? this.keyForSealedValue('c', sealedValue) : undefined;
+    return createHmac('sha256', (key ?? this.keys[0]).macKey).update(value).digest('base64url');
+  }
+
+  private aad(kind: SealedKind): Buffer {
+    return Buffer.from(this.aadContext ? `${kind}:${this.aadContext}` : kind);
+  }
+
+  private openWithKey<T>(kind: SealedKind, raw: Buffer, key: Buffer): T | undefined {
+    try {
+      const decipher = createDecipheriv('aes-256-gcm', key, raw.subarray(0, IV_BYTES));
+      decipher.setAAD(this.aad(kind));
+      decipher.setAuthTag(raw.subarray(IV_BYTES, IV_BYTES + TAG_BYTES));
+      const plain = Buffer.concat([decipher.update(raw.subarray(IV_BYTES + TAG_BYTES)), decipher.final()]);
+      return JSON.parse(plain.toString('utf8')) as T;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private keyForSealedValue(kind: SealedKind, value: string): { key: Buffer; macKey: Buffer } | undefined {
+    const head = `${SEALED_PREFIX}${kind}.`;
+    if (!value.startsWith(head)) return undefined;
+    const raw = Buffer.from(value.slice(head.length), 'base64url');
+    if (raw.length <= IV_BYTES + TAG_BYTES) return undefined;
+    return this.keys.find(candidate => this.openWithKey(kind, raw, candidate.key) !== undefined);
   }
 }
 
