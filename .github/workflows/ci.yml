@@ -137,6 +137,29 @@ jobs:
           path: ${{ steps.pack.outputs.zip }}
           if-no-files-found: error
 
+  npm-package:
+    name: Verify npm package installation
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify npm package install and MCP initialize
+        run: npm run check:package
+
   docker:
     name: Build Docker image and smoke-test stdio
     runs-on: ubuntu-latest

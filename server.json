@@ -9,6 +9,36 @@
   "version": "1.3.1",
   "packages": [
     {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "polarion-mcp",
+      "version": "1.3.1",
+      "runtimeHint": "npx",
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "-y"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "API_BASE_URL",
+          "description": "Base URL for the Polarion REST API, e.g. https://your-polarion-server.com/polarion/rest/v1",
+          "isRequired": true
+        },
+        {
+          "name": "BEARER_TOKEN",
+          "description": "Personal Access Token (PAT) for authenticating with the Polarion REST API",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ],
+      "packageArguments": []
+    },
+    {
       "registryType": "oci",
       "identifier": "ghcr.io/phillipboesger/polarion-mcp",
       "version": "1.3.1",

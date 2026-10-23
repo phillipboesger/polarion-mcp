@@ -102,15 +102,31 @@ jobs:
 
           echo "Release ZIP verified: production install succeeds, server starts, MCP initialize works."
 
+      - name: Pack Claude Desktop Extension
+        id: mcpb
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          STAGE="${RUNNER_TEMP}/polarion-mcp-mcpb"
+          BUNDLE="${RUNNER_TEMP}/polarion-mcp-v${VERSION}.mcpb"
+          rm -rf "${STAGE}"
+          mkdir -p "${STAGE}"
+          npm prune --omit=dev
+          cp -r build node_modules package.json "${STAGE}/"
+          cp mcpb/manifest.json "${STAGE}/manifest.json"
+          npx --yes @anthropic-ai/mcpb pack "${STAGE}" "${BUNDLE}"
+          echo "bundle=${BUNDLE}" >> "$GITHUB_OUTPUT"
+          ls -lh "${BUNDLE}"
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" --clobber
+            gh release upload "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" "${{ steps.mcpb.outputs.bundle }}" --clobber
           else
-            gh release create "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" \
+            gh release create "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" "${{ steps.mcpb.outputs.bundle }}" \
               --title "${GITHUB_REF_NAME}" \
               --generate-notes
           fi
