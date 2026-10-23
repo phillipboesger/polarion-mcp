@@ -137,6 +137,43 @@ jobs:
           path: ${{ steps.pack.outputs.zip }}
           if-no-files-found: error
 
+  e2e:
+    name: End-to-end conformance
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: Run conformance suite
+        run: npm run test:e2e
+
+      - name: MCP Inspector CLI tools/list against stdio
+        run: npx --yes @modelcontextprotocol/inspector --cli node build/index.js --method tools/list
+        env:
+          API_BASE_URL: https://polarion.example.com/polarion/rest/v1
+          BEARER_TOKEN: ci-inspector-pat
+
+      - name: Build image
+        run: docker build -t polarion-mcp:e2e .
+
+      - name: Initialize MCP over image stdio
+        run: |
+          INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}}}'
+          printf '%s\n' "$INIT" | timeout 30 docker run -i --rm -e API_BASE_URL=https://polarion.example.com/polarion/rest/v1 -e BEARER_TOKEN=ci-docker-pat polarion-mcp:e2e node build/index.js | grep -q '"serverInfo"'
+
   npm-package:
     name: Verify npm package installation
     needs: build-and-test
