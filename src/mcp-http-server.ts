@@ -84,6 +84,11 @@ export function patFailureRateLimitKey(ip: string, token: string): string {
   return `${ipKeyGenerator(ip)}:${tokenScope(token)}`;
 }
 
+/** Hashes the normalized caller address and OAuth client id to keep limiter keys fixed-size. */
+export function tokenRateLimitKey(ip: string, clientId: string): string {
+  return createHash('sha256').update(`${ipKeyGenerator(ip)}\0${clientId}`).digest('hex');
+}
+
 /**
  * @param value - A redirect URI from an authorize request.
  * @returns True if it is exactly a Custom GPT callback,
@@ -202,13 +207,23 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     optionsSuccessStatus: 204,
   });
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const path = req.path.replace(/\/+$/, '') || '/';
+    const path = req.path.toLowerCase().replace(/\/+$/, '') || '/';
     const isOAuthMetadata = path.startsWith('/.well-known/oauth-protected-resource');
     if (!ORIGIN_PROTECTED_PATHS.has(path) && !isOAuthMetadata) return next();
 
     const origin = req.get('origin');
     if (!origin) return next();
-    if (!allowedOrigins.includes(origin)) {
+    const requestHost = req.get('host')?.toLowerCase();
+    const requestHostIsConfigured = Boolean(requestHost && allowedHosts?.some(host => host.toLowerCase() === requestHost));
+    let configuredRequestOrigin: string | undefined;
+    if (requestHostIsConfigured) {
+      try {
+        configuredRequestOrigin = new URL(`${req.protocol}://${requestHost}`).origin;
+      } catch {
+        // A malformed configured Host is not an origin to trust.
+      }
+    }
+    if (!allowedOrigins.includes(origin) && origin !== publicUrl?.origin && origin !== configuredRequestOrigin) {
       if (path === MCP_PATH) res.status(403).json(jsonRpcError('Origin is not allowed'));
       else res.status(403).json({ error: 'origin_not_allowed' });
       return;
@@ -317,6 +332,15 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       next();
     });
 
+    const tokenIpLimit = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: 500,
+      keyGenerator: req => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? ''),
+      validate: { keyGeneratorIpFallback: false },
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests from this IP' }),
+    });
     // The SDK token endpoint only reads client credentials from the body;
     // move HTTP Basic credentials there so client_secret_basic clients work.
     // The SDK's own urlencoded parser then sees a consumed stream and keeps this body.
@@ -334,6 +358,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       }
       next();
     });
+    // The preceding shim parses the body so this per-IP ceiling bounds the
+    // number of distinct client-id buckets one source can create.
+    app.post('/token', tokenIpLimit);
     // The SDK metadata omits Basic even though the token shim supports it; augment its JSON response.
     app.use('/.well-known/oauth-authorization-server', (_req: Request, res: Response, next: NextFunction) => {
       const sendJson = res.json.bind(res);
@@ -367,7 +394,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
           rateLimit: {
             windowMs: 15 * 60 * 1000,
             limit: 50,
-            keyGenerator: req => String(req.body?.client_id || ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? '')),
+            keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id ?? '')),
             validate: { keyGeneratorIpFallback: false },
             standardHeaders: true,
             legacyHeaders: false,
@@ -698,11 +725,20 @@ function mountCustomGpt(
   const tokenLimit = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 50,
-    keyGenerator: req => String(req.body?.client_id || gptClient.clientId),
+    keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id || gptClient.clientId)),
     validate: { keyGeneratorIpFallback: false },
     standardHeaders: true,
     legacyHeaders: false,
     handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests' }),
+  });
+  const tokenIpLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 500,
+    keyGenerator: req => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? ''),
+    validate: { keyGeneratorIpFallback: false },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests from this IP' }),
   });
 
   app.get(GPT_AUTHORIZE_PATH, authorizeLimit, (req: Request, res: Response) => {
@@ -724,7 +760,7 @@ function mountCustomGpt(
     oauth.authorizeGpt(gptClient.clientId, redirectUri, param('state'), res);
   });
 
-  app.post(GPT_TOKEN_PATH, tokenLimit, express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+  app.post(GPT_TOKEN_PATH, express.urlencoded({ extended: false }), tokenIpLimit, tokenLimit, async (req: Request, res: Response) => {
     res.set('Cache-Control', 'no-store');
     const body = (req.body ?? {}) as Record<string, string | undefined>;
     const credentials = basicCredentials(req.get('authorization')) ?? { clientId: body.client_id ?? '', clientSecret: body.client_secret ?? '' };
@@ -833,7 +869,7 @@ export function parseTrustProxy(value: string | undefined): string | number | un
  *
  * @returns The underlying Node HTTP server once it is listening.
  */
-export function startMcpHttpServer(): HttpServer {
+export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } = {}): HttpServer {
   const port = Number(process.env.MCP_HTTP_PORT || process.env.PORT || process.env.HTTP_PORT || 3000);
   const allowedHosts = (process.env.MCP_ALLOWED_HOSTS || '')
     .split(',')
@@ -851,6 +887,9 @@ export function startMcpHttpServer(): HttpServer {
     : undefined;
 
   const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+  if (publicUrl && trustProxy === undefined) {
+    (options.logger ?? console).warn('[SECURITY WARNING] MCP_PUBLIC_URL is set while TRUST_PROXY is unset. Behind a reverse proxy, rate limits see one shared IP and can lock out users; set TRUST_PROXY to the trusted proxy hop count or address.');
+  }
   const idleMinutes = Number(process.env.MCP_SESSION_IDLE_MINUTES);
   const sessionIdleMs = idleMinutes > 0 ? idleMinutes * 60_000 : undefined;
   const maxSessions = Number(process.env.MCP_MAX_SESSIONS) > 0 ? Number(process.env.MCP_MAX_SESSIONS) : undefined;

@@ -483,6 +483,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
       && normalizeResource(params.resource.href) !== normalizeResource(this.resourceAudience)) {
       throw new InvalidRequestError('The requested resource does not match this MCP server');
     }
+    const supportedScopes = params.scopes?.filter(scope => scope === POLARION_SCOPE) ?? [];
     this.beginLogin(
       {
         flow: 'mcp',
@@ -492,7 +493,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
         state: params.state,
         codeChallenge: params.codeChallenge,
         // The SDK passes [] when the client asks for no scope.
-        scopes: params.scopes?.length ? params.scopes.filter(scope => scope === POLARION_SCOPE) : [POLARION_SCOPE],
+        scopes: supportedScopes.length ? supportedScopes : [POLARION_SCOPE],
         resource: params.resource?.href,
       },
       res
@@ -683,6 +684,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    *   a scope sent with the refresh request is ignored.
    */
   async refresh(clientId: string, refreshToken: string): Promise<OAuthTokens> {
+    // Rotation is stateless: an older refresh token remains usable until its own exp (within the 90-day family cap).
+    // Detecting reuse and revoking prior tokens would require server-side token-family state.
     const entry = this.sealer.open<RefreshPayload>('r', refreshToken);
     const now = Math.floor(Date.now() / 1000);
     if (!entry || entry.c !== clientId || (this.resourceAudience !== undefined && entry.aud !== this.resourceAudience)

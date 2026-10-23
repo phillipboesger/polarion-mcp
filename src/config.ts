@@ -141,10 +141,10 @@ export function callerCacheScope(): string {
 
 /**
  * @param token - A Polarion token, if any.
- * @returns A short, stable, non-reversible id of it.
+ * @returns A stable, non-reversible 128-bit cache identifier.
  */
 export function tokenScope(token: string | undefined): string {
-  return token ? createHash('sha256').update(token).digest('hex').slice(0, 16) : 'no-token';
+  return token ? createHash('sha256').update(token).digest('hex').slice(0, 32) : 'no-token';
 }
 
 /**

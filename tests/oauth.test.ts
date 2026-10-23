@@ -220,6 +220,15 @@ test("authorization drops requested scopes that the server does not support", as
   }
 })
 
+test("an unknown-only requested scope falls back to the supported default", async () => {
+  const { base, stop } = await startApp()
+  try {
+    assert.equal((await loginTokens(base, "unknown.scope")).scope, "polarion")
+  } finally {
+    await stop()
+  }
+})
+
 test("the login page cannot be framed, so its return-host warning cannot be hidden", async () => {
   const { base, stop } = await startApp()
   try {

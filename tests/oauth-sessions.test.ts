@@ -257,6 +257,22 @@ test("refresh rotates the refresh token and each old token keeps its own expiry"
   }
 })
 
+test("a rotated refresh token remains usable until its own expiry", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, 3600)
+  try {
+    const { client, tokens } = await login(base, pat)
+    const first = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(first.status, 200)
+    const rotated = (await first.json()) as Tokens
+    const replayedOld = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(replayedOld.status, 200)
+    assert.notEqual(((await replayedOld.json()) as Tokens).refresh_token, rotated.refresh_token)
+  } finally {
+    await stop()
+  }
+})
+
 test("a PAT revoked in Polarion ends the session at the next refresh with invalid_grant", async () => {
   const pat = freshPat()
   const { base, stop } = await startApp()
@@ -610,7 +626,7 @@ test("the per-IP failed-PAT ceiling caps token spraying and returns JSON-RPC", a
 test("failed-PAT limiter keys contain only an IP and the truncated token hash", () => {
   const pat = "secret-pat-must-not-appear-in-rate-limit-key"
   const key = patFailureRateLimitKey("203.0.113.7", pat)
-  assert.match(key, /^203\.0\.113\.7:[a-f0-9]{16}$/)
+  assert.match(key, /^203\.0\.113\.7:[a-f0-9]{32}$/)
   assert.equal(key.includes(pat), false)
 })
 
