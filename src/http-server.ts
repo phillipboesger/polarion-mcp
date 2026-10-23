@@ -28,6 +28,7 @@ import { createRestToolsRouter, specServerUrl, type RestToolsOptions } from './r
 import { safeEqual } from './sealed.js';
 import { bearerCredential } from './utils.js';
 import type { Express } from 'express';
+import { parseMaxResponseChars } from './executor.js';
 
 export interface HttpAppOptions {
   apiKey: string;
@@ -112,7 +113,8 @@ app.use(createRestToolsRouter({
     description: 'API Key for HTTP server authentication. Configure this in your Custom GPT settings.'
   },
   unauthorizedDescription: 'Authentication failed - invalid or missing API key',
-  executeTool: options.executeTool
+  executeTool: options.executeTool,
+  maxResponseChars: parseMaxResponseChars(options.env.MCP_MAX_RESPONSE_CHARS),
 }));
 
 /**

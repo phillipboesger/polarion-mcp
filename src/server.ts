@@ -28,7 +28,7 @@ import { sanitizeInputSchema } from './utils.js';
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes } from './tools.js';
 import { enabledTools, omitOutputSchema } from './tool-filter.js';
-import { executeApiTool } from './executor.js';
+import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
 
 /**
@@ -54,7 +54,7 @@ function toolsForClient(): object[] {
   return listedTools;
 }
 
-export function createPolarionServer(): Server {
+export function createPolarionServer(options: { maxResponseChars?: number } = {}): Server {
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
@@ -88,7 +88,7 @@ export function createPolarionServer(): Server {
       console.error(`[ERROR] Unknown tool requested: ${toolName}`);
       return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
     }
-    return await executeApiTool(toolName, toolDefinition, toolArgs ?? {}, securitySchemes);
+    return await executeApiTool(toolName, toolDefinition, toolArgs ?? {}, securitySchemes, undefined, options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
   });
 
   /**

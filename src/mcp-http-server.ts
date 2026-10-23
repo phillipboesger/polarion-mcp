@@ -42,6 +42,7 @@ import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextproto
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
 import { createPolarionServer } from './server.js';
+import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
 import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
@@ -111,6 +112,8 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
  * Options for {@link createMcpHttpApp}.
  */
 export interface McpHttpAppOptions {
+  /** Maximum characters returned in tool text content. */
+  maxResponseChars?: number;
   /** Optional allow-list of Host header values enabling DNS-rebinding protection. */
   allowedHosts?: string[];
   /**
@@ -169,7 +172,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   app: express.Express;
   closeAllSessions: () => Promise<void>;
 } {
-  const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris } = options;
+  const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris, maxResponseChars } = options;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   // Parsed per route, after authentication, so anonymous callers cannot make
@@ -399,7 +402,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   if (oauth && publicUrl && gptClient) {
-    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge);
+    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
   }
 
   // Health check (no auth) for load balancers and quick verification.
@@ -482,7 +485,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer();
+      const server = createPolarionServer({ maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
@@ -545,7 +548,8 @@ function mountCustomGpt(
   oauth: PolarionOAuthProvider,
   publicUrl: URL,
   gptClient: { clientId: string; clientSecret: string },
-  bearerChallenge: (error?: string) => string
+  bearerChallenge: (error?: string) => string,
+  maxResponseChars: number
 ): void {
   // Same limits the SDK applies to its own /authorize and /token.
   const authorizeLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: true, legacyHeaders: false });
@@ -621,6 +625,7 @@ function mountCustomGpt(
       },
     },
     unauthorizedDescription: 'Not logged in, or the login expired',
+    maxResponseChars,
   }));
 }
 
@@ -689,9 +694,10 @@ export function startMcpHttpServer(): HttpServer {
   const sessionIdleMs = idleMinutes > 0 ? idleMinutes * 60_000 : undefined;
   const maxSessions = Number(process.env.MCP_MAX_SESSIONS) > 0 ? Number(process.env.MCP_MAX_SESSIONS) : undefined;
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
+  const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions,
+    allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions, maxResponseChars,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

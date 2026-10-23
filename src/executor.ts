@@ -59,6 +59,17 @@ function nameMapFor(definition: McpToolDefinition): Record<string, string> {
 // imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
 export { sendWithRetry };
 
+export const DEFAULT_MAX_RESPONSE_CHARS = 100_000;
+const RESPONSE_TRUNCATION_NOTICE = '\n[Response truncated. Use fields and page_size_ to shrink the response.]';
+
+/** Parses the response text cap from the entry-point environment. */
+export function parseMaxResponseChars(value: string | undefined): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= RESPONSE_TRUNCATION_NOTICE.length + 1
+    ? parsed
+    : DEFAULT_MAX_RESPONSE_CHARS;
+}
+
 /**
  * Builds the enum-guard targets for a Work Item write tool, or `null` if
  * `definition` isn't one of the (small, explicit) set of tools the guard
@@ -538,7 +549,8 @@ export async function executeApiTool(
   definition: McpToolDefinition,
   toolArgs: JsonObject,
   allSecuritySchemes: Record<string, any>,
-  sendOpts?: SendWithRetryOpts
+  sendOpts?: SendWithRetryOpts,
+  maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS
 ): Promise<CallToolResult> {
   try {
     // ===== STEP 0: Strip dry_run before validation =====
@@ -992,8 +1004,7 @@ export async function executeApiTool(
         // field so the model gets readable Markdown alongside the raw HTML, without
         // losing or altering anything in the original response.
         const renderedData = renderRichTextFieldsAsMarkdown(response.data);
-        // Pretty-print JSON with 2-space indentation
-        responseText = JSON.stringify(renderedData, null, 2);
+        responseText = JSON.stringify(renderedData);
         // Safe: this branch already checked `response.data` is a non-null object,
         // and renderRichTextFieldsAsMarkdown preserves the top-level shape.
         structuredContent = renderedData as JsonObject;
@@ -1032,11 +1043,15 @@ export async function executeApiTool(
     // non-JSON answer to a successful call has none to offer, so it gets an empty
     // object, which the advertised (lenient) schema accepts. isError would
     // report a write that worked as failed and invite a duplicating retry.
+    const fullResponseText = `API Response (Status: ${response.status}):\n${responseText}`;
+    const boundedResponseText = fullResponseText.length > maxResponseChars
+      ? fullResponseText.slice(0, Math.max(0, maxResponseChars - RESPONSE_TRUNCATION_NOTICE.length)) + RESPONSE_TRUNCATION_NOTICE
+      : fullResponseText;
     return {
       content: [
         {
           type: "text",
-          text: `API Response (Status: ${response.status}):\n${responseText}`
+          text: boundedResponseText
         }
       ],
       ...(definition.outputSchema ? { structuredContent: structuredContent ?? {} } : {}),

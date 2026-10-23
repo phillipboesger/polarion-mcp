@@ -73,6 +73,8 @@ export interface RestToolsOptions {
   /** What a 401 means, as documented in the specs. */
   unauthorizedDescription: string;
   executeTool?: typeof executeApiTool;
+  /** Maximum characters returned in a tool's text content. */
+  maxResponseChars?: number;
 }
 
 /**
@@ -232,7 +234,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       }
 
       // Execute the tool
-      const result = await executeTool(toolName, toolDefinition, toolArgs, securitySchemes);
+      const result = await executeTool(toolName, toolDefinition, toolArgs, securitySchemes, undefined, options.maxResponseChars);
 
       // Extract text content from MCP response format
       const textContent = result.content
