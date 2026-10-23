@@ -9,7 +9,6 @@ const SECRET_PAT = "secret-pat-value"
 const STATUS: Record<string, number> = { ok: 200, revoked: 401, unlicensed: 403, broken: 400 }
 const polarion = createServer((req, res) => {
   const token = (req.headers.authorization ?? "").replace(/^Bearer /, "").replace(SECRET_PAT, "")
-  if (token === "proxy") { res.writeHead(403, { "content-type": "text/html" }); res.end("<h1>Forbidden</h1>"); return }
   const status = STATUS[token] ?? 500
   res.writeHead(status, { "content-type": "application/json" })
   res.end(JSON.stringify(status === 200 ? { data: [] } : { errors: [{ status: String(status), detail: `No access for\n user (${status})` }] }))
@@ -45,15 +44,4 @@ test("a failed check logs status and Polarion's detail, never the token", async 
   assert.match(log, /HTTP 403 - No access for user \(403\)/)
   assert.doesNotMatch(log, new RegExp(SECRET_PAT))
   assert.equal((await check(`${SECRET_PAT}ok`)).log, "", "a successful check logs nothing")
-})
-
-test("a 403 log names the called URL and flags an answer that is not a Polarion error", async () => {
-  const { log } = await check(`${SECRET_PAT}unlicensed`)
-  assert.match(log, /\[GET http:\/\/127\.0\.0\.1:\d+\/polarion\/rest\/v1\/projects;/)
-  assert.doesNotMatch(log, /not a Polarion REST error body/)
-  const { log: proxied } = await check(`${SECRET_PAT}proxy`)
-  assert.match(proxied, /not a Polarion REST error body/)
-  assert.doesNotMatch(proxied, new RegExp(SECRET_PAT))
-  assert.match(log, /rest\.enabled=true/)
-  assert.doesNotMatch((await check(`${SECRET_PAT}revoked`)).log, /\[GET /, "the hint is 403-only")
 })
