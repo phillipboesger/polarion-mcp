@@ -8,7 +8,7 @@ import { resolve } from "node:path"
 import https from "node:https"
 
 import { createMcpHttpApp } from "../src/mcp-http-server.js"
-import { createCimdMetadataFetcher, fetchClientMetadataDocument } from "../src/cimd.js"
+import { createCimdMetadataFetcher, fetchClientMetadataDocument, isPublicCimdAddress } from "../src/cimd.js"
 
 const CERT = readFileSync(resolve("tests/fixtures/cimd-test-cert.pem"))
 const KEY = readFileSync(resolve("tests/fixtures/cimd-test-key.pem"))
@@ -215,6 +215,85 @@ test("CIMD SSRF guard rejects special addresses and every private DNS answer", a
 
   for (const host of ["2130706433", "0x7f000001", "0177.0.0.1", "127.1"]) {
     await assert.rejects(fetchClientMetadataDocument(`https://${host}/client.json`), /non-public address/i, host)
+  }
+})
+
+test("CIMD SSRF guard rejects additional special-purpose IPv4 and IPv6 CIDRs", () => {
+  const blocked = [
+    "198.18.0.1", "192.31.196.1", "192.52.193.1", "192.175.48.1", "192.0.0.1",
+    "192.0.2.1", "198.51.100.1", "203.0.113.1", "240.0.0.1",
+    "64:ff9b:1::1", "100::1", "2001:10::1", "2001:20::1", "5f00::1",
+    "2620:4f:8000::1", "3fff::1", "2001:db8::1",
+  ]
+  for (const address of blocked) assert.equal(isPublicCimdAddress(address), false, address)
+  for (const address of blocked.slice(0, 9)) {
+    const mapped = `::ffff:${address}`
+    assert.equal(isPublicCimdAddress(mapped), false, mapped)
+  }
+})
+
+test("CIMD fetches cap global concurrency, deduplicate URLs, and cache failures", async () => {
+  let requests = 0
+  let active = 0
+  let maxActive = 0
+  const local = await startCimdServer((request, response) => {
+    requests++
+    active++
+    maxActive = Math.max(maxActive, active)
+    const clientId = `https://127.0.0.1${request.url}`
+    setTimeout(() => {
+      active--
+      void readClientMetadata(request, response, metadata(clientId))
+    }, 50)
+  })
+  const fetcher = createCimdMetadataFetcher({ testOnlyAllowPrivateIps: true, testOnlyCa: CERT, testOnlyConnectPort: local.port })
+  try {
+    const distinct = await Promise.allSettled(Array.from({ length: 50 }, (_, index) => fetcher(`https://127.0.0.1/client-${index}.json`)))
+    assert.ok(maxActive <= 8, `observed ${maxActive} active fetches`)
+    assert.equal(distinct.filter(result => result.status === "fulfilled").length, 8)
+    assert.equal(requests, 8)
+
+    requests = 0
+    const same = await Promise.all(Array.from({ length: 20 }, () => fetcher("https://127.0.0.1/shared.json")))
+    assert.equal(same.length, 20)
+    assert.equal(requests, 1, "concurrent calls for one URL share an in-flight request")
+  } finally {
+    await local.close()
+  }
+
+  let failures = 0
+  const failingServer = await startCimdServer((_request, response) => {
+    failures++
+    response.writeHead(503, { "content-type": "application/json" })
+    response.end("{}")
+  })
+  const failingFetcher = createCimdMetadataFetcher({ testOnlyAllowPrivateIps: true, testOnlyCa: CERT, testOnlyConnectPort: failingServer.port })
+  try {
+    await assert.rejects(failingFetcher(CLIENT_ID))
+    await assert.rejects(failingFetcher(CLIENT_ID))
+    assert.equal(failures, 1, "failed fetch is negatively cached")
+  } finally {
+    await failingServer.close()
+  }
+})
+
+test("CIMD no-store metadata is fetched once during loopback authorize precheck and SDK handling", async () => {
+  let requests = 0
+  const callback = "http://localhost:8787/callback"
+  const local = await startCimdServer((request, response) => {
+    requests++
+    void readClientMetadata(request, response, metadata(CLIENT_ID, [callback]), { "cache-control": "no-store" })
+  })
+  const fetcher = createCimdMetadataFetcher({ testOnlyAllowPrivateIps: true, testOnlyCa: CERT, testOnlyConnectPort: local.port })
+  const app = await startApp({ enabled: true, fetcher, allowedRedirectUris: [callback] })
+  try {
+    const response = await fetch(authorizationUrl(app.base, CLIENT_ID, callback, "v".repeat(43)), { redirect: "manual" })
+    assert.equal(response.status, 200)
+    await response.arrayBuffer()
+    assert.equal(requests, 1)
+  } finally {
+    await app.close()
+    await local.close()
   }
 })
 

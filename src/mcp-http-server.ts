@@ -45,7 +45,7 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, reque
 import { createPolarionServer } from './server.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
 import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
-import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { fetchClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
@@ -443,7 +443,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
           res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri must exactly match the CIMD document' });
           return;
         }
-        next();
+        withCimdClientMemo(client, next);
       });
     }
     app.use(
