@@ -44,6 +44,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test:live": "node --test --test-concurrency=1 tests/live/*.test.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:docs:strict": "node scripts/check-docs.mjs --strict",
     "prepare": "node -e \"const fs=require('fs'); if (fs.existsSync('tsconfig.json') && fs.existsSync('src') && fs.existsSync('node_modules/.bin/tsc')) require('child_process').execSync('npm run build', { stdio: 'inherit' })\"",
     "download-spec": "curl -fsSL ${BEARER_TOKEN:+-H \"Authorization: Bearer ${BEARER_TOKEN}\"} \"${SPEC_URL:-https://testdrive.polarion.com/polarion/sdk/doc/rest/polarionrest.json}\" -o openapi.json",
     "fix-sparse-fields": "node scripts/fix-sparse-fields.cjs",
