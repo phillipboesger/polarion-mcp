@@ -1,25 +1,47 @@
 # ChatGPT connectors / Apps
 
-Minimal setup information from [clients.json](../clients.json), verified 2026-10-23.
-
-> **Unverified:** The client setup details below are not verified against current official client documentation. Check the linked sources before deployment.
+> **Unverified (check the vendor docs):** client setup details are not verified against current official documentation.
 
 ## Prerequisites
 
-- ChatGPT connectors / Apps configured for streamable-http, sse.
-- A remote Polarion MCP server URL or a local stdio installation, plus a PAT when required by the selected authentication mode.
+- A reachable Polarion MCP server at `https://YOUR-SERVER/mcp`.
+- A Polarion personal access token (PAT) for the supported bearer or OAuth login flow, where applicable.
+- Configure server environment variables using [configuration](../configuration.md); this guide does not duplicate the environment variable reference.
 
-## Setup
-
-Transport: streamable-http, sse. Authentication modes in the manifest: oauth-dcr, cimd, preregistered-client.
+## Configuration
 
 ```text
 Create a custom MCP app with server URL https://YOUR-SERVER/mcp; select OAuth and configure the server authorization metadata.
 ```
 
-## Redirect URI
+This is the exact client snippet recorded in [clients.json](../clients.json). It is unverified (check the vendor docs).
 
-- **Unverified:** `ChatGPT provides callback URI in the app setup/authorization metadata; fixed URI not verified`
+## Authentication
+
+**OAuth:** where supported by this client, register or discover the OAuth client, allow the exact callback below, then enter the Polarion PAT at the Polarion login page. Server OAuth settings are in [configuration](../configuration.md).
+
+## OAuth redirect allowlist
+
+Set `MCP_ALLOWED_REDIRECT_PRESETS` to: chatgpt (unverified, and it currently expands to no fixed URI); use MCP_ALLOWED_REDIRECT_PREFIXES with the exact callback URI.. Available preset names in server code are `claude`, `chatgpt`, `vscode`, `cursor`, `copilot-studio`, `gemini`, and `loopback`. Presets without a verified fixed URI add no fixed callback. For generated callbacks, put the exact URI supplied by the client in `MCP_ALLOWED_REDIRECT_PREFIXES`. The `loopback` preset permits loopback callbacks. See [configuration](../configuration.md).
+
+## Recommended tools
+
+Use the narrow **work-items and documents** selection: set the endpoint to `https://YOUR-SERVER/mcp/work-items,documents`, or send `X-MCP-Toolsets: work-items,documents` with requests to `/mcp`. Selectors only narrow the server-configured tools. Valid toolsets: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`.
+
+## Troubleshooting
+
+- **MCP request returns 401** -> the bearer token is missing or Polarion rejects it -> check the Authorization header and use a valid Polarion PAT; the server validates it with Polarion before opening the session.
+- **OAuth registration or login is refused** -> the callback is not in the server allowlist -> configure the matching preset or exact URI in `MCP_ALLOWED_REDIRECT_PREFIXES`; see [configuration](../configuration.md).
+- **Toolset selector returns HTTP 400** -> the selector is empty or has an unknown name -> use one or more valid names listed above.
+
+Client-specific notes:
+
+- ChatGPT custom MCP apps are remote only; OAuth requires refresh-token support for durable access.
+- Static API key auth is not a supported custom MCP authentication option in current docs.
+
+## Verify the connection
+
+Refresh or inspect the client server tools and confirm `tools/list` returns Polarion tools from the selected toolset. For stdio, use the client connection check and confirm its `tools/list` result.
 
 ## Sources
 
