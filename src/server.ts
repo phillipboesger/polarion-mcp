@@ -30,7 +30,7 @@ import { securitySchemes, toolDefinitionMap } from './tools.js';
 import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
 import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS, capToolResponseText } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
-import { listVirtualTools, type VirtualTool } from './virtual-tools.js';
+import { listVirtualTools, discoverVirtualTools, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
 import { API_BASE_URL, getBearerToken, tokenScope } from './config.js';
 import { parseToolFilter } from './tool-filter.js';
@@ -127,7 +127,12 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     try { return options.telemetry.onSpanStart({ name: 'polarion.tools.call', correlationId, tool: toolName }); } catch { return undefined; }
   })();
     const execute = async (): Promise<void> => {
-      if (virtual) {
+      if (virtual?.name === 'call_tool') {
+        const target = String(args.name ?? '');
+        if (!options.clientTools.has(target)) result = { content: [{ type: 'text', text: `Error: Unknown or filtered tool: ${target}` }], isError: true };
+        else result = await callToolPipeline(target, (args.arguments ?? {}) as Record<string, unknown>, options);
+        outcome = result.isError ? 'error' : 'success';
+      } else if (virtual) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
         result = await virtual.handler(callArgs, {
           callPolarionTool: async (name, callArgs) => {
@@ -279,7 +284,9 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     toolsets: options.filter?.toolsets,
   };
   const clientTools = filterTools(enabledTools, options.filter ?? {}).tools;
-  const virtualTools = listVirtualTools(filter);
+  const mode = process.env.MCP_MODE ?? 'full';
+  if (mode !== 'full' && mode !== 'discover') throw new Error('MCP_MODE must be full or discover');
+  const virtualTools = mode === 'discover' ? discoverVirtualTools(clientTools) : listVirtualTools(filter);
   const allNames = new Set(clientTools.keys());
   for (const tool of virtualTools) {
     if (allNames.has(tool.name)) throw new Error(`Virtual tool conflicts with generated tool: ${tool.name}`);
@@ -288,7 +295,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   const knownNames = new Set([...toolDefinitionMap.keys(), ...listVirtualTools().map(tool => tool.name)]);
   const unknown = (filter.allow ?? []).filter(name => !knownNames.has(name));
   if (unknown.length > 0) logger.warn(`[WARN] MCP_TOOLS names unknown tools, ignored: ${unknown.join(', ')}`);
-  if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
+    if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
@@ -310,7 +317,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Sanitizes each tool's input schema so property names are MCP-safe; the
    * executor maps the sanitized names back to the originals.
    */
-  const listedTools = [
+  const listedTools = mode === 'discover' ? virtualTools.map(def => ({ name: def.name, title: def.title, description: def.description, inputSchema: sanitizeInputSchema(def.inputSchema), annotations: def.annotations })) : [
     ...toolsForClient(clientTools),
     ...virtualTools.map(def => ({
       name: def.name,
