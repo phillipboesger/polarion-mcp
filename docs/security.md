@@ -1,43 +1,39 @@
 # Security
 
-## Secrets and Tokens
+## Security model
 
-- Store BEARER_TOKEN and HTTP_API_KEY in environment variables only.
-- Do not commit .env files or tokens to the repository.
-- Use least-privilege tokens for Polarion access.
-- Prefer a dedicated Personal Access Token for this server instead of reusing a broad administrator token.
-- If the token is generated from Polarion user settings, copy it once and store it immediately because some deployments do not show it again.
+The REST HTTP wrapper (`build/http-server.js`) authenticates callers with `HTTP_API_KEY` and makes Polarion calls using the deployment's `BEARER_TOKEN`. The Streamable HTTP MCP server uses each caller's Polarion PAT directly, or a sealed OAuth token containing that PAT. Polarion remains the authorization boundary for tool operations. Server-side tool filters and toolsets reduce the callable surface. OAuth tokens and client credentials are sealed statelessly; in-memory login state, authorization codes, and MCP sessions are not shared between instances.
 
-## MCP Client Hygiene
+## Secrets and tokens
 
-- Keep MCP client config files in user-scoped or ignored locations.
-- Do not paste Polarion bearer tokens into prompts, issues, or screenshots.
-- Use separate MCP entries per environment so dev and production credentials do not get mixed.
+- Keep Polarion PATs, `HTTP_API_KEY`, OAuth client secrets, and `MCP_TOKEN_SECRET` in environment secret storage. Do not commit them or include them in logs, prompts, issues, or screenshots.
+- Use least-privilege PATs and a dedicated Polarion identity where possible.
+- `MCP_TOKEN_SECRET` must be at least 32 characters and stable across restarts and instances. If it is unset, a random key is generated on startup, invalidating logins after restart.
+- Rotate `MCP_TOKEN_SECRET` by setting the new key and listing the old key in `MCP_TOKEN_SECRET_PREVIOUS`. Previous keys are used to open old sealed values; newly issued values use the current key. Remove the old key after clients have renewed.
+- Changing the secret without a previous-key entry invalidates OAuth tokens and requires users to sign in again. Changing the public resource audience also requires a new login.
 
-## REST Wrapper Protection (http-server.js)
+## OAuth and revocation
 
-- HTTP_API_KEY applies to the REST wrapper (`build/http-server.js`) only. There it is required for all endpoints except /health and the OpenAPI specs.
-- Generate a long random key (see scripts/generate-api-key.sh).
-- Treat the HTTP API key as a second security boundary. It protects the wrapper service, while BEARER_TOKEN protects access to Polarion.
+Access tokens last one hour. Refresh tokens last 14 days by default, slide forward when used, and have a 90-day family cap. Refresh tokens are stateless: a previously issued refresh token remains valid until its own expiry, including after a later refresh. The server has no token-family revocation store or OAuth revocation endpoint. Revoking the backing PAT in Polarion prevents successful renewal and access. Tokens are bound to the protected resource URL under RFC 8707.
 
-## MCP HTTP Server Protection (mcp-http-server.js)
+Existing deployments upgrading to resource-bound tokens require each user to authenticate once again after the upgrade.
 
-The Streamable HTTP server does not use HTTP_API_KEY. Every request carries the caller's own Polarion PAT, directly or inside a sealed OAuth access token, and Polarion authorizes each call.
+Set `MCP_ALLOWED_REDIRECT_PREFIXES` or `MCP_ALLOWED_REDIRECT_PRESETS` when OAuth login is enabled. Without an allowlist, dynamically registered OAuth clients can use arbitrary callback URIs. Preset names are `claude`, `chatgpt`, `vscode`, `cursor`, `copilot-studio`, `gemini`, and `loopback`. Callback entries ending in `/` are prefixes; other entries are exact matches.
 
-- Set MCP_ALLOWED_REDIRECT_PREFIXES when the OAuth login is enabled. Client registration is open, so without it anyone can register their own callback and send a user a genuine login link on your domain; whoever pastes their PAT there hands the resulting access to that callback. The login page names the host the login returns to, but an allowlist is the real protection.
-- Behind a reverse proxy, set TRUST_PROXY (e.g. `loopback`) so the login, token and registration rate limits count per client instead of per proxy.
-- A Polarion PAT sent directly is checked with Polarion before it may open a session (remembered for one minute), and failed checks are rate limited per client address. An invented token therefore cannot fill the session table or push real users out.
-- Narrow the tool surface server-side with MCP_TOOLS and/or MCP_READ_ONLY. A filtered tool cannot be called at all, which is a stronger guard against prompt injection than switching tools off in the client.
+Client ID Metadata Documents are disabled by default. Set `MCP_CIMD_ENABLED=true` only when needed. When enabled, the server restricts identifiers to HTTPS URLs (or loopback), blocks private and special-use IP destinations, checks DNS results before connecting, pins the validated addresses to the connection, and refuses metadata-fetch redirects to mitigate SSRF and DNS rebinding. CIMD clients must use loopback redirects and the exact callback URL listed in their metadata document.
 
-## TLS Handling
+## Browser origins and DNS rebinding
 
-- TLS verification is enabled by default.
-- Use NODE_TLS_REJECT_UNAUTHORIZED=0 only for trusted internal servers.
+`MCP_ALLOWED_HOSTS` enables Host validation against DNS rebinding. `MCP_ALLOWED_ORIGINS` controls browser Origin headers on MCP and OAuth paths; the `MCP_PUBLIC_URL` origin is always allowed. Protected endpoint path matching is case-insensitive. Requests without an Origin header are allowed, so these checks are browser protections, not caller authentication. The REST wrapper has its own `HTTP_CORS_ORIGINS` list and still requires its API key.
 
-## Logging
+## Rate limits and reverse proxies
 
-- Logs go to the process's stdout/stderr (stderr only in stdio mode); never log secrets.
+Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts (configurable with `MCP_RATE_LIMIT_TOKEN_IP`); successful requests do not count toward token failure ceilings. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour by default (`MCP_RATE_LIMIT_REGISTER`). Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
+
+## REST wrapper and TLS
+
+`HTTP_API_KEY` protects the REST wrapper; `BEARER_TOKEN` is the Polarion credential it uses. Keep TLS verification enabled. Setting `NODE_TLS_REJECT_UNAUTHORIZED=0` disables certificate validation and exposes credentials to interception.
 
 ## read_when
 
-- Use this guide when reviewing security posture or handling credentials.
+- Use this guide when reviewing deployment security or handling credentials.

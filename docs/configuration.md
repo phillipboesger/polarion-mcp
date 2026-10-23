@@ -1,67 +1,79 @@
 # Configuration
 
-## Environment Files
+## Environment variables
 
-- Copy .env.example to .env and fill in local values.
-- Do not commit .env files.
+The server loads `.env` in local runs. Secret values belong in the deployment's secret manager or environment, never in committed files.
 
-## Core Variables
+| Variable | Default | Read by | Secret? | Purpose |
+|---|---|---|---|---|
+| `API_BASE_URL` | `https://polarion.example.com/polarion/rest/v1` | `src/config.ts` at import | No | Polarion REST API base URL. Set this to your instance. |
+| `BEARER_TOKEN` | Unset | `src/config.ts` when making calls | Yes | Polarion PAT for stdio and REST HTTP mode; fallback when a scheme-specific credential is absent. Streamable HTTP uses each request's PAT instead. |
+| `HTTP_PORT` | `3000` | `src/http-server.ts` startup | No | REST wrapper port; `PORT` takes precedence. |
+| `PORT` | Platform supplied, otherwise ignored | `src/http-server.ts`, `src/mcp-http-server.ts` | No | Hosting platform port. Takes precedence over `HTTP_PORT`. |
+| `HTTP_API_KEY` | Unset, required by REST HTTP mode | `src/http-server.ts` startup | Yes | REST wrapper bearer key. Does not apply to Streamable HTTP MCP. |
+| `PUBLIC_URL` | `RENDER_EXTERNAL_URL`, otherwise request host fallback | `src/rest-api.ts` | No | Public URL advertised in REST OpenAPI specs. Use a trusted URL to prevent a forged Host header changing generated specs. |
+| `RENDER_EXTERNAL_URL` | Unset | `src/rest-api.ts` | No | Render public URL fallback when `PUBLIC_URL` is unset. |
+| `HTTP_CORS_ORIGINS` | `https://chat.openai.com,https://chatgpt.com` | `src/http-server.ts` | No | Comma-separated allowed browser origins for the REST wrapper. CORS does not replace API-key authentication. |
+| `MCP_HTTP_PORT` | `PORT`, then `HTTP_PORT`, then `3000` | `src/mcp-http-server.ts` startup | No | Streamable HTTP MCP port. |
+| `MCP_HTTP_HOST` | `0.0.0.0` | `src/mcp-http-server.ts` startup | No | Bind address. Use `127.0.0.1` behind a local TLS proxy. |
+| `MCP_PUBLIC_URL` | Unset | `src/mcp-http-server.ts` startup | No | Public HTTPS origin that enables OAuth login. Must be an origin without a path. Also defines the token's protected-resource audience. |
+| `MCP_TOKEN_SECRET` | Random per process if unset | `src/mcp-http-server.ts`, `src/sealed.ts` | Yes | Secret of at least 32 characters used to seal OAuth client and token data. Keep stable across restarts and instances. |
+| `MCP_TOKEN_SECRET_PREVIOUS` | Empty | `src/mcp-http-server.ts`, `src/sealed.ts` | Yes | Comma-separated prior sealing keys tried for opening existing values during key rotation. New values use `MCP_TOKEN_SECRET`. Remove old keys after clients have renewed. |
+| `GPT_CLIENT_ID` | Unset | `src/mcp-http-server.ts` startup | Yes | Enables the preconfigured Custom GPT OAuth flow when paired with `GPT_CLIENT_SECRET` and `MCP_PUBLIC_URL`. |
+| `GPT_CLIENT_SECRET` | Unset | `src/mcp-http-server.ts` startup | Yes | Custom GPT OAuth client secret. |
+| `MCP_ALLOWED_HOSTS` | Empty, no Host allowlist | `src/mcp-http-server.ts` startup | No | Comma-separated Host header allowlist for DNS-rebinding protection. |
+| `MCP_ALLOWED_ORIGINS` | Claude.ai and ChatGPT origins | `src/mcp-http-server.ts` startup | No | Comma-separated browser origin allowlist for MCP and OAuth routes. The `MCP_PUBLIC_URL` origin is always allowed. |
+| `MCP_ALLOWED_REDIRECT_PREFIXES` | Empty, registration allows redirect URIs | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Comma-separated exact redirect URI allowlist; entries ending in `/` are prefixes. Configure this or named presets for production OAuth. |
+| `MCP_ALLOWED_REDIRECT_PRESETS` | Empty | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Comma-separated built-in names: `claude`, `chatgpt`, `vscode`, `cursor`, `copilot-studio`, `gemini`, `loopback`. Verified callbacks currently exist for `claude` and `cursor`; `loopback` allows localhost callback ports. Unknown names are ignored. |
+| `MCP_CIMD_ENABLED` | `false` | `src/mcp-http-server.ts` startup | No | Set to `true` to opt in to OAuth Client ID Metadata Documents. See Security. |
+| `MCP_REFRESH_TOKEN_TTL` | `1209600` seconds (14 days) | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Sliding refresh-token lifetime in seconds, capped by a 90-day token-family lifetime. Must be a positive integer. |
+| `MCP_RATE_LIMIT_REGISTER` | `100` | `src/mcp-http-server.ts` | No | Successful or failed dynamic OAuth registrations allowed per IP per hour. Positive integer. |
+| `MCP_RATE_LIMIT_TOKEN_IP` | `500` | `src/mcp-http-server.ts` | No | Failed OAuth token requests allowed per IP per 15 minutes. Successful requests do not count. Positive integer. |
+| `MCP_SESSION_IDLE_MINUTES` | `60` minutes | `src/mcp-http-server.ts` | No | Idle Streamable HTTP session lifetime. Positive integer overrides default. |
+| `MCP_MAX_SESSIONS` | `1000` | `src/mcp-http-server.ts` | No | Maximum in-memory MCP sessions; excess sessions evict the least recently used. Positive integer overrides default. |
+| `MCP_MAX_RESPONSE_CHARS` | `100000` characters | `src/index.ts`, `src/http-server.ts`, `src/mcp-http-server.ts` | No | Maximum returned text size. Positive integer overrides default. |
+| `MCP_TOOLSETS` | Unset, all toolsets | `src/config.ts`, `src/mcp-http-server.ts` | No | Deployment-wide comma-separated toolset allowlist. Names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`. Requests may narrow this list. |
+| `MCP_TOOLS` | Unset, all tools | `src/tool-filter.ts` | No | Tool name allowlist, separated by commas, spaces, or newlines. |
+| `MCP_READ_ONLY` | `false` | `src/tool-filter.ts` | No | Keep only tools annotated read-only. Accepts true/1/yes/on or false/0/no/off. |
+| `MCP_OMIT_OUTPUT_SCHEMA` | `false` | `src/tool-filter.ts` | No | Omit output schemas from tools/list while retaining structured results. Same boolean values as `MCP_READ_ONLY`. |
+| `TRUST_PROXY` | Unset | `src/http-server.ts`, `src/mcp-http-server.ts` | No | Express trusted proxy setting (for example `loopback`, hop count `1`, or proxy addresses). Required behind a proxy for client IP rate limiting. `true` is rejected. |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | TLS verification enabled | `src/config.ts` | No | Set to `0` to disable certificate verification. Use only with trusted internal TLS endpoints. |
+| `API_KEY_<SCHEME>` | Unset | `src/executor.ts` | Yes | API key for an OpenAPI security scheme. Replace `<SCHEME>` with the uppercased scheme name, replacing non-alphanumeric characters with `_`. |
+| `BEARER_TOKEN_<SCHEME>` | Falls back to `BEARER_TOKEN` | `src/config.ts` | Yes | Scheme-specific bearer credential using the same `<SCHEME>` conversion. |
+| `BASIC_USERNAME_<SCHEME>` / `BASIC_PASSWORD_<SCHEME>` | Unset | `src/executor.ts` | Yes | Basic credentials for an OpenAPI security scheme. |
+| `OAUTH_CLIENT_ID_<SCHEME>` / `OAUTH_CLIENT_SECRET_<SCHEME>` | Unset | `src/auth.ts`, `src/executor.ts` | Yes | OAuth client credentials for an OpenAPI security scheme. |
+| `OAUTH_SCOPES_<SCHEME>` | Unset | `src/auth.ts` | No | Optional OAuth scopes for the security scheme. |
+| `OAUTH_TOKEN_<SCHEME>` | Unset | `src/executor.ts` | Yes | Pre-supplied OAuth token for the scheme. |
+| `OPENID_TOKEN_<SCHEME>` | Unset | `src/executor.ts` | Yes | Pre-supplied OpenID token for the scheme. |
 
-- API_BASE_URL: Base URL for the Polarion REST API. Must point at your own instance, e.g. https://your-polarion-server/polarion/rest/v1 (the built-in default is a non-functional placeholder).
-- BEARER_TOKEN: Personal Access Token for Polarion, used by stdio and REST HTTP mode. Obtain it from your Polarion user profile or personal settings. If Personal Access Tokens are not available in your instance, ask your administrator. The Streamable HTTP MCP transport ignores it whenever the request carries its own token.
-- HTTP_PORT: Port for the REST HTTP server (default 3000). PORT, which platforms such as Render inject, takes precedence.
-- After `git pull`, run `npm run build` before starting: `npm start` runs the existing build, it does not rebuild.
-- HTTP_API_KEY: Required for the REST HTTP wrapper (ChatGPT Custom GPT) authentication.
-- PUBLIC_URL: Public base URL of the REST HTTP wrapper, written into the `servers` entry of `/openapi.json` and `/openapi-gpt.json` (Render's `RENDER_EXTERNAL_URL` is used when this is unset). Without either, the request's `Host` header is echoed when it is a plain host name, with `https` (`http` for localhost); set it so a forged `Host` header cannot change which server a Custom GPT imports. The server refuses to start if it is not an `http(s)` URL.
-- MCP_HTTP_PORT: Optional port for the MCP HTTP server (falls back to PORT, then HTTP_PORT, then 3000).
-- MCP_PUBLIC_URL: Public HTTPS base URL of the deployment. Setting it enables the OAuth login flow (client registration, authorization, token endpoints, and the page where a user pastes their Polarion PAT), which is how clients that cannot be handed a token by hand — Claude.ai connectors — authenticate. Unset, the server only accepts a Polarion PAT sent directly as the Bearer token.
-- MCP_TOKEN_SECRET: Secret (at least 32 characters) that encrypts the tokens the OAuth login hands out; they carry the user's PAT, so the server stores nothing. Keep it stable: a login then lasts until Polarion stops accepting the PAT, across restarts. Run a single instance (or route each client to the same one): pending logins, authorization codes and MCP sessions live in the process's memory and are not shared between instances. Unset, a random secret is used and every login ends on restart. Changing it logs everyone out.
-- GPT_CLIENT_ID / GPT_CLIENT_SECRET: Enable per-user OAuth for ChatGPT Custom GPT Actions on the Streamable HTTP MCP server (needs MCP_PUBLIC_URL). Enter the same values in the GPT editor; endpoints are `/gpt/authorize` and `/gpt/token`.
-- MCP_HTTP_HOST: Optional bind address for the MCP HTTP server (default 0.0.0.0). Set it to 127.0.0.1 when a TLS reverse proxy sits in front, so the plaintext port that carries client PATs is not reachable from outside.
-- MCP_ALLOWED_HOSTS: Optional comma-separated Host allow-list; setting it enables DNS-rebinding protection for the MCP HTTP server.
-- MCP_ALLOWED_REDIRECT_PREFIXES: Optional comma-separated allowlist of OAuth redirect URIs that clients may register (MCP HTTP server with OAuth). An entry ending in `/` is a prefix, any other must match exactly; loopback entries such as `http://localhost/callback` match on any port. Unset, any client may register any redirect URI, so anyone can send your users a genuine login link that hands their Polarion access to a callback of their choosing. Set it for every production deployment, e.g. `https://claude.ai/api/mcp/auth_callback`. A refused registration is logged with its redirect URIs. Registrations issued before it was set stop working if their redirect URIs are not on the list.
-- TRUST_PROXY: Express `trust proxy` setting for the MCP HTTP server behind a reverse proxy: `loopback` for a proxy on the same host, a hop count such as `1`, or a comma-separated list of proxy addresses. Without it, every request behind the proxy shares one rate-limit counter (login, token, registration), so one client can lock everyone out. `true` is refused: it would trust an X-Forwarded-For sent by anyone.
-- MCP_SESSION_IDLE_MINUTES: Minutes after which an unused MCP session is closed (default 60). The client then gets a 404 and starts a new session on its own.
-- MCP_MAX_SESSIONS: Most MCP sessions held at once (default 1000); beyond it the least recently used one is closed. A session only answers to the Polarion token that created it.
-- MCP_TOOLS: Optional allowlist of tool names, separated by commas, spaces or newlines. Other tools are neither listed nor callable, over MCP or the REST wrapper. Unknown names are logged at startup; the server refuses to start if no listed name matches a tool. The instructions, guides and prompts only mention tools that remain.
-- MCP_READ_ONLY: `true` (also `1`, `yes`, `on`) keeps only tools annotated `readOnlyHint: true` (combined with MCP_TOOLS, both must match). Any value that is neither on nor off (`0`, `false`, `no`, `off`, empty) stops the server at startup, so a typo cannot leave the write tools exposed.
-- MCP_OMIT_OUTPUT_SCHEMA: `true` (same values as MCP_READ_ONLY) leaves output schemas out of tools/list, which shrinks it from about 840 KB to 530 KB for all tools. Results still carry structured content.
-- LOG_LEVEL: Reserved for logging configuration (informational only).
+The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Toolsets` and `X-MCP-Readonly` headers, or a path such as `/mcp/projects,work-items`. Toolset names are listed above. These selectors can only narrow `MCP_TOOLSETS` and the tool filters.
 
-## Minimal Configuration by Mode
+`MCP_ALLOWED_ORIGINS` protects MCP and OAuth routes from browser-origin abuse and DNS rebinding. The request path is matched case-insensitively. The public origin in `MCP_PUBLIC_URL` is always accepted; otherwise configure trusted origins. Requests without an Origin header are not rejected. The REST wrapper uses the separate `HTTP_CORS_ORIGINS` setting.
 
-- MCP stdio mode requires API_BASE_URL and BEARER_TOKEN.
-- Streamable HTTP MCP mode (Claude.ai, ChatGPT) requires only API_BASE_URL, and optionally MCP_HTTP_PORT / MCP_HTTP_HOST / MCP_ALLOWED_HOSTS. Each client authenticates with its own Polarion PAT as the Bearer token of every `/mcp` request; before the first request of a session the server asks Polarion whether the PAT is valid (remembered for one minute), so an invented token cannot open sessions. For the OAuth login add MCP_PUBLIC_URL, MCP_TOKEN_SECRET and MCP_ALLOWED_REDIRECT_PREFIXES; behind a reverse proxy also TRUST_PROXY; for Custom GPT OAuth also GPT_CLIENT_ID and GPT_CLIENT_SECRET. HTTP_API_KEY does not apply to this server.
-- REST HTTP mode (ChatGPT) requires API_BASE_URL, BEARER_TOKEN, HTTP_API_KEY, and optionally HTTP_PORT and PUBLIC_URL.
+## Modes
 
-## Token Storage Guidance
+- Stdio: set `API_BASE_URL` and `BEARER_TOKEN`.
+- REST HTTP wrapper: set `API_BASE_URL`, `BEARER_TOKEN`, and `HTTP_API_KEY`; `PORT` or `HTTP_PORT` selects its port.
+- Streamable HTTP MCP: set `API_BASE_URL`; clients send their own PAT on each request. To enable OAuth login, also set `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, and an OAuth redirect allowlist. `HTTP_API_KEY` is not used here.
 
-- Prefer .env for local development.
-- Prefer MCP client-specific env settings for user-local assistant setups.
-- Do not reuse HTTP_API_KEY as a Polarion bearer token.
-- Rotate tokens if they are exposed in logs, screenshots, or copied into shared settings.
+## OAuth token lifetime and audience
 
-## TLS Settings
+Access tokens last one hour. Refresh tokens last 14 days by default and are renewed on use, but cannot exceed 90 days from the initial login. Refresh tokens are stateless: an earlier refresh token remains usable until its own expiry, even after a refresh. There is no server-side refresh-token revocation. Revoking the underlying PAT in Polarion prevents renewal and subsequent Polarion access. Changing the sealing secret without retaining the old value in `MCP_TOKEN_SECRET_PREVIOUS` invalidates existing OAuth tokens. OAuth tokens are bound to the MCP resource URL (RFC 8707); changing `MCP_PUBLIC_URL` or the deployment audience requires users to log in again.
 
-- NODE_TLS_REJECT_UNAUTHORIZED=0 disables certificate verification.
-- Use only for trusted internal servers with self-signed certificates.
+## TLS and credential handling
 
-## Security Scheme Overrides
+Keep `.env` out of version control and use least-privilege Polarion PATs. `NODE_TLS_REJECT_UNAUTHORIZED=0` disables TLS certificate verification and should only be used for trusted internal systems.
 
-The executor supports security schemes from the OpenAPI spec. Environment variables follow this format:
+## Script-only variables
 
-- `API_KEY_<SCHEME>`
-- `BEARER_TOKEN_<SCHEME>`
-- BASIC*USERNAME*<SCHEME>
-- BASIC*PASSWORD*<SCHEME>
-- OAUTH*CLIENT_ID*<SCHEME>
-- OAUTH*CLIENT_SECRET*<SCHEME>
-- OAUTH*SCOPES*<SCHEME>
-- OAUTH*TOKEN*<SCHEME>
-- OPENID*TOKEN*<SCHEME>
-
-Where <SCHEME> is the scheme name uppercased with non-alphanumeric characters replaced by underscores.
+| Variable | Default | Read by | Secret? | Purpose |
+|---|---|---|---|---|
+| `POLARION_URL` | `http://localhost` | `scripts/live/create-pat.mjs` | No | Polarion base URL for live PAT setup. |
+| `POLARION_USER` | `admin` | `scripts/live/create-pat.mjs` | No | Username for live PAT setup. |
+| `POLARION_PASS` | `admin` | `scripts/live/create-pat.mjs` | Yes | Password for live PAT setup. |
+| `PAT_NAME` | `live-suite` | `scripts/live/create-pat.mjs` | No | Name assigned to the generated live-test PAT. |
+| `CHECK_DOCS_STRICT` | `0` | `scripts/check-docs.mjs` | No | Set to `1` to make all documentation checker findings fail the command. |
 
 ## read_when
 
-- Use this guide when setting up environment variables or troubleshooting auth.
+- Use this guide when setting environment variables or troubleshooting authentication.

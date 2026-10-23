@@ -16,7 +16,14 @@ Required environment variables on Render:
 Optional environment variables:
 
 - HTTP_PORT when the platform does not provide PORT-like routing automatically.
+- MCP_PUBLIC_URL, MCP_TOKEN_SECRET, MCP_ALLOWED_REDIRECT_PREFIXES (or MCP_ALLOWED_REDIRECT_PRESETS), and TRUST_PROXY when deploying the Streamable HTTP MCP server with OAuth. Render must start `node build/mcp-http-server.js` for that mode; the provided blueprint currently builds the REST wrapper.
 - NODE_TLS_REJECT_UNAUTHORIZED only for trusted internal deployments with self-signed certificates.
+
+## Docker and reverse proxies
+
+The Dockerfile runs the Streamable HTTP MCP server on port 3000. Set `API_BASE_URL`; each caller supplies their own Polarion PAT. For OAuth login also set a stable `MCP_TOKEN_SECRET`, `MCP_PUBLIC_URL`, and redirect allowlist. When a TLS proxy sits in front, forward the public Host and client IP, set `TRUST_PROXY` to the trusted hop count or proxy address, and consider binding the container service privately. Do not use `TRUST_PROXY=true` on a public listener.
+
+Render's checked-in `render.yaml` builds and starts the REST wrapper. To deploy Streamable HTTP on Render, change the start command to `node build/mcp-http-server.js` and configure MCP environment variables. Configure `TRUST_PROXY` based on the actual trusted proxy chain. Without it, all requests may appear to share Render's proxy egress IP; a single user's failed logins can exhaust the shared IP rate limit and lock out other users. Confirm the platform's forwarded-header behavior before trusting a hop count.
 
 ## Other Platforms
 
