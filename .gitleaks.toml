@@ -1,0 +1,7 @@
+# Throwaway TLS key pair used only by tests/cimd.test.ts against a local server.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test-only TLS fixtures"
+paths = ['''tests/fixtures/cimd-test-(key|cert)\.pem''']
