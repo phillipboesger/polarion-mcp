@@ -27,7 +27,7 @@ import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { sanitizeInputSchema } from './utils.js';
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes } from './tools.js';
-import { enabledTools, omitOutputSchema } from './tool-filter.js';
+import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
 import { executeApiTool } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
 
@@ -40,21 +40,19 @@ import { lenientOutputSchema } from './output-schema.js';
  *
  * @returns A {@link Server} ready to be connected to any MCP transport.
  */
-let listedTools: object[] | undefined;
-
-/** @returns The tools/list entries; the tool set is fixed, so they are built once. */
-function toolsForClient(): object[] {
-  listedTools ??= Array.from(enabledTools.values()).map(def => ({
+/** @param tools - The deployment and session-filtered tool definitions. */
+function toolsForClient(tools: ReadonlyMap<string, import('./types.js').McpToolDefinition>): object[] {
+  return [...tools.values()].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(def => ({
     name: def.name,
     description: def.description,
     inputSchema: sanitizeInputSchema(def.inputSchema),
     ...(def.annotations ? { annotations: def.annotations } : {}),
     ...(def.outputSchema && !omitOutputSchema ? { outputSchema: lenientOutputSchema(def.outputSchema) } : {}),
   }));
-  return listedTools;
 }
 
-export function createPolarionServer(): Server {
+export function createPolarionServer(filter: ToolFilter = {}): Server {
+  const clientTools = filterTools(enabledTools, filter).tools;
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
@@ -73,7 +71,8 @@ export function createPolarionServer(): Server {
    * Sanitizes each tool's input schema so property names are MCP-safe; the
    * executor maps the sanitized names back to the originals.
    */
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolsForClient() as any[] }));
+  const listedTools = toolsForClient(clientTools);
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listedTools as any[] }));
 
   /**
    * Handler: Execute a Tool (API Call).
@@ -83,7 +82,7 @@ export function createPolarionServer(): Server {
    */
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name: toolName, arguments: toolArgs } = request.params;
-    const toolDefinition = enabledTools.get(toolName);
+    const toolDefinition = clientTools.get(toolName);
     if (!toolDefinition) {
       console.error(`[ERROR] Unknown tool requested: ${toolName}`);
       return { content: [{ type: "text", text: `Error: Unknown tool requested: ${toolName}` }], isError: true };

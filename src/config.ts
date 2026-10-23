@@ -17,6 +17,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { parseToolsetNames, type ToolsetName } from './toolsets.js';
 
 // Load environment variables from .env file
 // This allows configuration without modifying code
@@ -44,6 +45,18 @@ function packageVersion(): string {
 
 /** Reported in serverInfo and /health, so a deployment shows which build runs. */
 export const SERVER_VERSION = packageVersion();
+
+/**
+ * Parses the deployment-wide HTTP toolset allowlist.
+ *
+ * @param env - Environment read by the transport start function.
+ * @returns Configured toolsets, or undefined to allow all toolsets.
+ * @throws Error when the value is malformed or names an unknown toolset.
+ */
+export function configuredToolsets(env: NodeJS.ProcessEnv): ToolsetName[] | undefined {
+  const value = env.MCP_TOOLSETS?.trim();
+  return value ? parseToolsetNames(value, 'MCP_TOOLSETS') : undefined;
+}
 
 /**
  * API Base URL - configurable via environment variable

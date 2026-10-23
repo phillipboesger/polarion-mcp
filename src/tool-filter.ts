@@ -16,12 +16,15 @@
 import { toolDefinitionMap } from './tools.js';
 import { correctAnnotations } from './annotations.js';
 import type { McpToolDefinition } from './types.js';
+import { toolsetsForDefinition, type ToolsetName } from './toolsets.js';
 
 export interface ToolFilter {
   /** Tool names to keep; undefined keeps all. */
   allow?: string[];
   /** Keep only tools annotated as read-only. */
   readOnly?: boolean;
+  /** Keep tools whose generated REST path belongs to one of these domains. */
+  toolsets?: readonly ToolsetName[];
 }
 
 /**
@@ -65,9 +68,12 @@ export function filterTools(
   filter: ToolFilter
 ): { tools: Map<string, McpToolDefinition>; unknown: string[] } {
   const allow = filter.allow ? new Set(filter.allow) : undefined;
+  const toolsets = filter.toolsets ? new Set(filter.toolsets) : undefined;
   const kept = new Map(
     [...tools]
-      .filter(([name, def]) => (!allow || allow.has(name)) && (!filter.readOnly || def.annotations?.readOnlyHint === true))
+      .filter(([name, def]) => (!allow || allow.has(name))
+        && (!filter.readOnly || def.annotations?.readOnlyHint === true)
+        && (!toolsets || toolsetsForDefinition(def).some(toolset => toolsets.has(toolset))))
       .map(([name, def]) => [name, correctAnnotations(def)] as const)
   );
   return { tools: kept, unknown: (filter.allow ?? []).filter(name => !tools.has(name)) };

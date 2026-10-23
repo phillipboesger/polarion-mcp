@@ -41,8 +41,10 @@ import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets } from './config.js';
 import { createPolarionServer } from './server.js';
+import { parseFlag, type ToolFilter } from './tool-filter.js';
+import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
 import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, REDIRECT_PRESET_URIS, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
@@ -129,6 +131,8 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
  * Options for {@link createMcpHttpApp}.
  */
 export interface McpHttpAppOptions {
+  /** Deployment-wide toolset allowlist. Request selectors can only narrow it. */
+  allowedToolsets?: readonly ToolsetName[];
   /** Optional allow-list of Host header values enabling DNS-rebinding protection. */
   allowedHosts?: string[];
   /**
@@ -181,8 +185,8 @@ export interface McpHttpAppOptions {
  * @param message - Human-readable error message.
  * @returns A JSON-RPC 2.0 error envelope with a null id.
  */
-function jsonRpcError(message: string) {
-  return { jsonrpc: '2.0' as const, error: { code: -32000, message }, id: null };
+function jsonRpcError(message: string, code = -32000) {
+  return { jsonrpc: '2.0' as const, error: { code, message }, id: null };
 }
 
 /**
@@ -201,20 +205,22 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris } = options;
   const allowedPresets = parseRedirectAllowlist(undefined, options.allowedRedirectPresets);
   const effectiveAllowedRedirectUris = [...(allowedRedirectUris ?? []), ...allowedPresets];
+  const allowedToolsets = options.allowedToolsets ?? TOOLSET_NAMES;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   const allowedOrigins = options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
   const corsMiddleware = cors({
     origin: true,
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'X-MCP-Toolsets', 'X-MCP-Readonly'],
     exposedHeaders: ['mcp-session-id', 'mcp-protocol-version', 'www-authenticate'],
     optionsSuccessStatus: 204,
   });
   app.use((req: Request, res: Response, next: NextFunction) => {
     const path = req.path.toLowerCase().replace(/\/+$/, '') || '/';
     const isOAuthMetadata = path.startsWith('/.well-known/oauth-protected-resource');
-    if (!ORIGIN_PROTECTED_PATHS.has(path) && !isOAuthMetadata) return next();
+    const isMcpRequestPath = path === MCP_PATH || path.startsWith(`${MCP_PATH}/`);
+    if (!ORIGIN_PROTECTED_PATHS.has(path) && !isOAuthMetadata && !isMcpRequestPath) return next();
 
     const origin = req.get('origin');
     if (!origin) return next();
@@ -229,7 +235,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       }
     }
     if (!allowedOrigins.includes(origin) && origin !== publicUrl?.origin && origin !== configuredRequestOrigin) {
-      if (path === MCP_PATH) res.status(403).json(jsonRpcError('Origin is not allowed'));
+      if (isMcpRequestPath) res.status(403).json(jsonRpcError('Origin is not allowed'));
       else res.status(403).json({ error: 'origin_not_allowed' });
       return;
     }
@@ -597,6 +603,39 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   /**
+   * Parses request selectors for validation and computes a deployment-bounded
+   * filter. A session only consumes this value during initialization.
+   *
+   * @param req - Incoming MCP request.
+   * @returns The tool filter to bind to a newly initialized session.
+   * @throws Error when a selector is unknown or malformed.
+   */
+  const requestToolFilter = (req: Request): ToolFilter => {
+    const pathToolsets = req.params.toolsets;
+    const headerToolsets = req.get('X-MCP-Toolsets');
+    const pathSelection = pathToolsets === undefined ? undefined : parseToolsetNames(Array.isArray(pathToolsets) ? pathToolsets.join(',') : pathToolsets, 'MCP path');
+    const headerSelection = headerToolsets === undefined ? undefined : parseToolsetNames(headerToolsets, 'X-MCP-Toolsets');
+    const requested = pathSelection && headerSelection
+      ? pathSelection.filter(name => headerSelection.includes(name))
+      : pathSelection ?? headerSelection;
+    const allowed = new Set(allowedToolsets);
+    return {
+      toolsets: requested ? requested.filter(name => allowed.has(name)) : [...allowed],
+      readOnly: parseFlag('X-MCP-Readonly', req.get('X-MCP-Readonly')),
+    };
+  };
+
+  /** Reject invalid selectors while leaving existing session filters immutable. */
+  const validateToolSelectors = (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      res.locals.toolFilter = requestToolFilter(req);
+      next();
+    } catch (error) {
+      res.status(400).json(jsonRpcError(error instanceof Error ? error.message : 'Invalid toolset selector', -32602));
+    }
+  };
+
+  /**
    * Handles MCP requests on an existing session (GET for the SSE stream, DELETE
    * to terminate the session).
    *
@@ -628,7 +667,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   // POST: initialize a new session, or dispatch into an existing one.
-  app.post(MCP_PATH, requireBearer, jsonBody, async (req: Request, res: Response) => {
+  app.post([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, jsonBody, async (req: Request, res: Response) => {
     const sessionId = req.header('mcp-session-id');
     const existing = sessionId ? useSession(sessionId) : undefined;
     let transport: StreamableHTTPServerTransport;
@@ -654,7 +693,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer();
+      const server = createPolarionServer(res.locals.toolFilter as ToolFilter);
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
@@ -667,8 +706,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     await transport.handleRequest(req, res, req.body);
   });
 
-  app.get(MCP_PATH, requireBearer, handleSessionRequest);
-  app.delete(MCP_PATH, requireBearer, handleSessionRequest);
+  app.get([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, handleSessionRequest);
+  app.delete([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, handleSessionRequest);
 
   /**
    * Closes every active transport. Used on shutdown and by tests.
@@ -912,9 +951,10 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   for (const preset of allowedRedirectPresets) {
     if (!knownRedirectPresets.has(preset)) (options.logger ?? console).warn(`[WARN] Ignoring unknown MCP_ALLOWED_REDIRECT_PRESETS entry: ${preset}`);
   }
+  const allowedToolsets = configuredToolsets(process.env);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
