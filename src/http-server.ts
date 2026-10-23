@@ -18,6 +18,8 @@
  */
 
 import express, { Request, Response } from 'express';
+import * as fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
@@ -26,7 +28,7 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings } from
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import { createRestToolsRouter, specServerUrl, type RestToolsOptions } from './rest-api.js';
 import { safeEqual } from './sealed.js';
-import { bearerCredential } from './utils.js';
+import { bearerCredential, parseTrustProxy, redact } from './utils.js';
 import type { Express } from 'express';
 import { parseMaxResponseChars } from './executor.js';
 
@@ -35,6 +37,7 @@ export interface HttpAppOptions {
   env: NodeJS.ProcessEnv;
   port: number;
   rateLimit?: { windowMs: number; limit: number };
+  trustProxy?: string | number;
   executeTool?: RestToolsOptions['executeTool'];
 }
 
@@ -85,6 +88,7 @@ const authenticateRequest = (apiKey: string) => (req: Request, res: Response, ne
 
 export function createHttpApp(options: HttpAppOptions): Express {
 const app = express();
+if (options.trustProxy !== undefined) app.set('trust proxy', options.trustProxy);
 const origins = (options.env.HTTP_CORS_ORIGINS ?? 'https://chat.openai.com,https://chatgpt.com').split(',').map(origin => origin.trim()).filter(Boolean);
 app.use(cors({ origin: origins }));
 app.use(authenticateRequest(options.apiKey));
@@ -143,7 +147,7 @@ app.use((err: Error & { status?: number }, req: Request, res: Response, _next: F
     res.status(err.status).json({ error: err.status === 413 ? 'Request body too large' : 'Bad Request', message: 'The body is not valid JSON or too large' });
     return;
   }
-  const safeMessage = String(err?.message ?? err).replace(/(authorization\s*:\s*bearer\s+)\S+/ig, '$1[REDACTED]').replace(/\bBearer\s+\S+/ig, 'Bearer [REDACTED]').replace(/\b(?:pat|token|secret)[=: ]+[^\s,;]+/ig, '[REDACTED]');
+const safeMessage = redact(String(err?.message ?? err));
   console.error('[ERROR] Unhandled error:', safeMessage);
   res.status(500).json({
     error: 'Internal server error',
@@ -157,12 +161,13 @@ return app;
 /**
  * Start the server
  */
-const startHttpServer = (env: NodeJS.ProcessEnv) => {
+function startHttpServer(env: NodeJS.ProcessEnv): void {
 dotenv.config();
 const PORT = env.PORT || env.HTTP_PORT || 3000;
 const HTTP_API_KEY = env.HTTP_API_KEY;
 if (!HTTP_API_KEY) throw new Error('HTTP_API_KEY is required');
-const app = createHttpApp({ apiKey: HTTP_API_KEY, env, port: Number(PORT) });
+const trustProxy = parseTrustProxy(env.TRUST_PROXY);
+const app = createHttpApp({ apiKey: HTTP_API_KEY, env, port: Number(PORT), trustProxy });
 const server = app.listen(PORT, () => {
   console.log(`[INFO] Polarion MCP HTTP Server v${SERVER_VERSION} running on port ${PORT}`);
   console.log(`[INFO] API Base URL: ${API_BASE_URL}`);
@@ -193,8 +198,8 @@ const shutdown = () => {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
-};
+}
 
-if (process.argv[1]?.endsWith('/http-server.js') || process.argv[1]?.endsWith('http-server.js')) {
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   try { startHttpServer(process.env); } catch (error) { console.error('[ERROR]', error); process.exitCode = 1; }
 }

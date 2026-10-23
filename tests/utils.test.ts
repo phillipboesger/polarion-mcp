@@ -1,8 +1,15 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { AxiosError } from "axios"
-import { extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, sanitizeInputSchema } from "../src/utils.js"
+import { extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, redact, sanitizeInputSchema } from "../src/utils.js"
 import { toolDefinitionMap } from "../src/tools.js"
+
+test("redact removes authorization credentials and query API keys", () => {
+  const value = redact("Authorization: Bearer abc123 Basic dXNlcjpwYXNz ?api_key=key-1&token=tok-2")
+  assert.doesNotMatch(value, /abc123|dXNlcjpwYXNz|key-1|tok-2/)
+  assert.match(value, /Bearer \[REDACTED\]/)
+  assert.match(value, /Basic \[REDACTED\]/)
+})
 
 test("sanitizeInputSchema rewrites invalid property names and records the mapping", () => {
   const nameMap: Record<string, string> = {}

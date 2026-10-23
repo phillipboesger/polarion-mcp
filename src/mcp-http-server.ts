@@ -46,7 +46,8 @@ import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js
 import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
-import { bearerCredential } from './utils.js';
+import { bearerCredential, parseTrustProxy } from './utils.js';
+export { parseTrustProxy } from './utils.js';
 
 dotenv.config();
 
@@ -644,23 +645,6 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
     throw new Error(`MCP_PUBLIC_URL must be the origin without a path (got ${value}); serve the server at the root of its own host or subdomain`);
   }
   return url;
-}
-
-/**
- * Parses `TRUST_PROXY`: a hop count, or what Express accepts as a string
- * ("loopback", or a comma-separated list of addresses/subnets).
- *
- * @param value - The raw environment value.
- * @returns The `trust proxy` setting, or undefined to leave it off.
- * @throws Error for "true", which would trust any X-Forwarded-For a client sends.
- */
-export function parseTrustProxy(value: string | undefined): string | number | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed || trimmed === 'false') return undefined;
-  if (trimmed === 'true') {
-    throw new Error('TRUST_PROXY=true trusts any X-Forwarded-For a client sends; use "loopback", a hop count or the proxy address');
-  }
-  return /^\d+$/.test(trimmed) ? Number(trimmed) : trimmed;
 }
 
 /**

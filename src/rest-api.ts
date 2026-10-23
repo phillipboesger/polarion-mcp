@@ -18,7 +18,7 @@ import express, { type Request, type RequestHandler, type Response } from 'expre
 import { executeApiTool } from './executor.js';
 import { toolDefinitionMap, securitySchemes } from './tools.js';
 import { enabledTools } from './tool-filter.js';
-import { sanitizeInputSchema } from './utils.js';
+import { redact, sanitizeInputSchema } from './utils.js';
 import { SERVER_VERSION } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import type { JsonObject } from './types.js';
@@ -258,10 +258,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       });
 
     } catch (error: unknown) {
-      const detail = String(error instanceof Error ? error.message : error)
-        .replace(/(authorization\s*:\s*bearer\s+)\S+/ig, '$1[REDACTED]')
-        .replace(/\bBearer\s+\S+/ig, 'Bearer [REDACTED]')
-        .replace(/\b(?:pat|token|secret)[=: ]+[^\s,;]+/ig, '[REDACTED]');
+      const detail = redact(String(error instanceof Error ? error.message : error));
       console.error(`[ERROR] Error executing tool '${toolName}': ${detail}`);
 
       res.status(500).json({

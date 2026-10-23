@@ -252,12 +252,12 @@ test("uploads: a multipart tool called without a body is refused instead of send
   assert.equal(requests.length, 0)
 })
 
-test("a write answered with an HTML page (login or proxy) is an error, not a success", async () => {
+test("a write without a declared JSON response type preserves an HTML body", async () => {
   const { result } = await run("patchWorkItem", {
     projectId: "P", workItemId: "W-1", requestBody: { data: { type: "workitems", id: "P/W-1", attributes: { title: "x" } } },
   }, () => ({ status: 200, headers: { "content-type": "text/html" }, data: "<html>login</html>" }))
-  assert.equal(result.isError, true)
-  assert.match((result.content[0] as any).text, /HTML/)
+  assert.equal(result.isError, undefined)
+  assert.match((result.content[0] as any).text, /<html>login<\/html>/)
 })
 
 test("a read answered with an HTML login page is an error with API configuration guidance", async () => {

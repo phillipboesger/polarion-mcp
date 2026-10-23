@@ -95,6 +95,8 @@ export interface McpToolDefinition {
   pathTemplate: string;
   executionParameters: { name: string, in: string }[];
   requestBodyContentType?: string;
+  /** Declared success response MIME type when known. */
+  responseContentType?: string;
   securityRequirements: any[];
   annotations?: McpToolAnnotations;
   outputSchema?: any;

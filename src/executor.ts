@@ -60,12 +60,29 @@ function nameMapFor(definition: McpToolDefinition): Record<string, string> {
 export { sendWithRetry };
 
 export const DEFAULT_MAX_RESPONSE_CHARS = 100_000;
-const RESPONSE_TRUNCATION_NOTICE = '\n[Response truncated. Use fields and page_size_ to shrink the response.]';
+const MIN_RESPONSE_CHARS = JSON.stringify({ truncated: true, totalChars: Number.MAX_SAFE_INTEGER, preview: '', hint: 'Use fields and page_size_ to shrink the response.' }).length;
+
+function truncateResponse(text: string, maxChars: number, definition: McpToolDefinition): string {
+  const properties = definition.inputSchema?.properties ?? {};
+  const suggestions = [
+    properties.fields ? 'fields' : undefined,
+    properties['page[size]'] || properties.page_size_ ? 'page_size_' : undefined,
+  ].filter(Boolean);
+  const hint = suggestions.length ? `Use ${suggestions.join(' and ')} to shrink the response.` : 'Narrow the query to shrink the response.';
+  const codePoints = Array.from(text);
+  let previewLength = Math.min(codePoints.length, maxChars);
+  while (previewLength >= 0) {
+    const envelope = JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, previewLength).join(''), hint });
+    if (envelope.length <= maxChars || previewLength === 0) return envelope;
+    previewLength--;
+  }
+  return JSON.stringify({ truncated: true, totalChars: text.length, preview: '', hint });
+}
 
 /** Parses the response text cap from the entry-point environment. */
 export function parseMaxResponseChars(value: string | undefined): number {
   const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= RESPONSE_TRUNCATION_NOTICE.length + 1
+  return Number.isSafeInteger(parsed) && parsed >= MIN_RESPONSE_CHARS
     ? parsed
     : DEFAULT_MAX_RESPONSE_CHARS;
 }
@@ -1029,8 +1046,12 @@ export async function executeApiTool(
       responseText = `(Status: ${response.status} - No body content)`;
     }
 
-    // A login or proxy page can answer with 200 text/html for reads as well as writes.
-    if (contentType.includes('text/html')) {
+    // JSON-declared tools can receive an SSO/proxy page; HTML-declared exports are valid.
+    const htmlPage = typeof response.data === 'string' && /^\s*(?:<!doctype\b|<html\b)/i.test(response.data);
+    const successIsJson = definition.responseContentType
+      ? definition.responseContentType.toLowerCase().includes('json')
+      : Boolean(definition.outputSchema);
+    if (successIsJson && contentType.includes('text/html') && htmlPage) {
       return {
         content: [{
           type: 'text',
@@ -1049,7 +1070,7 @@ export async function executeApiTool(
     // report a write that worked as failed and invite a duplicating retry.
     const fullResponseText = `API Response (Status: ${response.status}):\n${responseText}`;
     const boundedResponseText = fullResponseText.length > maxResponseChars
-      ? fullResponseText.slice(0, Math.max(0, maxResponseChars - RESPONSE_TRUNCATION_NOTICE.length)) + RESPONSE_TRUNCATION_NOTICE
+      ? truncateResponse(fullResponseText, maxResponseChars, definition)
       : fullResponseText;
     return {
       content: [
@@ -1058,6 +1079,7 @@ export async function executeApiTool(
           text: boundedResponseText
         }
       ],
+      // MCP_MAX_RESPONSE_CHARS caps text content only; structuredContent stays unchanged by design.
       ...(definition.outputSchema ? { structuredContent: structuredContent ?? {} } : {}),
     };
 
