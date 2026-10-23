@@ -28,6 +28,30 @@ import type { NameMap } from './types.js';
  */
 const INPUT_KEY_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
 
+/** Removes credentials from error text before it reaches logs. */
+export function redact(value: string): string {
+  return value
+    .replace(/\b(Bearer|Basic)\s+[^\s"'&,;]+/ig, '$1 [REDACTED]')
+    .replace(/([?&](?:api_key|token)=)[^&\s#]*/ig, '$1[REDACTED]')
+    .replace(/\b(?:pat|token|secret|api_key)[=: ]+[^\s,;&]+/ig, '[REDACTED]');
+}
+
+/**
+ * Parses `TRUST_PROXY`: a hop count, or what Express accepts as a string.
+ *
+ * @param value - The raw environment value.
+ * @returns The `trust proxy` setting, or undefined to leave it off.
+ * @throws Error for "true", which would trust any X-Forwarded-For a client sends.
+ */
+export function parseTrustProxy(value: string | undefined): string | number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === 'false') return undefined;
+  if (trimmed === 'true') {
+    throw new Error('TRUST_PROXY=true trusts any X-Forwarded-For a client sends; use "loopback", a hop count or the proxy address');
+  }
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : trimmed;
+}
+
 /**
  * Encodes one URL path segment. `encodeURIComponent` leaves "." and ".." as
  * they are and the HTTP client then collapses them, so `deletePlan` with a

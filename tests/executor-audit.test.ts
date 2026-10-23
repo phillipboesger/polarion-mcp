@@ -39,6 +39,28 @@ test("pagination: a wrong type for page_size_ is rejected, not silently ignored"
   assert.equal(requests.length, 0)
 })
 
+test("patchAllWorkItems rejects an id without its project prefix", async () => {
+  const { result, requests } = await run("patchAllWorkItems", {
+    requestBody: { data: [{ type: "workitems", id: "WI-1", attributes: { title: "changed" } }] },
+  })
+  assert.equal(result.isError, true)
+  assert.match((result.content[0] as any).text, /project.*prefix|PROJECT\/WI-1/i)
+  assert.equal(requests.some((request) => String(request.method).toUpperCase() === "PATCH"), false)
+})
+
+test("changeTypeTo validates status using the destination Work Item type", async () => {
+  const { result, requests } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "WI-1", changeTypeTo: "defect",
+    requestBody: { data: { type: "workitems", id: "P/WI-1", attributes: { status: "closed" } } },
+  }, (config) => String(config.url).includes("getAvailableOptions")
+    ? { data: { data: [{ id: "closed" }] } }
+    : { data: { data: { type: "workitems", id: "P/WI-1" } } })
+  assert.notEqual(result.isError, true, JSON.stringify(result.content))
+  const optionsRequest = requests.find((request) => String(request.url).includes("getAvailableOptions"))
+  assert.match(String(optionsRequest?.url), /workitems\/fields\/status\/actions\/getAvailableOptions$/)
+  assert.equal(optionsRequest?.params?.type, "defect")
+})
+
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00, 0x80])
 const octet = (data: Buffer, extra: Record<string, string> = {}) => () => ({ headers: { "content-type": "application/octet-stream", ...extra }, data })
 
@@ -230,12 +252,35 @@ test("uploads: a multipart tool called without a body is refused instead of send
   assert.equal(requests.length, 0)
 })
 
-test("a write answered with an HTML page (login or proxy) is an error, not a success", async () => {
+test("a write without a declared JSON response type preserves an HTML body", async () => {
   const { result } = await run("patchWorkItem", {
     projectId: "P", workItemId: "W-1", requestBody: { data: { type: "workitems", id: "P/W-1", attributes: { title: "x" } } },
   }, () => ({ status: 200, headers: { "content-type": "text/html" }, data: "<html>login</html>" }))
+  assert.equal(result.isError, undefined)
+  assert.match((result.content[0] as any).text, /<html>login<\/html>/)
+})
+
+test("a read answered with an HTML login page is an error with API configuration guidance", async () => {
+  const { result } = await run("getWorkItem", { projectId: "P", workItemId: "W-1" }, () => ({
+    headers: { "content-type": "text/html" }, data: "<html>login</html>",
+  }))
   assert.equal(result.isError, true)
-  assert.match((result.content[0] as any).text, /HTML/)
+  assert.match((result.content[0] as any).text, /login\/SSO page returned, check API_BASE_URL\/token/)
+})
+
+test("multipart tools accept an object requestBody and build the expected file parts", async () => {
+  const body = {
+    resource: { data: [{ type: "workitem_attachments", attributes: { fileName: "notes.txt" } }] },
+    files: [Buffer.from("hello").toString("base64")],
+  }
+  const { result, requests } = await run("postWorkItemAttachments", { projectId: "P", workItemId: "W-1", requestBody: body })
+  assert.notEqual(result.isError, true, JSON.stringify(result.content))
+  const form = requests[0].data as Buffer
+  const multipart = form.toString("utf8")
+  assert.match(String(requests[0].headers?.["content-type"]), /^multipart\/form-data; boundary=/)
+  assert.match(multipart, /name="resource"/)
+  assert.match(multipart, /filename="notes.txt"/)
+  assert.match(multipart, /hello/)
 })
 
 test("a JSON body without a JSON content type is still read as JSON, not [object Object]", async () => {

@@ -16,6 +16,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings } from './config.js';
 import { createPolarionServer } from './server.js';
+import { parseMaxResponseChars } from './executor.js';
 
 /**
  * Builds the Polarion MCP server and serves it over stdio.
@@ -27,7 +28,8 @@ import { createPolarionServer } from './server.js';
  */
 async function main(): Promise<void> {
   try {
-    const server = createPolarionServer();
+    const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
+    const server = createPolarionServer({ maxResponseChars });
     const transport = new StdioServerTransport();
     await server.connect(transport);
 

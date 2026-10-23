@@ -3,10 +3,12 @@ import assert from "node:assert/strict"
 import { AxiosError } from "axios"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
 import type { McpToolDefinition } from "../src/types.js"
-import { executeApiTool, sendWithRetry, CUSTOM_FIELD_TOOL_SPECS } from "../src/executor.js"
+import { executeApiTool, sendWithRetry, CUSTOM_FIELD_TOOL_SPECS, DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from "../src/executor.js"
 import { _optionsCache, _fieldKeyCache } from "../src/guards.js"
 import { toolDefinitionMap } from "../src/tools.js"
 import { requestBearerToken } from "../src/config.js"
+import { compileZodSchema } from "../src/utils.js"
+import { lenientOutputSchema } from "../src/output-schema.js"
 
 const patchWorkItemDefinition: McpToolDefinition = {
   name: "patchWorkItem",
@@ -154,6 +156,13 @@ const emptyDefinition: McpToolDefinition = {
   executionParameters: [],
   securityRequirements: [],
 }
+
+test("MCP_MAX_RESPONSE_CHARS defaults to 100000 and accepts only usable integer caps", () => {
+  assert.equal(parseMaxResponseChars(undefined), DEFAULT_MAX_RESPONSE_CHARS)
+  assert.equal(parseMaxResponseChars("2048"), 2048)
+  assert.equal(parseMaxResponseChars("not-a-number"), DEFAULT_MAX_RESPONSE_CHARS)
+  assert.equal(parseMaxResponseChars("10"), DEFAULT_MAX_RESPONSE_CHARS)
+})
 
 const postWorkItemAttachmentsDefinition: McpToolDefinition = {
   name: "postWorkItemAttachments",
@@ -412,9 +421,22 @@ test("executeApiTool renders text/html rich-text fields as Markdown alongside th
   const message = result.content[0]
   assert.equal(message.type, "text")
   if (message.type === "text") {
-    assert.match(message.text, /"value": "<p>Hello <strong>world<\/strong><\/p>"/, "original HTML value must still be present, byte-identical")
-    assert.match(message.text, /"value_markdown": "Hello \*\*world\*\*"/)
+    assert.match(message.text, /"value":"<p>Hello <strong>world<\/strong><\/p>"/, "original HTML value must still be present, byte-identical")
+    assert.match(message.text, /"value_markdown":"Hello \*\*world\*\*"/)
   }
+})
+
+test("executeApiTool treats an HTML page as an error only for JSON-declared tools", async () => {
+  const html = "<!doctype html><html><body>Login</body></html>"
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: html, status: 200, statusText: "OK", headers: { "content-type": "text/html" }, config: {} as any })
+  const jsonTool = { ...emptyDefinition, name: "json_tool", responseContentType: "application/json", outputSchema: { type: "object", properties: {} } }
+  const jsonResult = await executeApiTool("json_tool", jsonTool, {}, {}, { httpClient, minIntervalMs: 0 })
+  assert.equal(jsonResult.isError, true)
+
+  const htmlTool = { ...emptyDefinition, name: "export_tool", responseContentType: "text/html" }
+  const htmlResult = await executeApiTool("export_tool", htmlTool, {}, {}, { httpClient, minIntervalMs: 0 })
+  assert.equal(htmlResult.isError, undefined)
+  assert.equal((htmlResult.content[0] as { text: string }).text, `API Response (Status: 200):\n${html}`)
 })
 
 test("executeApiTool includes structuredContent matching the JSON body when the tool declares an outputSchema (MCP spec requirement)", async () => {
@@ -436,6 +458,50 @@ test("executeApiTool includes structuredContent matching the JSON body when the 
 
   const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 })
   assert.deepEqual(result.structuredContent, body)
+})
+
+test("executeApiTool compacts JSON text and caps it while preserving schema-valid structuredContent", async () => {
+  const definition: McpToolDefinition = {
+    ...emptyDefinition, name: "get_thing", method: "get", pathTemplate: "/things/1",
+    inputSchema: { type: "object", properties: { fields: { type: "string" }, "page[size]": { type: "number" } } },
+    outputSchema: { type: "object", properties: { data: { type: "object", additionalProperties: true } } },
+  }
+  const body = { data: { description: "x".repeat(211_000) } }
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: body, status: 200, statusText: "OK", headers: { "content-type": "application/json" }, config: {} as any })
+  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 }, 1_000)
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") {
+    assert.ok(message.text.length <= 1_000)
+    const envelope = JSON.parse(message.text) as { truncated: boolean; totalChars: number; preview: string; hint: string }
+    assert.equal(envelope.truncated, true)
+    assert.ok(envelope.totalChars > 1_000)
+    assert.match(envelope.hint, /fields.*page_size_|page_size_.*fields/i)
+    assert.doesNotMatch(message.text, /\n\s+"data"/)
+  }
+  assert.deepEqual(result.structuredContent, body)
+  assert.deepEqual(compileZodSchema(lenientOutputSchema(definition.outputSchema) as Record<string, unknown>).parse(result.structuredContent), body)
+})
+
+test("executeApiTool truncation stays valid JSON, respects code points, and gives only applicable advice", async () => {
+  const definition: McpToolDefinition = { ...emptyDefinition, name: "get_thing", method: "get", pathTemplate: "/things/1" }
+  const body = { message: "😀".repeat(2_000) }
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: body, status: 200, statusText: "OK", headers: { "content-type": "application/json" }, config: {} as any })
+  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 }, 1_000)
+  const text = (result.content[0] as { text: string }).text
+  const envelope = JSON.parse(text) as { truncated: boolean; preview: string; hint: string }
+  assert.equal(envelope.truncated, true)
+  assert.equal(/[\uD800-\uDBFF]$/.test(envelope.preview), false)
+  assert.match(envelope.hint, /narrow the query/i)
+  assert.doesNotMatch(envelope.hint, /fields|page_size_/)
+})
+
+test("executeApiTool leaves under-cap JSON response text unchanged except for compact formatting", async () => {
+  const definition: McpToolDefinition = { ...emptyDefinition, name: "get_thing", method: "get", pathTemplate: "/things/1" }
+  const body = { data: { id: "1", name: "Example" } }
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: body, status: 200, statusText: "OK", headers: { "content-type": "application/json" }, config: {} as any })
+  const result = await executeApiTool("get_thing", definition, {}, {}, { httpClient, minIntervalMs: 0 }, 1_000)
+  assert.equal((result.content[0] as any).text, `API Response (Status: 200):\n${JSON.stringify(body)}`)
 })
 
 test("executeApiTool omits structuredContent when the tool has no outputSchema, even for a JSON response", async () => {

@@ -45,11 +45,13 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, reque
 import { createPolarionServer } from './server.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
 import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
+import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
 import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
 import { fetchClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
-import { bearerCredential } from './utils.js';
+import { bearerCredential, parseTrustProxy } from './utils.js';
+export { parseTrustProxy } from './utils.js';
 
 dotenv.config();
 
@@ -141,6 +143,8 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
 export interface McpHttpAppOptions {
   /** Deployment-wide toolset allowlist. Request selectors can only narrow it. */
   allowedToolsets?: readonly ToolsetName[];
+  /** Maximum characters returned in tool text content. */
+  maxResponseChars?: number;
   /** Optional allow-list of Host header values enabling DNS-rebinding protection. */
   allowedHosts?: string[];
   /**
@@ -216,7 +220,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   app: express.Express;
   closeAllSessions: () => Promise<void>;
 } {
-  const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris } = options;
+  const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris, maxResponseChars } = options;
   const allowedPresets = parseRedirectAllowlist(undefined, options.allowedRedirectPresets);
   const effectiveAllowedRedirectUris = [...(allowedRedirectUris ?? []), ...allowedPresets];
   const allowedToolsets = options.allowedToolsets ?? TOOLSET_NAMES;
@@ -638,7 +642,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   if (oauth && publicUrl && gptClient) {
-    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500);
+    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
   }
 
   // Health check (no auth) for load balancers and quick verification.
@@ -754,7 +758,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer(res.locals.toolFilter as ToolFilter);
+      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
@@ -819,6 +823,7 @@ function mountCustomGpt(
   gptClient: { clientId: string; clientSecret: string },
   bearerChallenge: (error?: string) => string,
   tokenIpRateLimit: number,
+  maxResponseChars: number
 ): void {
   // Same limits the SDK applies to its own /authorize and /token.
   const authorizeLimit = rateLimit({
@@ -919,6 +924,7 @@ function mountCustomGpt(
       },
     },
     unauthorizedDescription: 'Not logged in, or the login expired',
+    maxResponseChars,
   }));
 }
 
@@ -944,23 +950,6 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
     throw new Error(`MCP_PUBLIC_URL must be the origin without a path (got ${value}); serve the server at the root of its own host or subdomain`);
   }
   return url;
-}
-
-/**
- * Parses `TRUST_PROXY`: a hop count, or what Express accepts as a string
- * ("loopback", or a comma-separated list of addresses/subnets).
- *
- * @param value - The raw environment value.
- * @returns The `trust proxy` setting, or undefined to leave it off.
- * @throws Error for "true", which would trust any X-Forwarded-For a client sends.
- */
-export function parseTrustProxy(value: string | undefined): string | number | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed || trimmed === 'false') return undefined;
-  if (trimmed === 'true') {
-    throw new Error('TRUST_PROXY=true trusts any X-Forwarded-For a client sends; use "loopback", a hop count or the proxy address');
-  }
-  return /^\d+$/.test(trimmed) ? Number(trimmed) : trimmed;
 }
 
 /**
@@ -1020,9 +1009,10 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
     if (!knownRedirectPresets.has(preset)) (options.logger ?? console).warn(`[WARN] Ignoring unknown MCP_ALLOWED_REDIRECT_PRESETS entry: ${preset}`);
   }
   const allowedToolsets = configuredToolsets(process.env);
+  const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
