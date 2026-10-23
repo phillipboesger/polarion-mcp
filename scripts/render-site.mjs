@@ -23,7 +23,7 @@ export function renderSite(rootDir = root) {
   const htmlPath = path.join(rootDir, 'docs/index.html');
   const clients = JSON.parse(fs.readFileSync(path.join(rootDir, 'docs/clients.json'), 'utf8')).clients;
   const toolsSource = fs.readFileSync(path.join(rootDir, 'src/tools.ts'), 'utf8');
-  const count = [...toolsSource.matchAll(/^\s*\[\"[^\"]+\", \{/gm)].length;
+  const count = [...toolsSource.matchAll(/^\s*\["[^"]+", \{/gm)].length;
   if (!count) throw new Error('Could not derive tool count from src/tools.ts');
   const html = fs.readFileSync(htmlPath, 'utf8');
   const block = `${startMarker}\n${renderSiteClientsBlock(clients)}\n    ${endMarker}`;

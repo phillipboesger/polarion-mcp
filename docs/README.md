@@ -33,6 +33,7 @@ Choose a client guide for its connection and authentication steps:
 | [Configuration](configuration.md) | Environment variables and configuration behavior. |
 | [Deployment](deployment.md) | Deployment targets, reverse proxy setup, and operations. |
 | [Example task](example-task.md) | An example workflow using Polarion MCP. |
+| [Extension seams](extensions.md) | Synthetic tools, policy, audit, authentication, and instance resolver interfaces. |
 | [Features](features.md) | Supported server features and behavior. |
 | [Live tests](live-tests.md) | Running integration tests against a live Polarion instance. |
 | [OpenAPI and generation](openapi-and-generation.md) | How the API specification and generated tools are maintained. |

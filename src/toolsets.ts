@@ -4,6 +4,7 @@ import type { McpToolDefinition } from './types.js';
 export const TOOLSET_NAMES = [
   'work-items', 'documents', 'test-management', 'plans', 'collections',
   'projects', 'users', 'admin', 'jobs', 'pages', 'enumerations',
+  'composites',
 ] as const;
 
 export type ToolsetName = typeof TOOLSET_NAMES[number];

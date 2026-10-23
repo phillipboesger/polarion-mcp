@@ -567,7 +567,8 @@ export async function executeApiTool(
   toolArgs: JsonObject,
   allSecuritySchemes: Record<string, any>,
   sendOpts?: SendWithRetryOpts,
-  maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS
+  maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS,
+  apiBaseUrl = API_BASE_URL
 ): Promise<CallToolResult> {
   try {
     // ===== STEP 0: Strip dry_run before validation =====
@@ -710,7 +711,7 @@ export async function executeApiTool(
 
     // Construct the full URL
     // Combine base URL (from config) with the path we built
-    const requestUrl = API_BASE_URL ? `${API_BASE_URL}${urlPath}` : urlPath;
+    const requestUrl = apiBaseUrl ? `${apiBaseUrl}${urlPath}` : urlPath;
 
     // ===== STEP 4: Handle Request Body =====
     const requestBody = readArg(validatedArgs, 'requestBody', nameMap);
@@ -933,7 +934,7 @@ export async function executeApiTool(
     // 3. User references (assignee/votes/watches) -- Work Item write tools only.
     // See guards.ts for exactly what's validated and what's an explicit,
     // documented follow-up (categories, module/linkedRevisions existence).
-    const guardRequestContext = { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() };
+    const guardRequestContext = { baseUrl: apiBaseUrl, headers, rejectUnauthorized: shouldRejectUnauthorized() };
 
     const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
     if (enumTargets) {

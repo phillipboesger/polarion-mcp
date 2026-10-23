@@ -14,7 +14,7 @@
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, configuredToolsets } from './config.js';
 import { createPolarionServer } from './server.js';
 import { parseMaxResponseChars } from './executor.js';
 
@@ -29,7 +29,7 @@ import { parseMaxResponseChars } from './executor.js';
 async function main(): Promise<void> {
   try {
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
-    const server = createPolarionServer({ maxResponseChars });
+    const server = createPolarionServer({ maxResponseChars, apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
     const transport = new StdioServerTransport();
     await server.connect(transport);
 

@@ -80,13 +80,6 @@ export function filterTools(
 }
 
 const filtered = filterTools(toolDefinitionMap, parseToolFilter(process.env));
-if (filtered.unknown.length > 0) {
-  console.error(`[WARN] MCP_TOOLS names unknown tools, ignored: ${filtered.unknown.join(', ')}`);
-}
-if (filtered.tools.size === 0) {
-  // A server without tools is never what a deployment wants; a typo or a renamed tool should not go unnoticed.
-  throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY) leaves no tools; check the names in MCP_TOOLS');
-}
 if (filtered.tools.size !== toolDefinitionMap.size) {
   console.error(`[INFO] Tool filter: ${filtered.tools.size}/${toolDefinitionMap.size} tools enabled`);
 }
