@@ -17,6 +17,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import https from 'node:https';
 import axios from 'axios';
 import type { Response } from 'express';
@@ -42,6 +43,12 @@ export const LOGIN_PATH = '/polarion-login';
  * silent and is where a revoked PAT is noticed.
  */
 const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
+const cimdRequestClientMemo = new AsyncLocalStorage<Map<string, OAuthClientInformationFull>>();
+
+/** Reuses a prevalidated CIMD client throughout one authorization request. */
+export function withCimdClientMemo(client: OAuthClientInformationFull, callback: () => void): void {
+  cimdRequestClientMemo.run(new Map([[client.client_id, client]]), callback);
+}
 
 /** Default sliding refresh-token lifetime; deployments may override in seconds. */
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60;
@@ -282,6 +289,8 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
    */
   async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
     if (isCimdClientIdentifier(clientId)) {
+      const requestMemo = cimdRequestClientMemo.getStore()?.get(clientId);
+      if (requestMemo) return requestMemo;
       if (!this.cimdEnabled) return undefined;
       try {
         parseClientIdentifierUrl(clientId);

@@ -12,6 +12,15 @@ const FETCH_TIMEOUT_MS = 5_000;
 const DEFAULT_CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 500;
+const MAX_IN_FLIGHT_FETCHES = 8;
+const FAILURE_CACHE_TTL_MS = 30 * 1000;
+const EXTRA_DENYLIST_CIDRS: Array<[ipaddr.IPv4 | ipaddr.IPv6, number]> = [
+  '198.18.0.0/15', '192.31.196.0/24', '192.52.193.0/24', '192.175.48.0/24',
+  '192.0.0.0/24', '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24', '240.0.0.0/4',
+  '64:ff9b:1::/48', '100::/64', '2001:10::/28', '2001:20::/28', '5f00::/16',
+  '2620:4f:8000::/48', '3fff::/20', '2001:db8::/32',
+].map(cidr => ipaddr.parseCIDR(cidr));
+let activeFetches = 0;
 
 export interface CimdClientMetadata {
   client_id: string;
@@ -46,7 +55,8 @@ interface FetchResult {
 }
 
 interface CacheEntry {
-  metadata: CimdClientMetadata;
+  metadata?: CimdClientMetadata;
+  error?: Error;
   expiresAt: number;
 }
 
@@ -60,7 +70,13 @@ export function isPublicCimdAddress(address: string): boolean {
     }
     // ipaddr.js uses real byte parsing and marks special-purpose ranges (private,
     // loopback, link-local, CGNAT, multicast, unspecified and reserved) separately.
-    return parsed.range() === 'unicast';
+    if (parsed.range() !== 'unicast') return false;
+    return !EXTRA_DENYLIST_CIDRS.some(([network, prefix]) => {
+      if (parsed.kind() !== network.kind()) return false;
+      return parsed.kind() === 'ipv4'
+        ? (parsed as ipaddr.IPv4).match(network as ipaddr.IPv4, prefix)
+        : (parsed as ipaddr.IPv6).match(network as ipaddr.IPv6, prefix);
+    });
   } catch {
     return false;
   }
@@ -88,26 +104,48 @@ export async function fetchClientMetadataDocument(clientId: string, options: Cim
 /** Creates a bounded, URL-keyed metadata cache around the SSRF-safe fetcher. */
 export function createCimdMetadataFetcher(options: CimdFetchOptions = {}): CimdMetadataFetcher {
   const cache = new Map<string, CacheEntry>();
+  const inFlight = new Map<string, Promise<CimdClientMetadata>>();
   return async (clientId: string): Promise<CimdClientMetadata> => {
     const cached = cache.get(clientId);
     if (cached && cached.expiresAt > Date.now()) {
       cache.delete(clientId);
       cache.set(clientId, cached);
-      return cached.metadata;
+      if (cached.error) throw cached.error;
+      if (cached.metadata) return cached.metadata;
     }
     if (cached) cache.delete(clientId);
 
-    const result = await fetchDocument(clientId, options);
-    if (result.cacheTtlMs > 0) {
-      cache.set(clientId, { metadata: result.metadata, expiresAt: Date.now() + result.cacheTtlMs });
-      while (cache.size > MAX_CACHE_ENTRIES) {
-        const oldest = cache.keys().next().value as string | undefined;
-        if (oldest === undefined) break;
-        cache.delete(oldest);
-      }
+    const existing = inFlight.get(clientId);
+    if (existing) return existing;
+    if (activeFetches >= MAX_IN_FLIGHT_FETCHES) {
+      throw new Error('Client metadata fetch capacity is full');
     }
-    return result.metadata;
+
+    activeFetches++;
+    const request = fetchDocument(clientId, options).then(result => {
+      if (result.cacheTtlMs > 0) setCacheEntry(cache, clientId, { metadata: result.metadata, expiresAt: Date.now() + result.cacheTtlMs });
+      return result.metadata;
+    }).catch(error => {
+      const failure = error instanceof Error ? error : new Error('Client metadata fetch failed');
+      setCacheEntry(cache, clientId, { error: failure, expiresAt: Date.now() + FAILURE_CACHE_TTL_MS });
+      throw failure;
+    }).finally(() => {
+      activeFetches--;
+      inFlight.delete(clientId);
+    });
+    inFlight.set(clientId, request);
+    return request;
   };
+}
+
+function setCacheEntry(cache: Map<string, CacheEntry>, clientId: string, entry: CacheEntry): void {
+  cache.delete(clientId);
+  cache.set(clientId, entry);
+  while (cache.size > MAX_CACHE_ENTRIES) {
+    const oldest = cache.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
 }
 
 const defaultCimdMetadataFetcher = createCimdMetadataFetcher();
