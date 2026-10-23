@@ -36,6 +36,7 @@ import { API_BASE_URL, getBearerToken, tokenScope } from './config.js';
 import { parseToolFilter } from './tool-filter.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { ToolCallRateLimiter } from './tool-rate-limit.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -64,6 +65,7 @@ interface ToolCallPipelineOptions {
   maxResponseChars: number;
   logger: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
   signal?: AbortSignal;
+  rateLimiter: ToolCallRateLimiter;
 }
 
 /** Applies auth, policy, execution, and audit once for every MCP tools/call request. */
@@ -80,6 +82,12 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
   let result: CallToolResult;
   try {
     principal = await options.extensions.authProvider.validateRequest({ bearerToken, userScope });
+    const retryAfter = options.rateLimiter.check(principal.id);
+    if (retryAfter !== undefined) {
+      outcome = 'denied';
+      result = { content: [{ type: 'text', text: `Tool call rate limit exceeded. Retry in ${retryAfter} seconds.` }], isError: true };
+      return result;
+    }
     const decision = await options.extensions.policyHook.beforeCall({
       tool: toolName, args, user: principal,
       readOnly: annotations?.readOnlyHint === true,
@@ -135,6 +143,10 @@ export interface PolarionServerOptions {
   extensions?: Partial<PolarionExtensions>;
   apiBaseUrl?: string;
   logger?: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
+  /** Calls per user per rolling minute; zero disables the limiter. */
+  rateLimitTools?: number;
+  /** Clock injection for deterministic sliding-window tests. */
+  now?: () => number;
 }
 
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {
@@ -161,6 +173,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl), ...options.extensions };
+  const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
@@ -200,7 +213,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   server.setRequestHandler(CallToolRequestSchema, (request, extra) => callToolPipeline(
     request.params.name,
     (request.params.arguments ?? {}) as Record<string, unknown>,
-    { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal },
+    { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter },
   ));
 
   /**

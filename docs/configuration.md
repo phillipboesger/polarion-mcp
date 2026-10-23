@@ -32,6 +32,7 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_SESSION_IDLE_MINUTES` | `60` minutes | `src/mcp-http-server.ts` | No | Idle Streamable HTTP session lifetime. Positive integer overrides default. |
 | `MCP_MAX_SESSIONS` | `1000` | `src/mcp-http-server.ts` | No | Maximum in-memory MCP sessions; excess sessions evict the least recently used. Positive integer overrides default. |
 | `MCP_MAX_RESPONSE_CHARS` | `100000` characters | `src/index.ts`, `src/http-server.ts`, `src/mcp-http-server.ts` | No | Maximum returned text size. Positive integer overrides default. |
+| `MCP_RATE_LIMIT_TOOLS` | `0` (off) | `src/index.ts`, `src/mcp-http-server.ts` | No | Maximum tool calls per user in a rolling minute. Non-negative integer; over-limit calls return an MCP error with a retry hint. |
 | `MCP_TOOLSETS` | Unset, all toolsets | `src/config.ts`, `src/mcp-http-server.ts` | No | Deployment-wide comma-separated toolset allowlist. Names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`. Requests may narrow this list. |
 | `MCP_TOOLS` | Unset, all tools | `src/tool-filter.ts` | No | Tool name allowlist, separated by commas, spaces, or newlines. |
 | `MCP_READ_ONLY` | `false` | `src/tool-filter.ts` | No | Keep only tools annotated read-only. Accepts true/1/yes/on or false/0/no/off. |

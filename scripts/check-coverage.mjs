@@ -27,6 +27,7 @@ const targets = [
   'src/virtual-tools.ts',
   'src/extensions.ts',
   'src/shaping.ts',
+  'src/tool-rate-limit.ts',
 ]
 const sourceFiles = [...files].filter(([file]) => file.startsWith('src/') && file !== 'src/tools.ts')
 if (sourceFiles.length === 0) throw new Error('coverage/lcov.info contains no eligible src/*.ts files')
