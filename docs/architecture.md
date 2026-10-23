@@ -1,68 +1,32 @@
 # Architecture
 
-## Runtime Modes
+## Runtime modes
 
-The application has two runtime modes that share the same execution core:
+The repository has three transports over a shared execution core:
 
-- MCP stdio mode: src/index.ts registers MCP handlers for tools, resources, and prompts.
-- HTTP mode: src/http-server.ts exposes the same tool execution path over Express (on Render, `npm run build:http` copies it over build/index.js).
+- **stdio MCP**: `src/index.ts` creates the MCP server and connects it to stdio for local clients.
+- **Streamable HTTP MCP**: `src/mcp-http-server.ts` serves MCP at `/mcp`, with per-caller authenticated sessions and optional OAuth.
+- **REST HTTP**: `src/http-server.ts` exposes tool listing and execution for HTTP clients, protected by `HTTP_API_KEY`.
 
-## Components
+`src/server.ts` creates the shared MCP server. `src/rest-api.ts` supplies REST tool routes. `src/executor.ts` validates and maps arguments, applies request pacing and retries, runs write guards, calls Polarion, converts rich text, and formats results. `src/httpClient.ts`, `src/auth.ts`, and `src/oauth.ts` implement HTTP requests and authentication flows.
 
-- Configuration layer: src/config.ts loads environment variables, server identity, default API location, and documentation resource metadata.
-- MCP transport layer: src/index.ts connects the MCP SDK server to stdio transport and publishes tool, resource, and prompt capabilities.
-- HTTP transport layer: src/http-server.ts adds HTTP authentication, health endpoints, tool listing, tool execution, and generated OpenAPI documents.
-- Execution layer: src/executor.ts validates arguments, restores original OpenAPI parameter names, applies security, executes HTTP requests, and formats responses.
-- Polarion helper layer: src/polarion.ts serves documentation resources, caches project configuration, and provides guided prompts.
-- Authentication layer: src/auth.ts performs OAuth2 token acquisition and in-memory token caching for compatible security schemes.
-- Utility layer: src/utils.ts sanitizes schemas, looks up mapped arguments, formats Axios failures, and creates runtime Zod validators.
-- Generated interface layer: src/tools.ts contains the generated tool definitions from Polarion OpenAPI.
-- GPT subset layer: src/gpt-tools.ts defines the constrained tool subset used to generate the Custom GPT OpenAPI document.
+## Tool definitions and filtering
 
-## Generated and Handwritten Boundaries
+`src/tools.ts` is generated from Polarion OpenAPI and currently defines 284 tools. Do not edit it by hand. `src/tool-filter.ts` applies configured tool filters; `src/toolsets.ts` classifies tools into named domains. The MCP HTTP transport supports deployment-wide toolset limits and per-request selectors. Read-only filtering is also available.
 
-- Handwritten files own transport, auth, validation, resources, prompts, and deployment behavior.
-- src/tools.ts is generated and should be replaced by regeneration, not edited manually.
-- The rest of the repository is responsible for adapting generated operations to MCP and HTTP client constraints.
+The Custom GPT OpenAPI document is derived from `src/gpt-tools.ts`, a curated subset of the complete generated tool map.
 
-## MCP Request Flow
+## MCP execution flow
 
-1. MCP client lists tools from src/tools.ts.
-2. Input schemas are sanitized to MCP-safe keys.
-3. Tool invocation runs through executeApiTool in src/executor.ts.
-4. Auth is applied based on OpenAPI security schemes.
-5. HTTP request is sent to Polarion REST API.
-6. Response is formatted and returned to MCP client.
+1. The client initializes the MCP connection and discovers enabled tools, resources, and prompts.
+2. Input schemas are sanitized to MCP-compatible property names; a name map restores original Polarion parameter names for requests.
+3. `src/executor.ts` validates arguments, performs applicable pre-write checks, applies the OpenAPI security scheme, and sends the request.
+4. Results include text content and, for tools with an output schema, structured content. Text is capped by `MCP_MAX_RESPONSE_CHARS` (default 100,000 characters); structured content is not truncated.
 
-## HTTP Request Flow
+## Resources and validation
 
-1. HTTP client calls /api/tools or /api/tools/:toolName.
-2. Input schemas are sanitized and mapped to original names.
-3. The same executor pipeline is reused.
-4. Response is returned as JSON with text content.
-5. /openapi.json and /openapi-gpt.json expose full and limited specs.
+`src/polarion.ts` provides server instructions, offline guides, optional local SDK PDF resources, and workflow prompts. Write guards in `src/guards.ts` validate supported enumeration values, custom-field keys, and Work Item user references before dispatch. Rich HTML fields gain a `value_markdown` sibling while preserving the original value.
 
-## Supporting Capabilities
+## Generation boundary
 
-- Server instructions, offline guide resources and prompt templates in src/polarion.ts give the model task guidance on top of the raw REST operations.
-- Optional local SDK PDFs in sdk/ are exposed as text resources when present.
-
-## Schema Sanitization and Validation
-
-- sanitizeInputSchema converts invalid property names (for example, page[size]) to MCP-safe keys.
-- A name map preserves original names for API execution.
-- JSON Schema is converted to Zod for runtime validation.
-
-## Resources and Project Configuration
-
-- Resources are offline guides (query syntax, write bodies, paging) plus optional local SDK PDFs; nothing is fetched from the network.
-
-## Operational Constraints
-
-- MCP mode expects the client to manage the server process and environment variables.
-- HTTP mode requires an additional HTTP_API_KEY because it exposes a network-accessible interface.
-- Bearer token authentication to Polarion is handled by environment variables, not by incoming tool arguments.
-
-## read_when
-
-- Use this guide when understanding request flows or extending server behavior.
+Regeneration updates `src/tools.ts`; transport, execution, filtering, resources, and prompts are handwritten. See [OpenAPI and generation](./openapi-and-generation.md) for the pipeline.

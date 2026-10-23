@@ -2,38 +2,12 @@
 
 ## How versioning works
 
-The server's tool surface (`src/tools.ts`) is generated from a Polarion OpenAPI
-definition, so the supported version is simply whichever spec you last regenerated
-from. The REST path `/polarion/rest/v1` is stable across Polarion releases; newer
-releases mainly add endpoints and fields, which regeneration picks up.
+The tool surface in `src/tools.ts` is generated from a Polarion OpenAPI definition. The committed file currently contains 284 tool definitions. That count describes the generated operations, not a guarantee that every operation works identically on every Polarion release or instance. Runtime behavior also depends on Polarion configuration and permissions.
 
-- Default spec source: the public Polarion demo (kept current by Siemens).
-- The committed `src/tools.ts` reflects the most recent regeneration (see its header for the tool count).
+The default regeneration source is the public Polarion demo definition. To target another published definition, set `SPEC_URL`; an authenticated instance may also require `BEARER_TOKEN`. See [OpenAPI and generation](./openapi-and-generation.md).
 
-You do **not** need to update anything continuously — only when you move to a newer
-Polarion version and want its new endpoints.
+## Updating the generated tool surface
 
-## Updating to a newer version (e.g. 2606)
+Run `npm run regenerate` locally, optionally setting `SPEC_URL` and `BEARER_TOKEN`. The `Update Polarion tools` GitHub workflow also supports manual dispatch and runs weekly against its default source. It opens a pull request when the generated file changes. Review changes and run the project quality checks before merging.
 
-Two equivalent options:
-
-- **Automated (recommended):** run the *Update Polarion tools* GitHub Action
-  (Actions tab → Run workflow). Leave `spec_url` blank to use the public demo, or
-  paste the published REST spec URL of your target version. It regenerates, runs
-  build + tests, and opens a pull request with the updated `src/tools.ts`.
-- **Local:**
-
-  ```bash
-  # public demo (latest)
-  npm run regenerate
-  # or a specific instance/version
-  SPEC_URL="https://your-polarion-server/polarion/rest/v1/definition" BEARER_TOKEN="..." npm run regenerate
-  ```
-
-Then review the `src/tools.ts` diff, smoke test key workflows (auth, work items,
-documents, search), and merge.
-
-## Notes
-
-- Regeneration only rewrites `src/tools.ts`; all hand-written modules are preserved (see [openapi-and-generation.md](./openapi-and-generation.md)).
-- A weekly scheduled run of the same workflow surfaces drift automatically.
+Regeneration updates the generated `src/tools.ts`; handwritten runtime modules are preserved. The process runs build and tests. It does not establish compatibility with every Polarion release, so verify important operations against the target version, using the live test suite where available.
