@@ -72,6 +72,7 @@ export interface RestToolsOptions {
   securityScheme: Record<string, unknown>;
   /** What a 401 means, as documented in the specs. */
   unauthorizedDescription: string;
+  executeTool?: typeof executeApiTool;
 }
 
 /**
@@ -182,6 +183,7 @@ const HEALTH_RESPONSE = {
 export function createRestToolsRouter(options: RestToolsOptions): express.Router {
   const { authenticate, serverUrl, securityScheme, unauthorizedDescription } = options;
   const router = express.Router();
+  const executeTool = options.executeTool ?? executeApiTool;
 
   /**
    * List all available tools
@@ -230,7 +232,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       }
 
       // Execute the tool
-      const result = await executeApiTool(toolName, toolDefinition, toolArgs, securitySchemes);
+      const result = await executeTool(toolName, toolDefinition, toolArgs, securitySchemes);
 
       // Extract text content from MCP response format
       const textContent = result.content
@@ -254,14 +256,16 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       });
 
     } catch (error: unknown) {
-      console.error(`[ERROR] Error executing tool '${toolName}':`, error);
-
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const detail = String(error instanceof Error ? error.message : error)
+        .replace(/(authorization\s*:\s*bearer\s+)\S+/ig, '$1[REDACTED]')
+        .replace(/\bBearer\s+\S+/ig, 'Bearer [REDACTED]')
+        .replace(/\b(?:pat|token|secret)[=: ]+[^\s,;]+/ig, '[REDACTED]');
+      console.error(`[ERROR] Error executing tool '${toolName}': ${detail}`);
 
       res.status(500).json({
         success: false,
         error: 'Tool execution failed',
-        message: errorMessage,
+        message: 'Tool execution failed',
         tool: toolName,
         timestamp: new Date().toISOString()
       });

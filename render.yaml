@@ -48,8 +48,6 @@ services:
         sync: false # Must be set manually in Dashboard
         # Example: Generate with: openssl rand -hex 32
 
-      - key: LOG_LEVEL
-        value: "info"
 # For deploying multiple Polarion servers:
 #
 # Option 1 (Recommended): Deploy via Render Dashboard

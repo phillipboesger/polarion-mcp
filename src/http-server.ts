@@ -20,34 +20,28 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import { enabledTools } from './tool-filter.js';
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
-import { createRestToolsRouter, specServerUrl } from './rest-api.js';
+import { createRestToolsRouter, specServerUrl, type RestToolsOptions } from './rest-api.js';
 import { safeEqual } from './sealed.js';
 import { bearerCredential } from './utils.js';
+import type { Express } from 'express';
 
-// Load environment variables
-dotenv.config();
-
-const app = express();
-// PORT is what Render and most platforms inject.
-const PORT = process.env.PORT || process.env.HTTP_PORT || 3000;
-const HTTP_API_KEY = process.env.HTTP_API_KEY;
-
-// Security check
-if (!HTTP_API_KEY) {
-  console.error('[ERROR] HTTP_API_KEY is not set in .env file');
-  console.error('[ERROR] Please set HTTP_API_KEY to protect your HTTP endpoints');
-  console.error('[ERROR] Generate one with: openssl rand -hex 32');
-  process.exit(1);
+export interface HttpAppOptions {
+  apiKey: string;
+  env: NodeJS.ProcessEnv;
+  port: number;
+  rateLimit?: { windowMs: number; limit: number };
+  executeTool?: RestToolsOptions['executeTool'];
 }
 
 /**
  * Authentication Middleware
  * Validates the Bearer token from Authorization header
  */
-const authenticateRequest = (req: Request, res: Response, next: Function) => {
+const authenticateRequest = (apiKey: string) => (req: Request, res: Response, next: Function) => {
   // Skip auth for health check and OpenAPI spec endpoints
   if (req.path === '/health' || req.path === '/openapi.json' || req.path === '/openapi-gpt.json') {
     return next();
@@ -75,7 +69,7 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
     });
   }
 
-  if (!safeEqual(token, HTTP_API_KEY)) {
+  if (!safeEqual(token, apiKey)) {
     return res.status(401).json({
       success: false,
       error: 'Invalid API key',
@@ -88,9 +82,13 @@ const authenticateRequest = (req: Request, res: Response, next: Function) => {
   next();
 };
 
-// Middleware
-app.use(cors()); // Enable CORS for Custom GPT access
-app.use(authenticateRequest); // Authenticate all requests (except health/openapi)
+export function createHttpApp(options: HttpAppOptions): Express {
+const app = express();
+const origins = (options.env.HTTP_CORS_ORIGINS ?? 'https://chat.openai.com,https://chatgpt.com').split(',').map(origin => origin.trim()).filter(Boolean);
+app.use(cors({ origin: origins }));
+app.use(authenticateRequest(options.apiKey));
+const limiter = rateLimit({ windowMs: options.rateLimit?.windowMs ?? 15 * 60_000, limit: options.rateLimit?.limit ?? 100, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => res.status(429).json({ success: false, error: 'Too many requests', message: 'Rate limit exceeded' }) });
+app.use('/api', limiter);
 
 /**
  * Health check endpoint
@@ -107,13 +105,14 @@ app.get('/health', (req: Request, res: Response) => {
 app.use(createRestToolsRouter({
   // Already enforced app-wide above.
   authenticate: (_req, _res, next) => next(),
-  serverUrl: specServerUrl(process.env, Number(PORT)),
+  serverUrl: specServerUrl(options.env, options.port),
   securityScheme: {
     type: 'http',
     scheme: 'bearer',
     description: 'API Key for HTTP server authentication. Configure this in your Custom GPT settings.'
   },
-  unauthorizedDescription: 'Authentication failed - invalid or missing API key'
+  unauthorizedDescription: 'Authentication failed - invalid or missing API key',
+  executeTool: options.executeTool
 }));
 
 /**
@@ -142,20 +141,30 @@ app.use((err: Error & { status?: number }, req: Request, res: Response, _next: F
     res.status(err.status).json({ error: err.status === 413 ? 'Request body too large' : 'Bad Request', message: 'The body is not valid JSON or too large' });
     return;
   }
-  console.error('[ERROR] Unhandled error:', err);
+  const safeMessage = String(err?.message ?? err).replace(/(authorization\s*:\s*bearer\s+)\S+/ig, '$1[REDACTED]').replace(/\bBearer\s+\S+/ig, 'Bearer [REDACTED]').replace(/\b(?:pat|token|secret)[=: ]+[^\s,;]+/ig, '[REDACTED]');
+  console.error('[ERROR] Unhandled error:', safeMessage);
   res.status(500).json({
     error: 'Internal server error',
-    message: err.message
+    message: 'An unexpected error occurred'
   });
 });
+
+return app;
+}
 
 /**
  * Start the server
  */
+const startHttpServer = (env: NodeJS.ProcessEnv) => {
+dotenv.config();
+const PORT = env.PORT || env.HTTP_PORT || 3000;
+const HTTP_API_KEY = env.HTTP_API_KEY;
+if (!HTTP_API_KEY) throw new Error('HTTP_API_KEY is required');
+const app = createHttpApp({ apiKey: HTTP_API_KEY, env, port: Number(PORT) });
 const server = app.listen(PORT, () => {
   console.log(`[INFO] Polarion MCP HTTP Server v${SERVER_VERSION} running on port ${PORT}`);
   console.log(`[INFO] API Base URL: ${API_BASE_URL}`);
-  for (const warning of configurationWarnings(process.env, { needsToken: true })) console.log(`[WARN] ${warning}`);
+  for (const warning of configurationWarnings(env, { needsToken: true })) console.log(`[WARN] ${warning}`);
   console.log(`[INFO] Available tools: ${enabledTools.size}`);
   console.log(`[INFO] Essential GPT tools: ${ESSENTIAL_GPT_TOOLS.filter(name => enabledTools.has(name)).length}`);
   console.log(`[INFO] Endpoints:`);
@@ -182,3 +191,8 @@ const shutdown = () => {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+};
+
+if (process.argv[1]?.endsWith('/http-server.js') || process.argv[1]?.endsWith('http-server.js')) {
+  try { startHttpServer(process.env); } catch (error) { console.error('[ERROR]', error); process.exitCode = 1; }
+}
