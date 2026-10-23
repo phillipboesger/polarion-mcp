@@ -34,7 +34,7 @@ function parseToolRateLimit(value: string | undefined): number {
 async function main(): Promise<void> {
   try {
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
-    const server = createPolarionServer({ maxResponseChars, rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
+    const server = createPolarionServer({ maxResponseChars, rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true', apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
     const transport = new StdioServerTransport();
     await server.connect(transport);
 

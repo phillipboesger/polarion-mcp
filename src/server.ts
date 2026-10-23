@@ -37,6 +37,7 @@ import { parseToolFilter } from './tool-filter.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
+import { annotateToolText } from './untrusted-content.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -66,6 +67,7 @@ interface ToolCallPipelineOptions {
   logger: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
   signal?: AbortSignal;
   rateLimiter: ToolCallRateLimiter;
+  markUntrusted: boolean;
 }
 
 /** Applies auth, policy, execution, and audit once for every MCP tools/call request. */
@@ -134,6 +136,11 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       outcome, durationMs: Math.max(0, Date.now() - started),
     });
   }
+  if (!result!.isError) {
+    result!.content = result!.content.map(item => item.type === 'text'
+      ? { ...item, text: annotateToolText(item.text, options.markUntrusted) }
+      : item);
+  }
   return result!;
 }
 
@@ -147,6 +154,8 @@ export interface PolarionServerOptions {
   rateLimitTools?: number;
   /** Clock injection for deterministic sliding-window tests. */
   now?: () => number;
+  /** Wrap user-authored Polarion strings in untrusted-content markers. */
+  markUntrusted?: boolean;
 }
 
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {
@@ -213,7 +222,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   server.setRequestHandler(CallToolRequestSchema, (request, extra) => callToolPipeline(
     request.params.name,
     (request.params.arguments ?? {}) as Record<string, unknown>,
-    { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter },
+    { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false },
   ));
 
   /**
