@@ -34,6 +34,12 @@ Polarion results include a `_notice` that user-authored content is data, not ins
 
 Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts (configurable with `MCP_RATE_LIMIT_TOKEN_IP`); successful requests do not count toward token failure ceilings. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour by default (`MCP_RATE_LIMIT_REGISTER`). Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
 
+## Logging and telemetry
+
+Set `MCP_LOG_FORMAT=json` to emit structured tool-call records to stderr. Records include a validated or generated correlation ID, tool, outcome, duration, and timestamp. Credential-like values and the current caller token are scrubbed before writing. Keep any custom log sinks private and avoid recording tool arguments. `MCP_LOG_LEVEL` filters records.
+
+Telemetry callbacks receive span start and end metadata through the optional extension hook; the default implementation is no-op and adds no SDK dependency.
+
 ## REST wrapper and TLS
 
 `HTTP_API_KEY` protects the REST wrapper; `BEARER_TOKEN` is the Polarion credential it uses. Keep TLS verification enabled. Setting `NODE_TLS_REJECT_UNAUTHORIZED=0` disables certificate validation and exposes credentials to interception.

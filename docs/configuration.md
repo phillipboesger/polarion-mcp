@@ -34,6 +34,8 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_MAX_RESPONSE_CHARS` | `100000` characters | `src/index.ts`, `src/http-server.ts`, `src/mcp-http-server.ts` | No | Maximum returned text size. Positive integer overrides default. |
 | `MCP_RATE_LIMIT_TOOLS` | `0` (off) | `src/index.ts`, `src/mcp-http-server.ts` | No | Maximum tool calls per user in a rolling minute. Non-negative integer; over-limit calls return an MCP error with a retry hint. |
 | `MCP_MARK_UNTRUSTED` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Wrap likely user-authored Polarion text fields in `<polarion-untrusted>` markers after neutralizing embedded closing markers. The response also includes an `_notice` instruction to treat Polarion content as data. |
+| `MCP_LOG_FORMAT` | `text` | `src/index.ts`, `src/mcp-http-server.ts` | No | Tool-call log format: `text` preserves current output; `json` writes structured JSON lines to stderr. |
+| `MCP_LOG_LEVEL` | `info` | `src/index.ts`, `src/mcp-http-server.ts` | No | Minimum tool-call log level: `debug`, `info`, `warn`, or `error`. |
 | `MCP_TOOLSETS` | Unset, all toolsets | `src/config.ts`, `src/mcp-http-server.ts` | No | Deployment-wide comma-separated toolset allowlist. Names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`. Requests may narrow this list. |
 | `MCP_TOOLS` | Unset, all tools | `src/tool-filter.ts` | No | Tool name allowlist, separated by commas, spaces, or newlines. |
 | `MCP_READ_ONLY` | `false` | `src/tool-filter.ts` | No | Keep only tools annotated read-only. Accepts true/1/yes/on or false/0/no/off. |

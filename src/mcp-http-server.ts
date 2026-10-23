@@ -52,6 +52,8 @@ import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
 import { bearerCredential, parseTrustProxy } from './utils.js';
 import type { PolarionExtensions } from './extensions.js';
+import type { LogFormat, LogLevel } from './logger.js';
+import type { TelemetryHooks } from './telemetry.js';
 export { parseTrustProxy } from './utils.js';
 
 dotenv.config();
@@ -150,6 +152,9 @@ export interface McpHttpAppOptions {
   rateLimitTools?: number;
   /** Mark user-authored Polarion response fields as untrusted. */
   markUntrusted?: boolean;
+  logFormat?: LogFormat;
+  logLevel?: LogLevel;
+  telemetry?: TelemetryHooks;
   /** Injected policy, audit, authentication, and instance seams. */
   extensions?: Partial<PolarionExtensions>;
   /** Polarion REST API base URL captured by the entry point. */
@@ -769,7 +774,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, markUntrusted: options.markUntrusted, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
+      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
@@ -1024,9 +1029,12 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const configuredToolRateLimit = Number(process.env.MCP_RATE_LIMIT_TOOLS ?? 0);
   const rateLimitTools = Number.isSafeInteger(configuredToolRateLimit) && configuredToolRateLimit >= 0 ? configuredToolRateLimit : 0;
   const markUntrusted = process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true';
+  const logFormat = process.env.MCP_LOG_FORMAT?.trim().toLowerCase() === 'json' ? 'json' : 'text';
+  const configuredLogLevel = process.env.MCP_LOG_LEVEL?.trim().toLowerCase();
+  const logLevel = ['debug', 'info', 'warn', 'error'].includes(configuredLogLevel ?? '') ? configuredLogLevel as LogLevel : 'info';
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, rateLimitTools, markUntrusted, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, rateLimitTools, markUntrusted, logFormat, logLevel, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

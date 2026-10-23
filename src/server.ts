@@ -38,6 +38,8 @@ import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
 import { annotateToolText } from './untrusted-content.js';
+import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
+import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -64,16 +66,18 @@ interface ToolCallPipelineOptions {
   virtualTools: readonly VirtualTool[];
   extensions: PolarionExtensions;
   maxResponseChars: number;
-  logger: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
+  logger: PipelineLogger;
   signal?: AbortSignal;
   rateLimiter: ToolCallRateLimiter;
   markUntrusted: boolean;
+  telemetry: TelemetryHooks;
+  correlationId?: string;
 }
 
 /** Applies auth, policy, execution, and audit once for every MCP tools/call request. */
 async function callToolPipeline(toolName: string, args: Record<string, unknown>, options: ToolCallPipelineOptions): Promise<CallToolResult> {
   const started = Date.now();
-  const correlationId = randomUUID();
+  const correlationId = options.correlationId ?? randomUUID();
   const virtual = options.virtualTools.find(tool => tool.name === toolName);
   const generated = options.clientTools.get(toolName);
   const annotations = virtual?.annotations ?? generated?.annotations;
@@ -81,7 +85,9 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
   const userScope = tokenScope(bearerToken);
   let principal = { id: userScope ?? 'anonymous' } as Awaited<ReturnType<PolarionExtensions['authProvider']['validateRequest']>>;
   let outcome: 'success' | 'error' | 'denied' | 'confirmation-required' = 'error';
-  let result: CallToolResult;
+  let result: CallToolResult | undefined;
+  let span: ReturnType<TelemetryHooks['onSpanStart']> = undefined;
+  try { span = options.telemetry.onSpanStart({ name: 'polarion.tools.call', correlationId, tool: toolName }); } catch { span = undefined; }
   try {
     principal = await options.extensions.authProvider.validateRequest({ bearerToken, userScope });
     const retryAfter = options.rateLimiter.check(principal.id);
@@ -129,12 +135,15 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     result = { content: [{ type: 'text', text: error instanceof Error ? error.message : 'Tool call failed' }], isError: true };
     outcome = 'error';
   } finally {
+    const durationMs = Math.max(0, Date.now() - started);
     await options.extensions.auditSink.record({
       timestamp: new Date().toISOString(), correlationId, tool: toolName,
       argsHash: hashAuditValue(args),
       userIdHash: createHash('sha256').update(principal.id).digest('hex'),
-      outcome, durationMs: Math.max(0, Date.now() - started),
+      outcome, durationMs,
     });
+    try { options.telemetry.onSpanEnd(span, { correlationId, tool: toolName, outcome, durationMs }); } catch { /* telemetry must not change the tool result */ }
+    options.logger.toolCall?.({ correlationId, tool: toolName, outcome, durationMs, msg: outcome === 'success' ? 'Tool call completed' : 'Tool call ended', secrets: bearerToken ? [bearerToken] : [] });
   }
   if (!result!.isError) {
     result!.content = result!.content.map(item => item.type === 'text'
@@ -150,6 +159,9 @@ export interface PolarionServerOptions {
   extensions?: Partial<PolarionExtensions>;
   apiBaseUrl?: string;
   logger?: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
+  logFormat?: LogFormat;
+  logLevel?: LogLevel;
+  telemetry?: TelemetryHooks;
   /** Calls per user per rolling minute; zero disables the limiter. */
   rateLimitTools?: number;
   /** Clock injection for deterministic sliding-window tests. */
@@ -159,7 +171,7 @@ export interface PolarionServerOptions {
 }
 
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {
-  const logger = options.logger ?? console;
+  const logger: PipelineLogger = options.logger ?? createLogger({ format: options.logFormat, level: options.logLevel });
   const deploymentFilter = parseToolFilter(process.env);
   const intersect = (left?: readonly string[], right?: readonly string[]) => left && right
     ? left.filter(value => right.includes(value))
@@ -219,11 +231,14 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Looks up the requested tool and delegates execution (validation, auth, HTTP
    * call, response formatting) to {@link executeApiTool}.
    */
-  server.setRequestHandler(CallToolRequestSchema, (request, extra) => callToolPipeline(
-    request.params.name,
-    (request.params.arguments ?? {}) as Record<string, unknown>,
-    { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false },
-  ));
+  server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
+    const requestHeader = extra?.requestInfo?.headers['x-request-id'];
+    return callToolPipeline(
+      request.params.name,
+      (request.params.arguments ?? {}) as Record<string, unknown>,
+      { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined) },
+    );
+  });
 
   /**
    * Handler: List Available Resources (SDK docs, OpenAPI specs, cached configs).

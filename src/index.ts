@@ -17,10 +17,16 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, configuredToolsets } from './config.js';
 import { createPolarionServer } from './server.js';
 import { parseMaxResponseChars } from './executor.js';
+import type { LogFormat, LogLevel } from './logger.js';
 
 function parseToolRateLimit(value: string | undefined): number {
   const parsed = Number(value ?? 0);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+function logSettings(env: NodeJS.ProcessEnv): { logFormat: LogFormat; logLevel: LogLevel } {
+  const format = env.MCP_LOG_FORMAT?.trim().toLowerCase();
+  const level = env.MCP_LOG_LEVEL?.trim().toLowerCase();
+  return { logFormat: format === 'json' ? 'json' : 'text', logLevel: ['debug', 'info', 'warn', 'error'].includes(level ?? '') ? level as LogLevel : 'info' };
 }
 
 /**
@@ -34,7 +40,7 @@ function parseToolRateLimit(value: string | undefined): number {
 async function main(): Promise<void> {
   try {
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
-    const server = createPolarionServer({ maxResponseChars, rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true', apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
+    const server = createPolarionServer({ ...logSettings(process.env), maxResponseChars, rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true', apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
     const transport = new StdioServerTransport();
     await server.connect(transport);
 
