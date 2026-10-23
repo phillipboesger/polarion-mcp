@@ -31,6 +31,7 @@ import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { Server as HttpServer } from 'node:http';
 import express, { type Request, type Response, type NextFunction } from 'express';
+import cors from 'cors';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -50,6 +51,7 @@ import { bearerCredential } from './utils.js';
 dotenv.config();
 
 const MCP_PATH = '/mcp';
+const DEFAULT_ALLOWED_ORIGINS = ['https://claude.ai', 'https://chatgpt.com', 'https://chat.openai.com'];
 
 /** A session nobody used for this long is closed; the client re-initializes on the 404. */
 const DEFAULT_SESSION_IDLE_MS = 60 * 60 * 1000;
@@ -67,6 +69,12 @@ const MAX_SESSIONS_PER_OWNER = 20;
 /** Custom GPT Action endpoints; separate from the MCP ones because they skip PKCE. */
 const GPT_AUTHORIZE_PATH = '/gpt/authorize';
 const GPT_TOKEN_PATH = '/gpt/token';
+const ORIGIN_PROTECTED_PATHS = new Set([
+  MCP_PATH,
+  '/authorize', '/token', '/register', '/revoke', LOGIN_PATH,
+  '/.well-known/oauth-authorization-server',
+  GPT_AUTHORIZE_PATH, GPT_TOKEN_PATH,
+]);
 
 /** Hosts ChatGPT sends Custom GPT OAuth callbacks from. */
 const GPT_CALLBACK_HOSTS = new Set(['chatgpt.com', 'chat.openai.com']);
@@ -151,6 +159,8 @@ export interface McpHttpAppOptions {
    * counter for every user. Unset, the peer address is used.
    */
   trustProxy?: string | number;
+  /** Browser origins allowed to call MCP and OAuth endpoints; unset uses Claude.ai and ChatGPT. */
+  allowedOrigins?: string[];
   /** Dynamic OAuth registrations allowed per hour. Defaults to 100. */
   registerRateLimit?: number;
   /** Sliding refresh-token lifetime in seconds. Defaults to 14 days. */
@@ -183,6 +193,36 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris } = options;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
+  const allowedOrigins = options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
+  const corsMiddleware = cors({
+    origin: true,
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version'],
+    exposedHeaders: ['mcp-session-id', 'mcp-protocol-version', 'www-authenticate'],
+    optionsSuccessStatus: 204,
+  });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const path = req.path.replace(/\/+$/, '') || '/';
+    const isOAuthMetadata = path.startsWith('/.well-known/oauth-protected-resource');
+    if (!ORIGIN_PROTECTED_PATHS.has(path) && !isOAuthMetadata) return next();
+
+    const origin = req.get('origin');
+    if (!origin) return next();
+    if (!allowedOrigins.includes(origin)) {
+      if (path === MCP_PATH) res.status(403).json(jsonRpcError('Origin is not allowed'));
+      else res.status(403).json({ error: 'origin_not_allowed' });
+      return;
+    }
+
+    // The SDK's OAuth routes use wildcard CORS internally. Keep their response
+    // header aligned with this origin check instead of widening the allowlist.
+    const setHeader = res.setHeader.bind(res);
+    res.setHeader = ((name: string, value: string | number | readonly string[]) => {
+      if (name.toLowerCase() === 'access-control-allow-origin') value = origin;
+      return setHeader(name, value);
+    }) as Response['setHeader'];
+    corsMiddleware(req, res, next);
+  });
   // Parsed per route, after authentication, so anonymous callers cannot make
   // the server parse 10 MB bodies.
   const jsonBody = express.json({ limit: '10mb' });
@@ -799,6 +839,10 @@ export function startMcpHttpServer(): HttpServer {
     .split(',')
     .map(h => h.trim())
     .filter(Boolean);
+  const configuredAllowedOrigins = (process.env.MCP_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
   const publicUrl = parsePublicUrl(process.env.MCP_PUBLIC_URL);
   const tokenSecret = process.env.MCP_TOKEN_SECRET || undefined;
   const previousTokenSecrets = (process.env.MCP_TOKEN_SECRET_PREVIOUS || '').split(',').map(secret => secret.trim()).filter(Boolean);
@@ -819,7 +863,7 @@ export function startMcpHttpServer(): HttpServer {
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
