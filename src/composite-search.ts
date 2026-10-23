@@ -162,7 +162,8 @@ const safePart = '[^/?#&]+';
 const routes: Array<{ regex: RegExp; type: EntityRef['type']; id: (m: RegExpExecArray, url: URL) => string; space?: (m: RegExpExecArray) => string }> = [
   { regex: new RegExp(`/workitem\\?id=(${safePart})`, 'i'), type: 'workitem', id: m => m[1] },
   { regex: new RegExp(`/workitem/(${safePart})`, 'i'), type: 'workitem', id: m => m[1] },
-  { regex: new RegExp(`/document\\?doc=(${safePart})`, 'i'), type: 'document', id: m => m[1] },
+  { regex: /\/document\?doc=([^?#&]+)/i, type: 'document', id: m => m[1] },
+  { regex: new RegExp(`/document\\?id=(${safePart})`, 'i'), type: 'document', id: m => m[1] },
   { regex: new RegExp(`/document/(${safePart})`, 'i'), type: 'document', id: m => m[1] },
   { regex: new RegExp(`/(?:testrun|testRun)\\?id=(${safePart})`, 'i'), type: 'testrun', id: m => m[1] },
   { regex: new RegExp(`/testruns?/(${safePart})`, 'i'), type: 'testrun', id: m => m[1] },
@@ -184,9 +185,15 @@ export function parsePolarionUrl(input: string, apiBaseUrl: string): EntityRef {
   for (const route of routes) {
     const match = route.regex.exec(routeText);
     if (!match) continue;
-    const id = decodeURIComponent(route.id(match, url));
+    let id = decodeURIComponent(route.id(match, url));
+    let spaceId = route.space ? decodeURIComponent(route.space(match)) : route.type === 'document' ? url.searchParams.get('space') ?? undefined : undefined;
+    if (route.type === 'document' && id.includes('/')) {
+      const parts = id.split('/');
+      if (parts.length !== 2 || parts.some(part => !part)) throw new Error('Malformed document URL identifier');
+      [spaceId, id] = parts;
+    }
     if (!id || /[\\/]/.test(id) && route.type !== 'workitem') throw new Error('Malformed Polarion entity ID');
-    return { type: route.type, projectId: decodeURIComponent(projectMatch[1]), id, ...(route.space ? { spaceId: decodeURIComponent(route.space(match)) } : {}) };
+    return { type: route.type, projectId: decodeURIComponent(projectMatch[1]), id, ...(spaceId ? { spaceId } : {}) };
   }
   throw new Error('Unsupported or malformed Polarion entity URL');
 }

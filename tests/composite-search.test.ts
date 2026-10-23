@@ -36,6 +36,8 @@ test('resolves same-host URL forms and rejects foreign or malformed URLs', () =>
     ['https://polarion.example/polarion/#/project/PRJ/workitem?id=WI-1', 'workitem', 'PRJ', 'WI-1'],
     ['https://polarion.example/polarion/redirect/project/PRJ/workitem?id=WI-2', 'workitem', 'PRJ', 'WI-2'],
     ['https://polarion.example/polarion/#/project/PRJ/document?doc=Spec', 'document', 'PRJ', 'Spec'],
+    ['https://polarion.example/polarion/#/project/PRJ/document?doc=space/Spec', 'document', 'PRJ', 'Spec', 'space'],
+    ['https://polarion.example/polarion/redirect/project/PRJ/document?id=Spec&space=space', 'document', 'PRJ', 'Spec', 'space'],
     ['https://polarion.example/polarion/#/project/PRJ/wiki/space/Page', 'page', 'PRJ', 'Page', 'space'],
     ['https://polarion.example/polarion/redirect/project/PRJ/testrun?id=TR-1', 'testrun', 'PRJ', 'TR-1'],
     ['https://polarion.example/polarion/redirect/project/PRJ/plan?id=PLAN-1', 'plan', 'PRJ', 'PLAN-1'],
