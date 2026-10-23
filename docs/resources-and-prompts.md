@@ -14,6 +14,8 @@ Offline guides served over MCP:
 
 Optional SDK PDF text resources use the `polarion://local/*` URI family. A resource is listed only if its corresponding PDF exists in `sdk/`. See [sdk/README.md](../sdk/README.md). Resources are MCP capabilities and are not exposed by the REST wrapper.
 
+Resource templates provide read-only live views for a project, a Work Item within a project, and a Document within a project and space. They use the caller's Polarion token, require the corresponding read tool to be enabled, render rich text as Markdown, and cap output at 100,000 characters. Set `MCP_RESOURCE_LINKS=true` to append resource links to successful `getWorkItem` and `getDocument` results; it is off by default.
+
 ## Prompts
 
 The server provides three guided prompts:

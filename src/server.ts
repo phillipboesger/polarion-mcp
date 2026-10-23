@@ -18,6 +18,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
@@ -36,6 +37,7 @@ import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from
 import { API_BASE_URL, getBearerToken, tokenScope, callerCacheScope } from './config.js';
 import { parseToolFilter } from './tool-filter.js';
 import { MetadataCache, type MetadataKind } from './metadata-cache.js';
+import { renderRichTextFieldsAsMarkdown } from './markdown.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
@@ -229,6 +231,38 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       } else {
         await execute();
       }
+<<<<<<< HEAD
+=======
+    } else if (virtual?.name === 'call_tool') {
+      const target = String(args.name ?? '');
+      if (!options.clientTools.has(target)) result = { content: [{ type: 'text', text: `Error: Unknown or filtered tool: ${target}` }], isError: true };
+      else result = await callToolPipeline(target, (args.arguments ?? {}) as Record<string, unknown>, options);
+      outcome = result.isError ? 'error' : 'success';
+    } else if (virtual) {
+      const resolved = await options.extensions.instanceResolver.resolve(principal);
+      result = await virtual.handler(callArgs, {
+        callPolarionTool: async (name, callArgs) => {
+          const definition = options.clientTools.get(name);
+          if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
+          return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+        },
+        requestBearerToken: bearerToken,
+        userScope,
+        logger: options.logger,
+        signal: options.signal ?? new AbortController().signal,
+        reportProgress: async () => undefined,
+      });
+      outcome = result.isError ? 'error' : 'success';
+    } else if (generated) {
+      const resolved = await options.extensions.instanceResolver.resolve(principal);
+      result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+      if (/^(1|true|yes|on)$/i.test(process.env.MCP_RESOURCE_LINKS ?? '') && !result.isError) {
+        const uri = toolName === 'getWorkItem' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/workitem/${encodeURIComponent(String(args.workItemId ?? ''))}`
+          : toolName === 'getDocument' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/document/${encodeURIComponent(String(args.spaceId ?? ''))}/${encodeURIComponent(String(args.documentName ?? ''))}` : undefined;
+        if (uri) result.content.push({ type: 'resource_link', uri, name: toolName === 'getWorkItem' ? String(args.workItemId) : String(args.documentName), mimeType: 'text/markdown' });
+      }
+      outcome = result.isError ? 'error' : 'success';
+>>>>>>> d507299 (feat: resource templates and resource links)
     } else {
       await execute();
     }
@@ -373,8 +407,16 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Handler: Read a Specific Resource by its `polarion://` URI.
    */
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const uri = request.params.uri;
+    if (uri.startsWith('polarion://project/')) return await readProjectResource(uri, clientTools, extensions, options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
     return await readPolarionResource(request.params.uri);
   });
+
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [
+    ...(clientTools.has('getWorkItem') ? [{ uriTemplate: 'polarion://project/{projectId}/workitem/{workItemId}', name: 'Polarion Work Item', mimeType: 'text/markdown' }] : []),
+    ...(clientTools.has('getDocument') ? [{ uriTemplate: 'polarion://project/{projectId}/document/{spaceId}/{documentName}', name: 'Polarion Document', mimeType: 'text/markdown' }] : []),
+    { uriTemplate: 'polarion://project/{projectId}', name: 'Polarion project', mimeType: 'text/markdown' },
+  ] }));
 
   /**
    * Handler: List Available Prompt templates.
@@ -397,17 +439,23 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     const scope = callerCacheScope();
     const kind: MetadataKind | undefined = argument.name === 'projectId' ? 'projects'
       : argument.name === 'workItemType' || argument.name === 'type' ? 'work-item-types'
-      : argument.name === 'status' ? 'statuses' : argument.name === 'user' || argument.name === 'assignee' ? 'users' : undefined;
+      : argument.name === 'status' ? 'statuses'
+      : argument.name === 'enum' || argument.name === 'enumValue' ? 'enums'
+      : argument.name === 'user' || argument.name === 'assignee' ? 'users' : undefined;
     let values: string[] = [];
     try {
       if (kind) {
         const cached = metadataCache.get(apiBaseUrl, scope, kind, projectId);
         if (cached) values = cached;
         else {
-          const tool = kind === 'projects' ? 'getProjects' : kind === 'users' ? 'getUsers' : kind === 'work-item-types' ? 'getProjectFieldsMetadata' : 'getAvailableEnumOptionsForWorkItemType';
-          const args: Record<string, unknown> = kind === 'work-item-types' ? { projectId, resourceType: 'workitems' }
-            : kind === 'statuses' ? { projectId, workItemType: context?.arguments?.workItemType ?? 'requirement', fieldId: 'status' } : {};
-          const result = await callToolPipeline(tool, args, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger });
+          const tool = kind === 'projects' ? 'getProjects' : kind === 'users' ? 'getUsers' : kind === 'work-item-types' || kind === 'statuses' || kind === 'enums' ? 'getAvailableEnumOptionsForWorkItemType' : 'getProjectFieldsMetadata';
+          const fieldId = kind === 'work-item-types' ? 'type' : kind === 'statuses' ? 'status' : context?.arguments?.fieldId ?? '';
+          const args: Record<string, unknown> = kind === 'projects' || kind === 'users' ? {}
+            : kind === 'work-item-types' ? { projectId, fieldId, type: '~' }
+            : kind === 'statuses' ? { projectId, fieldId, type: context?.arguments?.workItemType ?? '~' }
+            : kind === 'enums' ? { projectId, fieldId, type: context?.arguments?.workItemType ?? '~' }
+            : { projectId, resourceType: 'workitems' };
+          const result = await callToolPipeline(tool, args, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, server });
           const raw = result.structuredContent ?? result.content?.map(item => item.type === 'text' ? item.text : '').join(' ') ?? '';
           let parsed: unknown = raw;
           if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = raw; } }
@@ -436,4 +484,28 @@ function extractCompletionValues(value: unknown, argument: string): string[] {
   };
   walk(value);
   return [...found];
+}
+
+const MAX_DYNAMIC_RESOURCE_CHARS = 100_000;
+async function readProjectResource(uri: string, tools: ToolCallPipelineOptions['clientTools'], extensions: PolarionExtensions, maxResponseChars: number) {
+  let match = /^polarion:\/\/project\/([^/]+)\/workitem\/([^/]+)$/.exec(uri);
+  let name: string; let args: Record<string, unknown>;
+  if (match) { name = 'getWorkItem'; args = { projectId: decodeURIComponent(match[1]), workItemId: decodeURIComponent(match[2]) }; }
+  else if ((match = /^polarion:\/\/project\/([^/]+)\/document\/([^/]+)\/([^/]+)$/.exec(uri))) { name = 'getDocument'; args = { projectId: decodeURIComponent(match[1]), spaceId: decodeURIComponent(match[2]), documentName: decodeURIComponent(match[3]) }; }
+  else if ((match = /^polarion:\/\/project\/([^/]+)$/.exec(uri))) { name = 'getProject'; args = { projectId: decodeURIComponent(match[1]) }; }
+  else throw new Error(`Invalid Polarion resource URI: ${uri}`);
+  const definition = tools.get(name);
+  if (!definition) throw new Error(`Resource access requires enabled tool ${name}`);
+  const bearerToken = getBearerToken();
+  const userScope = tokenScope(bearerToken);
+  const principal = await extensions.authProvider.validateRequest({ bearerToken, userScope });
+  const resolved = await extensions.instanceResolver.resolve(principal);
+  const result = await executeApiTool(name, definition, args, securitySchemes, undefined, maxResponseChars, resolved.apiBaseUrl);
+  if (result.isError) throw new Error(result.content.map(item => item.type === 'text' ? item.text : '').join('\n'));
+  let data: unknown = result.structuredContent;
+  if (!data) { const text = result.content.find(item => item.type === 'text'); if (text?.type === 'text') { try { data = JSON.parse(text.text); } catch { data = text.text; } } }
+  const rendered = renderRichTextFieldsAsMarkdown(data);
+  let text = `# ${name}\n\n${JSON.stringify(rendered, null, 2)}`;
+  if (text.length > MAX_DYNAMIC_RESOURCE_CHARS) text = `${text.slice(0, MAX_DYNAMIC_RESOURCE_CHARS)}\n\n[Truncated]`;
+  return { contents: [{ uri, mimeType: 'text/markdown', text }] };
 }

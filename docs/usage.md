@@ -23,6 +23,8 @@ Start with `npm run start:mcp-http`. The MCP endpoint is `/mcp`; `/health` is un
 
 The HTTP MCP transport supports toolsets. `MCP_TOOLSETS` limits the deployment's available domains; clients may further narrow a request with the supported toolset selectors. `MCP_READ_ONLY` restricts the available tools to read-only operations.
 
+Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` over the tools left enabled by deployment and request filters. The default `full` mode preserves the normal catalog. Set `MCP_COMPLETIONS=true` to advertise metadata-backed prompt argument completions.
+
 ## REST HTTP mode
 
 Start with `npm run start:http`. Set `HTTP_API_KEY`; requests use that key to access `/api/tools` and `/api/tools/:toolName`. The wrapper also serves `/health`, `/openapi.json`, and `/openapi-gpt.json`. The latter is generated from the curated subset in `src/gpt-tools.ts`. Tool calls accept either a direct argument object or an `arguments` wrapper.

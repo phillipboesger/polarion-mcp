@@ -38,6 +38,8 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_LOG_LEVEL` | `info` | `src/index.ts`, `src/mcp-http-server.ts` | No | Minimum tool-call log level: `debug`, `info`, `warn`, or `error`. |
 | `MCP_CONFIRM_DESTRUCTIVE` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Set to `true` to require confirmation for destructive, delete, `patchAll*`, and bulk tools. Elicitation-capable clients receive a confirmation prompt; others must preview with `dry_run: true` and repeat with `confirm: true`. |
 | `MCP_COMPLETIONS` | `false` | `src/server.ts` | No | Advertise MCP `completion/complete` and suggest cached project, Work Item type, status, and user values. Metadata is isolated by deployment and caller, expires after five minutes, and is bounded to 500 entries. |
+| `MCP_MODE` | `full` | `src/server.ts` | No | `full` exposes the normal tools. `discover` exposes search_tools, describe_tool, and call_tool over the enabled tool set. |
+| `MCP_RESOURCE_LINKS` | `false` | `src/server.ts` | No | Add MCP resource_link items to successful getWorkItem and getDocument results. |
 | `MCP_TOOLSETS` | Unset, all toolsets | `src/config.ts`, `src/mcp-http-server.ts` | No | Deployment-wide comma-separated toolset allowlist. Names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`. Requests may narrow this list. |
 | `MCP_TOOLS` | Unset, all tools | `src/tool-filter.ts` | No | Tool name allowlist, separated by commas, spaces, or newlines. |
 | `MCP_READ_ONLY` | `false` | `src/tool-filter.ts` | No | Keep only tools annotated read-only. Accepts true/1/yes/on or false/0/no/off. |

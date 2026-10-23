@@ -44,7 +44,7 @@ Choose a client guide for its connection and authentication steps:
 | [Mutation baseline](quality/mutation-baseline.md) | Mutation testing baseline and results. |
 | [Sonar quality](quality/sonar.md) | Sonar analysis configuration and quality results. |
 | [Repository overview](repository-overview.md) | Repository layout and development entry points. |
-| [Resources and prompts](resources-and-prompts.md) | MCP resources and prompts provided by the server. |
+| [Resources and prompts](resources-and-prompts.md) | MCP resources, live resource templates, and prompts. |
 | [Security](security.md) | Authentication, authorization, and security controls. |
 | [Troubleshooting](troubleshooting.md) | Common setup and runtime issues. |
 | [Usage](usage.md) | Calling tools and using the server. |
