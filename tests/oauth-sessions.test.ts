@@ -26,9 +26,11 @@ async function startApp(
   refreshTokenTtlSeconds?: number,
   publicUrl = PUBLIC_URL,
   previousTokenSecrets: string[] = [],
+  trustProxy?: string | number,
 ) {
   const options = {
     publicUrl: new URL(publicUrl), validateToken, tokenSecret, previousTokenSecrets,
+    ...(trustProxy === undefined ? {} : { trustProxy }),
     ...(refreshTokenTtlSeconds === undefined ? {} : { refreshTokenTtlSeconds }),
   } as Parameters<typeof createMcpHttpApp>[0]
   const { app, closeAllSessions } = createMcpHttpApp(options)
@@ -587,6 +589,24 @@ test("six OAuth clients behind one IP can each refresh without sharing a limiter
     const responses = await Promise.all(users.flatMap(({ client, tokens }) =>
       Array.from({ length: 9 }, () => refresh(base, client.client_id, tokens.refresh_token))))
     assert.ok(responses.every(response => response.status === 200), "refresh limits should be scoped to each OAuth client")
+  } finally {
+    await stop()
+  }
+})
+
+test("600 successful refreshes from one trusted client IP do not hit the per-IP failure ceiling", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, undefined, PUBLIC_URL, [], "loopback")
+  try {
+    const { client, tokens } = await login(base, pat)
+    for (let i = 0; i < 600; i++) {
+      const response = await fetch(`${base}/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "203.0.113.11" },
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tokens.refresh_token, client_id: client.client_id }),
+      })
+      assert.equal(response.status, 200, `successful refresh ${i + 1}`)
+    }
   } finally {
     await stop()
   }

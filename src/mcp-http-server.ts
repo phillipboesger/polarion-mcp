@@ -175,6 +175,8 @@ export interface McpHttpAppOptions {
   allowedOrigins?: string[];
   /** Dynamic OAuth registrations allowed per hour. Defaults to 100. */
   registerRateLimit?: number;
+  /** Failed OAuth token requests allowed per IP per 15 minutes. Defaults to 500. */
+  tokenIpRateLimit?: number;
   /** Sliding refresh-token lifetime in seconds. Defaults to 14 days. */
   refreshTokenTtlSeconds?: number;
 }
@@ -345,7 +347,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
 
     const tokenIpLimit = rateLimit({
       windowMs: 15 * 60 * 1000,
-      limit: 500,
+      limit: options.tokenIpRateLimit ?? 500,
+      skipSuccessfulRequests: true,
       keyGenerator: req => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? ''),
       validate: { keyGeneratorIpFallback: false },
       standardHeaders: true,
@@ -405,6 +408,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
           rateLimit: {
             windowMs: 15 * 60 * 1000,
             limit: 50,
+            skipSuccessfulRequests: true,
             keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id ?? '')),
             validate: { keyGeneratorIpFallback: false },
             standardHeaders: true,
@@ -577,7 +581,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   if (oauth && publicUrl && gptClient) {
-    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge);
+    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500);
   }
 
   // Health check (no auth) for load balancers and quick verification.
@@ -756,7 +760,8 @@ function mountCustomGpt(
   oauth: PolarionOAuthProvider,
   publicUrl: URL,
   gptClient: { clientId: string; clientSecret: string },
-  bearerChallenge: (error?: string) => string
+  bearerChallenge: (error?: string) => string,
+  tokenIpRateLimit: number,
 ): void {
   // Same limits the SDK applies to its own /authorize and /token.
   const authorizeLimit = rateLimit({
@@ -769,6 +774,7 @@ function mountCustomGpt(
   const tokenLimit = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 50,
+    skipSuccessfulRequests: true,
     keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id || gptClient.clientId)),
     validate: { keyGeneratorIpFallback: false },
     standardHeaders: true,
@@ -777,7 +783,8 @@ function mountCustomGpt(
   });
   const tokenIpLimit = rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 500,
+    limit: tokenIpRateLimit,
+    skipSuccessfulRequests: true,
     keyGenerator: req => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? ''),
     validate: { keyGeneratorIpFallback: false },
     standardHeaders: true,
@@ -941,6 +948,8 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const maxSessions = Number(process.env.MCP_MAX_SESSIONS) > 0 ? Number(process.env.MCP_MAX_SESSIONS) : undefined;
   const configuredRegisterLimit = Number(process.env.MCP_RATE_LIMIT_REGISTER);
   const registerRateLimit = Number.isInteger(configuredRegisterLimit) && configuredRegisterLimit > 0 ? configuredRegisterLimit : 100;
+  const configuredTokenIpLimit = Number(process.env.MCP_RATE_LIMIT_TOKEN_IP);
+  const tokenIpRateLimit = Number.isInteger(configuredTokenIpLimit) && configuredTokenIpLimit > 0 ? configuredTokenIpLimit : 500;
   const configuredRefreshTokenTtl = Number(process.env.MCP_REFRESH_TOKEN_TTL);
   const refreshTokenTtlSeconds = Number.isInteger(configuredRefreshTokenTtl) && configuredRefreshTokenTtl > 0
     ? configuredRefreshTokenTtl
@@ -954,7 +963,7 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const allowedToolsets = configuredToolsets(process.env);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, sessionIdleMs, maxSessions, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
