@@ -6,6 +6,7 @@ export interface VirtualToolContext {
   callPolarionTool(name: string, args: Record<string, unknown>): Promise<CallToolResult>;
   requestBearerToken?: string;
   userScope?: string;
+  apiBaseUrl: string;
   logger: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
   signal: AbortSignal;
   reportProgress(progress: { progress: number; total?: number; message?: string }): Promise<void>;

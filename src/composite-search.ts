@@ -1,0 +1,223 @@
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { registerVirtualTool, type VirtualTool, type VirtualToolContext } from './virtual-tools.js';
+
+const staticFields = new Set([
+  'id', 'type', 'title', 'description', 'status', 'resolution', 'severity', 'priority',
+  'assignee', 'assignee.id', 'author', 'author.id', 'created', 'updated', 'dueDate',
+  'plannedStart', 'plannedEnd', 'resolvedOn', 'outlineNumber', 'initialEstimate', 'remainingEstimate', 'timeSpent',
+]);
+const fieldCache = new Map<string, { fields: Set<string>; expires: number }>();
+const CACHE_TTL_MS = 5 * 60_000;
+const luceneSpecial = new Set('+-!(){}[]^"~*?:\\/|&');
+
+export function escapeLuceneValue(value: string): string {
+  return [...value].map(char => luceneSpecial.has(char) ? `\\${char}` : char).join('');
+}
+
+function fieldNames(value: unknown): Set<string> {
+  const output = new Set(staticFields);
+  const entries = Array.isArray(value) ? value : (value && typeof value === 'object' ? Object.values(value as Record<string, unknown>) : []);
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    const item = entry as Record<string, unknown>;
+    const name = typeof item.id === 'string' ? item.id : typeof item.name === 'string' ? item.name : undefined;
+    if (name && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)) output.add(name);
+    const attributes = item.attributes;
+    if (attributes && typeof attributes === 'object') {
+      const attrs = attributes as Record<string, unknown>;
+      const id = typeof attrs.id === 'string' ? attrs.id : typeof attrs.name === 'string' ? attrs.name : undefined;
+      if (id && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(id)) output.add(id);
+    }
+  }
+  return output;
+}
+
+async function workItemFields(projectId: string | undefined, ctx: VirtualToolContext): Promise<Set<string>> {
+  if (!projectId) return new Set(staticFields);
+  const cached = fieldCache.get(projectId);
+  if (cached && cached.expires > Date.now()) return cached.fields;
+  // The project-level metadata operation is the REST equivalent of the
+  // work-item-specific metadata operation (which requires an item ID).
+  const result = await ctx.callPolarionTool('getProjectFieldsMetadata', { projectId, resourceType: 'workitems' });
+  if (!result.isError && result.structuredContent) {
+    const fields = fieldNames((result.structuredContent as Record<string, unknown>).data);
+    fieldCache.set(projectId, { fields, expires: Date.now() + CACHE_TTL_MS });
+    return fields;
+  }
+  return new Set(staticFields);
+}
+
+export function lintLuceneQuery(query: string, knownFields: ReadonlySet<string> = staticFields): string[] {
+  const warnings: string[] = [];
+  let quoted = false;
+  let escaped = false;
+  let parens = 0;
+  for (const char of query) {
+    if (escaped) { escaped = false; continue; }
+    if (char === '\\') { escaped = true; continue; }
+    if (char === '"') quoted = !quoted;
+    else if (!quoted && char === '(') parens++;
+    else if (!quoted && char === ')') parens--;
+  }
+  if (quoted) warnings.push('Unbalanced quotation marks.');
+  if (parens !== 0) warnings.push('Unbalanced parentheses.');
+  const fields = [...query.matchAll(/(?:^|\s|\()([A-Za-z_][A-Za-z0-9_.-]*):/g)].map(match => match[1]);
+  for (const field of fields) if (!knownFields.has(field)) warnings.push(`Unknown field: ${field}`);
+  if (/\b(?:AND|OR|NOT)\s*$/i.test(query) || /^\s*(?:AND|OR|NOT)\b/i.test(query) || /\b(?:AND|OR)\s+(?:AND|OR)\b/i.test(query)) {
+    warnings.push('Suspicious boolean operator placement.');
+  }
+  if (/[-+](?:AND|OR|NOT)\b/i.test(query)) warnings.push('Suspicious escaped operator.');
+  return [...new Set(warnings)];
+}
+
+function textResult(payload: unknown): CallToolResult {
+  return { content: [{ type: 'text', text: JSON.stringify(payload) }] };
+}
+
+function stringArray(value: unknown, name: string): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string')) throw new Error(`${name} must be an array of strings`);
+  return value as string[];
+}
+
+export function buildWorkItemQuery(args: Record<string, unknown>, knownFields: ReadonlySet<string>): string {
+  const clauses: string[] = [];
+  const add = (field: string, value: string) => {
+    if (!knownFields.has(field)) throw new Error(`Unknown work item field: ${field}`);
+    clauses.push(`${field}:"${escapeLuceneValue(value)}"`);
+  };
+  for (const type of stringArray(args.types, 'types')) add('type', type);
+  for (const status of stringArray(args.statuses, 'statuses')) add('status', status);
+  if (typeof args.assignee === 'string' && args.assignee) add('assignee.id', args.assignee);
+  if (typeof args.text === 'string' && args.text) {
+    const escaped = escapeLuceneValue(args.text);
+    clauses.push(`(title:"${escaped}" OR description:"${escaped}")`);
+  }
+  if (Array.isArray(args.filters)) {
+    for (const item of args.filters) {
+      if (!item || typeof item !== 'object') throw new Error('filters must contain {field, value} objects');
+      const filter = item as Record<string, unknown>;
+      if (typeof filter.field !== 'string' || typeof filter.value !== 'string') throw new Error('Each filter requires string field and value');
+      add(filter.field, filter.value);
+    }
+  }
+  for (const [arg, field] of [['createdAfter', 'created'], ['updatedAfter', 'updated']] as const) {
+    if (args[arg] !== undefined) {
+      if (typeof args[arg] !== 'string' || Number.isNaN(Date.parse(args[arg] as string))) throw new Error(`${arg} must be a valid date string`);
+      clauses.push(`${field}:"${escapeLuceneValue(args[arg] as string)}"`);
+    }
+  }
+  return clauses.length ? clauses.join(' AND ') : '*';
+}
+
+function pageSize(args: Record<string, unknown>): number | undefined {
+  const value = args.page_size ?? args.max_items;
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 1000) throw new Error('page_size and max_items must be integers from 1 to 1000');
+  return value as number;
+}
+
+const searchTool: VirtualTool = {
+  name: 'search_work_items', title: 'Search Work Items',
+  description: 'Search work items with structured filters. Values are escaped and quoted into a Lucene query; the result includes that query for reuse.',
+  toolset: 'composites', annotations: { readOnlyHint: true },
+  inputSchema: { type: 'object', properties: {
+    projectId: { type: 'string' }, types: { type: 'array', items: { type: 'string' } }, statuses: { type: 'array', items: { type: 'string' } },
+    assignee: { type: 'string' }, text: { type: 'string' }, filters: { type: 'array', items: { type: 'object', properties: { field: { type: 'string' }, value: { type: 'string' } }, required: ['field', 'value'], additionalProperties: false } },
+    createdAfter: { type: 'string' }, updatedAfter: { type: 'string' }, sort: { type: 'string' }, page_size: { type: 'integer', minimum: 1, maximum: 1000 }, max_items: { type: 'integer', minimum: 1, maximum: 1000 },
+  } },
+  async handler(args, ctx) {
+    const fields = await workItemFields(typeof args.projectId === 'string' ? args.projectId : undefined, ctx);
+    const query = buildWorkItemQuery(args, fields);
+    let sort: string | undefined;
+    if (typeof args.sort === 'string') {
+      const desc = args.sort.startsWith('-');
+      const name = desc ? args.sort.slice(1) : args.sort;
+      if (!fields.has(name)) throw new Error(`Unknown sort field: ${name}`);
+      sort = `${desc ? '-' : ''}${name}`;
+    }
+    const limit = pageSize(args);
+    const toolName = typeof args.projectId === 'string' ? 'getWorkItems' : 'getAllWorkItems';
+    const callArgs: Record<string, unknown> = { query, ...(sort ? { sort } : {}), ...(limit ? { page_size_: limit } : {}) };
+    if (typeof args.projectId === 'string') callArgs.projectId = args.projectId;
+    const result = await ctx.callPolarionTool(toolName, callArgs);
+    return result.isError ? result : textResult({ query, results: result.structuredContent ?? result.content });
+  },
+};
+
+const lintTool: VirtualTool = {
+  name: 'lint_query', title: 'Lint Lucene Query',
+  description: 'Check a Lucene query for unknown work-item fields, unbalanced quotes or parentheses, and suspicious boolean operators. This tool never executes the query.',
+  toolset: 'composites', annotations: { readOnlyHint: true },
+  inputSchema: { type: 'object', properties: { query: { type: 'string' }, projectId: { type: 'string' } }, required: ['query'], additionalProperties: false },
+  async handler(args, ctx) {
+    if (typeof args.query !== 'string') throw new Error('query must be a string');
+    const fields = await workItemFields(typeof args.projectId === 'string' ? args.projectId : undefined, ctx);
+    return textResult({ query: args.query, warnings: lintLuceneQuery(args.query, fields), executed: false });
+  },
+};
+
+type EntityRef = { type: 'workitem' | 'document' | 'page' | 'testrun' | 'plan'; projectId: string; id: string; spaceId?: string };
+const safePart = '[^/?#&]+';
+const routes: Array<{ regex: RegExp; type: EntityRef['type']; id: (m: RegExpExecArray, url: URL) => string; space?: (m: RegExpExecArray) => string }> = [
+  { regex: new RegExp(`/workitem\\?id=(${safePart})`, 'i'), type: 'workitem', id: m => m[1] },
+  { regex: new RegExp(`/workitem/(${safePart})`, 'i'), type: 'workitem', id: m => m[1] },
+  { regex: new RegExp(`/document\\?doc=(${safePart})`, 'i'), type: 'document', id: m => m[1] },
+  { regex: new RegExp(`/document/(${safePart})`, 'i'), type: 'document', id: m => m[1] },
+  { regex: new RegExp(`/(?:testrun|testRun)\\?id=(${safePart})`, 'i'), type: 'testrun', id: m => m[1] },
+  { regex: new RegExp(`/testruns?/(${safePart})`, 'i'), type: 'testrun', id: m => m[1] },
+  { regex: new RegExp(`/plan\\?id=(${safePart})`, 'i'), type: 'plan', id: m => m[1] },
+  { regex: new RegExp(`/plans?/(${safePart})`, 'i'), type: 'plan', id: m => m[1] },
+  { regex: new RegExp(`/wiki/(${safePart})/(${safePart})`, 'i'), type: 'page', id: m => m[2], space: m => m[1] },
+  { regex: new RegExp(`/pages?/(${safePart})`, 'i'), type: 'page', id: m => m[1] },
+];
+
+export function parsePolarionUrl(input: string, apiBaseUrl: string): EntityRef {
+  let base: URL;
+  let url: URL;
+  try { base = new URL(apiBaseUrl); url = new URL(input); } catch { throw new Error('Malformed Polarion URL or API base URL'); }
+  if (url.origin !== base.origin) throw new Error('URL host does not match the configured Polarion API host');
+  const path = decodeURI(url.pathname);
+  const routeText = `${path}${url.hash}${url.search}`;
+  const projectMatch = /(?:^|\/)project\/([^/?#]+)/i.exec(routeText) ?? /\/projects\/([^/?#]+)/i.exec(routeText);
+  if (!projectMatch) throw new Error('Polarion URL does not include a project');
+  for (const route of routes) {
+    const match = route.regex.exec(routeText);
+    if (!match) continue;
+    const id = decodeURIComponent(route.id(match, url));
+    if (!id || /[\\/]/.test(id) && route.type !== 'workitem') throw new Error('Malformed Polarion entity ID');
+    return { type: route.type, projectId: decodeURIComponent(projectMatch[1]), id, ...(route.space ? { spaceId: decodeURIComponent(route.space(match)) } : {}) };
+  }
+  throw new Error('Unsupported or malformed Polarion entity URL');
+}
+
+const resolveTool: VirtualTool = {
+  name: 'resolve_polarion_url', title: 'Resolve Polarion URL',
+  description: 'Resolve a same-host Polarion work item, document, page, test run, or plan URL to its entity identifiers. Set fetch to retrieve the entity.',
+  toolset: 'composites', annotations: { readOnlyHint: true },
+  inputSchema: { type: 'object', properties: { url: { type: 'string' }, fetch: { type: 'boolean' } }, required: ['url'], additionalProperties: false },
+  async handler(args, ctx) {
+    if (typeof args.url !== 'string') throw new Error('url must be a string');
+    const entity = parsePolarionUrl(args.url, ctx.apiBaseUrl);
+    if (args.fetch !== true) return textResult(entity);
+    const calls: Record<EntityRef['type'], { name: string; args: Record<string, unknown> }> = {
+      workitem: { name: 'getWorkItem', args: { projectId: entity.projectId, workItemId: entity.id } },
+      document: { name: 'getDocument', args: { projectId: entity.projectId, spaceId: entity.spaceId ?? '_default', documentName: entity.id } },
+      page: { name: 'getPage', args: { projectId: entity.projectId, spaceId: entity.spaceId ?? '_default', pageName: entity.id } },
+      testrun: { name: 'getTestRun', args: { projectId: entity.projectId, testRunId: entity.id } },
+      plan: { name: 'getPlan', args: { projectId: entity.projectId, planId: entity.id } },
+    };
+    const call = calls[entity.type];
+    const result = await ctx.callPolarionTool(call.name, call.args);
+    return result.isError ? result : textResult({ ...entity, entity: result.structuredContent ?? result.content });
+  },
+};
+
+let unregister: (() => void)[] = [];
+export function registerCompositeTools(): void {
+  if (unregister.length) return;
+  unregister = [searchTool, lintTool, resolveTool].map(tool => registerVirtualTool(tool));
+}
+export function clearCompositeToolsForTests(): void { unregister.splice(0).forEach(remove => remove()); fieldCache.clear(); }
+
+export const compositeTools = [searchTool, lintTool, resolveTool] as const;

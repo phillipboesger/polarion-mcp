@@ -6,7 +6,7 @@ import type { VirtualToolContext } from '../src/virtual-tools.js';
 const text = (result: CallToolResult) => result.content.find((item): item is { type: 'text'; text: string } => item.type === 'text')?.text ?? '';
 const response = (data: unknown, extra: Record<string, unknown> = {}): CallToolResult => ({ content: [], structuredContent: { data, ...extra } });
 function context(call: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>, signal = new AbortController().signal, progress: unknown[] = []): VirtualToolContext {
-  return { callPolarionTool: call, signal, logger: console, reportProgress: async item => { progress.push(item); } };
+  return { callPolarionTool: call, signal, apiBaseUrl: 'https://polarion.test/polarion/rest/v1', logger: console, reportProgress: async item => { progress.push(item); } };
 }
 const job = (state: string, status?: string) => response([{ id: 'job-1', attributes: { state, status: status ? { type: status, message: 'done' } : undefined } }]);
 import { runJobAndWait } from '../src/composite-jobs.js';

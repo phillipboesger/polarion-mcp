@@ -41,6 +41,7 @@ import { annotateToolText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
+import { registerCompositeTools } from './composite-search.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -184,6 +185,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
         },
         requestBearerToken: bearerToken,
         userScope,
+        apiBaseUrl: resolved.apiBaseUrl,
         logger: options.logger,
         signal: options.signal ?? new AbortController().signal,
         reportProgress: options.reportProgress ?? (async () => undefined),
@@ -241,6 +243,7 @@ export interface PolarionServerOptions {
 
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {
   const logger: PipelineLogger = options.logger ?? createLogger({ format: options.logFormat, level: options.logLevel });
+  registerCompositeTools();
   const deploymentFilter = parseToolFilter(process.env);
   const intersect = (left?: readonly string[], right?: readonly string[]) => left && right
     ? left.filter(value => right.includes(value))

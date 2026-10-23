@@ -47,6 +47,8 @@ The `composites` toolset adds higher-level tools that call existing Polarion RES
 
 When a client sends `_meta.progressToken`, `run_job_and_wait` emits MCP progress notifications. Without a progress token, it emits none.
 
+The `composites` toolset includes `search_work_items` for structured Work Item filters. It returns the generated Lucene query along with the results. `lint_query` checks a Lucene query for unknown fields, unbalanced quotes or parentheses, and suspicious boolean operators without executing it. Project field metadata is cached briefly when available; otherwise the tools use common Work Item fields.
+
 ## Quality checks
 
 Run `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as applicable. See [quality/e2e.md](./quality/e2e.md), [quality/mutation-baseline.md](./quality/mutation-baseline.md), [quality/sonar.md](./quality/sonar.md), and [quality/distribution.md](./quality/distribution.md).
