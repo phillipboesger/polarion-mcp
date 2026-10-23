@@ -151,6 +151,8 @@ export interface McpHttpAppOptions {
   trustProxy?: string | number;
   /** Dynamic OAuth registrations allowed per hour. Defaults to 100. */
   registerRateLimit?: number;
+  /** Sliding refresh-token lifetime in seconds. Defaults to 14 days. */
+  refreshTokenTtlSeconds?: number;
 }
 
 /**
@@ -247,7 +249,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
 
   // OAuth login, for clients that cannot be handed a token by hand.
   const sealer = publicUrl ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url')) : undefined;
-  const oauth = publicUrl && sealer ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris) : undefined;
+  const oauth = publicUrl && sealer
+    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris, options.refreshTokenTtlSeconds)
+    : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
   /**
@@ -765,10 +769,14 @@ export function startMcpHttpServer(): HttpServer {
   const maxSessions = Number(process.env.MCP_MAX_SESSIONS) > 0 ? Number(process.env.MCP_MAX_SESSIONS) : undefined;
   const configuredRegisterLimit = Number(process.env.MCP_RATE_LIMIT_REGISTER);
   const registerRateLimit = Number.isInteger(configuredRegisterLimit) && configuredRegisterLimit > 0 ? configuredRegisterLimit : 100;
+  const configuredRefreshTokenTtl = Number(process.env.MCP_REFRESH_TOKEN_TTL);
+  const refreshTokenTtlSeconds = Number.isInteger(configuredRefreshTokenTtl) && configuredRefreshTokenTtl > 0
+    ? configuredRefreshTokenTtl
+    : 14 * 24 * 60 * 60;
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit,
+    allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, refreshTokenTtlSeconds,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

@@ -20,8 +20,11 @@ async function validateToken(token: string): Promise<TokenCheck> {
 }
 
 /** Starts the app with the OAuth login enabled, sealing tokens with `tokenSecret`. */
-async function startApp(tokenSecret = SECRET) {
-  const { app, closeAllSessions } = createMcpHttpApp({ publicUrl: new URL(PUBLIC_URL), validateToken, tokenSecret })
+async function startApp(tokenSecret = SECRET, refreshTokenTtlSeconds?: number) {
+  const { app, closeAllSessions } = createMcpHttpApp({
+    publicUrl: new URL(PUBLIC_URL), validateToken, tokenSecret,
+    ...(refreshTokenTtlSeconds === undefined ? {} : { refreshTokenTtlSeconds }),
+  })
   const server = app.listen(0)
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const { port } = server.address() as AddressInfo
@@ -169,14 +172,73 @@ test("an expired access token gets a 401 invalid_token challenge, and the refres
   }
 })
 
-test("a refresh token keeps working long after the old 8 h limit, as long as Polarion accepts the PAT", async () => {
+test("refresh tokens slide across the default 14-day lifetime while staying within the family cap", async () => {
   const pat = freshPat()
   const { base, stop } = await startApp()
   mock.timers.enable({ apis: ["Date"], now: Date.now() })
   try {
     const { client, tokens } = await login(base, pat)
-    mock.timers.tick(60 * 24 * 60 * 60 * 1000)
-    assert.equal((await refresh(base, client.client_id, tokens.refresh_token)).status, 200)
+    mock.timers.tick(13 * 24 * 60 * 60 * 1000)
+    const first = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(first.status, 200)
+    const rotated = (await first.json()) as Tokens
+    mock.timers.tick(13 * 24 * 60 * 60 * 1000)
+    assert.equal((await refresh(base, client.client_id, rotated.refresh_token)).status, 200)
+  } finally {
+    mock.timers.reset()
+    await stop()
+  }
+})
+
+test("an expired refresh token is rejected with invalid_grant", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, 60)
+  mock.timers.enable({ apis: ["Date"], now: Date.now() })
+  try {
+    const { client, tokens } = await login(base, pat)
+    mock.timers.tick(61_000)
+    const res = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(res.status, 400)
+    assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
+  } finally {
+    mock.timers.reset()
+    await stop()
+  }
+})
+
+test("a refresh-token family expires at its 90-day absolute cap", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp()
+  mock.timers.enable({ apis: ["Date"], now: Date.now() })
+  try {
+    const { client, tokens } = await login(base, pat)
+    mock.timers.tick(90 * 24 * 60 * 60 * 1000 + 1_000)
+    const res = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(res.status, 400)
+    assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
+  } finally {
+    mock.timers.reset()
+    await stop()
+  }
+})
+
+test("refresh rotates the refresh token and each old token keeps its own expiry", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, 3600)
+  mock.timers.enable({ apis: ["Date"], now: Date.now() })
+  try {
+    const { client, tokens } = await login(base, pat)
+    mock.timers.tick(30 * 60 * 1000)
+    const res = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(res.status, 200)
+    const rotated = (await res.json()) as Tokens
+    assert.notEqual(rotated.refresh_token, tokens.refresh_token)
+
+    mock.timers.tick(31 * 60 * 1000)
+    const oldResponse = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(oldResponse.status, 400)
+    assert.equal(((await oldResponse.json()) as { error: string }).error, "invalid_grant")
+    assert.equal((await refresh(base, client.client_id, rotated.refresh_token)).status, 200)
   } finally {
     mock.timers.reset()
     await stop()
