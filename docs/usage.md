@@ -51,6 +51,8 @@ The `composites` toolset includes `search_work_items` for structured Work Item f
 
 `resolve_polarion_url` recognizes same-host Polarion work item, LiveDoc, wiki page, test run, and plan URLs. It returns the parsed entity identifiers; pass `fetch: true` to retrieve the matching resource through its REST tool. URLs on another host or with an unsupported shape are rejected.
 
+Generated list tools that expose pagination accept optional `max_items` (1 to 1000). For example, call `getWorkItems` with `projectId` and `max_items: 250` to collect across pages. Automatic collection follows at most 20 pages and reports `truncated: true` when either limit stops it. Without `max_items`, the tool still returns only its requested page.
+
 ## Quality checks
 
 Run `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as applicable. See [quality/e2e.md](./quality/e2e.md), [quality/mutation-baseline.md](./quality/mutation-baseline.md), [quality/sonar.md](./quality/sonar.md), and [quality/distribution.md](./quality/distribution.md).

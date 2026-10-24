@@ -16,19 +16,16 @@ export function escapeLuceneValue(value: string): string {
 
 function fieldNames(value: unknown): Set<string> {
   const output = new Set(staticFields);
-  const entries = Array.isArray(value) ? value : (value && typeof value === 'object' ? Object.values(value as Record<string, unknown>) : []);
-  for (const entry of entries) {
-    if (!entry || typeof entry !== 'object') continue;
+  const add = (name: unknown) => { if (typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)) output.add(name); };
+  const visit = (entry: unknown, parentKey = '') => {
+    if (Array.isArray(entry)) { for (const item of entry) visit(item, parentKey); return; }
+    if (!entry || typeof entry !== 'object') return;
     const item = entry as Record<string, unknown>;
-    const name = typeof item.id === 'string' ? item.id : typeof item.name === 'string' ? item.name : undefined;
-    if (name && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)) output.add(name);
-    const attributes = item.attributes;
-    if (attributes && typeof attributes === 'object') {
-      const attrs = attributes as Record<string, unknown>;
-      const id = typeof attrs.id === 'string' ? attrs.id : typeof attrs.name === 'string' ? attrs.name : undefined;
-      if (id && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(id)) output.add(id);
-    }
-  }
+    add(typeof item.id === 'string' ? item.id : item.name);
+    if (parentKey === 'attributes' || parentKey === 'relationships') for (const key of Object.keys(item)) add(key);
+    for (const [key, child] of Object.entries(item)) visit(child, key);
+  };
+  visit(value);
   return output;
 }
 
@@ -104,7 +101,7 @@ export function buildWorkItemQuery(args: Record<string, unknown>, knownFields: R
   for (const [arg, field] of [['createdAfter', 'created'], ['updatedAfter', 'updated']] as const) {
     if (args[arg] !== undefined) {
       if (typeof args[arg] !== 'string' || Number.isNaN(Date.parse(args[arg] as string))) throw new Error(`${arg} must be a valid date string`);
-      clauses.push(`${field}:"${escapeLuceneValue(args[arg] as string)}"`);
+      clauses.push(`${field}:["${escapeLuceneValue(args[arg] as string)}" TO *]`);
     }
   }
   return clauses.length ? clauses.join(' AND ') : '*';
@@ -138,10 +135,21 @@ const searchTool: VirtualTool = {
     }
     const limit = pageSize(args);
     const toolName = typeof args.projectId === 'string' ? 'getWorkItems' : 'getAllWorkItems';
-    const callArgs: Record<string, unknown> = { query, ...(sort ? { sort } : {}), ...(limit ? { page_size_: limit } : {}) };
+    const callArgs: Record<string, unknown> = { query, ...(sort ? { sort } : {}), ...(limit ? { page_size_: limit } : {}), ...(args.max_items ? { max_items: args.max_items } : {}) };
     if (typeof args.projectId === 'string') callArgs.projectId = args.projectId;
     const result = await ctx.callPolarionTool(toolName, callArgs);
-    return result.isError ? result : textResult({ query, results: result.structuredContent ?? result.content });
+    if (result.isError) return result;
+    const data = (result.structuredContent as Record<string, unknown> | undefined)?.data;
+    const items = Array.isArray(data) ? data.map(item => {
+      if (!item || typeof item !== 'object') return item;
+      const resource = item as Record<string, unknown>;
+      const attrs = resource.attributes && typeof resource.attributes === 'object' ? resource.attributes as Record<string, unknown> : {};
+      const concise: Record<string, unknown> = { id: resource.id };
+      for (const key of ['type', 'title', 'status', 'created', 'updated']) if (attrs[key] !== undefined) concise[key] = attrs[key];
+      if (resource.type !== undefined) concise.resourceType = resource.type;
+      return concise;
+    }) : result.content;
+    return textResult({ query, results: items });
   },
 };
 

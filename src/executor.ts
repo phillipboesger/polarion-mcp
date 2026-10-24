@@ -80,6 +80,11 @@ function truncateResponse(text: string, maxChars: number, definition: McpToolDef
   return JSON.stringify({ truncated: true, totalChars: text.length, preview: '', hint });
 }
 
+/** Applies the executor's text-size cap to a composed response. */
+export function capToolResponseText(text: string, maxChars: number, definition: McpToolDefinition): string {
+  return text.length > maxChars ? truncateResponse(text, maxChars, definition) : text;
+}
+
 /** Parses the response text cap from the entry-point environment. */
 export function parseMaxResponseChars(value: string | undefined): number {
   const parsed = Number(value);
@@ -1078,9 +1083,7 @@ export async function executeApiTool(
     // object, which the advertised (lenient) schema accepts. isError would
     // report a write that worked as failed and invite a duplicating retry.
     const fullResponseText = `API Response (Status: ${response.status}):\n${responseText}`;
-    const boundedResponseText = fullResponseText.length > maxResponseChars
-      ? truncateResponse(fullResponseText, maxResponseChars, definition)
-      : fullResponseText;
+    const boundedResponseText = capToolResponseText(fullResponseText, maxResponseChars, definition);
     return {
       content: [
         {

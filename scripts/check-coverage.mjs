@@ -31,6 +31,7 @@ const targets = [
   'src/untrusted-content.ts',
   'src/logger.ts',
   'src/telemetry.ts',
+  'src/pagination.ts',
   'src/composite-tools.ts',
   'src/composite-utils.ts',
   'src/composite-jobs.ts',

@@ -28,7 +28,7 @@ import { sanitizeInputSchema } from './utils.js';
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes, toolDefinitionMap } from './tools.js';
 import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
-import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
+import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS, capToolResponseText } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
 import { listVirtualTools, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
@@ -42,6 +42,7 @@ import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type Pi
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
 import { registerCompositeTools } from './composite-search.js';
+import { MAX_AUTO_ITEMS, paginate, pageNumberFromLink, type JsonApiPage } from './pagination.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -120,11 +121,80 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
   delete callArgs.confirm;
   const userScope = tokenScope(bearerToken);
   let principal = { id: userScope ?? 'anonymous' } as Awaited<ReturnType<PolarionExtensions['authProvider']['validateRequest']>>;
-  let outcome: 'success' | 'error' | 'denied' | 'confirmation-required' = 'error';
+  let outcome = 'error' as 'success' | 'error' | 'denied' | 'confirmation-required';
   let result: CallToolResult | undefined;
   const span = (() => {
     try { return options.telemetry.onSpanStart({ name: 'polarion.tools.call', correlationId, tool: toolName }); } catch { return undefined; }
   })();
+    const execute = async (): Promise<void> => {
+      if (virtual) {
+        const resolved = await options.extensions.instanceResolver.resolve(principal);
+        result = await virtual.handler(callArgs, {
+          callPolarionTool: async (name, callArgs) => {
+            // Composite dependencies remain callable when a request narrows the
+            // visible toolset to `composites`; deployment-level MCP_TOOLS and
+            // MCP_READ_ONLY filtering has already been applied to enabledTools.
+            const definition = enabledTools.get(name);
+            if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
+            return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+          },
+          requestBearerToken: bearerToken,
+          userScope,
+          apiBaseUrl: resolved.apiBaseUrl,
+          logger: options.logger,
+          signal: options.signal ?? new AbortController().signal,
+          reportProgress: options.reportProgress ?? (async () => undefined),
+        });
+        outcome = result.isError ? 'error' : 'success';
+      } else if (generated) {
+        const resolved = await options.extensions.instanceResolver.resolve(principal);
+        const maxItems = callArgs.max_items;
+        const outputProperties = generated.outputSchema?.properties;
+        const supportsPagination = generated.method.toLowerCase() === 'get'
+          && Boolean(outputProperties?.data?.items && outputProperties?.links?.properties?.next && outputProperties?.meta?.properties?.totalCount);
+        if (maxItems === undefined || !supportsPagination) {
+          result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+        } else {
+          if (!Number.isInteger(maxItems) || (maxItems as number) < 1 || (maxItems as number) > MAX_AUTO_ITEMS) throw new Error(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);
+          const firstArgs = { ...callArgs };
+          delete firstArgs.max_items;
+          const pageSizeKey = generated.inputSchema?.properties?.['page[size]'] ? 'page_size_' : undefined;
+          if (pageSizeKey) {
+            const suppliedSize = Number(firstArgs[pageSizeKey]);
+            const requested = Number.isInteger(suppliedSize) && suppliedSize > 0 ? suppliedSize : maxItems as number;
+            firstArgs[pageSizeKey] = Math.min(requested, maxItems as number, MAX_AUTO_ITEMS);
+          }
+          const first = await executeApiTool(toolName, generated, firstArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+          const body = first.structuredContent;
+          if (first.isError || !body || typeof body !== 'object' || !Array.isArray((body as JsonApiPage).data)) {
+            result = first;
+          } else {
+            const { response, truncated } = await paginate(body as JsonApiPage, maxItems as number, async next => {
+              const nextArgs = { ...firstArgs };
+              const nextPageNumber = pageNumberFromLink(next, resolved.apiBaseUrl, Number(nextArgs.page_number_ ?? 1) + 1);
+              nextArgs.page_number_ = nextPageNumber;
+              const page = await executeApiTool(toolName, generated, nextArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+              if (page.isError || !page.structuredContent || typeof page.structuredContent !== 'object') throw new Error(`Pagination failed for ${toolName}: ${page.content.find(item => item.type === 'text')?.text ?? 'invalid page response'}`);
+              return page.structuredContent as JsonApiPage;
+            });
+            const structuredContent = { ...response, ...(truncated ? { truncated: true } : {}) };
+            const firstText = first.content.find(item => item.type === 'text');
+            const prefix = firstText?.type === 'text' ? (firstText.text.split('\n', 1)[0] ?? 'API Response') : 'API Response';
+            const fullText = `${prefix}\n${JSON.stringify(structuredContent)}`;
+            result = {
+              ...first,
+              content: [{ type: 'text', text: capToolResponseText(fullText, options.maxResponseChars, generated) }],
+              structuredContent,
+            };
+          }
+        }
+        outcome = result.isError ? 'error' : 'success';
+      } else {
+        options.logger.error(`[ERROR] Unknown tool requested: ${toolName}`);
+        result = { content: [{ type: 'text', text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
+        outcome = 'error';
+      }
+    };
   try {
     principal = await options.extensions.authProvider.validateRequest({ bearerToken, userScope });
     const retryAfter = options.rateLimiter.check(principal.id);
@@ -149,56 +219,11 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
           ? 'This destructive tool requires confirmation. First repeat the call with dry_run: true to review its preview, then repeat the same call with confirm: true.'
           : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
         result = { content: [{ type: 'text', text }], isError: true };
-      } else if (virtual) {
-        const resolved = await options.extensions.instanceResolver.resolve(principal);
-        result = await virtual.handler(callArgs, {
-          callPolarionTool: async (name, callArgs) => {
-            const definition = options.clientTools.get(name);
-            if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
-            return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-          },
-          requestBearerToken: bearerToken,
-          userScope,
-          logger: options.logger,
-          signal: options.signal ?? new AbortController().signal,
-          reportProgress: async () => undefined,
-        });
-        outcome = result.isError ? 'error' : 'success';
-      } else if (generated) {
-        const resolved = await options.extensions.instanceResolver.resolve(principal);
-        result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-        outcome = result.isError ? 'error' : 'success';
       } else {
-        result = { content: [{ type: 'text', text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
-        outcome = 'error';
+        await execute();
       }
-    } else if (virtual) {
-      const resolved = await options.extensions.instanceResolver.resolve(principal);
-      result = await virtual.handler(callArgs, {
-        callPolarionTool: async (name, callArgs) => {
-          // Composite dependencies remain callable when a request narrows the
-          // visible toolset to `composites`; deployment-level MCP_TOOLS and
-          // MCP_READ_ONLY filtering has already been applied to enabledTools.
-          const definition = enabledTools.get(name);
-          if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
-          return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-        },
-        requestBearerToken: bearerToken,
-        userScope,
-        apiBaseUrl: resolved.apiBaseUrl,
-        logger: options.logger,
-        signal: options.signal ?? new AbortController().signal,
-        reportProgress: options.reportProgress ?? (async () => undefined),
-      });
-      outcome = result.isError ? 'error' : 'success';
-    } else if (generated) {
-      const resolved = await options.extensions.instanceResolver.resolve(principal);
-      result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-      outcome = result.isError ? 'error' : 'success';
     } else {
-      options.logger.error(`[ERROR] Unknown tool requested: ${toolName}`);
-      result = { content: [{ type: 'text', text: `Error: Unknown tool requested: ${toolName}` }], isError: true };
-      outcome = 'error';
+      await execute();
     }
   } catch (error) {
     result = { content: [{ type: 'text', text: error instanceof Error ? error.message : 'Tool call failed' }], isError: true };

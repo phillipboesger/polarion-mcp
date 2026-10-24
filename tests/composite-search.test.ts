@@ -18,7 +18,7 @@ test('Lucene values escape metacharacters and stay inside quoted clauses', () =>
 
 test('builds structured work-item query and rejects unknown fields', () => {
   assert.equal(buildWorkItemQuery({ types: ['task'], statuses: ['open'], assignee: 'sam', createdAfter: '2026-01-01' }, fields),
-    'type:"task" AND status:"open" AND assignee.id:"sam" AND created:"2026\\-01\\-01"');
+    'type:"task" AND status:"open" AND assignee.id:"sam" AND created:["2026\\-01\\-01" TO *]');
   assert.throws(() => buildWorkItemQuery({ filters: [{ field: 'evil', value: 'x' }] }, fields), /Unknown work item field/);
 });
 
@@ -57,7 +57,7 @@ test('search tool queries through callPolarionTool and includes generated query'
     callPolarionTool: async (name: string, args: Record<string, unknown>) => {
       calls.push([name, args]);
       return name === 'getProjectFieldsMetadata'
-        ? { content: [], structuredContent: { data: [{ id: 'customField' }] } }
+        ? { content: [], structuredContent: { data: { attributes: { customField: { label: 'Custom' } } } } }
         : { content: [], structuredContent: { data: [{ id: 'PRJ/WI-1' }] } };
     },
   } satisfies VirtualToolContext;
@@ -73,8 +73,11 @@ test('search tool queries through callPolarionTool and includes generated query'
 test('lint and URL virtual tools never execute a Lucene search without fetch', async () => {
   const calls: string[] = [];
   const ctx = { apiBaseUrl: 'https://polarion.example/polarion/rest/v1', logger: console, signal: new AbortController().signal, reportProgress: async () => undefined,
-    callPolarionTool: async (name: string) => { calls.push(name); return { content: [] }; } } as unknown as VirtualToolContext;
+    callPolarionTool: async (name: string) => { calls.push(name); return { content: [], structuredContent: { data: { id: 'PRJ/WI-1' } } }; } } as unknown as VirtualToolContext;
   await compositeTools[1].handler({ query: 'status:open' }, ctx);
   await compositeTools[2].handler({ url: 'https://polarion.example/polarion/#/project/PRJ/workitem?id=WI-1' }, ctx);
   assert.deepEqual(calls, []);
+  const fetched = await compositeTools[2].handler({ url: 'https://polarion.example/polarion/redirect/project/PRJ/workitem?id=WI-1', fetch: true }, ctx);
+  assert.deepEqual(calls, ['getWorkItem']);
+  assert.match((fetched.content[0] as { type: 'text'; text: string }).text, /PRJ\/WI-1/);
 });
