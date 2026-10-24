@@ -27,7 +27,7 @@ test('website client block matches the rendered client manifest', () => {
   const renderer = path.join(repo, 'scripts/render-site.mjs');
   const result = spawnSync(process.execPath, [renderer, '--check'], { encoding: 'utf8' });
   assert.equal(result.status, 0, `${result.stdout ?? ''}${result.stderr ?? ''}`);
-  assert.match(result.stdout ?? '', /client block and generated tool counts are up to date/);
+  assert.match(result.stdout ?? '', /setup, domains and daily examples are up to date/);
 });
 
 test('clean documentation fixture passes every rule', t => {

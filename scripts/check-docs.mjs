@@ -236,7 +236,7 @@ function checker(root) {
   const website = read(root, 'docs/index.html');
   const countRx = /\b(\d{2,4})\s+(?:Polarion\s+REST\s+)?(?:operations|tools)\b/gi;
   const readmeCounts = [...readme.matchAll(countRx)].map(m => +m[1]);
-  for (const m of website.matchAll(countRx)) if (+m[1] !== actualCount || (readmeCounts.length && +m[1] !== readmeCounts[0])) add('website', 'docs/index.html', lineAt(website, m.index), `website cites ${m[1]}; README/source count is ${readmeCounts[0] ?? actualCount}/${actualCount}`);
+  for (const m of website.replace(/<!-- domains:start -->[\s\S]*?<!-- domains:end -->/, '').matchAll(countRx)) if (+m[1] !== actualCount || (readmeCounts.length && +m[1] !== readmeCounts[0])) add('website', 'docs/index.html', lineAt(website, m.index), `website cites ${m[1]}; README/source count is ${readmeCounts[0] ?? actualCount}/${actualCount}`);
 
   // 8. Optional clients manifest. Absence is intentionally silent.
   const clientsPath = path.join(root, 'docs/clients.json');

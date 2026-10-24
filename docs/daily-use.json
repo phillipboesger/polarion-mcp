@@ -1,0 +1,37 @@
+[
+  {
+    "id": "triage", "label": "Release triage", "time": "09:00", "title": "Start with the blockers.",
+    "prompt": "Which open defects could block Release 2.4? Group them by severity and show who owns the next step.",
+    "calls": [{"tool":"getWorkItems","detail":"Query defects in the chosen project and release; page through the results."},{"tool":"getWorkItem","detail":"Read each candidate’s severity, owner and current status."}],
+    "result": "Example: 8 open defects, 2 critical, 3 without an owner. A short triage list with item IDs, links and missing information to check.",
+    "guard": "Read-only review. Ask for approval before proposing any reassignment or status change."
+  },
+  {
+    "id": "review", "label": "Document review", "time": "10:30", "title": "Turn a vague requirement into a proposal.",
+    "prompt": "Review the requirements in the Brake Control LiveDoc. Rewrite REQ-17 so its acceptance criteria are measurable. Preview the change first.",
+    "calls": [{"tool":"getDocument","detail":"Read the selected document’s metadata."},{"tool":"getDocumentParts","detail":"Locate the referenced work items in the document."},{"tool":"getWorkItem","detail":"Read REQ-17 and its current description."},{"tool":"patchWorkItem","detail":"dry_run: true · preview the proposed description update."}],
+    "result": "Example: a proposed REQ-17 description, the assumptions behind the rewrite, and a preview of the PATCH request. Nothing has been saved.",
+    "guard": "You review the proposal. Only after approval does the assistant repeat the update without dry_run. This edits the requirement, not arbitrary LiveDoc body text."
+  },
+  {
+    "id": "test", "label": "Test preparation", "time": "13:00", "title": "From requirements to a test record.",
+    "prompt": "Draft test cases for these requirements and prepare a test run. After I execute them, record the results I provide. Preview all writes first.",
+    "calls": [{"tool":"getWorkItems","detail":"Read the selected requirements and check existing test cases first."},{"tool":"postWorkItems","detail":"dry_run: true · draft test case items using the project’s configured types."},{"tool":"postTestRuns","detail":"dry_run: true · preview the new test run."},{"tool":"postTestRecords","detail":"After execution and approval, record the supplied outcomes; preview first."}],
+    "result": "Example: 4 draft test cases and a run proposal. After you execute the tests and provide outcomes, the assistant can record those results in Polarion.",
+    "guard": "Approve each write after its preview. The connector records results; it does not execute your product tests or infer a pass."
+  },
+  {
+    "id": "status", "label": "Release status", "time": "15:00", "title": "Bring evidence to the status meeting.",
+    "prompt": "Summarize the Release 2.4 plan: unfinished work, owners, open defects and the latest test runs. Flag anything the data cannot answer.",
+    "calls": [{"tool":"getPlan","detail":"Read the chosen plan and its scheduled item relationships."},{"tool":"getWorkItems","detail":"Read the scheduled items and release defects."},{"tool":"getTestRuns","detail":"Read matching run status and available result fields."}],
+    "result": "Example: 12 unfinished items, 2 blocking defects and 1 unfinished run, with source IDs and a list of missing data. A draft meeting update you can check.",
+    "guard": "Read-only summary. You decide whether the release is ready; the assistant does not approve or close it."
+  },
+  {
+    "id": "trace", "label": "Traceability gaps", "time": "16:30", "title": "Find the missing links before the review.",
+    "prompt": "For the requirements in this release, find those without a verifies link to a test case. Check existing items before proposing new tests.",
+    "calls": [{"tool":"getWorkItems","detail":"Fetch the agreed requirement scope and any candidate test cases."},{"tool":"getLinkedWorkItems","detail":"Inspect each requirement’s links and the project’s link direction."}],
+    "result": "Example: 6 requirements without the expected test link. Existing candidate tests are listed separately from requirements that may need a new test.",
+    "guard": "Read-only gap list. Review the project’s link roles and scope before approving any new item or link."
+  }
+]
