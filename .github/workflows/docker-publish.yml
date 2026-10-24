@@ -23,7 +23,7 @@ jobs:
         run: |
           test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")" \
             || { echo "::error::tag ${GITHUB_REF_NAME} does not match package.json"; exit 1; }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22.x
           cache: npm
@@ -55,7 +55,7 @@ jobs:
 
       # Smoke-test the image before anything is pushed (amd64, loaded locally).
       - name: Build image for the smoke test
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
@@ -91,7 +91,7 @@ jobs:
 
       - name: Build and push
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
