@@ -141,6 +141,19 @@ jobs:
             polarion-mcp-${{ github.ref_name }}.tgz
             polarion-mcp-${{ github.ref_name }}.bom.json
 
+      - name: Publish to npm
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "NPM_TOKEN not set, skipping npm publish"
+            exit 0
+          fi
+          npm config set //registry.npmjs.org/:_authToken "${NODE_AUTH_TOKEN}"
+          npm publish --provenance --access public
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

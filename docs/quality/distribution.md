@@ -30,4 +30,4 @@ The VS Code link uses the `vscode:mcp/install?` handler. The Cursor link uses `c
 
 The MCPB manifest is `mcpb/manifest.json`. On a version-tag release, GitHub Actions stages the built server with production dependencies, runs `npx --yes @anthropic-ai/mcpb pack`, and uploads the `.mcpb` file beside the release ZIP. The manifest prompts for the REST API URL and a sensitive PAT.
 
-The release workflow does not publish to npm. Publishing would require configuring an `NPM_TOKEN` and adding an explicitly guarded npm publish step.
+On a version-tag release the workflow publishes to npm with provenance, but only when the repository secret `NPM_TOKEN` (an npm automation token with publish rights) is set. Without the secret the step is skipped and the rest of the release is unaffected.
