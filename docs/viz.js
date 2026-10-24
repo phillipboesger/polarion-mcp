@@ -8,7 +8,6 @@
     var n = parseInt(hex.slice(1), 16);
     return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a.toFixed(3) + ")";
   }
-  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
   function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
   function rng(seed) {
     var s = seed >>> 0;
@@ -103,7 +102,6 @@
       for (var i2 = 0; i2 < N; i2++) {
         var p = P(i2), d = ring[i2];
         d.lit = Math.max(0, d.lit - dt * 0.9);
-        var near = 0;
         ctx.fillStyle = d.lit > 0.05 ? rgba(C.cyan, 0.35 + d.lit * 0.65) : rgba(C.ice, 0.3 + d.band * 0.08);
         var r2 = 1.5 + d.band * 0.3 + d.lit * 3.2;
         if (d.lit > 0.05) {

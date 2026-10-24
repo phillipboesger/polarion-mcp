@@ -22,7 +22,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
+import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
@@ -910,7 +910,7 @@ export async function executeApiTool(
         })
         .join(' OR ');
 
-      console.error(`[WARN] Tool '${toolName}' requires security: ${securityRequirementsString}, but no suitable credentials found.`);
+      console.error("[WARN] Tool '%s' requires security: %s, but no suitable credentials found.", logSafe(toolName), logSafe(securityRequirementsString));
       // Sending it anyway only earns a bare "No access token" from Polarion (or a DNS error when
       // API_BASE_URL is unset); say what to configure instead.
       return {
@@ -1003,7 +1003,7 @@ export async function executeApiTool(
     // Log request info to stderr (doesn't affect MCP output)
     // All console.error() calls go to stderr, which is for logging
     // MCP protocol messages go to stdout
-    console.error(`[INFO] Executing tool "${toolName}": ${config.method} ${config.url}`);
+    console.error('[INFO] Executing tool "%s": %s %s', logSafe(toolName), logSafe(config.method), logSafe(config.url));
 
     // Execute the request with pacing + retry-with-backoff on 429/5xx
     const response = await sendWithRetry(config, sendOpts);
@@ -1114,7 +1114,7 @@ export async function executeApiTool(
     }
 
     // Log error to stderr (for debugging)
-    console.error(`[ERROR] Error during execution of tool '${toolName}':`, errorMessage);
+    console.error("[ERROR] Error during execution of tool '%s':", logSafe(toolName), logSafe(errorMessage));
 
     // Return error message to AI assistant
     return { content: [{ type: "text", text: errorMessage }], isError: true };

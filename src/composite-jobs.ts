@@ -23,13 +23,12 @@ export const runJobAndWait: VirtualTool = {
     if (!jobId) return errorResult('executeJob did not return a job ID.');
     let job: JsonObject = first(execution);
     let delay = 1000;
-    let terminal = false;
     await ctx.reportProgress({ progress: 0, total: 1, message: `Job ${jobId} started` });
-    while (!terminal) {
+    for (;;) {
       if (ctx.signal.aborted) return textResult({ jobId, status: 'cancelled', jobCancelled: false, message: 'Polling stopped because the request was cancelled; the Polarion job was not cancelled.' });
       const state = String(attrs(job).state ?? '').toLowerCase();
       const statusType = String(attrs(job).status?.type ?? '').toUpperCase();
-      terminal = ['finished', 'completed', 'done', 'failed', 'cancelled', 'canceled'].includes(state) || ['OK', 'FAILED', 'CANCELLED', 'UNKNOWN'].includes(statusType);
+      const terminal = ['finished', 'completed', 'done', 'failed', 'cancelled', 'canceled'].includes(state) || ['OK', 'FAILED', 'CANCELLED', 'UNKNOWN'].includes(statusType);
       if (terminal) break;
       const elapsed = (Date.now() - started) / 1000;
       if (elapsed >= waitSeconds) return textResult({ jobId, status: 'timeout', maxWaitSeconds: waitSeconds, jobCancelled: false });

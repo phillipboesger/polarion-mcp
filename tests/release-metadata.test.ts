@@ -18,7 +18,7 @@ test("server.json and its image tag carry the package version", () => {
 })
 
 test("the Docker image is labelled with the registry name from server.json", () => {
-  assert.match(readFileSync("Dockerfile", "utf8"), new RegExp(`io\\.modelcontextprotocol\\.server\\.name="${server.name.replace(/[.]/g, "\\.")}"`))
+  assert.match(readFileSync("Dockerfile", "utf8"), new RegExp(`io\\.modelcontextprotocol\\.server\\.name="${server.name.replace(/[.\\]/g, "\\$&")}"`))
 })
 
 test("the stdio entry point has a shebang, so the polarion-mcp bin runs", () => {

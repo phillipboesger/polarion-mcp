@@ -18,7 +18,7 @@ import express, { type Request, type RequestHandler, type Response } from 'expre
 import { executeApiTool } from './executor.js';
 import { toolDefinitionMap, securitySchemes } from './tools.js';
 import { enabledTools } from './tool-filter.js';
-import { redact, sanitizeInputSchema } from './utils.js';
+import { logSafe, redact, sanitizeInputSchema } from './utils.js';
 import { SERVER_VERSION } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import type { JsonObject } from './types.js';
@@ -259,7 +259,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
 
     } catch (error: unknown) {
       const detail = redact(String(error instanceof Error ? error.message : error));
-      console.error(`[ERROR] Error executing tool '${toolName}': ${detail}`);
+      console.error("[ERROR] Error executing tool '%s': %s", logSafe(toolName), logSafe(detail));
 
       res.status(500).json({
         success: false,
