@@ -98,6 +98,8 @@ test('file path validation rejects relative paths, traversal, outside-root, dire
     for (const [value, pattern] of [['relative', /absolute/], [`${root}/../secret`, /traversal/], [outsideFile, /outside/], [prefixEscapeFile, /outside/], [dir, /regular file/], [path.join(root, 'escape'), /outside/]] as const) {
       const result = await invoke(value); assert.equal(result.isError, true); assert.match((result.content[0] as { text: string }).text, pattern);
     }
+    const missing = await invoke(path.join(outside, 'does-not-exist')); const present = await invoke(outsideFile);
+    assert.equal((missing.content[0] as { text: string }).text, (present.content[0] as { text: string }).text);
     const large = await invoke(file, '4'); assert.match((large.content[0] as { text: string }).text, /exceeds/);
   } finally { await rm(root, { recursive: true, force: true }); await rm(outside, { recursive: true, force: true }); await rm(prefixEscape, { recursive: true, force: true }); }
 });

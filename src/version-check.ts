@@ -32,7 +32,7 @@ export async function checkPolarionVersion(options: VersionCheckOptions): Promis
     const timer = setTimeout(() => controller.abort(), 3000);
     try {
       const response = await (options.fetchImpl ?? fetch)(`${options.apiBaseUrl.replace(/\/$/, '')}/metadata`, {
-        headers: options.bearerToken ? { Authorization: `Bearer ${options.bearerToken}` } : {}, signal: controller.signal,
+        headers: options.bearerToken ? { Authorization: `Bearer ${options.bearerToken}` } : {}, signal: controller.signal, redirect: 'error',
       });
       if (!response.ok) return;
       const data = await response.json() as { data?: { attributes?: { version?: unknown } } };

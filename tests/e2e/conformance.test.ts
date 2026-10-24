@@ -84,7 +84,7 @@ test("stdio and Streamable HTTP conform through the official MCP SDK client", as
     stdio = new Client({ name: "e2e-stdio", version: "1" })
     await stdio.connect(stdioTransport)
     const stdioTools = await listViaClient(stdio)
-    assert.equal(stdioTools.tools.length, 289)
+    assert.equal(stdioTools.tools.length, 293)
     const stdioProjects = await stdio.callTool({ name: "getProjects", arguments: {} })
     assert.match(JSON.stringify(stdioProjects), /demo/)
 
@@ -93,7 +93,7 @@ test("stdio and Streamable HTTP conform through the official MCP SDK client", as
       const { client, transport } = await rpcClient(server.base, PAT)
       http = client
       const tools = await listViaClient(client)
-      assert.equal(tools.tools.length, 289)
+      assert.equal(tools.tools.length, 293)
       const result = await client.callTool({ name: "getProjects", arguments: {} })
       assert.match(JSON.stringify(result), /demo/)
       await client.listTools() // exercises the initialized session on a later request
@@ -124,7 +124,7 @@ test("DCR OAuth discovery, PKCE login, audience binding, MCP access and refresh 
     assert.equal(good.status, 200)
     const tokens = await good.json() as { access_token: string; refresh_token: string }
     const mcp = await rpcClient(server.base, tokens.access_token)
-    assert.equal((await mcp.client.listTools()).tools.length, 289)
+    assert.equal((await mcp.client.listTools()).tools.length, 293)
     await mcp.transport.close()
     const refreshed = await fetch(`${server.base}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "refresh_token", client_id: flow.client_id, refresh_token: tokens.refresh_token }) })
     assert.equal(refreshed.status, 200)

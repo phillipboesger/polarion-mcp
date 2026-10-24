@@ -62,8 +62,11 @@ async function readLocalFile(filePath: unknown, rootsValue: string | undefined, 
   const roots = (rootsValue ?? '').split(',').map(root => root.trim()).filter(Boolean);
   if (!roots.length) throw new Error('Local file upload is disabled; configure MCP_UPLOAD_ROOTS with one or more absolute directories');
   if (roots.some(root => !path.isAbsolute(root))) throw new Error('Every MCP_UPLOAD_ROOTS entry must be an absolute directory');
-  const [resolvedFile, resolvedRoots] = await Promise.all([realpath(filePath), Promise.all(roots.map(root => realpath(root)))]);
-  if (!resolvedRoots.some(root => inside(root, resolvedFile))) throw new Error('filePath is outside MCP_UPLOAD_ROOTS');
+  const resolvedRoots = await Promise.all(roots.map(root => realpath(root)));
+  // Same message for missing and out-of-root paths so the tool is no filesystem existence oracle.
+  const deniedMessage = 'filePath is outside MCP_UPLOAD_ROOTS or unreadable';
+  const resolvedFile = await realpath(filePath).catch(() => { throw new Error(deniedMessage); });
+  if (!resolvedRoots.some(root => inside(root, resolvedFile))) throw new Error(deniedMessage);
   const info = await stat(resolvedFile);
   if (!info.isFile()) throw new Error('filePath must refer to a regular file');
   if (info.size > maxBytes) throw new Error(`File exceeds the ${maxBytes}-byte upload limit`);
@@ -74,6 +77,8 @@ async function readBoundedFile(filePath: string, maxBytes: number): Promise<Buff
   const chunks: Buffer[] = [];
   let size = 0;
   const handle = await open(filePath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  const opened = await handle.stat();
+  if (!opened.isFile() || opened.size > maxBytes) { await handle.close(); throw new Error('filePath must refer to a regular file within the upload limit'); }
   await new Promise<void>((resolve, reject) => {
     const stream = handle.createReadStream();
     stream.on('data', (chunk: Buffer | string) => {
@@ -149,8 +154,14 @@ export async function fetchAttachmentUrl(rawUrl: string, config: UploadConfig = 
       continue;
     }
     if (response.status < 200 || response.status >= 300) throw new Error(`URL download returned HTTP ${response.status}`);
-    return { bytes: response.bytes, defaultName: path.basename(decodeURIComponent(url.pathname)) || 'upload' };
+    return { bytes: response.bytes, defaultName: urlFileName(url) };
   }
+}
+
+function urlFileName(url: URL): string {
+  let decoded = url.pathname;
+  try { decoded = decodeURIComponent(url.pathname); } catch { /* keep the raw path */ }
+  try { return safeFileName(path.basename(decoded)) ?? 'upload'; } catch { return 'upload'; }
 }
 
 function withDeadline<T>(promise: Promise<T>, deadline: number): Promise<T> {
@@ -222,7 +233,7 @@ export function createUploadAttachmentTool(configProvider: () => UploadConfig = 
       return await ctx.callPolarionTool(request.tool, request.args);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Attachment upload failed';
-      ctx.logger.warn(`upload_attachment failed: ${message}`);
+      ctx.logger.warn('upload_attachment failed');
       return { isError: true, content: [{ type: 'text', text: `Error: ${message}` }] };
     }
     },

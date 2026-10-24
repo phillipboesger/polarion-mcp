@@ -338,7 +338,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const checkVersion = process.env.MCP_VERSION_CHECK?.trim().toLowerCase() === 'true'
-    ? createVersionCheck({ apiBaseUrl, bearerToken: process.env.BEARER_TOKEN, logger })
+    ? createVersionCheck({ apiBaseUrl, bearerToken: options.transport === 'stdio' ? process.env.BEARER_TOKEN : undefined, logger })
     : undefined;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
