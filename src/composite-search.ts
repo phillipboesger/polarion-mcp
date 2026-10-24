@@ -195,7 +195,7 @@ export function parsePolarionUrl(input: string, apiBaseUrl: string): EntityRef {
     if (!match) continue;
     const rawId = route.id(match, url);
     let id: string;
-    let spaceId = route.space ? decodePolarionIdentifier(route.space(match)) : route.type === 'document' ? url.searchParams.get('space') ?? undefined : undefined;
+    let spaceId = route.space ? decodePolarionIdentifier(route.space(match)) : route.type === 'document' && url.searchParams.has('space') ? validateDecodedPolarionIdentifier(url.searchParams.get('space')!) : undefined;
     if (route.type === 'document' && rawId.includes('/')) {
       const parts = rawId.split('/');
       if (parts.length !== 2 || parts.some(part => !part)) throw new Error('Malformed document URL identifier');
@@ -215,7 +215,7 @@ export function parsePolarionUrl(input: string, apiBaseUrl: string): EntityRef {
       [spaceId, id] = parts.map(part => decodePolarionIdentifier(part));
     }
     if (!id) throw new Error('Malformed Polarion entity ID');
-    return { type: route.type, projectId: decodePolarionIdentifier(projectMatch[1]), id, ...(spaceId ? { spaceId: decodePolarionIdentifier(spaceId) } : {}) };
+    return { type: route.type, projectId: decodePolarionIdentifier(projectMatch[1]), id, ...(spaceId ? { spaceId } : {}) };
   }
   throw new Error('Unsupported or malformed Polarion entity URL');
 }
