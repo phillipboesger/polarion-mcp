@@ -35,7 +35,8 @@ const INPUT_KEY_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
  *   control characters (which could forge log entries) become spaces.
  */
 export function logSafe(value: unknown): string {
-  return String(value).replace(/\p{Cc}+/gu, ' ');
+  // The explicit \r\n pass is the form CodeQL's js/log-injection recognises as a sanitizer.
+  return String(value).replace(/[\r\n]+/g, ' ').replace(/\p{Cc}+/gu, ' ');
 }
 
 export function redact(value: string): string {
