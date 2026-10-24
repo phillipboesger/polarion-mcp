@@ -86,7 +86,14 @@ export function countDomains(toolsSource) {
 
 export function renderDomains(toolsSource) {
   const { counts } = countDomains(toolsSource);
-  return `<div class="domain-grid">${domains.map(domain => `<article data-domain="${domain.id}"><div class="domain-top"><span class="domain-icon" aria-hidden="true">${domain.icon}</span><span class="domain-count">${counts[domain.id]} operations</span></div><h3>${domain.title}</h3><p>${domain.outcome}</p></article>`).join('\n')}</div>`;
+  const cards = domains.map((domain, i) => `<article class="domain-card" id="topic-${domain.id}" data-domain="${domain.id}" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${domains.length}"><div class="domain-top"><span class="domain-icon" aria-hidden="true">${domain.icon}</span><span class="domain-count">${counts[domain.id]} operations</span></div><h3>${domain.title}</h3><p>${domain.outcome}</p></article>`).join('\n');
+  const dots = domains.map((domain, i) => `<button type="button" class="carousel-dot" data-slide="${i}" aria-label="Show ${domain.title}"${i === 0 ? ' aria-current="true"' : ''}></button>`).join('');
+  return `<div class="carousel" role="region" aria-roledescription="carousel" aria-label="Polarion topics covered by the tools">
+<div class="carousel-track" tabindex="0">
+${cards}
+</div>
+<div class="carousel-controls"><button type="button" class="carousel-prev" aria-label="Previous topic">←</button><div class="carousel-dots">${dots}</div><button type="button" class="carousel-next" aria-label="Next topic">→</button></div>
+</div>`;
 }
 
 export function renderDailyUse(scenarios) {

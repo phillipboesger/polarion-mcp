@@ -27,14 +27,12 @@
         },
         {
           "id": "openai",
-          "name": "OpenAI / ChatGPT",
+          "name": "ChatGPT / OpenAI",
           "mark": "O",
-          "description": "Chat, coding and agents",
+          "description": "ChatGPT, custom GPTs and Codex",
           "clients": [
             "chatgpt-apps",
             "custom-gpt",
-            "openai-api",
-            "openai-agents",
             "codex-cli"
           ]
         },
@@ -52,9 +50,21 @@
           "id": "google",
           "name": "Google",
           "mark": "G",
-          "description": "Gemini in your terminal",
+          "description": "Gemini Enterprise and Gemini CLI",
           "clients": [
-            "gemini-cli"
+            "gemini-cli",
+            "gemini-enterprise"
+          ]
+        },
+        {
+          "id": "other",
+          "name": "Other / Custom",
+          "mark": "+",
+          "description": "Any other AI provider or MCP client",
+          "clients": [
+            "generic-stdio",
+            "openai-api",
+            "openai-agents"
           ]
         }
       ]
@@ -87,10 +97,9 @@
           "id": "self-hosted",
           "name": "Run it your way",
           "mark": ">_",
-          "description": "A team server, your own client, or a workflow.",
+          "description": "A team server, an HTTP client, or a workflow.",
           "clients": [
             "docker",
-            "generic-stdio",
             "generic-http",
             "rest-wrapper",
             "n8n"
@@ -542,7 +551,7 @@
     {
       "id": "openai-api",
       "name": "OpenAI Responses API",
-      "label": "API",
+      "label": "OpenAI API",
       "provider": "openai",
       "setup": "openai-api",
       "steps": [
@@ -586,7 +595,7 @@
     {
       "id": "openai-agents",
       "name": "OpenAI Agents SDK",
-      "label": "Agents SDK",
+      "label": "OpenAI Agents SDK",
       "provider": "openai",
       "setup": "agents-sdk",
       "steps": [
@@ -838,6 +847,50 @@
         }
       },
       "defaultMode": "npm"
+    },
+    {
+      "id": "gemini-enterprise",
+      "name": "Gemini Enterprise",
+      "label": "Gemini Enterprise",
+      "provider": "google",
+      "setup": "connector",
+      "steps": [
+        "Get your team’s HTTPS MCP URL. Gemini Enterprise accepts only Streamable HTTP, and the server needs a certificate from a public CA.",
+        "In the Google Cloud console open Gemini Enterprise > Data stores > Create data store, choose Custom MCP Server and add the URL. Choose OAuth 2.0 and enter the OAuth details of your server.",
+        "Reload the custom actions, enable the Polarion tools you want, then connect the data store to your Gemini Enterprise app."
+      ],
+      "sources": [
+        "https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server"
+      ],
+      "checked": "2026-10-24",
+      "note": "An administrator may need to override the organization policy that blocks custom MCP data stores. Tools are disabled until you enable them.",
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "This connector cannot launch npx; use a reachable HTTPS server."
+        },
+        "remote": {
+          "setup": "connector",
+          "steps": [
+            "Get your team’s HTTPS MCP URL. Gemini Enterprise accepts only Streamable HTTP, and the server needs a certificate from a public CA.",
+            "In the Google Cloud console open Gemini Enterprise > Data stores > Create data store, choose Custom MCP Server and add the URL. Choose OAuth 2.0 and enter the OAuth details of your server.",
+            "Reload the custom actions, enable the Polarion tools you want, then connect the data store to your Gemini Enterprise app."
+          ],
+          "note": "An administrator may need to override the organization policy that blocks custom MCP data stores. Tools are disabled until you enable them."
+        },
+        "docker": {
+          "setup": "connector",
+          "steps": [
+            "Deploy the server with the Docker command below and configure public HTTPS and OAuth before connecting.",
+            "Get your team’s HTTPS MCP URL. Gemini Enterprise accepts only Streamable HTTP, and the server needs a certificate from a public CA.",
+            "In the Google Cloud console open Gemini Enterprise > Data stores > Create data store, choose Custom MCP Server and add the URL. Choose OAuth 2.0 and enter the OAuth details of your server.",
+            "Reload the custom actions, enable the Polarion tools you want, then connect the data store to your Gemini Enterprise app."
+          ],
+          "note": "An administrator may need to override the organization policy that blocks custom MCP data stores. Tools are disabled until you enable them.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "cursor",
@@ -1151,7 +1204,7 @@
     {
       "id": "generic-stdio",
       "name": "Other AI provider / any MCP client",
-      "label": "Other AI provider / any MCP client",
+      "label": "Any MCP client",
       "provider": "custom",
       "setup": "local-json",
       "steps": [
@@ -1346,13 +1399,13 @@
       "client": "claude-desktop"
     },
     {
-      "name": "ChatGPT / APIs",
-      "summary": "ChatGPT connector and Responses API: HTTPS; GPT Actions: REST/OpenAPI; SDK and Codex: local or remote.",
+      "name": "ChatGPT / Codex",
+      "summary": "ChatGPT connector: HTTPS; Custom GPT Actions: REST/OpenAPI; Codex: local or remote.",
       "client": "chatgpt-apps"
     },
     {
-      "name": "Editors / other providers",
-      "summary": "VS Code, Cursor, Gemini and more; client-specific steps and supported server choices.",
+      "name": "Gemini, editors, other providers",
+      "summary": "Gemini Enterprise and CLI, VS Code, Cursor and more; OpenAI API, Agents SDK or any MCP client.",
       "client": "cursor"
     },
     {
