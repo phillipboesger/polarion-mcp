@@ -134,7 +134,7 @@ jobs:
           echo "${out}" | grep -q '"serverInfo"' || { echo "::error::stdio initialize failed: ${out}"; exit 1; }
 
       - name: Upload release ZIP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: polarion-mcp-dist
           path: ${{ steps.pack.outputs.zip }}
@@ -256,7 +256,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: polarion-mcp-coverage
           path: coverage/
