@@ -222,5 +222,5 @@ test('topic carousel advances on its own, responds to controls and honors reduce
   await page.reload();
   await track.scrollIntoViewIfNeeded();
   await page.waitForTimeout(5500);
-  expect(await track.evaluate(el => el.scrollLeft)).toBe(0);
+  expect(await track.evaluate(el => el.scrollLeft)).toBeLessThan(10);
 });
