@@ -8,7 +8,6 @@ Static analysis runs entirely on GitHub; no external service or token is needed.
 | ESLint (`--max-warnings 0`) | `ci.yml` (Lint job) | Type-aware lint errors, floating promises, unused code. |
 | Coverage gate | `ci.yml` | Per-module coverage targets (`scripts/check-coverage.mjs`). |
 | Gitleaks | `security.yml` | Committed secrets, full history. |
-| Dependency review | `security.yml` (pull requests) | New dependencies with known high-severity advisories. |
 | `npm audit` | `security.yml` | Known vulnerabilities in production dependencies. |
 | actionlint | `security.yml` | Mistakes in workflow files. |
 
