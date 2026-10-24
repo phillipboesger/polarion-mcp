@@ -21,6 +21,7 @@ for (const line of report.split(/\r?\n/)) {
 const targets = [
   'src/oauth.ts',
   'src/cimd.ts',
+  'src/ssrf.ts',
   'src/sealed.ts',
   'src/guards.ts',
   'src/tool-filter.ts',
