@@ -4,46 +4,41 @@
 
 ## Prerequisites
 
-- A reachable Polarion MCP server at `https://YOUR-SERVER/mcp`.
-- A Polarion personal access token (PAT) for the supported bearer or OAuth login flow, where applicable.
-- Configure server environment variables using [configuration](../configuration.md); this guide does not duplicate the environment variable reference.
+- A deployed [REST wrapper](../deployment.md) for the default API-key setup. Its OpenAPI document is at `https://YOUR-SERVER/openapi-gpt.json`; it does not require an MCP `/mcp` endpoint.
+- The administrator configures `API_BASE_URL`, `BEARER_TOKEN` (the server's Polarion PAT), and a separate `HTTP_API_KEY`. See [configuration](../configuration.md).
 
 ## Configuration
 
 ```text
-Action OpenAPI URL: https://YOUR-SERVER/openapi-gpt.json; configure API key auth with YOUR_POLARION_PAT (or configure the server's GPT OAuth endpoints).
+Action OpenAPI URL: https://YOUR-SERVER/openapi-gpt.json; configure API key auth with the deployment's HTTP_API_KEY. For GPT OAuth, use the MCP HTTP server's GPT Actions endpoints instead.
 ```
 
 This is the exact client snippet recorded in [clients.json](../clients.json). It is unverified (check the vendor docs).
 
-## Authentication
+Use the editor's bearer API-key authentication with `HTTP_API_KEY`. Requests to the REST wrapper carry `Authorization: Bearer YOUR_HTTP_API_KEY`; the wrapper calls Polarion using its configured `BEARER_TOKEN`. These are separate credentials.
 
-**PAT static header:** send `Authorization: Bearer YOUR_POLARION_PAT` on MCP requests or configure the PAT in the client auth UI.
+<details>
+<summary>Alternative: GPT OAuth through the MCP HTTP server</summary>
 
-**OAuth:** where supported by this client, register or discover the OAuth client, allow the exact callback below, then enter the Polarion PAT at the Polarion login page. Server OAuth settings are in [configuration](../configuration.md).
+The MCP HTTP server also exposes GPT Actions routes and an OAuth login flow. Deploy that entry point instead of the API-key REST wrapper and follow [deployment](../deployment.md) and [security](../security.md). Inspect the GPT editor for the exact OAuth callback and allow it with `MCP_ALLOWED_REDIRECT_PREFIXES`; no fixed callback is asserted here. Do not apply the wrapper's shared API-key instructions to this flow.
 
-## OAuth redirect allowlist
-
-Set `MCP_ALLOWED_REDIRECT_PRESETS` to: No preset; inspect the GPT editor and use MCP_ALLOWED_REDIRECT_PREFIXES with its exact callback URI.. Available preset names in server code are `claude`, `chatgpt`, `vscode`, `cursor`, `copilot-studio`, `gemini`, and `loopback`. Presets without a verified fixed URI add no fixed callback. For generated callbacks, put the exact URI supplied by the client in `MCP_ALLOWED_REDIRECT_PREFIXES`. The `loopback` preset permits loopback callbacks. See [configuration](../configuration.md).
+</details>
 
 ## Recommended tools
 
-This client uses REST Actions rather than MCP, so MCP toolset selection does not apply.
+Custom GPT Actions use REST/OpenAPI rather than MCP transport. The project provides a reduced 30-action document; MCP toolset selection does not apply to the wrapper.
 
 ## Troubleshooting
 
-- **MCP request returns 401** -> the bearer token is missing or Polarion rejects it -> check the Authorization header and use a valid Polarion PAT; the server validates it with Polarion before opening the session.
-- **OAuth registration or login is refused** -> the callback is not in the server allowlist -> configure the matching preset or exact URI in `MCP_ALLOWED_REDIRECT_PREFIXES`; see [configuration](../configuration.md).
-
-Client-specific notes:
-
-- Custom GPT Actions use REST/OpenAPI rather than MCP transport; project publishes a reduced 30-action document.
+- **Wrapper request returns 401:** check that the caller sends the deployment's `HTTP_API_KEY`, rather than the Polarion PAT.
+- **Polarion request is denied:** the administrator should check the wrapper's `BEARER_TOKEN`, REST API URL, and Polarion permissions.
+- **GPT OAuth login is refused:** check the exact editor callback against the MCP HTTP server's redirect allowlist; see [configuration](../configuration.md).
 
 ## Verify the connection
 
-Call the configured Action and confirm its operation is returned and can be invoked.
+Call a read-only Action and confirm it returns data from the intended Polarion instance.
 
 ## Sources
 
-- [https://help.openai.com/en/articles/8554397-creating-a-gpt](https://help.openai.com/en/articles/8554397-creating-a-gpt)
-- [https://platform.openai.com/docs/actions/authentication](https://platform.openai.com/docs/actions/authentication)
+- [Creating a GPT](https://help.openai.com/en/articles/8554397-creating-a-gpt)
+- [GPT Actions authentication](https://platform.openai.com/docs/actions/authentication)
