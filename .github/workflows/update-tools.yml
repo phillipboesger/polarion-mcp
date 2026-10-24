@@ -82,7 +82,7 @@ jobs:
       # explicitly so the bot branch receives the full CI gate.
       - name: Open pull request if tools changed
         id: cpr
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: bot/update-polarion-tools
           base: main
