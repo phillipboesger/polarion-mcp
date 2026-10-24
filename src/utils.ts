@@ -465,7 +465,7 @@ export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z
     return compileZodSchema(jsonSchema);
   } catch (err: any) {
     // A test compiles every generated tool, so this only guards hand-written definitions.
-    console.error("Failed to generate/evaluate Zod schema for '%s':", logSafe(toolName), err);
+    console.error("Failed to generate/evaluate Zod schema for '%s':", String(toolName).replace(/\n|\r/g, ' '), err);
     return z.object({}).passthrough();
   }
 }
