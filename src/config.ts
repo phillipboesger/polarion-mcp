@@ -21,7 +21,7 @@ import { parseToolsetNames, type ToolsetName } from './toolsets.js';
 
 // Load environment variables from .env file
 // This allows configuration without modifying code
-dotenv.config();
+dotenv.config({ quiet: true });
 
 /**
  * Server configuration

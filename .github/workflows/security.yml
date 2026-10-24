@@ -19,7 +19,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
@@ -33,13 +33,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # Personal accounts do not need a license key. Organizations may need
       # GITLEAKS_LICENSE depending on their Gitleaks plan.
       - name: Scan for leaked secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install pinned actionlint
         run: |
           curl -fsSL -o actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
