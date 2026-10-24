@@ -272,7 +272,7 @@ test("a wrong type inside attributes still names the expected type although null
   assert.equal(message.type, "text")
   if (message.type === "text") {
     assert.match(message.text, /requestBody\.data\.attributes\.dueDate/)
-    assert.match(message.text, /Expected string, received number/)
+    assert.match(message.text, /Invalid input: expected string, received number/)
     assert.doesNotMatch(message.text, /invalid_union/)
   }
 })

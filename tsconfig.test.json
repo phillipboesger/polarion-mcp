@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "./build-tests",
     "declaration": false,
-    "sourceMap": false
+    "sourceMap": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "build", "build-tests"]

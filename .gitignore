@@ -20,6 +20,9 @@ lerna-debug.log*
 
 # Reports
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+reports/mutation/
+reports/stryker-incremental.json
+.stryker-tmp/
 
 # Runtime data
 pids

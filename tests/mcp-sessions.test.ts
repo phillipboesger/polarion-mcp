@@ -27,6 +27,20 @@ async function startApp(options: McpHttpAppOptions = {}) {
   return { base, stop, init, list }
 }
 
+async function assertLiveToolsList(response: Response) {
+  assert.equal(response.status, 200)
+  const text = await response.text()
+  const eventData = text.split("\n").find((line) => line.startsWith("data:"))
+  const message = JSON.parse(eventData ? eventData.slice("data:".length).trim() : text) as {
+    jsonrpc?: string
+    id?: number
+    result?: { tools?: unknown[] }
+  }
+  assert.equal(message.jsonrpc, "2.0")
+  assert.equal(message.id, 2)
+  assert.ok(Array.isArray(message.result?.tools), "session must return a tools/list result")
+}
+
 test("a session belongs to the token that created it: another token gets 404", async () => {
   const app = await startApp()
   try {
@@ -34,7 +48,7 @@ test("a session belongs to the token that created it: another token gets 404", a
     assert.equal((await app.list("pat-bob", sid)).status, 404)
     const del = await fetch(`${app.base}/mcp`, { method: "DELETE", headers: { authorization: "Bearer pat-bob", "mcp-session-id": sid } })
     assert.equal(del.status, 404, "another user must not be able to end the session")
-    assert.equal((await app.list("pat-alice", sid)).status, 200)
+    await assertLiveToolsList(await app.list("pat-alice", sid))
   } finally {
     await app.stop()
   }
@@ -60,7 +74,7 @@ test("activity keeps a session alive", async () => {
     const sid = await app.init("pat-alice")
     for (let i = 0; i < 4; i++) {
       await new Promise((r) => setTimeout(r, 250))
-      assert.equal((await app.list("pat-alice", sid)).status, 200)
+      await assertLiveToolsList(await app.list("pat-alice", sid))
     }
   } finally {
     await app.stop()

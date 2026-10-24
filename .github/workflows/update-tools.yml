@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      - name: Type check
+        run: npm run typecheck
+
       - name: Regenerate tools from the Polarion spec
         env:
           # Empty for scheduled runs -> the npm script falls back to the public demo.
@@ -62,6 +65,7 @@ jobs:
     needs: regenerate
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -74,9 +78,10 @@ jobs:
           name: tools-ts
           path: src
 
-      # Note: a PR opened with GITHUB_TOKEN triggers no workflows, so CI does
-      # not run on it; run CI on the branch (or push a commit) before merging.
+      # A PR opened with GITHUB_TOKEN does not trigger workflows. Dispatch CI
+      # explicitly so the bot branch receives the full CI gate.
       - name: Open pull request if tools changed
+        id: cpr
         uses: peter-evans/create-pull-request@v7
         with:
           branch: bot/update-polarion-tools
@@ -94,3 +99,9 @@ jobs:
           add-paths: |
             src/tools.ts
           delete-branch: true
+
+      - name: Run CI on the bot branch
+        if: steps.cpr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref bot/update-polarion-tools

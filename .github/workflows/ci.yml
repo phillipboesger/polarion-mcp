@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -168,3 +169,67 @@ jobs:
           test "${ok}" = "1" || { docker logs mcp-ci; echo "::error::image did not become healthy"; exit 1; }
           code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3010/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -d '{}')"
           test "${code}" = "401" || { echo "::error::expected 401 without token, got ${code}"; exit 1; }
+
+  coverage:
+    name: Coverage gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run coverage and thresholds
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: polarion-mcp-coverage
+          path: coverage/
+          if-no-files-found: error
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+  docs:
+    name: Documentation consistency (report mode)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Check documentation
+        run: npm run check:docs

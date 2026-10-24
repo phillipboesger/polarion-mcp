@@ -6,12 +6,14 @@ import type { AddressInfo } from "node:net"
 // Each test file runs in its own process, so API_BASE_URL can point at a stub
 // Polarion before oauth.js reads it at import time.
 const SECRET_PAT = "secret-pat-value"
-const STATUS: Record<string, number> = { ok: 200, revoked: 401, unlicensed: 403, broken: 400 }
+const STATUS: Record<string, number> = { ok: 200, created: 201, revoked: 401, unlicensed: 403, broken: 400, empty: 500 }
+const observed: Array<{ url: string; authorization: string | undefined }> = []
 const polarion = createServer((req, res) => {
+  observed.push({ url: req.url ?? "", authorization: req.headers.authorization })
   const token = (req.headers.authorization ?? "").replace(/^Bearer /, "").replace(SECRET_PAT, "")
   const status = STATUS[token] ?? 500
   res.writeHead(status, { "content-type": "application/json" })
-  res.end(JSON.stringify(status === 200 ? { data: [] } : { errors: [{ status: String(status), detail: `No access for\n user (${status})` }] }))
+  res.end(JSON.stringify(status === 200 || status === 201 ? { data: [] } : status === 500 ? null : { errors: [{ status: String(status), detail: `No access for\n user (${status})` }] }))
 })
 polarion.listen(0, "127.0.0.1")
 await new Promise<void>((resolve) => polarion.once("listening", () => resolve()))
@@ -34,9 +36,20 @@ async function check(token: string) {
 
 test("Polarion's answer maps to accepted, rejected, forbidden or unavailable", async () => {
   assert.equal((await check(`${SECRET_PAT}ok`)).result, true)
+  assert.equal((await check(`${SECRET_PAT}created`)).result, true, "all 2xx responses are accepted")
   assert.equal((await check(`${SECRET_PAT}revoked`)).result, false)
   assert.equal((await check(`${SECRET_PAT}unlicensed`)).result, "forbidden")
   assert.equal((await check(`${SECRET_PAT}broken`)).result, "unavailable")
+  assert.equal((await check(`${SECRET_PAT}empty`)).result, "unavailable", "missing error details must not throw or accept")
+})
+
+test("the token check sends a bearer and requests one Polarion page", async () => {
+  observed.length = 0
+  assert.equal((await check(`${SECRET_PAT}ok`)).result, true)
+  const request = observed.at(-1)
+  assert.ok(request)
+  assert.equal(request.authorization, `Bearer ${SECRET_PAT}ok`)
+  assert.equal(new URL(request.url, "http://polarion").searchParams.get("page[size]"), "1")
 })
 
 test("a failed check logs status and Polarion's detail, never the token", async () => {

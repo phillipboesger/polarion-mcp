@@ -79,7 +79,10 @@ async function login(base: string, pat: string) {
     body: new URLSearchParams({ grant_type: "authorization_code", code, client_id: client.client_id, code_verifier: verifier, redirect_uri: REDIRECT }),
   })
   assert.equal(res.status, 200)
-  return { client, tokens: (await res.json()) as Tokens }
+  const tokens = (await res.json()) as Tokens
+  assert.equal(tokens.expires_in, 60 * 60, "access tokens must retain the one-hour TTL")
+  assert.ok(tokens.refresh_token, "successful exchange must issue a refresh token")
+  return { client, tokens }
 }
 
 function refresh(base: string, clientId: string, refreshToken: string) {

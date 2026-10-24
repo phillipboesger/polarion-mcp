@@ -14,14 +14,7 @@ name: Live Polarion
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "tests/live/**"
-      - "scripts/live/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/live-polarion.yml"
+    # The job guard below limits push runs to main and version tags.
   pull_request:
     paths:
       - "src/**"
@@ -31,8 +24,10 @@ on:
       - "package-lock.json"
       - ".github/workflows/live-polarion.yml"
   schedule:
-    # Monday 05:00 UTC: catches a changed Polarion image without a code change.
-    - cron: "0 5 * * 1"
+    # Nightly 05:00 UTC: catches a changed Polarion image without a code change.
+    - cron: "0 5 * * *"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -48,7 +43,7 @@ jobs:
   live:
     name: Polarion ${{ matrix.polarion }}
     # Fork and Dependabot PRs get a read-only token without package access.
-    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
+    if: (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) && (github.event_name != 'push' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:

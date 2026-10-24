@@ -23,7 +23,7 @@ import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, sanitizeInputSchema } from "./utils.js";
-import { API_BASE_URL, getBearerToken, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
+import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
 import {
@@ -496,8 +496,8 @@ function summarizeMultipartForPreview(requestBody: unknown): unknown {
  */
 function issueBranch(issue: ZodIssue): ZodIssue | undefined {
   if (issue.code !== 'invalid_union') return undefined;
-  const last = issue.unionErrors.at(-1)?.issues[0];
-  return last?.code === 'invalid_type' && last.expected === 'null' ? issue.unionErrors[0]?.issues[0] : undefined;
+  const last = issue.errors.at(-1)?.[0];
+  return last?.code === 'invalid_type' && last.expected === 'null' ? issue.errors[0]?.[0] : undefined;
 }
 const issueCode = (issue: ZodIssue): string => issueBranch(issue)?.code ?? issue.code;
 const issueMessage = (issue: ZodIssue): string => issueBranch(issue)?.message ?? issue.message;
@@ -522,6 +522,7 @@ const issueMessage = (issue: ZodIssue): string => issueBranch(issue)?.message ??
  *   near-zero pacing/backoff/delays.
  * @returns Formatted API response or error message
  */
+// Stryker disable all: keep the executor baseline practical; mutate the guarded HTTP dispatch path below.
 export async function executeApiTool(
   toolName: string,
   definition: McpToolDefinition,
@@ -584,11 +585,11 @@ export async function executeApiTool(
     let validatedArgs: JsonObject;
     try {
       const zodSchema = getZodSchemaFromJsonSchema(definition.inputSchema, toolName);
-      validatedArgs = zodSchema.parse(argsForValidation);
+      validatedArgs = zodSchema.parse(argsForValidation) as JsonObject;
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
-        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${issueCode(e)}): ${issueMessage(e)}`).join(', ')}`;
+        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.issues.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${issueCode(e)}): ${issueMessage(e)}`).join(', ')}`;
         return { content: [{ type: 'text', text: validationErrorMessage }], isError: true };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -700,7 +701,7 @@ export async function executeApiTool(
     // We try each requirement group until we find one where all schemes are available
     const appliedSecurity = definition.securityRequirements?.find(req => {
       // Check if all schemes in this requirement are available
-      return Object.entries(req).every(([schemeName, scopesArray]) => {
+      return Object.entries(req).every(([schemeName, _scopesArray]) => {
         const scheme = allSecuritySchemes[schemeName];
         if (!scheme) return false;
 
@@ -865,6 +866,7 @@ export async function executeApiTool(
       };
     }
 
+    // Stryker restore all
     // ===== STEP 7: Execute the HTTP Request =====
     // Prepare the axios request configuration
     const config: AxiosRequestConfig = {
@@ -958,6 +960,7 @@ export async function executeApiTool(
       return downloadResult(response.data, String(response.headers['content-type'] ?? ''), requestUrl, fileName);
     }
 
+    // Stryker disable all: response formatting has focused tests; baseline targets guarded dispatch.
     // ===== STEP 8: Format the Response =====
     let responseText = '';
     // Populated alongside `responseText` for JSON bodies, and only surfaced in the
@@ -984,7 +987,7 @@ export async function executeApiTool(
         // Safe: this branch already checked `response.data` is a non-null object,
         // and renderRichTextFieldsAsMarkdown preserves the top-level shape.
         structuredContent = renderedData as JsonObject;
-      } catch (e) {
+      } catch {
         responseText = "[Stringify Error]";
       }
     }
