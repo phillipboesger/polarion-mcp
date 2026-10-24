@@ -27,4 +27,4 @@ Run `npm run regenerate` to download the selected OpenAPI spec, patch sparse fie
 
 ## Quality gate
 
-Use `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as appropriate. Details are in [quality/e2e.md](./quality/e2e.md), [quality/mutation-baseline.md](./quality/mutation-baseline.md), [quality/sonar.md](./quality/sonar.md), and [quality/distribution.md](./quality/distribution.md).
+Use `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as appropriate. Details are in [quality/e2e.md](./quality/e2e.md), [quality/mutation-baseline.md](./quality/mutation-baseline.md), [quality/static-analysis.md](./quality/static-analysis.md), and [quality/distribution.md](./quality/distribution.md).

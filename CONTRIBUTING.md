@@ -26,7 +26,7 @@ npm test
 npm run check:docs
 ```
 
-Additional gates are `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, and `npm run check:package`. See [docs/quality/e2e.md](docs/quality/e2e.md), [docs/quality/mutation-baseline.md](docs/quality/mutation-baseline.md), [docs/quality/sonar.md](docs/quality/sonar.md), and [docs/quality/distribution.md](docs/quality/distribution.md).
+Additional gates are `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, and `npm run check:package`. See [docs/quality/e2e.md](docs/quality/e2e.md), [docs/quality/mutation-baseline.md](docs/quality/mutation-baseline.md), [docs/quality/static-analysis.md](docs/quality/static-analysis.md), and [docs/quality/distribution.md](docs/quality/distribution.md).
 
 For a real Polarion integration run, see [docs/live-tests.md](docs/live-tests.md). Do not run it against production data.
 

@@ -43,7 +43,7 @@ Choose a client guide for its connection and authentication steps:
 | [Agent evals](quality/evals.md) | Offline validation and optional agent tool-selection evals. |
 | [Mutation baseline](quality/mutation-baseline.md) | Mutation testing baseline and results. |
 | [REST API coverage](quality/rest-coverage.md) | Generated operation coverage and Polarion version differences. |
-| [Sonar quality](quality/sonar.md) | Sonar analysis configuration and quality results. |
+| [Static analysis](quality/static-analysis.md) | CodeQL, ESLint, Gitleaks, dependency review and audit: what runs in CI and how to read it. |
 | [Repository overview](repository-overview.md) | Repository layout and development entry points. |
 | [Resources and prompts](resources-and-prompts.md) | MCP resources, live resource templates, and prompts. |
 | [Polarion Claude Code plugin](../plugin/README.md) | MCP server configuration and three workflow skills. |
