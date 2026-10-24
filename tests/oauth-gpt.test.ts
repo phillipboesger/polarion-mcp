@@ -18,7 +18,7 @@ async function startApp(withGpt = true) {
     tokenSecret: "gpt-test-token-secret-long-enough-0123456789",
     ...(withGpt ? { gptClient: GPT_CLIENT } : {}),
   })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const { port } = server.address() as AddressInfo
   const base = `http://127.0.0.1:${port}`
@@ -228,7 +228,7 @@ test("Custom GPT Basic credentials work even when the secret contains a raw %", 
   const { app, closeAllSessions } = createMcpHttpApp({
     publicUrl: new URL("http://127.0.0.1"), gptClient: { clientId: "gpt", clientSecret: "gpt%secret" }, validateToken: async () => true,
   })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   try {
     const port = (server.address() as import("node:net").AddressInfo).port

@@ -128,7 +128,7 @@ test("the Custom GPT spec stays within GPT Action limits: at most 30 operations,
   const { createRestToolsRouter } = await import("../src/rest-api.js")
   const app = express()
   app.use(createRestToolsRouter({ authenticate: (_req, _res, next) => next(), serverUrl: () => "http://x", securityScheme: {}, unauthorizedDescription: "" }))
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   try {
     const port = (server.address() as import("node:net").AddressInfo).port

@@ -23,7 +23,7 @@ function parseRpc(body: string): any {
 
 async function start(options: Parameters<typeof createMcpHttpApp>[0] = {}, toolsets?: string, readOnly = false) {
   const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true, ...options })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>(resolve => server.once('listening', resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const init = await fetch(`${base}/mcp`, {

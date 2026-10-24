@@ -21,7 +21,7 @@ function parseRpc(body: string): any {
 }
 
 async function listen(app: express.Express) {
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, server }
 }

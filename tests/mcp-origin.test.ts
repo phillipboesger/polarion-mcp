@@ -21,7 +21,7 @@ async function startApp(allowedOrigins?: string[], trustProxy?: string | number,
     trustProxy,
     allowedHosts,
   } as Parameters<typeof createMcpHttpApp>[0])
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", resolve))
   const { port } = server.address() as AddressInfo
   return {
@@ -235,7 +235,7 @@ test("GPT token limits are isolated by trusted client IP and still cap one IP", 
     validateToken: async () => true,
     trustProxy: "loopback",
   })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", resolve))
   const { port } = server.address() as AddressInfo
   const base = `http://127.0.0.1:${port}`
@@ -262,7 +262,7 @@ test("600 successful Custom GPT refreshes from one trusted IP do not hit token c
     validateToken: async () => true,
     trustProxy: "loopback",
   })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", resolve))
   const { port } = server.address() as AddressInfo
   const base = `http://127.0.0.1:${port}`
@@ -327,7 +327,7 @@ test("Custom GPT token failures hit the per-IP ceiling after 500 and spare anoth
     validateToken: async () => true,
     trustProxy: "loopback",
   })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", resolve))
   const { port } = server.address() as AddressInfo
   const base = `http://127.0.0.1:${port}`

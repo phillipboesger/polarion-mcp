@@ -14,7 +14,7 @@ const initializeBody = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initiali
 
 async function startApp(allowedToolsets?: ToolsetName[]) {
   const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true, allowedToolsets })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   return {

@@ -34,7 +34,7 @@ async function startApp(
     ...(refreshTokenTtlSeconds === undefined ? {} : { refreshTokenTtlSeconds }),
   } as Parameters<typeof createMcpHttpApp>[0]
   const { app, closeAllSessions } = createMcpHttpApp(options)
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const { port } = server.address() as AddressInfo
   const base = `http://127.0.0.1:${port}`
@@ -672,7 +672,7 @@ test("a valid PAT is checked once per minute, not on every request of its sessio
   polarion.reachable = true
   let checks = 0
   const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => { checks++; return true } })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   try {

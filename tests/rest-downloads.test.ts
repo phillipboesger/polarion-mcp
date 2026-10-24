@@ -26,7 +26,7 @@ test.after(() => polarion.close())
 async function call(tool: string, args: Record<string, unknown>) {
   const app = express()
   app.use(createRestToolsRouter({ authenticate: (_req, _res, next) => next(), serverUrl: () => "http://x", securityScheme: {}, unauthorizedDescription: "" }))
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   try {
     const res = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/tools/${tool}`, {
