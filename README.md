@@ -12,75 +12,92 @@ An open-source [Model Context Protocol](https://modelcontextprotocol.io) server 
 [![Docker image](https://img.shields.io/badge/ghcr.io-polarion--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[**Connect your assistant**](https://polarion-mcp.boesger.com/#clients) · [Docs](docs/README.md) · [Tool catalog](src/tools.ts) · [Contribute](CONTRIBUTING.md)
+[**Connect your assistant**](https://polarion-mcp.boesger.com/#clients) · [Daily workflows](https://polarion-mcp.boesger.com/#daily-use) · [Tool catalog](src/tools.ts)
 
 </div>
 
-- **Find answers in your project:** ask “Which defects are still open for this release?” or “Summarize the requirements in this LiveDoc.”
-- **Prepare changes with control:** use `dry_run` to preview mutating REST requests, or enable `MCP_READ_ONLY` to expose only read-only tools.
-- **Use your existing assistant:** Claude, ChatGPT, Copilot, Gemini and major IDE clients connect locally or through a team server.
-- **Inspect what you run:** MIT source, release SBOMs and build provenance, plus cosign signatures for tagged container images. See [supply-chain verification](docs/quality/supply-chain.md).
-
-<p align="center"><img src="docs/assets/demo.gif" alt="Illustrated workflow: an AI assistant queries Polarion work items and presents the results" width="1000"></p>
-
 On this page:
 
-- [Quickstart](#quickstart)
-- [Choose your client](#choose-your-client)
-- [Docker and team servers](#docker-and-team-servers)
-- [Tool overview](#tool-overview)
-- [Security and enterprise](#security-and-enterprise)
+- [What the connector does for you](#what-the-connector-does-for-you)
+- [A day with Polarion MCP](#a-day-with-polarion-mcp)
+- [Get connected](#get-connected)
+- [FAQ](#faq)
+- [Feedback and community](#feedback-and-community)
 - [Documentation](#documentation)
-- [Contributing](#contributing)
 - [License](#license)
 
-## Quickstart
+## What the connector does for you
 
-You need **Node.js 22+**, a Polarion instance with its REST API enabled, and a personal access token (PAT).
+**Your AI client → Polarion MCP → your Polarion REST API.** Ask a question; the assistant chooses tools, reads the returned data and proposes an answer or change.
 
-1. **Choose your client** in the [inline setup guide](https://polarion-mcp.boesger.com/#clients). It shows the right config format, command or URL on the same page.
-2. **Connect.** For Claude Desktop, Cursor, Windsurf (legacy Cascade), JetBrains AI Assistant and Cline, paste this into the client's MCP configuration. Merge with existing settings and replace the URL and PAT locally. Other formats are in the inline guide.
+- **Find answers:** search requirements and defects, read LiveDocs and inspect traceability links.
+- **Prepare work:** draft test cases, prepare runs and record the test outcomes your team supplies.
+- **Control changes:** `MCP_READ_ONLY=1` exposes read-only tools and blocks writes. With writes enabled, `dry_run: true` previews a mutating REST request without sending the write. Set approval rules in your AI client; previews do not create an approval lock.
+- **Inspect what you run:** MIT source, release SBOMs, build provenance and signed container images. See [supply-chain verification](docs/quality/supply-chain.md).
 
-   ```json
-   {
-     "mcpServers": {
-       "polarion": {
-         "command": "npx",
-         "args": ["-y", "polarion-mcp"],
-         "env": {
-           "API_BASE_URL": "https://YOUR-POLARION/polarion/rest/v1",
-           "BEARER_TOKEN": "YOUR_POLARION_PAT"
-         }
-       }
-     }
-   }
-   ```
+| Domain | Outcome |
+|---|---|
+| Work items | Find requirements, triage defects, prepare field updates. |
+| Documents and pages | Read LiveDocs, inspect parts, manage attachments and supported pages. |
+| Test management | Prepare runs and record supplied results. |
+| Plans and collections | Review release scope and document collections. |
+| Projects, people and configuration | Discover accessible projects, users, allowed field values and metadata. |
 
-3. **Ask.** Save and reconnect the client, confirm that Polarion tools appear, then ask: “List the Polarion projects I can access.” Claude Desktop requires a full quit and restart.
+The [landing page](https://polarion-mcp.boesger.com/#features) shows counts by domain, computed from `src/tools.ts`. The **284 tools** count covers generated REST operations; configured toolsets and additional helpers change the exposed catalog. Selected Work Item writes validate enumeration values, custom-field keys and user references. [Features and limits](docs/features.md) describe the scope.
 
-The client launches the published npm package. Keep PATs out of Git. Cloud connectors need your own deployed HTTPS server; there is no public Polarion relay. See [usage](docs/usage.md) and [troubleshooting](docs/troubleshooting.md).
+## A day with Polarion MCP
 
-## Choose your client
+These are illustrative conversations using real tools, not recorded outputs. Project types, link roles and permissions vary.
 
-Choose a provider or tool below. Clients with the same configuration format share one setup panel with a client switcher. Each panel contains short steps, a copy button and one snippet.
+| Ask your assistant | Tools and result | Your control |
+|---|---|---|
+| “Which open defects could block this release?” | `getWorkItems`, `getWorkItem`: a scoped list of severity, owners and missing information. | Read-only triage; approve any later reassignment. |
+| “Review this LiveDoc and propose clearer acceptance criteria for REQ-17.” | `getDocument`, `getDocumentParts`, `getWorkItem`, `patchWorkItem`: a rewrite of the requirement’s description. | Preview with `dry_run: true`; approve before saving. |
+| “Draft tests from these requirements, then record the results I provide.” | `getWorkItems`, `postWorkItems`, `postTestRuns`, `postTestRecords`: proposed cases and a run, then supplied outcomes. | Check existing tests, preview each write and approve. The connector does not execute product tests. |
+| “Summarize this release plan and its latest test runs.” | `getPlan`, `getWorkItems`, `getTestRuns`: a draft status update with source IDs and missing data. | You decide release readiness. |
+| “Find requirements without a verifies link to a test case.” | `getWorkItems`, `getLinkedWorkItems`: a scoped gap list and existing candidate tests. | Confirm link roles and scope before creating anything. |
+
+[Explore the chat-style walkthroughs](https://polarion-mcp.boesger.com/#daily-use). For larger work, follow the [worked task](docs/example-task.md): read items one by one, check existing coverage, propose changes, then verify the result.
+
+## Get connected
+
+**First: how do you run the server?** You need a REST-enabled Polarion instance and a PAT.
+
+| Server choice | Use it when | What runs |
+|---|---|---|
+| **npm / npx** | Your desktop or coding client supports local MCP. | The client launches a stdio process with Node.js 22+ and your PAT. |
+| **Docker** | You are setting up your own or a team server. | Streamable HTTP, with each caller’s PAT. Add HTTPS and OAuth for cloud connectors. |
+| **Remote URL** | Your team already hosts it. | Nothing to install locally; get the endpoint from your administrator. |
+
+Choose your client in the [inline setup picker](https://polarion-mcp.boesger.com/#clients). It recommends a server choice, explains unsupported options, and shows the server command, client snippet and short steps together. Claude Desktop, Claude Code, Cursor and VS Code accept local or remote setups. **claude.ai and ChatGPT’s hosted connector path use a reachable HTTPS server**, rather than directly launching npx. OpenAI also offers [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) for private servers; that requires separate setup and permissions.
 
 <!-- clients:start -->
 | Group | Setup |
 |---|---|
-| [Claude](https://polarion-mcp.boesger.com/#setup/claude-desktop) | Desktop JSON; web connector URL; Claude Code CLI; Messages API. |
-| [OpenAI / ChatGPT](https://polarion-mcp.boesger.com/#setup/chatgpt-apps) | ChatGPT connector URL; GPT Actions schema; Responses / Agents SDK; Codex CLI. |
-| [Microsoft](https://polarion-mcp.boesger.com/#setup/copilot-studio) | Copilot Studio URL + PAT header; VS Code servers JSON. |
-| [Google](https://polarion-mcp.boesger.com/#setup/gemini-cli) | Gemini CLI add command with URL and PAT environment. |
-| [Tools / IDEs](https://polarion-mcp.boesger.com/#setup/cursor) | VS Code, Cursor, Windsurf, JetBrains, Zed, Cline: one shared JSON panel with client-specific format. |
-| [Docker team server](https://polarion-mcp.boesger.com/#setup/docker) | Published GHCR image, per-user PATs, Streamable HTTP; TLS / OAuth for cloud clients. |
-| [Custom / automation](https://polarion-mcp.boesger.com/#setup/generic-stdio) | Generic stdio / HTTP; REST wrapper + OpenAPI; n8n HTTP Request. |
+| [Claude](https://polarion-mcp.boesger.com/#setup/claude-desktop) | Claude Desktop and Claude Code: local or remote; claude.ai and API: HTTPS server. |
+| [ChatGPT / APIs](https://polarion-mcp.boesger.com/#setup/chatgpt-apps) | ChatGPT connector and Responses API: HTTPS; GPT Actions: REST/OpenAPI; SDK and Codex: local or remote. |
+| [Editors / other providers](https://polarion-mcp.boesger.com/#setup/cursor) | VS Code, Cursor, Gemini and more; client-specific steps and supported server choices. |
+| [Custom / team server](https://polarion-mcp.boesger.com/#setup/generic-stdio) | Other AI provider / any MCP client: stdio or HTTP; Docker, REST/OpenAPI and n8n. |
 <!-- clients:end -->
 
-[Source notes and compatibility details](docs/clients.md) record the current vendor documentation. Client account access, tool budgets and workspace policies can still vary.
+**Local example:** paste this into Claude Desktop’s Developer config or a compatible client’s private MCP settings. Replace the URL and PAT, merge with existing settings, then reconnect. Fully quit and restart Claude Desktop.
 
-## Docker and team servers
+```json
+{
+  "mcpServers": {
+    "polarion": {
+      "command": "npx",
+      "args": ["-y", "polarion-mcp"],
+      "env": {
+        "API_BASE_URL": "https://YOUR-POLARION/polarion/rest/v1",
+        "BEARER_TOKEN": "YOUR_POLARION_PAT"
+      }
+    }
+  }
+}
+```
 
-The published image starts a **Streamable HTTP MCP server**. For a local server:
+**Docker example:** the published image starts an HTTP server on a loopback port.
 
 ```bash
 docker run -d --name polarion-mcp \
@@ -90,50 +107,56 @@ docker run -d --name polarion-mcp \
   ghcr.io/phillipboesger/polarion-mcp:1.4.0
 ```
 
-Connect an HTTP client to `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. Each caller uses their own PAT. For cloud connectors and team access, add a TLS reverse proxy, set the public hostname in `MCP_ALLOWED_HOSTS`, and configure OAuth with a stable sealing secret and exact redirect allowlists. The [deployment guide](docs/deployment.md#docker) covers these steps.
+For a local HTTP client, use `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. For a team, proxy HTTPS to that port and add the public hostname to `MCP_ALLOWED_HOSTS`. Cloud connectors also need `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, exact redirect allowlists and a `TRUST_PROXY` setting matching the real proxy chain. The picker includes that server configuration for claude.ai and ChatGPT. See [deployment](docs/deployment.md#docker) for operations details.
 
-For [Custom GPT Actions](https://polarion-mcp.boesger.com/#setup/custom-gpt), OpenAPI integrations or n8n REST workflows, run the **separate REST wrapper** with the deployment PAT and `HTTP_API_KEY`. The [inline REST setup](https://polarion-mcp.boesger.com/#setup/rest-wrapper) includes its Docker command.
+**Other AI provider / any MCP client:** choose [the generic entry](https://polarion-mcp.boesger.com/#setup/generic-stdio) for stdio or HTTP connection shapes. For OpenAPI clients, Custom GPT Actions and n8n, run the **separate REST wrapper** with a deployment PAT and `HTTP_API_KEY`; the [REST setup](https://polarion-mcp.boesger.com/#setup/rest-wrapper) includes its command and schema URLs.
 
-## Tool overview
+Keep credentials out of Git. There is no public Polarion relay. Finish with a read-only check: “List the Polarion projects I can access.” [Vendor sources and compatibility notes](docs/clients.md) explain the documented paths.
 
-| Domain | What your assistant can do |
-|---|---|
-| Work items | Search requirements and defects, inspect links, create items and update fields. |
-| Documents | Read LiveDocs, work with document parts and contained work items, manage attachments. |
-| Test management | Inspect and create test runs, read test records and record results. |
-| Plans and collections | Review plans and scheduled items, work with document collections. |
-| Projects and people | List projects and users, inspect enumerations and project configuration. |
-| Administration and more | Use available REST operations for jobs, pages and other supported domains. |
+## FAQ
 
-The **284 tools** count covers generated REST operations. Enabled tools depend on configuration and may include additional helpers. [Named toolsets](docs/configuration.md), allowlists and read-only mode narrow the exposed surface. Mutating REST tools support `dry_run` previews; selected Work Item changes also validate enumeration values, custom-field keys and user references.
+<details><summary>Which setup do I need?</summary>
 
-Supported rich-text responses include Markdown alongside the original HTML. MCP resources and prompts provide additional context and reusable workflows. See [features and limits](docs/features.md), [resources and prompts](docs/resources-and-prompts.md), and a [worked example](docs/example-task.md).
+Start with npx for a local desktop or coding client. Use Docker to host a server, or Remote URL if your team already runs one. claude.ai and ChatGPT’s hosted connector path need HTTPS and OAuth. Custom GPT Actions uses the REST wrapper. The picker shows supported choices per client.
 
-## Security and enterprise
+</details>
+<details><summary>Is my data safe? Which permissions apply?</summary>
 
-Polarion enforces the caller's permissions. Local stdio uses the configured PAT. Remote MCP accepts each user's PAT or a sealed OAuth token issued by the server's PAT login flow. The REST wrapper uses the deployment's PAT and a separate API key.
+Polarion enforces the token owner’s permissions. Stdio uses the configured PAT; remote MCP uses each caller’s PAT directly or through OAuth login. REST calls use the deployment PAT. Results go back to your AI client, so provider data policies and your organization’s rules apply. Use HTTPS remotely and grant only the access you need.
 
-Teams can restrict tools and toolsets, enable read-only mode, configure token lifetimes and rate limits, and set exact redirect allowlists. [Extension interfaces](docs/extensions.md) provide policy, audit, authentication and instance-resolution hooks for custom integrations. Start with [security](docs/security.md), [configuration](docs/configuration.md) and [deployment](docs/deployment.md).
+</details>
+<details><summary>Can I use read-only mode?</summary>
 
-Live integration tests have passed against **Polarion 2506 and 2606**. See [version support](docs/polarion-versioning.md) for tested scope and instance-dependent limits. Release workflows generate CycloneDX SBOMs and build provenance; tagged container images are signed with cosign. Check each [release's artifacts](https://github.com/phillipboesger/polarion-mcp/releases) and [verification commands](docs/quality/supply-chain.md).
+Set `MCP_READ_ONLY=1` in the server environment and restart or reconnect. Only read-only tools are exposed and writes are blocked. In a write-enabled session, `dry_run: true` previews a mutating REST request without saving it.
+
+</details>
+<details><summary>Which Polarion versions work?</summary>
+
+Live integration tests have passed on **Polarion 2506 and 2606**. Generated tools do not guarantee identical coverage on every version. REST enablement, available endpoints and permissions affect behavior; verify the operations you rely on. See [version support](docs/polarion-versioning.md).
+
+</details>
+<details><summary>Which AI clients can I use?</summary>
+
+Use any compatible MCP stdio or Streamable HTTP client, or the separate REST/OpenAPI wrapper. The picker includes major assistants, IDEs and a generic provider entry. Account permissions and tool budgets vary; restrict the exposed toolset when needed.
+
+</details>
+<details><summary>How do I update?</summary>
+
+For local npx, refresh the package and reconnect. Use `npx -y polarion-mcp@latest` through your client, or pin a release for predictable updates. For Docker, pull your chosen release tag and recreate the container with the same configuration and stable OAuth secret. A team server’s administrator updates it; clients refresh the tool list or reconnect. OpenAPI regeneration is a maintainer task.
+
+</details>
+
+## Feedback and community
+
+**Feedback and questions:** [open an issue](https://github.com/phillipboesger/polarion-mcp/issues). Include what you tried, your client and server mode, and what you expected. Leave credentials out.
+
+Nothing documented for your case? Open an issue or PR on the repo and go wild. A clearer example, a small fix or a new integration can help the next team. Read [Contributing](CONTRIBUTING.md) for source builds and checks. Report vulnerabilities through the [security policy](SECURITY.md).
+
+Built by [Phillip Bösger](https://github.com/phillipboesger), building on [@Jonasdero](https://github.com/Jonasdero).
 
 ## Documentation
 
-| I want to… | Read |
-|---|---|
-| Get connected | [Inline setup](https://polarion-mcp.boesger.com/#clients) · [Vendor sources](docs/clients.md) |
-| Find a guide | [Documentation index](docs/README.md) |
-| Configure or host a server | [Configuration](docs/configuration.md) · [Deployment](docs/deployment.md) |
-| Review security | [Authentication and controls](docs/security.md) · [Supply chain](docs/quality/supply-chain.md) |
-| Use tools and prompts | [Usage](docs/usage.md) · [Resources and prompts](docs/resources-and-prompts.md) |
-| Inspect API coverage | [Tool catalog](src/tools.ts) · [REST coverage](docs/quality/rest-coverage.md) |
-| Understand or extend the server | [Architecture](docs/architecture.md) · [Extension interfaces](docs/extensions.md) |
-
-## Contributing
-
-Bug reports, documentation fixes and focused pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for a source build and checks, or [open an issue](https://github.com/phillipboesger/polarion-mcp/issues) to discuss a larger change.
-
-Built by [Phillip Bösger](https://github.com/phillipboesger), building on the work of [@Jonasdero](https://github.com/Jonasdero).
+[Docs index](docs/README.md) · [Configuration](docs/configuration.md) · [Deployment](docs/deployment.md) · [Security](docs/security.md) · [Usage](docs/usage.md) · [Architecture](docs/architecture.md) · [Extensions](docs/extensions.md) · [Releases](https://github.com/phillipboesger/polarion-mcp/releases)
 
 ## License
 

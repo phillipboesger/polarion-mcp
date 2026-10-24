@@ -1,43 +1,61 @@
-/* One inline panel per configuration family. No credentials are entered on this site. */
+/* One inline client/server setup panel. No credentials are entered on this site. */
 (() => {
   const data = JSON.parse(document.getElementById('client-data').textContent);
   const panel = document.getElementById('setup');
   const select = document.getElementById('setup-client');
   const code = document.getElementById('setup-code');
-  const copy = document.getElementById('copy-setup');
   const status = document.getElementById('setup-status');
   let copyReset;
   const text = (id, value) => { document.getElementById(id).textContent = value; };
 
-  function show(id, navigate = false) {
+  let selectedClient = data.clients[0].id;
+  select.replaceChildren(...data.clients.map(client => new Option(client.name, client.id)));
+
+  function show(id, navigate = false, requestedMode) {
     const client = data.clients.find(client => client.id === id);
     if (!client) return;
-    const setup = data.setups.find(setup => setup.id === client.setup);
-    const compatible = data.clients.filter(client => client.setup === setup.id);
-    text('setup-kind', setup.kind);
-    text('setup-title', setup.title);
-    select.replaceChildren(...compatible.map(client => new Option(client.name, client.id)));
+    const mode = client.connections[requestedMode]?.setup ? requestedMode : client.defaultMode;
+    const connection = client.connections[mode];
+    const setup = data.setups.find(setup => setup.id === connection.setup);
+    selectedClient = id;
+    text('setup-kind', `${data.serverModes.find(item => item.id === mode).label} · ${setup.kind}`);
+    text('setup-title', client.name);
     select.value = id;
-    text('setup-compatibility', compatible.length > 1 ? `Same format: ${compatible.map(client => client.label).join(' · ')}` : `For ${client.name}`);
-    document.getElementById('setup-steps').replaceChildren(...client.steps.map(step => {
+    text('setup-compatibility', `${client.name} · ${setup.title}`);
+    document.querySelectorAll('[name="server-mode"]').forEach(input => {
+      const reason = client.connections[input.value].reason;
+      input.disabled = Boolean(reason);
+      input.checked = input.value === mode;
+      input.setAttribute('aria-describedby', `reason-${input.value}`);
+      input.closest('label').classList.toggle('unsupported', Boolean(reason));
+      text(`description-${input.value}`, client.connections[input.value].description || data.serverModes.find(mode => mode.id === input.value).description);
+      text(`reason-${input.value}`, reason || (input.value === client.defaultMode ? 'Recommended for this client' : 'Supported'));
+    });
+    document.getElementById('setup-steps').replaceChildren(...connection.steps.map(step => {
       const item = document.createElement('li');
       item.textContent = step;
       return item;
     }));
-    code.textContent = client.snippet ?? setup.snippet;
-    text('snippet-language', setup.language);
-    text('setup-note', [client.note, setup.note].filter(Boolean).join(' '));
+    code.textContent = connection.snippet ?? setup.snippet;
+    text('snippet-language', `${setup.language} · client configuration`);
+    text('setup-note', connection.note || setup.note);
+    const serverSetup = data.setups.find(setup => setup.id === connection.serverSetup);
+    document.getElementById('server-command').hidden = !serverSetup;
+    text('server-code', serverSetup?.snippet || '');
+    text('server-note', serverSetup?.note || '');
     const source = document.getElementById('setup-source');
-    const sourceUrl = new URL(client.source, location.href);
-    // Only https links may reach the DOM; the manifest is data, not trusted markup.
-    if (sourceUrl.protocol === 'https:') source.href = sourceUrl.href; else source.removeAttribute('href');
+    source.removeAttribute('href');
+    try {
+      const sourceUrl = new URL(client.source);
+      // Only HTTPS URLs may reach this DOM sink, even if manifest data is changed.
+      if (sourceUrl.protocol === 'https:') source.href = sourceUrl.href;
+    } catch { /* Invalid source URLs remain plain, non-clickable text. */ }
     document.querySelectorAll('[data-client]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.client === id)));
     clearTimeout(copyReset);
-    copy.textContent = 'Copy snippet';
-    status.textContent = `${client.name} setup selected.`;
+    document.querySelectorAll('[data-copy]').forEach(button => { button.textContent = button.dataset.copy === 'server-code' ? 'Copy server command' : 'Copy snippet'; });
+    status.textContent = `${client.name}: ${data.serverModes.find(item => item.id === mode).label} selected.`;
     if (navigate) {
-      history.replaceState(null, '', `#setup/${id}`);
-      // Keep the choice and its instructions together on narrow screens.
+      history.replaceState(null, '', `#setup/${id}/${mode}`);
       if (matchMedia('(max-width: 1000px)').matches) panel.scrollIntoView({ block: 'start' });
       panel.focus({ preventScroll: true });
     }
@@ -46,33 +64,61 @@
   document.querySelectorAll('[data-client]').forEach(button => button.addEventListener('click', () => show(button.dataset.client, true)));
   document.querySelectorAll('a[href^="#setup/"]').forEach(link => link.addEventListener('click', event => {
     event.preventDefault();
-    show(link.hash.slice(7), true);
+    const [id, mode] = link.hash.slice(7).split('/');
+    show(id, true, mode);
     panel.scrollIntoView({ block: 'start' });
   }));
   select.addEventListener('change', () => show(select.value, true));
-  copy.addEventListener('click', async () => {
-    const snippet = code.textContent;
+  document.querySelectorAll('[name="server-mode"]').forEach(input => input.addEventListener('change', () => show(selectedClient, true, input.value)));
+  document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+    const target = document.getElementById(button.dataset.copy);
+    const snippet = target.textContent;
     try {
       await navigator.clipboard.writeText(snippet);
-      copy.textContent = 'Copied';
+      button.textContent = 'Copied';
       status.textContent = 'Setup snippet copied.';
     } catch {
       const selection = window.getSelection();
       const range = document.createRange();
-      range.selectNodeContents(code);
+      range.selectNodeContents(target);
       selection.removeAllRanges();
       selection.addRange(range);
-      copy.textContent = 'Select & copy';
+      button.textContent = 'Select & copy';
       status.textContent = 'Clipboard unavailable. Snippet selected; press Ctrl+C or Command+C.';
     }
-    copyReset = setTimeout(() => { copy.textContent = 'Copy snippet'; }, 3000);
-  });
+    clearTimeout(copyReset);
+    copyReset = setTimeout(() => { document.querySelectorAll('[data-copy]').forEach(item => { item.textContent = item.dataset.copy === 'server-code' ? 'Copy server command' : 'Copy snippet'; }); }, 3000);
+  }));
   function fromHash() {
     if (location.hash.startsWith('#setup/')) {
-      show(location.hash.slice(7));
+      const [id, mode] = location.hash.slice(7).split('/');
+      show(id, false, mode);
       panel.scrollIntoView({ block: 'start' });
     }
   }
   window.addEventListener('hashchange', fromHash);
+  show(data.clients[0].id);
   fromHash();
+
+  const tabs = [...document.querySelectorAll('.day-tabs [role="tab"]')];
+  function showDay(tab) {
+    tabs.forEach(item => {
+      const active = item === tab;
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+      document.getElementById(item.getAttribute('aria-controls')).hidden = !active;
+    });
+  }
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => showDay(tab));
+    tab.addEventListener('keydown', event => {
+      let next;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = tabs.length - 1;
+      if (next !== undefined) { event.preventDefault(); showDay(tabs[next]); tabs[next].focus(); }
+    });
+  });
+  if (tabs.length) showDay(tabs[0]);
 })();

@@ -103,7 +103,7 @@
     {
       "id": "local-json",
       "title": "Local MCP configuration",
-      "kind": "Local \u00b7 JSON",
+      "kind": "Local · JSON",
       "language": "json",
       "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
       "note": "Node.js 22+ runs the published npm package on your computer. Replace the URL and PAT locally; keep credentials out of Git."
@@ -111,7 +111,7 @@
     {
       "id": "cli",
       "title": "Add from your terminal",
-      "kind": "Local \u00b7 CLI",
+      "kind": "Local · CLI",
       "language": "bash",
       "snippet": "",
       "note": "Commands shown for macOS, Linux and WSL. Install the selected client and Node.js 22+. Replace the URL and PAT before running; the command stores them in your local client configuration."
@@ -119,7 +119,7 @@
     {
       "id": "connector",
       "title": "Connect to your team server",
-      "kind": "Remote \u00b7 URL",
+      "kind": "Remote · URL",
       "language": "text",
       "snippet": "https://YOUR-SERVER/mcp",
       "note": "Use your own deployed HTTPS URL. There is no public Polarion relay. Your server must be reachable by the client provider; an administrator sets up TLS, OAuth and exact redirect allowlists."
@@ -127,7 +127,7 @@
     {
       "id": "vscode-json",
       "title": "VS Code MCP configuration",
-      "kind": "Local \u00b7 JSON",
+      "kind": "Local · JSON",
       "language": "json",
       "snippet": "{\n  \"servers\": {\n    \"polarion\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
       "note": "Node.js 22+ is required. VS Code uses a servers object. Select the tools you need in chat; the full catalog can exceed the client tool budget."
@@ -135,7 +135,7 @@
     {
       "id": "zed-json",
       "title": "Zed context server",
-      "kind": "Local \u00b7 JSON",
+      "kind": "Local · JSON",
       "language": "json",
       "snippet": "{\n  \"context_servers\": {\n    \"polarion\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
       "note": "Node.js 22+ is required. Zed uses context_servers, with command, args and env directly inside the server entry."
@@ -143,7 +143,7 @@
     {
       "id": "claude-api",
       "title": "Claude Messages API",
-      "kind": "Remote \u00b7 API",
+      "kind": "Remote · API",
       "language": "json",
       "snippet": "{\n  \"mcp_servers\": [\n    {\n      \"type\": \"url\",\n      \"name\": \"polarion\",\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"authorization_token\": \"YOUR_POLARION_PAT\"\n    }\n  ],\n  \"tools\": [\n    {\n      \"type\": \"mcp_toolset\",\n      \"mcp_server_name\": \"polarion\"\n    }\n  ]\n}",
       "note": "Add these fields to your Messages request. Enable the mcp-client-2025-11-20 beta header. The Polarion PAT authenticates to this server; your Anthropic API key authenticates the API request."
@@ -151,7 +151,7 @@
     {
       "id": "openai-api",
       "title": "OpenAI Responses API",
-      "kind": "Remote \u00b7 API",
+      "kind": "Remote · API",
       "language": "json",
       "snippet": "{\n  \"tools\": [\n    {\n      \"type\": \"mcp\",\n      \"server_label\": \"polarion\",\n      \"server_url\": \"https://YOUR-SERVER/mcp\",\n      \"authorization\": \"YOUR_POLARION_PAT\",\n      \"require_approval\": \"always\"\n    }\n  ]\n}",
       "note": "Add this tools field to a Responses request. Use your OpenAI API key for the API request and your Polarion PAT for the MCP server."
@@ -159,15 +159,15 @@
     {
       "id": "agents-sdk",
       "title": "OpenAI Agents SDK",
-      "kind": "Remote \u00b7 Python",
+      "kind": "Remote · Python",
       "language": "python",
-      "snippet": "from agents.mcp import MCPServerStreamableHttp\n\nasync with MCPServerStreamableHttp(\n    name=\"Polarion\",\n    params={\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n    },\n) as server:\n    agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])",
+      "snippet": "from agents import Agent, Runner\nfrom agents.mcp import MCPServerStreamableHttp\n\nasync with MCPServerStreamableHttp(\n    name=\"Polarion\",\n    params={\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n    },\n) as server:\n    agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n    result = await Runner.run(agent, \"List Polarion projects\")",
       "note": "Use inside your async application with openai-agents installed and Agent imported from agents. Run the agent while the server context is open. Keep API keys and PATs in your application secret store."
     },
     {
       "id": "gpt-actions",
       "title": "Custom GPT Actions",
-      "kind": "Remote \u00b7 OpenAPI",
+      "kind": "Remote · OpenAPI",
       "language": "text",
       "snippet": "https://YOUR-SERVER/openapi-gpt.json",
       "note": "This uses the REST wrapper and its HTTP_API_KEY, not the MCP endpoint or the user PAT. The reduced schema contains 30 actions. A team administrator deploys the REST wrapper first."
@@ -175,64 +175,139 @@
     {
       "id": "docker",
       "title": "Docker team server",
-      "kind": "Self-hosted \u00b7 Docker",
+      "kind": "Self-hosted · Docker",
       "language": "bash",
       "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0",
-      "note": "The image starts Streamable HTTP. Each client sends its own Polarion PAT as Authorization: Bearer <PAT>. Local endpoint: http://localhost:3000/mcp. Add TLS and OAuth before connecting cloud clients."
-    },
-    {
-      "id": "stdio",
-      "title": "Any stdio MCP client",
-      "kind": "Custom \u00b7 stdio",
-      "language": "bash",
-      "snippet": "API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\nBEARER_TOKEN=YOUR_POLARION_PAT \\\nnpx -y polarion-mcp",
-      "note": "Node.js 22+ is required. The client owns stdin and stdout. Configure this as its subprocess; it is not a standalone web service."
+      "note": "The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends their own Polarion PAT. For team access, proxy HTTPS to the loopback port, forward the public Host, and add your public hostname to MCP_ALLOWED_HOSTS. Cloud connectors also need OAuth; their Docker choice includes that configuration."
     },
     {
       "id": "rest",
       "title": "REST wrapper / OpenAPI",
-      "kind": "Self-hosted \u00b7 REST",
+      "kind": "Self-hosted · REST",
       "language": "bash",
       "snippet": "docker run -d --name polarion-rest \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e BEARER_TOKEN=YOUR_POLARION_PAT \\\n  -e HTTP_API_KEY=YOUR_WRAPPER_API_KEY \\\n  -e PUBLIC_URL=https://YOUR-SERVER \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0 \\\n  node build/http-server.js",
-      "note": "All calls use the deployment PAT. Clients send Authorization: Bearer <HTTP_API_KEY>. Serve this behind HTTPS; schemas are at /openapi.json and /openapi-gpt.json."
+      "note": "All calls use the deployment PAT. Clients send Authorization: Bearer <HTTP_API_KEY>. Serve this behind HTTPS; schemas are at /openapi.json and /openapi-gpt.json. Forward the public Host through your TLS proxy."
     },
     {
       "id": "n8n-rest",
       "title": "n8n HTTP Request",
-      "kind": "Automation \u00b7 REST",
+      "kind": "Automation · REST",
       "language": "bash",
       "snippet": "curl -X POST https://YOUR-SERVER/api/tools/getProjects \\\n  -H \"Authorization: Bearer ${HTTP_API_KEY}\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{}'",
       "note": "This setup uses the REST wrapper. Its administrator configures API_BASE_URL, BEARER_TOKEN and HTTP_API_KEY. Store the wrapper key in an n8n credential after importing."
+    },
+    {
+      "id": "docker-oauth",
+      "title": "HTTPS team server with OAuth",
+      "kind": "Self-hosted · Docker",
+      "language": "bash",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PRESETS=claude \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0",
+      "note": "Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and forward the public Host. TRUST_PROXY=1 assumes exactly one trusted proxy hop; adjust it to your network. Generate a stable secret of at least 32 characters. The claude redirect preset allows the claude.ai callback used by Claude web and Desktop connectors."
+    },
+    {
+      "id": "remote-json",
+      "title": "Remote MCP configuration",
+      "kind": "Remote · JSON",
+      "language": "json",
+      "snippet": "",
+      "note": "Use the team’s HTTPS endpoint and your own PAT."
+    },
+    {
+      "id": "remote-cli",
+      "title": "Add your team server",
+      "kind": "Remote · CLI",
+      "language": "bash",
+      "snippet": "",
+      "note": "Use the team’s HTTPS endpoint and your own PAT."
+    },
+    {
+      "id": "agents-stdio",
+      "title": "Agents SDK local subprocess",
+      "kind": "Local · Python",
+      "language": "python",
+      "snippet": "from agents import Agent, Runner\nfrom agents.mcp import MCPServerStreamableHttp\n\nasync with MCPServerStreamableHttp(\n    name=\"Polarion\",\n    params={\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n    },\n) as server:\n    agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n    result = await Runner.run(agent, \"List Polarion projects\")",
+      "note": "Use inside your async application with openai-agents installed and Agent imported from agents. Run the agent while the server context is open. Keep API keys and PATs in your application secret store."
+    },
+    {
+      "id": "docker-chatgpt",
+      "title": "HTTPS team server for ChatGPT",
+      "kind": "Self-hosted · Docker",
+      "language": "bash",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PREFIXES=https://YOUR-CLIENT/EXACT-CALLBACK \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0",
+      "note": "Before connecting, replace MCP_ALLOWED_REDIRECT_PREFIXES with the exact callback shown by ChatGPT. Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and forward the public Host. TRUST_PROXY=1 assumes exactly one trusted hop; adjust it to your network. Generate a stable secret of at least 32 characters. Use dynamic client registration (DCR)."
+    },
+    {
+      "id": "docker-public",
+      "title": "Public HTTPS server for cloud APIs",
+      "kind": "Self-hosted · Docker",
+      "language": "bash",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0",
+      "note": "Required for cloud API calls: a publicly reachable HTTPS endpoint at https://YOUR-SERVER/mcp. Configure a TLS reverse proxy to 127.0.0.1:3000, forward the public Host and use a real public hostname in MCP_ALLOWED_HOSTS. TRUST_PROXY=1 assumes exactly one trusted hop. Each API request sends your Polarion PAT; OAuth is not required for this PAT-header path."
     }
   ],
   "clients": [
     {
       "id": "claude-desktop",
       "name": "Claude Desktop",
-      "label": "Desktop",
+      "label": "Claude Desktop",
       "provider": "claude",
       "setup": "local-json",
       "steps": [
         "Open Claude Desktop Settings > Developer > Edit Config.",
         "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
-        "Save, fully quit and reopen Claude Desktop. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Save, fully quit and reopen Claude Desktop. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
-        "https://modelcontextprotocol.io/docs/develop/connect-local-servers"
+        "https://modelcontextprotocol.io/docs/develop/connect-local-servers",
+        "https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp"
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "local-json",
+          "steps": [
+            "Open Claude Desktop Settings > Developer > Edit Config.",
+            "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+            "Save, fully quit and reopen Claude Desktop. Ask: “List the Polarion projects I can access.”"
+          ],
+          "note": ""
+        },
+        "remote": {
+          "setup": "connector",
+          "snippet": "https://YOUR-SERVER/mcp",
+          "steps": [
+            "Get your team’s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.",
+            "In Claude Desktop, open Settings > Connectors > Add custom connector. Paste the URL and use automatic registration (DCR).",
+            "Connect, enter your Polarion PAT on the server login page, and enable the connector in a conversation."
+          ],
+          "note": "Remote connectors in Claude Desktop connect from Anthropic’s cloud. Use a publicly reachable HTTPS server with OAuth; the Developer JSON file is for local stdio."
+        },
+        "docker": {
+          "setup": "connector",
+          "snippet": "https://YOUR-SERVER/mcp",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team’s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.",
+            "In Claude Desktop, open Settings > Connectors > Add custom connector. Paste the URL and use automatic registration (DCR).",
+            "Connect, enter your Polarion PAT on the server login page, and enable the connector in a conversation."
+          ],
+          "note": "Remote connectors in Claude Desktop connect from Anthropic’s cloud. Use a publicly reachable HTTPS server with OAuth; the Developer JSON file is for local stdio.",
+          "serverSetup": "docker-oauth"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "claude-web-desktop",
-      "name": "Claude web / Desktop connector",
-      "label": "Web connector",
+      "name": "claude.ai",
+      "label": "claude.ai",
       "provider": "claude",
       "setup": "connector",
       "steps": [
-        "Get your team\u2019s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.",
-        "Open Customize > Connectors > Add custom connector. Paste the URL below. Choose Register automatically for this server\u2019s DCR flow.",
+        "Get your team’s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.",
+        "Open Customize > Connectors > Add custom connector. Paste the URL below. Choose Register automatically for this server’s DCR flow.",
         "Connect, enter your Polarion PAT on the server login page, and enable the connector in a conversation."
       ],
       "sources": [
@@ -246,18 +321,44 @@
           "uri": "https://claude.ai/api/mcp/auth_callback",
           "verified": true
         }
-      ]
+      ],
+      "connections": {
+        "npm": {
+          "reason": "This connector cannot launch npx; use a reachable HTTPS server."
+        },
+        "remote": {
+          "setup": "connector",
+          "steps": [
+            "Get your team’s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.",
+            "Open Customize > Connectors > Add custom connector. Paste the URL below. Choose Register automatically for this server’s DCR flow.",
+            "Connect, enter your Polarion PAT on the server login page, and enable the connector in a conversation."
+          ],
+          "note": "On Team / Enterprise, an owner adds the connector under Organization settings > Connectors > Add > Custom > Web; members then choose Connect."
+        },
+        "docker": {
+          "setup": "connector",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team’s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.",
+            "Open Customize > Connectors > Add custom connector. Paste the URL below. Choose Register automatically for this server’s DCR flow.",
+            "Connect, enter your Polarion PAT on the server login page, and enable the connector in a conversation."
+          ],
+          "note": "On Team / Enterprise, an owner adds the connector under Organization settings > Connectors > Add > Custom > Web; members then choose Connect.",
+          "serverSetup": "docker-oauth"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "claude-code",
       "name": "Claude Code",
-      "label": "Code",
+      "label": "Claude Code",
       "provider": "claude",
       "setup": "cli",
       "steps": [
         "Install Claude Code and Node.js 22+.",
         "Replace the URL and PAT, then run the command below.",
-        "Start Claude Code, open /mcp, and confirm Polarion is connected. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Start Claude Code, open /mcp, and confirm Polarion is connected. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://code.claude.com/docs/en/mcp"
@@ -265,7 +366,42 @@
       "checked": "2026-10-24",
       "note": "",
       "redirectUris": [],
-      "snippet": "claude mcp add --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT --transport stdio polarion -- npx -y polarion-mcp"
+      "snippet": "claude mcp add --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT --transport stdio polarion -- npx -y polarion-mcp",
+      "connections": {
+        "npm": {
+          "setup": "cli",
+          "steps": [
+            "Install Claude Code and Node.js 22+.",
+            "Replace the URL and PAT, then run the command below.",
+            "Start Claude Code, open /mcp, and confirm Polarion is connected. Ask: “List the Polarion projects I can access.”"
+          ],
+          "snippet": "claude mcp add --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT --transport stdio polarion -- npx -y polarion-mcp",
+          "note": ""
+        },
+        "remote": {
+          "setup": "remote-cli",
+          "snippet": "claude mcp add --transport http polarion https://YOUR-SERVER/mcp --header \"Authorization: Bearer YOUR_POLARION_PAT\"",
+          "steps": [
+            "Get your team’s HTTPS MCP URL and your Polarion PAT.",
+            "Replace the placeholders and run the command below.",
+            "Open /mcp in Claude Code, confirm the connection, and list accessible projects."
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL."
+        },
+        "docker": {
+          "setup": "remote-cli",
+          "snippet": "claude mcp add --transport http polarion https://YOUR-SERVER/mcp --header \"Authorization: Bearer YOUR_POLARION_PAT\"",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team’s HTTPS MCP URL and your Polarion PAT.",
+            "Replace the placeholders and run the command below.",
+            "Open /mcp in Claude Code, confirm the connection, and list accessible projects."
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "claude-api",
@@ -283,7 +419,33 @@
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "This connector cannot launch npx; use a reachable HTTPS server."
+        },
+        "remote": {
+          "setup": "claude-api",
+          "steps": [
+            "Deploy or obtain a reachable HTTPS MCP server.",
+            "Add the snippet to your Messages request and set the beta header named below. Replace URL and PAT.",
+            "Send a request with your model, max_tokens and messages. Check the returned tool results."
+          ],
+          "note": ""
+        },
+        "docker": {
+          "setup": "claude-api",
+          "steps": [
+            "Deploy on a host reachable from your AI provider. Configure public HTTPS, the public hostname and the trusted TLS proxy using the server command below.",
+            "Deploy or obtain a reachable HTTPS MCP server.",
+            "Add the snippet to your Messages request and set the beta header named below. Replace URL and PAT.",
+            "Send a request with your model, max_tokens and messages. Check the returned tool results."
+          ],
+          "note": "The cloud API cannot reach localhost on your computer. Use your public HTTPS MCP URL and send your Polarion PAT in the API request. Keep provider API keys and PATs in your application secret store.",
+          "serverSetup": "docker-public"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "chatgpt-apps",
@@ -292,17 +454,45 @@
       "provider": "openai",
       "setup": "connector",
       "steps": [
-        "Get your team\u2019s HTTPS MCP URL. The administrator enables OAuth and allowlists the exact callback shown by ChatGPT.",
+        "Get your team’s HTTPS MCP URL. The administrator enables OAuth and allowlists the exact callback shown by ChatGPT.",
         "In ChatGPT Plugins, choose + > Add custom MCP server. Paste the URL and select OAuth with dynamic client registration (DCR).",
         "Install the resulting plugin, sign in with your Polarion PAT, and select it with @ in a conversation."
       ],
       "sources": [
         "https://developers.openai.com/api/docs/guides/custom-mcp-server",
-        "https://developers.openai.com/plugins/build/auth"
+        "https://developers.openai.com/plugins/build/auth",
+        "https://developers.openai.com/api/docs/guides/secure-mcp-tunnels"
       ],
       "checked": "2026-10-24",
       "note": "Custom MCP access depends on your ChatGPT workspace permissions. Use DCR for this server unless the administrator explicitly enabled CIMD.",
-      "redirectUris": []
+      "redirectUris": [],
+      "referenceNote": "This guide covers the public HTTPS connector path. OpenAI also documents Secure MCP Tunnel for private servers; that requires its own tunnel runtime and permissions, so local npx is not a direct connector setup.",
+      "connections": {
+        "npm": {
+          "reason": "This connector cannot launch npx; use a reachable HTTPS server."
+        },
+        "remote": {
+          "setup": "connector",
+          "steps": [
+            "Get your team’s HTTPS MCP URL. The administrator enables OAuth and allowlists the exact callback shown by ChatGPT.",
+            "In ChatGPT Plugins, choose + > Add custom MCP server. Paste the URL and select OAuth with dynamic client registration (DCR).",
+            "Install the resulting plugin, sign in with your Polarion PAT, and select it with @ in a conversation."
+          ],
+          "note": "Custom MCP access depends on your ChatGPT workspace permissions. Use DCR for this server unless the administrator explicitly enabled CIMD."
+        },
+        "docker": {
+          "setup": "connector",
+          "steps": [
+            "Set the exact OAuth callback shown by ChatGPT in MCP_ALLOWED_REDIRECT_PREFIXES. Deploy with the Docker command below and configure public HTTPS before connecting.",
+            "Get your team’s HTTPS MCP URL. The administrator enables OAuth and allowlists the exact callback shown by ChatGPT.",
+            "In ChatGPT Plugins, choose + > Add custom MCP server. Paste the URL and select OAuth with dynamic client registration (DCR).",
+            "Install the resulting plugin, sign in with your Polarion PAT, and select it with @ in a conversation."
+          ],
+          "note": "Custom MCP access depends on your ChatGPT workspace permissions. Use DCR for this server unless the administrator explicitly enabled CIMD.",
+          "serverSetup": "docker-chatgpt"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "custom-gpt",
@@ -311,7 +501,7 @@
       "provider": "openai",
       "setup": "gpt-actions",
       "steps": [
-        "Get your team\u2019s deployed REST wrapper URL and HTTP_API_KEY.",
+        "Get your team’s deployed REST wrapper URL and HTTP_API_KEY.",
         "In the GPT editor, open Actions > Create new action > Import from URL and paste the schema URL below.",
         "Choose API Key authentication, Bearer type, and enter HTTP_API_KEY. Test getProjects in the editor."
       ],
@@ -321,7 +511,33 @@
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "npx starts MCP stdio. This integration needs the separate REST wrapper."
+        },
+        "remote": {
+          "setup": "gpt-actions",
+          "steps": [
+            "Get your team’s deployed REST wrapper URL and HTTP_API_KEY.",
+            "In the GPT editor, open Actions > Create new action > Import from URL and paste the schema URL below.",
+            "Choose API Key authentication, Bearer type, and enter HTTP_API_KEY. Test getProjects in the editor."
+          ],
+          "note": ""
+        },
+        "docker": {
+          "setup": "gpt-actions",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team’s deployed REST wrapper URL and HTTP_API_KEY.",
+            "In the GPT editor, open Actions > Create new action > Import from URL and paste the schema URL below.",
+            "Choose API Key authentication, Bearer type, and enter HTTP_API_KEY. Test getProjects in the editor."
+          ],
+          "note": "",
+          "serverSetup": "rest"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "openai-api",
@@ -339,7 +555,33 @@
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "This connector cannot launch npx; use a reachable HTTPS server."
+        },
+        "remote": {
+          "setup": "openai-api",
+          "steps": [
+            "Get a reachable HTTPS MCP server and your Polarion PAT.",
+            "Add the snippet to your Responses request, replacing URL and PAT.",
+            "Send a request with your model and input. Review and approve MCP tool calls."
+          ],
+          "note": ""
+        },
+        "docker": {
+          "setup": "openai-api",
+          "steps": [
+            "Deploy on a host reachable from your AI provider. Configure public HTTPS, the public hostname and the trusted TLS proxy using the server command below.",
+            "Get a reachable HTTPS MCP server and your Polarion PAT.",
+            "Add the snippet to your Responses request, replacing URL and PAT.",
+            "Send a request with your model and input. Review and approve MCP tool calls."
+          ],
+          "note": "The cloud API cannot reach localhost on your computer. Use your public HTTPS MCP URL and send your Polarion PAT in the API request. Keep provider API keys and PATs in your application secret store.",
+          "serverSetup": "docker-public"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "openai-agents",
@@ -357,7 +599,40 @@
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "agents-stdio",
+          "snippet": "from agents import Agent, Runner\nfrom agents.mcp import MCPServerStdio\n\nasync with MCPServerStdio(params={\n    \"command\": \"npx\", \"args\": [\"-y\", \"polarion-mcp\"],\n    \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\",\n    },\n}) as server:\n    agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n    result = await Runner.run(agent, \"List Polarion projects\")",
+          "steps": [
+            "Install Node.js 22+ and openai-agents. Set your OpenAI API key in your application environment.",
+            "Place this snippet inside an async function, replace the Polarion URL and PAT, and run it.",
+            "The SDK starts the local subprocess and closes it when the context exits."
+          ],
+          "note": "Keep the Polarion PAT and your provider API key in your application secret store."
+        },
+        "remote": {
+          "setup": "agents-sdk",
+          "steps": [
+            "Install openai-agents and import Agent from agents in your async app.",
+            "Paste the snippet inside an async function. Replace URL and PAT.",
+            "Run the agent with Runner while the MCP server context is open."
+          ],
+          "note": ""
+        },
+        "docker": {
+          "setup": "agents-sdk",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Install openai-agents and import Agent from agents in your async app.",
+            "Paste the snippet inside an async function. Replace URL and PAT.",
+            "Run the agent with Runner while the MCP server context is open."
+          ],
+          "note": "For an SDK app running on the Docker host, replace the client URL with http://localhost:3000/mcp. A remotely hosted app needs an endpoint reachable from its network, using HTTPS. Keep API keys and PATs in your application secret store.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "codex-cli",
@@ -368,7 +643,7 @@
       "steps": [
         "Install Codex and Node.js 22+.",
         "Replace the URL and PAT, then run the command below.",
-        "Open Codex and inspect /mcp. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Open Codex and inspect /mcp. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://developers.openai.com/codex/mcp"
@@ -376,7 +651,42 @@
       "checked": "2026-10-24",
       "note": "",
       "redirectUris": [],
-      "snippet": "codex mcp add polarion --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT -- npx -y polarion-mcp"
+      "snippet": "codex mcp add polarion --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT -- npx -y polarion-mcp",
+      "connections": {
+        "npm": {
+          "setup": "cli",
+          "steps": [
+            "Install Codex and Node.js 22+.",
+            "Replace the URL and PAT, then run the command below.",
+            "Open Codex and inspect /mcp. Ask: “List the Polarion projects I can access.”"
+          ],
+          "snippet": "codex mcp add polarion --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT -- npx -y polarion-mcp",
+          "note": ""
+        },
+        "remote": {
+          "setup": "remote-cli",
+          "snippet": "export POLARION_PAT=YOUR_POLARION_PAT\ncodex mcp add polarion --url https://YOUR-SERVER/mcp --bearer-token-env-var POLARION_PAT",
+          "steps": [
+            "Get your team’s HTTPS MCP URL and your Polarion PAT.",
+            "Replace the placeholders, export the PAT in the shell that launches Codex, and run the command below.",
+            "Start Codex from that environment and inspect /mcp."
+          ],
+          "note": "The PAT is read from POLARION_PAT at runtime. Keep it in a private environment or secret store."
+        },
+        "docker": {
+          "setup": "remote-cli",
+          "snippet": "export POLARION_PAT=YOUR_POLARION_PAT\ncodex mcp add polarion --url https://YOUR-SERVER/mcp --bearer-token-env-var POLARION_PAT",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team’s HTTPS MCP URL and your Polarion PAT.",
+            "Replace the placeholders, export the PAT in the shell that launches Codex, and run the command below.",
+            "Start Codex from that environment and inspect /mcp."
+          ],
+          "note": "The PAT is read from POLARION_PAT at runtime. Keep it in a private environment or secret store. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "copilot-studio",
@@ -385,7 +695,7 @@
       "provider": "microsoft",
       "setup": "connector",
       "steps": [
-        "Open your agent\u2019s Tools page, then Add a tool > New tool > Model Context Protocol.",
+        "Open your agent’s Tools page, then Add a tool > New tool > Model Context Protocol.",
         "Enter a name, description and the URL below. Choose API key > Header, named Authorization.",
         "Create a connection with the value Bearer YOUR_POLARION_PAT. Add the tool and test the agent."
       ],
@@ -394,7 +704,33 @@
       ],
       "checked": "2026-10-24",
       "note": "Use generative orchestration. This path uses a PAT header and does not require an OAuth callback. Select only the tools your agent needs.",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "This connector cannot launch npx; use a reachable HTTPS server."
+        },
+        "remote": {
+          "setup": "connector",
+          "steps": [
+            "Open your agent’s Tools page, then Add a tool > New tool > Model Context Protocol.",
+            "Enter a name, description and the URL below. Choose API key > Header, named Authorization.",
+            "Create a connection with the value Bearer YOUR_POLARION_PAT. Add the tool and test the agent."
+          ],
+          "note": "Use generative orchestration. This path uses a PAT header and does not require an OAuth callback. Select only the tools your agent needs."
+        },
+        "docker": {
+          "setup": "connector",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Open your agent’s Tools page, then Add a tool > New tool > Model Context Protocol.",
+            "Enter a name, description and the URL below. Choose API key > Header, named Authorization.",
+            "Create a connection with the value Bearer YOUR_POLARION_PAT. Add the tool and test the agent."
+          ],
+          "note": "Use generative orchestration. This path uses a PAT header and does not require an OAuth callback. Select only the tools your agent needs. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "vscode-copilot",
@@ -405,7 +741,7 @@
       "steps": [
         "Run MCP: Open User Configuration from the Command Palette.",
         "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
-        "Save, start the server and trust it when prompted. In agent chat, select Polarion tools. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Save, start the server and trust it when prompted. In agent chat, select Polarion tools. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://code.visualstudio.com/docs/agents/reference/mcp-configuration",
@@ -413,7 +749,41 @@
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "vscode-json",
+          "steps": [
+            "Run MCP: Open User Configuration from the Command Palette.",
+            "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+            "Save, start the server and trust it when prompted. In agent chat, select Polarion tools. Ask: “List the Polarion projects I can access.”"
+          ],
+          "note": ""
+        },
+        "remote": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"servers\": {\n    \"polarion\": {\n      \"type\": \"http\",\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open VS Code / GitHub Copilot's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL."
+        },
+        "docker": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"servers\": {\n    \"polarion\": {\n      \"type\": \"http\",\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open VS Code / GitHub Copilot's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "gemini-cli",
@@ -424,7 +794,7 @@
       "steps": [
         "Install Gemini CLI and Node.js 22+.",
         "Replace the URL and PAT, then run the command below.",
-        "Start Gemini CLI and inspect /mcp. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Start Gemini CLI and inspect /mcp. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://geminicli.com/docs/tools/mcp-server/"
@@ -432,7 +802,42 @@
       "checked": "2026-10-24",
       "note": "Run Gemini in a trusted folder. If the server shows Disconnected, use gemini trust to trust that folder.",
       "redirectUris": [],
-      "snippet": "gemini mcp add --scope user --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT polarion npx -y polarion-mcp"
+      "snippet": "gemini mcp add --scope user --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT polarion npx -y polarion-mcp",
+      "connections": {
+        "npm": {
+          "setup": "cli",
+          "steps": [
+            "Install Gemini CLI and Node.js 22+.",
+            "Replace the URL and PAT, then run the command below.",
+            "Start Gemini CLI and inspect /mcp. Ask: “List the Polarion projects I can access.”"
+          ],
+          "snippet": "gemini mcp add --scope user --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT polarion npx -y polarion-mcp",
+          "note": "Run Gemini in a trusted folder. If the server shows Disconnected, use gemini trust to trust that folder."
+        },
+        "remote": {
+          "setup": "remote-cli",
+          "snippet": "gemini mcp add --scope user --transport http --header \"Authorization: Bearer YOUR_POLARION_PAT\" polarion https://YOUR-SERVER/mcp",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Gemini CLI's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL."
+        },
+        "docker": {
+          "setup": "remote-cli",
+          "snippet": "gemini mcp add --scope user --transport http --header \"Authorization: Bearer YOUR_POLARION_PAT\" polarion https://YOUR-SERVER/mcp",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Gemini CLI's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "cursor",
@@ -443,7 +848,7 @@
       "steps": [
         "Open your personal ~/.cursor/mcp.json, or create it. Do not put a PAT in a shared project file.",
         "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
-        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://cursor.com/docs/mcp"
@@ -460,7 +865,41 @@
           "verified": true,
           "notes": "Desktop callback; loopback fixed port."
         }
-      ]
+      ],
+      "connections": {
+        "npm": {
+          "setup": "local-json",
+          "steps": [
+            "Open your personal ~/.cursor/mcp.json, or create it. Do not put a PAT in a shared project file.",
+            "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+            "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
+          ],
+          "note": ""
+        },
+        "remote": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Cursor's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL."
+        },
+        "docker": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Cursor's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "windsurf",
@@ -471,14 +910,48 @@
       "steps": [
         "In legacy Cascade, open the Actions (...) menu > MCPs > Open MCP config file.",
         "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
-        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://docs.windsurf.com/windsurf/cascade/mcp"
       ],
       "checked": "2026-10-24",
       "note": "The vendor now documents this as legacy Cascade in Devin Desktop. Its 100-tool budget requires selecting a subset of Polarion tools. This config does not apply to the Devin Local agent.",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "local-json",
+          "steps": [
+            "In legacy Cascade, open the Actions (...) menu > MCPs > Open MCP config file.",
+            "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+            "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "The vendor now documents this as legacy Cascade in Devin Desktop. Its 100-tool budget requires selecting a subset of Polarion tools. This config does not apply to the Devin Local agent."
+        },
+        "remote": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"serverUrl\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Windsurf / Cascade's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL."
+        },
+        "docker": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"serverUrl\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Windsurf / Cascade's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "jetbrains-ai",
@@ -489,14 +962,41 @@
       "steps": [
         "Open Settings > Tools > AI Assistant > Model Context Protocol (MCP), add a server and choose STDIO.",
         "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
-        "Click OK and Apply. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Click OK and Apply. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://www.jetbrains.com/help/ai-assistant/mcp.html"
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "local-json",
+          "steps": [
+            "Open Settings > Tools > AI Assistant > Model Context Protocol (MCP), add a server and choose STDIO.",
+            "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+            "Click OK and Apply. Ask: “List the Polarion projects I can access.”"
+          ],
+          "note": ""
+        },
+        "remote": {
+          "reason": "Remote HTTP exists, but vendor docs do not specify PAT headers or OAuth for this server. Use local stdio."
+        },
+        "docker": {
+          "setup": "local-json",
+          "steps": [
+            "Install Docker and open JetBrains AI Assistant > Settings > Tools > MCP.",
+            "Choose a local stdio server and paste the JSON below, replacing the Polarion URL and PAT.",
+            "Apply and reconnect. The IDE launches the container; do not use -d or a TTY for stdio."
+          ],
+          "note": "This Docker alternative launches a local stdio subprocess. It is not a shared HTTP team server.",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"command\": \"docker\",\n      \"args\": [\n        \"run\",\n        \"-i\",\n        \"--rm\",\n        \"-e\",\n        \"API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1\",\n        \"-e\",\n        \"BEARER_TOKEN=YOUR_POLARION_PAT\",\n        \"ghcr.io/phillipboesger/polarion-mcp:1.4.0\",\n        \"node\",\n        \"build/index.js\"\n      ]\n    }\n  }\n}",
+          "description": "Local container · stdio, launched by the IDE"
+        }
+      },
+      "defaultMode": "npm",
+      "referenceNote": "The vendor documents Streamable HTTP but no authentication configuration matching this server. This guide therefore offers npx or Docker stdio; remote URL is disabled rather than inventing a PAT header field."
     },
     {
       "id": "zed",
@@ -507,14 +1007,48 @@
       "steps": [
         "Run zed: open settings file from the Command Palette.",
         "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
-        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://zed.dev/docs/ai/mcp"
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "zed-json",
+          "steps": [
+            "Run zed: open settings file from the Command Palette.",
+            "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+            "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
+          ],
+          "note": ""
+        },
+        "remote": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"context_servers\": {\n    \"polarion\": {\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Zed's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL."
+        },
+        "docker": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"context_servers\": {\n    \"polarion\": {\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Zed's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "cline",
@@ -525,14 +1059,48 @@
       "steps": [
         "Open Cline > MCP Servers > Configure > Configure MCP Servers.",
         "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
-        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://docs.cline.bot/mcp/mcp-overview"
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "local-json",
+          "steps": [
+            "Open Cline > MCP Servers > Configure > Configure MCP Servers.",
+            "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+            "Save and reconnect the server. Ask: “List the Polarion projects I can access.”"
+          ],
+          "note": ""
+        },
+        "remote": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"type\": \"streamableHttp\",\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Cline's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL."
+        },
+        "docker": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"type\": \"streamableHttp\",\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Cline's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "docker",
@@ -551,25 +1119,86 @@
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "This entry deploys a server. Choose your AI client for local npx."
+        },
+        "remote": {
+          "setup": "connector",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Docker team server's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "snippet": "https://YOUR-SERVER/mcp\nAuthorization: Bearer YOUR_POLARION_PAT",
+          "note": "No new container is needed when your team already hosts the server. Use this endpoint in any Streamable HTTP client."
+        },
+        "docker": {
+          "setup": "connector",
+          "steps": [
+            "Install Docker and replace the Polarion REST URL in the command.",
+            "Run the container. Connect a local HTTP client to http://localhost:3000/mcp with Authorization: Bearer YOUR_POLARION_PAT.",
+            "For a team, put a TLS proxy in front, set allowed hosts to its hostname, and configure OAuth for cloud connectors."
+          ],
+          "note": "",
+          "serverSetup": "docker",
+          "snippet": "http://localhost:3000/mcp\nAuthorization: Bearer YOUR_POLARION_PAT"
+        }
+      },
+      "defaultMode": "docker"
     },
     {
       "id": "generic-stdio",
-      "name": "Generic stdio client",
-      "label": "stdio",
+      "name": "Other AI provider / any MCP client",
+      "label": "Other AI provider / any MCP client",
       "provider": "custom",
-      "setup": "stdio",
+      "setup": "local-json",
       "steps": [
-        "Open your client\u2019s local MCP server settings.",
-        "Set command to npx, arguments to -y polarion-mcp, and pass API_BASE_URL and BEARER_TOKEN as environment variables, as shown below.",
-        "Let the client launch the process, then list its tools. Ask: \u201cList the Polarion projects I can access.\u201d"
+        "Check whether your client supports stdio or Streamable HTTP. These are generic connection shapes; adapt the keys to its settings.",
+        "For stdio, install Node.js 22+ and set command, args and env as shown. Replace the Polarion URL and PAT locally.",
+        "Let your client launch the process, list tools, and ask: “List the Polarion projects I can access.”"
       ],
       "sources": [
         "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"
       ],
       "checked": "2026-10-24",
-      "note": "",
-      "redirectUris": []
+      "note": "Your AI provider does not need a dedicated integration. Use any MCP-capable client. If it accepts OpenAPI instead, choose REST / OpenAPI below.",
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "setup": "local-json",
+          "steps": [
+            "Check whether your client supports stdio or Streamable HTTP. These are generic connection shapes; adapt the keys to its settings.",
+            "For stdio, install Node.js 22+ and set command, args and env as shown. Replace the Polarion URL and PAT locally.",
+            "Let your client launch the process, list tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Your AI provider does not need a dedicated integration. Use any MCP-capable client. If it accepts OpenAPI instead, choose REST / OpenAPI below. For OpenAPI-only integrations, choose REST / OpenAPI in the Custom group."
+        },
+        "remote": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Other AI provider / any MCP client's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For OpenAPI-only integrations, choose REST / OpenAPI in the Custom group."
+        },
+        "docker": {
+          "setup": "remote-json",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get your team's HTTPS MCP URL and your Polarion PAT. Open Other AI provider / any MCP client's MCP settings.",
+            "Use the HTTP configuration below, replacing the URL and PAT. Keep credentials in private user settings.",
+            "Reconnect, list the available tools, and ask: “List the Polarion projects I can access.”"
+          ],
+          "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL. For OpenAPI-only integrations, choose REST / OpenAPI in the Custom group. For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "npm"
     },
     {
       "id": "generic-http",
@@ -578,16 +1207,44 @@
       "provider": "custom",
       "setup": "connector",
       "steps": [
-        "Obtain your team\u2019s MCP server URL, or start the Docker server for local use.",
+        "Obtain your team’s MCP server URL, or start the Docker server for local use.",
         "Paste your HTTPS URL below into the Streamable HTTP setting, or use http://localhost:3000/mcp for local Docker. Add Authorization: Bearer YOUR_POLARION_PAT.",
-        "Connect and list tools. For OAuth-capable clients, use your administrator\u2019s login configuration instead."
+        "Connect and list tools. For OAuth-capable clients, use your administrator’s login configuration instead."
       ],
       "sources": [
         "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "An HTTP-only client cannot launch a stdio subprocess."
+        },
+        "remote": {
+          "setup": "connector",
+          "steps": [
+            "Obtain your team’s MCP server URL, or start the Docker server for local use.",
+            "Paste your HTTPS URL below into the Streamable HTTP setting, or use http://localhost:3000/mcp for local Docker. Add Authorization: Bearer YOUR_POLARION_PAT.",
+            "Connect and list tools. For OAuth-capable clients, use your administrator’s login configuration instead."
+          ],
+          "note": "",
+          "snippet": "URL: https://YOUR-SERVER/mcp\nTransport: Streamable HTTP\nAuthorization: Bearer YOUR_POLARION_PAT"
+        },
+        "docker": {
+          "setup": "connector",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Obtain your team’s MCP server URL, or start the Docker server for local use.",
+            "Paste your HTTPS URL below into the Streamable HTTP setting, or use http://localhost:3000/mcp for local Docker. Add Authorization: Bearer YOUR_POLARION_PAT.",
+            "Connect and list tools. For OAuth-capable clients, use your administrator’s login configuration instead."
+          ],
+          "note": " For local Docker, replace the client URL with http://localhost:3000/mcp. Use HTTPS for team access.",
+          "snippet": "URL: https://YOUR-SERVER/mcp\nTransport: Streamable HTTP\nAuthorization: Bearer YOUR_POLARION_PAT",
+          "serverSetup": "docker"
+        }
+      },
+      "defaultMode": "remote"
     },
     {
       "id": "rest-wrapper",
@@ -606,7 +1263,34 @@
       ],
       "checked": "2026-10-24",
       "note": "",
-      "redirectUris": []
+      "redirectUris": [],
+      "connections": {
+        "npm": {
+          "reason": "npx starts MCP stdio. This integration needs the separate REST wrapper."
+        },
+        "remote": {
+          "setup": "connector",
+          "snippet": "OpenAPI: https://YOUR-SERVER/openapi.json\nGPT Actions: https://YOUR-SERVER/openapi-gpt.json\nAuthorization: Bearer YOUR_WRAPPER_API_KEY",
+          "steps": [
+            "Get the deployed REST wrapper URL and HTTP_API_KEY from your administrator.",
+            "Import the schema below into your integration. Send HTTP_API_KEY as the Bearer token.",
+            "Call getProjects to check access."
+          ],
+          "note": "REST uses the deployment PAT, shared by all calls through this wrapper."
+        },
+        "docker": {
+          "setup": "connector",
+          "snippet": "OpenAPI: https://YOUR-SERVER/openapi.json\nGPT Actions: https://YOUR-SERVER/openapi-gpt.json\nAuthorization: Bearer YOUR_WRAPPER_API_KEY",
+          "steps": [
+            "Run the Docker command below after replacing the URL, deployment PAT, wrapper key and public origin.",
+            "Put a TLS reverse proxy in front of the loopback port and forward the public Host.",
+            "Import the OpenAPI schema below and authenticate with HTTP_API_KEY."
+          ],
+          "note": "REST uses the deployment PAT, shared by all calls through this wrapper.",
+          "serverSetup": "rest"
+        }
+      },
+      "defaultMode": "docker"
     },
     {
       "id": "n8n",
@@ -626,44 +1310,72 @@
       "checked": "2026-10-24",
       "note": "Use the HTTP Request node as a workflow step or attach it as a tool to an AI Agent.",
       "redirectUris": [],
-      "referenceNote": "This confirmed path uses REST. The MCP Client Tool documentation still describes an SSE Endpoint, so it is not used as evidence for a Streamable HTTP setup here."
+      "referenceNote": "This confirmed path uses REST. The MCP Client Tool documentation still describes an SSE Endpoint, so it is not used as evidence for a Streamable HTTP setup here.",
+      "connections": {
+        "npm": {
+          "reason": "npx starts MCP stdio. This integration needs the separate REST wrapper."
+        },
+        "remote": {
+          "setup": "n8n-rest",
+          "steps": [
+            "Get a deployed REST wrapper URL and its HTTP_API_KEY from your administrator.",
+            "Add an HTTP Request node, choose Import cURL and paste the command below after replacing the server URL.",
+            "Replace the imported Authorization header with a Bearer Auth credential containing HTTP_API_KEY, then execute the node. The shell variable in the snippet is a placeholder."
+          ],
+          "note": "Use the HTTP Request node as a workflow step or attach it as a tool to an AI Agent."
+        },
+        "docker": {
+          "setup": "n8n-rest",
+          "steps": [
+            "Deploy the server with the Docker command below. Replace the placeholders and configure HTTPS before cloud or team access.",
+            "Get a deployed REST wrapper URL and its HTTP_API_KEY from your administrator.",
+            "Add an HTTP Request node, choose Import cURL and paste the command below after replacing the server URL.",
+            "Replace the imported Authorization header with a Bearer Auth credential containing HTTP_API_KEY, then execute the node. The shell variable in the snippet is a placeholder."
+          ],
+          "note": "Use the HTTP Request node as a workflow step or attach it as a tool to an AI Agent.",
+          "serverSetup": "rest"
+        }
+      },
+      "defaultMode": "remote"
     }
   ],
   "readmeGroups": [
     {
       "name": "Claude",
-      "summary": "Desktop JSON; web connector URL; Claude Code CLI; Messages API.",
+      "summary": "Claude Desktop and Claude Code: local or remote; claude.ai and API: HTTPS server.",
       "client": "claude-desktop"
     },
     {
-      "name": "OpenAI / ChatGPT",
-      "summary": "ChatGPT connector URL; GPT Actions schema; Responses / Agents SDK; Codex CLI.",
+      "name": "ChatGPT / APIs",
+      "summary": "ChatGPT connector and Responses API: HTTPS; GPT Actions: REST/OpenAPI; SDK and Codex: local or remote.",
       "client": "chatgpt-apps"
     },
     {
-      "name": "Microsoft",
-      "summary": "Copilot Studio URL + PAT header; VS Code servers JSON.",
-      "client": "copilot-studio"
-    },
-    {
-      "name": "Google",
-      "summary": "Gemini CLI add command with URL and PAT environment.",
-      "client": "gemini-cli"
-    },
-    {
-      "name": "Tools / IDEs",
-      "summary": "VS Code, Cursor, Windsurf, JetBrains, Zed, Cline: one shared JSON panel with client-specific format.",
+      "name": "Editors / other providers",
+      "summary": "VS Code, Cursor, Gemini and more; client-specific steps and supported server choices.",
       "client": "cursor"
     },
     {
-      "name": "Docker team server",
-      "summary": "Published GHCR image, per-user PATs, Streamable HTTP; TLS / OAuth for cloud clients.",
-      "client": "docker"
+      "name": "Custom / team server",
+      "summary": "Other AI provider / any MCP client: stdio or HTTP; Docker, REST/OpenAPI and n8n.",
+      "client": "generic-stdio"
+    }
+  ],
+  "serverModes": [
+    {
+      "id": "npm",
+      "label": "npm / npx",
+      "description": "Local process · stdio"
     },
     {
-      "name": "Custom / automation",
-      "summary": "Generic stdio / HTTP; REST wrapper + OpenAPI; n8n HTTP Request.",
-      "client": "generic-stdio"
+      "id": "docker",
+      "label": "Docker",
+      "description": "Self-hosted or team server"
+    },
+    {
+      "id": "remote",
+      "label": "Remote URL",
+      "description": "Your team already hosts it"
     }
   ]
 }

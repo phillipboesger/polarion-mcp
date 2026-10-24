@@ -132,7 +132,7 @@
         ctx.beginPath(); ctx.arc(x, y, 3.4, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
       }
       ctx.font = MONO; ctx.textAlign = "center";
-      if (w >= 700) cpos.forEach(function (c, k3) {
+      if (w >= 1600) cpos.forEach(function (c, k3) {
         var tw = ctx.measureText(clients[k3][0].toUpperCase()).width + 22;
         ctx.fillStyle = "rgba(11,42,76,0.9)";
         roundRect(ctx, c[0] - tw / 2, c[1] - 13, tw, 26, 13); ctx.fill();

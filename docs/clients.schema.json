@@ -8,7 +8,8 @@
     "groups",
     "setups",
     "clients",
-    "readmeGroups"
+    "readmeGroups",
+    "serverModes"
   ],
   "additionalProperties": false,
   "properties": {
@@ -100,6 +101,34 @@
         }
       },
       "minItems": 1
+    },
+    "serverModes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "description"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -216,7 +245,9 @@
         "sources",
         "checked",
         "note",
-        "redirectUris"
+        "redirectUris",
+        "connections",
+        "defaultMode"
       ],
       "additionalProperties": false,
       "properties": {
@@ -294,8 +325,90 @@
         },
         "referenceNote": {
           "type": "string"
+        },
+        "defaultMode": {
+          "enum": [
+            "npm",
+            "docker",
+            "remote"
+          ]
+        },
+        "connections": {
+          "type": "object",
+          "required": [
+            "npm",
+            "docker",
+            "remote"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "npm": {
+              "$ref": "#/$defs/connection"
+            },
+            "docker": {
+              "$ref": "#/$defs/connection"
+            },
+            "remote": {
+              "$ref": "#/$defs/connection"
+            }
+          }
         }
       }
+    },
+    "connection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "reason"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "setup",
+            "steps"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "setup": {
+              "type": "string",
+              "minLength": 1
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 2,
+              "maxItems": 4
+            },
+            "snippet": {
+              "type": "string",
+              "minLength": 1
+            },
+            "note": {
+              "type": "string"
+            },
+            "serverSetup": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
     }
   }
 }

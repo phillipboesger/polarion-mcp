@@ -3,86 +3,183 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const manifest = JSON.parse(fs.readFileSync('docs/clients.json', 'utf8'));
-const screenshotDir = process.env.DOCS_SCREENSHOT_DIR || '/tmp/sol-docs2';
+const scenarios = JSON.parse(fs.readFileSync('docs/daily-use.json', 'utf8'));
+const screenshotDir = process.env.DOCS_SCREENSHOT_DIR || '/tmp/sol-docs3';
 
 async function noOverflow(page) {
   expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth)).toBe(true);
 }
 
-test('benefits fit the first screen and the picker is grouped', async ({ page }, info) => {
+async function screenshot(page, name) {
+  fs.mkdirSync(screenshotDir, { recursive: true });
+  await page.screenshot({ path: path.join(screenshotDir, name) });
+}
+
+test('hero breathes and the landing page follows the complete user journey', async ({ page }, info) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
   await page.evaluate(() => globalThis.document.fonts.ready);
   await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
   for (const text of ['284', 'Read-only', 'Open source', 'Signed']) await expect(page.locator('.proof').getByText(text, { exact: false })).toBeInViewport();
-  await expect(page.locator('body')).not.toContainText(/unverified/i);
-  await expect(page.locator('a[href^="clients/"]')).toHaveCount(0);
+  await expect(page.locator('.hero .outcomes')).toHaveCount(0);
+  await expect(page.locator('.hero .button')).toHaveCount(2);
+  await expect(page.locator('body')).not.toContainText(/unverified|Web connector/i);
+  expect(await page.locator('main > section').evaluateAll(sections => sections.map(section => section.id || section.className))).toEqual(['hero', 'features', 'daily-use', 'clients', 'faq']);
   await noOverflow(page);
-  fs.mkdirSync(screenshotDir, { recursive: true });
-  await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}.png`) });
-  await page.locator('#clients').scrollIntoViewIfNeeded();
+  await screenshot(page, `after-${info.project.name}.png`);
+  for (const section of ['features', 'daily-use', 'clients', 'setup', 'faq']) {
+    await page.locator(`#${section}`).scrollIntoViewIfNeeded();
+    await noOverflow(page);
+    await screenshot(page, `after-${info.project.name}-${section}.png`);
+  }
+  await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
   await expect(page.locator('.client-group > h3')).toHaveText(['AI providers', 'Tools / IDEs', 'Custom / self-hosted']);
-  await expect(page.locator('#group-providers + div h4')).toHaveText(['Claude', 'OpenAI / ChatGPT', 'Microsoft', 'Google']);
-  await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-setup.png`) });
+  await expect(page.locator('[data-client="claude-web-desktop"]')).toHaveText('claude.ai');
+  await expect(page.locator('[data-client="generic-stdio"]')).toHaveText('Other AI provider / any MCP client');
   expect(errors).toEqual([]);
 });
 
-test('every client opens its inline steps, one snippet and a compatible switcher', async ({ page }) => {
+test('every client shows its default, disabled reasons and every supported server configuration', async ({ page }) => {
+  test.setTimeout(120000);
   await page.goto('/');
   for (const client of manifest.clients) {
-    const setup = manifest.setups.find(setup => setup.id === client.setup);
     await page.locator(`[data-client="${client.id}"]`).first().click();
-    await expect(page).toHaveURL(new RegExp(`#setup/${client.id}$`));
-    await expect(page.locator('#setup-title')).toHaveText(setup.title);
-    await expect(page.locator('#setup-code')).toHaveText(client.snippet ?? setup.snippet);
-    await expect(page.locator('#setup-steps li')).toHaveText(client.steps);
-    await expect(page.locator('#setup-client option')).toHaveCount(manifest.clients.filter(item => item.setup === client.setup).length);
-    await expect(page.locator('#setup pre')).toHaveCount(1);
-    await noOverflow(page);
+    await expect(page.locator('#setup-title')).toHaveText(client.name);
+    await expect(page.locator(`[name="server-mode"][value="${client.defaultMode}"]`)).toBeChecked();
+    for (const mode of manifest.serverModes) {
+      const connection = client.connections[mode.id];
+      const input = page.locator(`[name="server-mode"][value="${mode.id}"]`);
+      if (connection.reason) {
+        await expect(input).toBeDisabled();
+        await expect(page.locator(`#reason-${mode.id}`)).toHaveText(connection.reason);
+        continue;
+      }
+      await expect(page.locator(`#description-${mode.id}`)).toHaveText(connection.description || mode.description);
+      await expect(input).toBeEnabled();
+      await input.check();
+      await expect(input).toBeChecked();
+      const setup = manifest.setups.find(setup => setup.id === connection.setup);
+      await expect(page.locator('#setup-code')).toHaveText(connection.snippet ?? setup.snippet);
+      await expect(page.locator('#setup-steps li')).toHaveText(connection.steps);
+      if (connection.serverSetup) {
+        const server = manifest.setups.find(setup => setup.id === connection.serverSetup);
+        await expect(page.locator('#server-command')).toBeVisible();
+        await expect(page.locator('#server-code')).toHaveText(server.snippet);
+      } else await expect(page.locator('#server-command')).toBeHidden();
+      await expect(page.locator('#setup-source')).toHaveAttribute('href', client.sources[0]);
+      await noOverflow(page);
+    }
   }
 });
 
-test('same-format clients share one panel and CLI switchers update the command', async ({ page }, info) => {
-  await page.goto('/');
-  await page.locator('[data-client="cursor"]').click();
-  await expect(page.locator('#setup-title')).toBeInViewport();
-  fs.mkdirSync(screenshotDir, { recursive: true });
-  await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-inline.png`) });
-  const json = await page.locator('#setup-code').textContent();
+test('client switcher and mode deep links restore configurations with safe defaults', async ({ page }) => {
+  await page.goto('/#setup/cursor/remote');
+  await expect(page.locator('#setup-title')).toHaveText('Cursor');
+  await expect(page.locator('#setup-code')).toContainText('https://YOUR-SERVER/mcp');
   await page.locator('#setup-client').selectOption('cline');
-  await expect(page.locator('#setup-code')).toHaveText(json);
-  await expect(page.locator('#setup-steps')).toContainText('Cline');
-  await page.locator('[data-client="claude-code"]').click();
-  await expect(page.locator('#setup-code')).toContainText('claude mcp add');
-  await page.locator('#setup-client').selectOption('codex-cli');
-  await expect(page.locator('#setup-code')).toContainText('codex mcp add');
-  await expect(page.locator('#setup-code')).toContainText('--env BEARER_TOKEN=');
+  await expect(page.locator('#setup-code')).toContainText('"command": "npx"');
+  await page.locator('[name="server-mode"][value="remote"]').check();
+  await expect(page.locator('#setup-code')).toContainText('"type": "streamableHttp"');
+  await page.reload();
+  await expect(page.locator('[name="server-mode"][value="remote"]')).toBeChecked();
+  await expect(page.locator('#setup-code')).toContainText('"type": "streamableHttp"');
+  await page.goto('/#setup/chatgpt-apps/npm');
+  await expect(page.locator('[name="server-mode"][value="remote"]')).toBeChecked();
+  await page.goto('/#setup/claude-desktop/invalid-mode');
+  await expect(page.locator('[name="server-mode"][value="npm"]')).toBeChecked();
 });
 
-test('copy writes exactly the selected snippet and handles clipboard denial', async ({ page, context }) => {
+test('copy uses the selected client or server snippet and handles clipboard denial', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/#setup/docker');
-  await expect(page.locator('#setup-title')).toHaveText('Docker team server');
-  const snippet = await page.locator('#setup-code').textContent();
-  await page.getByRole('button', { name: 'Copy snippet' }).click();
-  await expect(page.getByRole('button', { name: 'Copied', exact: true })).toBeVisible();
-  expect(await page.evaluate(() => globalThis.navigator.clipboard.readText())).toBe(snippet);
+  await page.goto('/#setup/claude-web-desktop/docker');
+  for (const target of ['setup-code', 'server-code']) {
+    const snippet = await page.locator(`#${target}`).textContent();
+    const button = page.locator(`[data-copy="${target}"]`);
+    await button.click();
+    await expect(button).toHaveText('Copied');
+    expect(await page.evaluate(() => globalThis.navigator.clipboard.readText())).toBe(snippet);
+  }
   await page.evaluate(() => { globalThis.navigator.clipboard.writeText = () => Promise.reject(new Error('blocked')); });
-  await page.getByRole('button', { name: 'Copied', exact: true }).click();
+  await page.locator('#copy-setup').click();
   await expect(page.getByRole('status')).toContainText('Clipboard unavailable');
-  expect(await page.evaluate(() => globalThis.getSelection().toString())).toBe(snippet);
+  expect(await page.evaluate(() => globalThis.getSelection().toString())).toBe(await page.locator('#setup-code').textContent());
 });
 
-test('Docker hero link opens the setup again when its hash is already selected', async ({ page }) => {
-  await page.goto('/#setup/docker');
+test('hero CTAs reach setup and Docker links work with an already selected hash', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Connect your assistant' }).click();
+  await expect(page.locator('#clients-title')).toBeInViewport();
+  await page.evaluate(() => globalThis.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.getByRole('link', { name: 'Run with Docker' }).click();
   await expect(page.locator('#setup-title')).toHaveText('Docker team server');
+  await expect(page.locator('#setup-title')).toBeInViewport();
+  await expect(page.locator('#server-code')).toContainText('ghcr.io/phillipboesger/polarion-mcp:1.4.0');
   await page.evaluate(() => globalThis.scrollTo({ top: 0, behavior: 'instant' }));
   await page.getByRole('link', { name: 'Run with Docker' }).click();
   await expect(page.locator('#setup-title')).toBeInViewport();
-  await expect(page.locator('#setup-code')).toContainText('ghcr.io/phillipboesger/polarion-mcp:1.4.0');
 });
 
+test('daily conversations support keyboard tabs without shifting the next section', async ({ page }, info) => {
+  await page.goto('/');
+  const setupTop = () => page.locator('#clients').evaluate(element => element.getBoundingClientRect().top + globalThis.scrollY);
+  const before = await setupTop();
+  for (const scenario of scenarios) {
+    await page.locator(`#tab-${scenario.id}`).click();
+    await expect(page.locator(`#tab-${scenario.id}`)).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tabpanel')).toHaveCount(1);
+    await expect(page.getByRole('tabpanel')).toContainText(scenario.prompt);
+    await expect(page.getByRole('tabpanel').locator('.approval')).toContainText(scenario.guard);
+    expect(await setupTop()).toBe(before);
+    await noOverflow(page);
+  }
+  await page.locator('#tab-trace').press('Home');
+  await expect(page.locator('#tab-triage')).toBeFocused();
+  await page.locator('#tab-triage').press('ArrowDown');
+  await expect(page.locator('#tab-review')).toHaveAttribute('aria-selected', 'true');
+  await screenshot(page, `after-${info.project.name}-daily-review.png`);
+  await page.locator('#tab-review').press('End');
+  await expect(page.locator('#tab-trace')).toBeFocused();
+});
+
+test('FAQ is usable inline and community links match enabled repository features', async ({ page }, info) => {
+  await page.goto('/');
+  const questions = page.locator('#faq details');
+  await expect(questions).toHaveCount(6);
+  for (const item of await questions.all()) {
+    await item.locator('summary').click();
+    await expect(item).toHaveAttribute('open', '');
+    await expect(item.locator('p')).toBeVisible();
+    await noOverflow(page);
+    await item.locator('summary').press('Enter');
+    await expect(item).not.toHaveAttribute('open', '');
+  }
+  await expect(page.locator('#faq a[href$="/issues"]')).toHaveCount(1);
+  await expect(page.locator('a[href*="/discussions"]')).toHaveCount(0);
+  await page.locator('#faq details').nth(1).locator('summary').click();
+  await page.locator('#faq').scrollIntoViewIfNeeded();
+  await screenshot(page, `after-${info.project.name}-faq-open.png`);
+});
+
+test('unsafe or malformed manifest source URLs never reach the DOM link', async ({ page }) => {
+  for (const source of ['javascript:alert(1)', 'http://example.com', 'data:text/html,test', 'not a URL']) {
+    await page.route('**/index.html', async route => {
+      const response = await route.fetch();
+      let body = await response.text();
+      body = body.replace(/(<script type="application\/json" id="client-data">)([\s\S]*?)(<\/script>)/, (_, start, json, end) => {
+        const data = JSON.parse(json);
+        for (const client of data.clients) client.source = source;
+        return start + JSON.stringify(data).replaceAll('<', '\\u003c') + end;
+      });
+      await route.fulfill({ response, body });
+    });
+    await page.goto('/index.html');
+    await expect(page.locator('#setup-source')).not.toHaveAttribute('href');
+    await page.locator('#setup-client').selectOption('cursor');
+    await expect(page.locator('#setup-source')).not.toHaveAttribute('href');
+    await page.unroute('**/index.html');
+  }
+});
 test('canvas stops for reduced motion and when the hero leaves the viewport', async ({ page }) => {
   await page.addInitScript(() => {
     globalThis.canvasFrames = {};
