@@ -51,3 +51,4 @@ Telemetry callbacks receive span start and end metadata through the optional ext
 ## read_when
 
 - Use this guide when reviewing deployment security or handling credentials.
+Tool-call rate limits and metadata caches are shared across MCP sessions in one HTTP app and keyed by caller token. Requests without a token use the single shared `no-token` bucket/cache scope.
