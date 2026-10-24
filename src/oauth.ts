@@ -24,7 +24,7 @@ import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/serv
 import type { AuthorizationParams, OAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/provider.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { InvalidClientMetadataError, InvalidGrantError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
@@ -42,6 +42,12 @@ export const LOGIN_PATH = '/polarion-login';
  */
 const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
 
+/** Default sliding refresh-token lifetime; deployments may override in seconds. */
+const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60;
+
+/** Maximum age of a refresh-token family, measured from its first issue. */
+const REFRESH_TOKEN_FAMILY_TTL_SECONDS = 90 * 24 * 60 * 60;
+
 /** How long the user has to complete the login page before the code dies. */
 const PENDING_LOGIN_TTL_MS = 10 * 60 * 1000;
 
@@ -53,6 +59,11 @@ const AUTHORIZATION_CODE_TTL_MS = 60 * 1000;
  * a cap a flood of authorize requests would grow memory for 10 minutes.
  */
 const MAX_PENDING_LOGINS = 10_000;
+
+/** Accept the RFC 8707 resource with or without its single trailing slash. */
+function normalizeResource(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
 
 /**
  * Result of asking Polarion about a PAT: accepted, rejected (401), known but
@@ -94,6 +105,14 @@ interface RefreshPayload {
   s: string[];
   /** RFC 8707 resource. */
   r?: string;
+  /** Issue time of this refresh token, in epoch seconds. */
+  iat: number;
+  /** Start time of its refresh-token family, in epoch seconds. */
+  fiat: number;
+  /** Expiration of this refresh token, in epoch seconds. */
+  exp: number;
+  /** Canonical protected resource this token was issued for. */
+  aud: string;
 }
 
 /** Sealed inside an access token. */
@@ -251,7 +270,7 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
    */
   private withCredentials(client: SealedClient, clientId: string): OAuthClientInformationFull {
     if (client.token_endpoint_auth_method === 'none') return { ...client, client_id: clientId };
-    return { ...client, client_id: clientId, client_secret: this.sealer.derive(clientId), client_secret_expires_at: 0 };
+    return { ...client, client_id: clientId, client_secret: this.sealer.derive(clientId, clientId), client_secret_expires_at: 0 };
   }
 }
 
@@ -418,8 +437,9 @@ export function renderLoginPage(loginId: string, polarionUrl: string, clientName
  *
  * In memory it keeps only what lasts minutes: open login pages and unredeemed
  * authorization codes. Registrations and tokens are sealed and held by the
- * client. There is no revocation endpoint — a sealed token cannot be recalled;
- * revoking the PAT in Polarion ends the login at the next refresh.
+ * client. There is no token revocation endpoint: revoke the PAT in Polarion
+ * (direct PAT validation has a 60-second acceptance cache) or rotate the server
+ * secret to invalidate every sealed token.
  */
 export class PolarionOAuthProvider implements OAuthServerProvider {
   private readonly clients: SealedClientsStore;
@@ -431,12 +451,16 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param sealer - Seals client ids and tokens.
    * @param validateToken - Token check; injectable so tests need no Polarion.
    * @param redirectAllowlist - Redirect URIs registered clients may use; empty allows any.
+   * @param refreshTokenTtlSeconds - Sliding refresh-token lifetime in seconds.
+   * @param resourceAudience - Canonical protected-resource URL for issued tokens.
    */
   constructor(
     private readonly polarionUrl: string,
     private readonly sealer: Sealer,
     private readonly validateToken: TokenValidator = validatePolarionToken,
-    redirectAllowlist: readonly string[] = []
+    redirectAllowlist: readonly string[] = [],
+    private readonly refreshTokenTtlSeconds = DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+    private readonly resourceAudience?: string
   ) {
     this.clients = new SealedClientsStore(sealer, redirectAllowlist);
   }
@@ -455,6 +479,11 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param res - Response to render the login page into.
    */
   async authorize(client: OAuthClientInformationFull, params: AuthorizationParams, res: Response): Promise<void> {
+    if (params.resource && this.resourceAudience
+      && normalizeResource(params.resource.href) !== normalizeResource(this.resourceAudience)) {
+      throw new InvalidRequestError('The requested resource does not match this MCP server');
+    }
+    const supportedScopes = params.scopes?.filter(scope => scope === POLARION_SCOPE) ?? [];
     this.beginLogin(
       {
         flow: 'mcp',
@@ -464,7 +493,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
         state: params.state,
         codeChallenge: params.codeChallenge,
         // The SDK passes [] when the client asks for no scope.
-        scopes: params.scopes?.length ? params.scopes : [POLARION_SCOPE],
+        scopes: supportedScopes.length ? supportedScopes : [POLARION_SCOPE],
         resource: params.resource?.href,
       },
       res
@@ -645,8 +674,9 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
   }
 
   /**
-   * Renews a login. Re-checks the PAT with Polarion, so a revoked or expired
-   * PAT ends the login here — that, not a timer, is what bounds it.
+   * Renews a login. Re-checks the PAT with Polarion, so revoking the PAT there
+   * ends the login at refresh. Direct PAT checks in the HTTP layer use a 60 s
+   * acceptance cache; rotating the server secret invalidates every sealed token.
    *
    * @param clientId - The authenticated client presenting the refresh token.
    * @param refreshToken - The refresh token to redeem.
@@ -654,8 +684,14 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    *   a scope sent with the refresh request is ignored.
    */
   async refresh(clientId: string, refreshToken: string): Promise<OAuthTokens> {
+    // Rotation is stateless: an older refresh token remains usable until its own exp (within the 90-day family cap).
+    // Detecting reuse and revoking prior tokens would require server-side token-family state.
     const entry = this.sealer.open<RefreshPayload>('r', refreshToken);
-    if (!entry || entry.c !== clientId) {
+    const now = Math.floor(Date.now() / 1000);
+    if (!entry || entry.c !== clientId || (this.resourceAudience !== undefined && entry.aud !== this.resourceAudience)
+      || !Number.isFinite(entry.iat) || !Number.isFinite(entry.fiat)
+      || !Number.isFinite(entry.exp) || now >= entry.exp
+      || now >= entry.fiat + REFRESH_TOKEN_FAMILY_TTL_SECONDS) {
       throw new InvalidGrantError('Invalid refresh token');
     }
     const check = await this.validateToken(entry.p);
@@ -667,7 +703,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     if (check !== true) {
       throw new InvalidGrantError('Polarion no longer accepts the token behind this login');
     }
-    return this.issue({ clientId, polarionToken: entry.p, scopes: entry.s, resource: entry.r });
+    return this.issue({ clientId, polarionToken: entry.p, scopes: entry.s, resource: entry.r }, entry.fiat);
   }
 
   /**
@@ -676,8 +712,22 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param login - Client, PAT, scopes and resource the tokens stand for.
    * @returns The OAuth token response.
    */
-  private issue(login: { clientId: string; polarionToken: string; scopes: string[]; resource?: string }): OAuthTokens {
-    const refresh: RefreshPayload = { c: login.clientId, p: login.polarionToken, s: login.scopes, r: login.resource };
+  private issue(
+    login: { clientId: string; polarionToken: string; scopes: string[]; resource?: string },
+    familyIssuedAt?: number
+  ): OAuthTokens {
+    const iat = Math.floor(Date.now() / 1000);
+    const fiat = familyIssuedAt ?? iat;
+    const refresh: RefreshPayload = {
+      c: login.clientId,
+      p: login.polarionToken,
+      s: login.scopes,
+      r: login.resource,
+      aud: this.resourceAudience ?? login.resource ?? '',
+      iat,
+      fiat,
+      exp: Math.min(iat + this.refreshTokenTtlSeconds, fiat + REFRESH_TOKEN_FAMILY_TTL_SECONDS),
+    };
     return {
       access_token: this.sealer.seal('a', { ...refresh, e: Date.now() + ACCESS_TOKEN_TTL_MS } satisfies AccessPayload),
       token_type: 'Bearer',
@@ -714,6 +764,14 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    */
   polarionTokenFor(token: string): string | undefined {
     return this.openAccessToken(token)?.p;
+  }
+
+  /**
+   * @param token - A sealed access token.
+   * @returns The protected resource this access token was issued for.
+   */
+  audienceFor(token: string): string | undefined {
+    return this.openAccessToken(token)?.aud;
   }
 
   /**

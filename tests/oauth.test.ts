@@ -26,7 +26,7 @@ async function startApp() {
 }
 
 /** Registers a client and opens the login page, returning its login_id. */
-async function beginLogin(base: string) {
+async function beginLogin(base: string, scope?: string) {
   const registration = await fetch(`${base}/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -44,6 +44,7 @@ async function beginLogin(base: string) {
   authorize.searchParams.set("code_challenge", challenge)
   authorize.searchParams.set("code_challenge_method", "S256")
   authorize.searchParams.set("state", "state-123")
+  if (scope !== undefined) authorize.searchParams.set("scope", scope)
 
   const page = await fetch(authorize, { redirect: "manual" })
   assert.equal(page.status, 200)
@@ -62,7 +63,22 @@ test("an unauthenticated /mcp request points the client at this server's login",
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
     })
     assert.equal(res.status, 401)
-    assert.match(res.headers.get("www-authenticate") ?? "", /resource_metadata=".*\/\.well-known\/oauth-protected-resource\/mcp"/)
+    assert.equal(res.headers.get("www-authenticate"), `Bearer resource_metadata="${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp"`)
+  } finally {
+    await stop()
+  }
+})
+
+test("a rejected bearer gets an invalid_token Bearer challenge", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const res = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: "Bearer rejected-pat" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+    })
+    assert.equal(res.status, 401)
+    assert.equal(res.headers.get("www-authenticate"), `Bearer error="invalid_token", error_description="The access token is invalid or expired", resource_metadata="${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp"`)
   } finally {
     await stop()
   }
@@ -152,8 +168,8 @@ test("a valid Polarion token completes the login and the issued access token aut
 })
 
 /** Completes register -> authorize -> login and redeems the code, returning the token response. */
-async function loginTokens(base: string) {
-  const { clientId, verifier, loginId } = await beginLogin(base)
+async function loginTokens(base: string, scope?: string) {
+  const { clientId, verifier, loginId } = await beginLogin(base, scope)
   const submitted = await fetch(`${base}/polarion-login`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -190,6 +206,24 @@ test("a client that asks for no scope gets the polarion scope, not an empty one"
   const { base, stop } = await startApp()
   try {
     assert.equal((await loginTokens(base)).scope, "polarion")
+  } finally {
+    await stop()
+  }
+})
+
+test("authorization drops requested scopes that the server does not support", async () => {
+  const { base, stop } = await startApp()
+  try {
+    assert.equal((await loginTokens(base, "polarion unknown.scope")).scope, "polarion")
+  } finally {
+    await stop()
+  }
+})
+
+test("an unknown-only requested scope falls back to the supported default", async () => {
+  const { base, stop } = await startApp()
+  try {
+    assert.equal((await loginTokens(base, "unknown.scope")).scope, "polarion")
   } finally {
     await stop()
   }

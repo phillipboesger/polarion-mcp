@@ -26,12 +26,13 @@
  * subsequent requests.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import type { Server as HttpServer } from 'node:http';
 import express, { type Request, type Response, type NextFunction } from 'express';
-import { rateLimit } from 'express-rate-limit';
+import cors from 'cors';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
@@ -52,6 +53,7 @@ export { parseTrustProxy } from './utils.js';
 dotenv.config();
 
 const MCP_PATH = '/mcp';
+const DEFAULT_ALLOWED_ORIGINS = ['https://claude.ai', 'https://chatgpt.com', 'https://chat.openai.com'];
 
 /** A session nobody used for this long is closed; the client re-initializes on the 404. */
 const DEFAULT_SESSION_IDLE_MS = 60 * 60 * 1000;
@@ -69,9 +71,25 @@ const MAX_SESSIONS_PER_OWNER = 20;
 /** Custom GPT Action endpoints; separate from the MCP ones because they skip PKCE. */
 const GPT_AUTHORIZE_PATH = '/gpt/authorize';
 const GPT_TOKEN_PATH = '/gpt/token';
+const ORIGIN_PROTECTED_PATHS = new Set([
+  MCP_PATH,
+  '/authorize', '/token', '/register', '/revoke', LOGIN_PATH,
+  '/.well-known/oauth-authorization-server',
+  GPT_AUTHORIZE_PATH, GPT_TOKEN_PATH,
+]);
 
 /** Hosts ChatGPT sends Custom GPT OAuth callbacks from. */
 const GPT_CALLBACK_HOSTS = new Set(['chatgpt.com', 'chat.openai.com']);
+
+/** Builds an opaque failed-PAT limiter key without retaining the credential. */
+export function patFailureRateLimitKey(ip: string, token: string): string {
+  return `${ipKeyGenerator(ip)}:${tokenScope(token)}`;
+}
+
+/** Hashes the normalized caller address and OAuth client id to keep limiter keys fixed-size. */
+export function tokenRateLimitKey(ip: string, clientId: string): string {
+  return createHash('sha256').update(`${ipKeyGenerator(ip)}\0${clientId}`).digest('hex');
+}
 
 /**
  * @param value - A redirect URI from an authorize request.
@@ -129,6 +147,8 @@ export interface McpHttpAppOptions {
    * restarts and instances, or every login ends. Unset, a random one is used.
    */
   tokenSecret?: string;
+  /** Older secrets tried only when opening sealed OAuth values. */
+  previousTokenSecrets?: string[];
   /** Preconfigured OAuth client for ChatGPT Custom GPT Actions; needs `publicUrl`. */
   gptClient?: { clientId: string; clientSecret: string };
   /** Token check used by the login page; injectable so tests need no Polarion. */
@@ -148,6 +168,14 @@ export interface McpHttpAppOptions {
    * counter for every user. Unset, the peer address is used.
    */
   trustProxy?: string | number;
+  /** Browser origins allowed to call MCP and OAuth endpoints; unset uses Claude.ai and ChatGPT. */
+  allowedOrigins?: string[];
+  /** Dynamic OAuth registrations allowed per hour. Defaults to 100. */
+  registerRateLimit?: number;
+  /** Failed OAuth token requests allowed per IP per 15 minutes. Defaults to 500. */
+  tokenIpRateLimit?: number;
+  /** Sliding refresh-token lifetime in seconds. Defaults to 14 days. */
+  refreshTokenTtlSeconds?: number;
 }
 
 /**
@@ -176,6 +204,46 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris, maxResponseChars } = options;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
+  const allowedOrigins = options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
+  const corsMiddleware = cors({
+    origin: true,
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version'],
+    exposedHeaders: ['mcp-session-id', 'mcp-protocol-version', 'www-authenticate'],
+    optionsSuccessStatus: 204,
+  });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const path = req.path.toLowerCase().replace(/\/+$/, '') || '/';
+    const isOAuthMetadata = path.startsWith('/.well-known/oauth-protected-resource');
+    if (!ORIGIN_PROTECTED_PATHS.has(path) && !isOAuthMetadata) return next();
+
+    const origin = req.get('origin');
+    if (!origin) return next();
+    const requestHost = req.get('host')?.toLowerCase();
+    const requestHostIsConfigured = Boolean(requestHost && allowedHosts?.some(host => host.toLowerCase() === requestHost));
+    let configuredRequestOrigin: string | undefined;
+    if (requestHostIsConfigured) {
+      try {
+        configuredRequestOrigin = new URL(`${req.protocol}://${requestHost}`).origin;
+      } catch {
+        // A malformed configured Host is not an origin to trust.
+      }
+    }
+    if (!allowedOrigins.includes(origin) && origin !== publicUrl?.origin && origin !== configuredRequestOrigin) {
+      if (path === MCP_PATH) res.status(403).json(jsonRpcError('Origin is not allowed'));
+      else res.status(403).json({ error: 'origin_not_allowed' });
+      return;
+    }
+
+    // The SDK's OAuth routes use wildcard CORS internally. Keep their response
+    // header aligned with this origin check instead of widening the allowlist.
+    const setHeader = res.setHeader.bind(res);
+    res.setHeader = ((name: string, value: string | number | readonly string[]) => {
+      if (name.toLowerCase() === 'access-control-allow-origin') value = origin;
+      return setHeader(name, value);
+    }) as Response['setHeader'];
+    corsMiddleware(req, res, next);
+  });
   // Parsed per route, after authentication, so anonymous callers cannot make
   // the server parse 10 MB bodies.
   const jsonBody = express.json({ limit: '10mb' });
@@ -243,8 +311,13 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   sweep.unref();
 
   // OAuth login, for clients that cannot be handed a token by hand.
-  const sealer = publicUrl ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url')) : undefined;
-  const oauth = publicUrl && sealer ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris) : undefined;
+  const sealer = publicUrl
+    ? new Sealer(options.tokenSecret ?? randomBytes(32).toString('base64url'), API_BASE_URL, options.previousTokenSecrets)
+    : undefined;
+  const resourceAudience = publicUrl ? new URL(MCP_PATH, publicUrl).href : undefined;
+  const oauth = publicUrl && sealer
+    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience)
+    : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
   /**
@@ -265,21 +338,77 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       next();
     });
 
+    const tokenIpLimit = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: options.tokenIpRateLimit ?? 500,
+      skipSuccessfulRequests: true,
+      keyGenerator: req => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? ''),
+      validate: { keyGeneratorIpFallback: false },
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests from this IP' }),
+    });
     // The SDK token endpoint only reads client credentials from the body;
     // move HTTP Basic credentials there so client_secret_basic clients work.
     // The SDK's own urlencoded parser then sees a consumed stream and keeps this body.
-    app.post('/token', express.urlencoded({ extended: false }), (req: Request, _res: Response, next: NextFunction) => {
+    app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response, next: NextFunction) => {
       const basic = basicCredentials(req.get('authorization'));
-      if (basic) req.body = { ...req.body, client_id: basic.clientId, client_secret: basic.clientSecret };
+      if (basic) {
+        const client = await oauth.clientsStore.getClient(basic.clientId);
+        const matches = constantTimeSecretEqual(basic.clientSecret, client?.client_secret ?? '');
+        if (!client || client.token_endpoint_auth_method !== 'client_secret_basic' || !matches) {
+          res.set('WWW-Authenticate', 'Basic realm="MCP OAuth"');
+          res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
+          return;
+        }
+        req.body = { ...req.body, client_id: basic.clientId, client_secret: basic.clientSecret };
+      }
       next();
     });
-
+    // The preceding shim parses the body so this per-IP ceiling bounds the
+    // number of distinct client-id buckets one source can create.
+    app.post('/token', tokenIpLimit);
+    // The SDK metadata omits Basic even though the token shim supports it; augment its JSON response.
+    app.use('/.well-known/oauth-authorization-server', (_req: Request, res: Response, next: NextFunction) => {
+      const sendJson = res.json.bind(res);
+      res.json = ((body: unknown) => {
+        if (body && typeof body === 'object' && 'token_endpoint_auth_methods_supported' in body) {
+          const methods = body.token_endpoint_auth_methods_supported;
+          if (Array.isArray(methods)) {
+            body = { ...body, token_endpoint_auth_methods_supported: [...new Set([...methods, 'client_secret_basic'])] };
+          }
+        }
+        return sendJson(body);
+      }) as Response['json'];
+      next();
+    });
     app.use(
       mcpAuthRouter({
         provider: oauth,
         issuerUrl: publicUrl,
         resourceServerUrl: new URL(MCP_PATH, publicUrl),
         resourceName: SERVER_NAME,
+        clientRegistrationOptions: {
+          rateLimit: {
+            windowMs: 60 * 60 * 1000,
+            limit: options.registerRateLimit ?? 100,
+            standardHeaders: true,
+            legacyHeaders: false,
+            handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many client registrations' }),
+          },
+        },
+        tokenOptions: {
+          rateLimit: {
+            windowMs: 15 * 60 * 1000,
+            limit: 50,
+            skipSuccessfulRequests: true,
+            keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id ?? '')),
+            validate: { keyGeneratorIpFallback: false },
+            standardHeaders: true,
+            legacyHeaders: false,
+            handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests' }),
+          },
+        },
         scopesSupported: [POLARION_SCOPE],
       })
     );
@@ -287,8 +416,25 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     // The login page posts here: check the pasted token, then hand the client
     // back to its redirect URI.
     // Each attempt is a PAT check against Polarion, so it gets the SDK's /token limit.
-    const loginLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
-    app.post(LOGIN_PATH, loginLimit, express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+    const loginPatLimit = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: 50,
+      keyGenerator: req => patFailureRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.token ?? '')),
+      validate: { keyGeneratorIpFallback: false },
+      skipSuccessfulRequests: true,
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many failed Personal Access Token checks' }),
+    });
+    const loginIpLimit = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: 500,
+      skipSuccessfulRequests: true,
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many failed Personal Access Token checks from this IP' }),
+    });
+    app.post(LOGIN_PATH, express.urlencoded({ extended: false }), loginIpLimit, loginPatLimit, async (req: Request, res: Response) => {
       const loginId = String(req.body?.login_id ?? '');
       const token = String(req.body?.token ?? '');
       const result = await oauth.completeLogin(loginId, token);
@@ -330,10 +476,24 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const patFailureLimit = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 50,
+    keyGenerator: req => patFailureRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', bearerCredential(req.get('authorization')) ?? ''),
+    validate: { keyGeneratorIpFallback: false },
+    skip: req => isCachedValidPat(bearerCredential(req.get('authorization')) ?? ''),
     skipSuccessfulRequests: true,
     requestWasSuccessful: (_req, res) => res.locals.patAccepted === true,
     standardHeaders: true,
     legacyHeaders: false,
+    handler: (_req, res) => res.status(429).json(jsonRpcError('Too many failed Personal Access Token checks')),
+  });
+  const patIpFailureLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 500,
+    skip: req => isCachedValidPat(bearerCredential(req.get('authorization')) ?? ''),
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (_req, res) => res.locals.patAccepted === true,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => res.status(429).json(jsonRpcError('Too many failed Personal Access Token checks from this IP')),
   });
 
   const requireBearer = (req: Request, res: Response, next: NextFunction): void => {
@@ -346,6 +506,11 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       return;
     }
     if (oauth && isSealed(value)) {
+      if (oauth.audienceFor(value) !== resourceAudience) {
+        res.set('WWW-Authenticate', bearerChallenge('The access token is for a different resource'));
+        res.status(401).json(jsonRpcError('Unauthorized: the access token is for a different resource'));
+        return;
+      }
       const pat = oauth.polarionTokenFor(value);
       if (!pat) {
         // A 401, not a pass-through to Polarion, is what makes the client refresh or log in again.
@@ -365,23 +530,29 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       requestBearerToken.run(value, next);
       return;
     }
-    patFailureLimit(req, res, () => {
+    patIpFailureLimit(req, res, () => patFailureLimit(req, res, () => {
       void checkDirectPat(value).then(failure => {
         if (!failure) {
           res.locals.patAccepted = true;
           requestBearerToken.run(value, next);
           return;
         }
+        if (failure.status === 401 && resourceMetadataUrl) {
+          res.set('WWW-Authenticate', bearerChallenge('The access token is invalid or expired'));
+        }
         res.status(failure.status).json(jsonRpcError(failure.message));
       }).catch(() => {
         res.status(503).json(jsonRpcError('Polarion could not be reached to check the token. Try again in a moment.'));
       });
-    });
+    }));
   };
 
   /** Polarion PATs accepted in the last minute, by token hash. */
   const acceptedPats = new Map<string, number>();
   const PAT_CACHE_MS = 60_000;
+  function isCachedValidPat(pat: string): boolean {
+    return (acceptedPats.get(tokenScope(pat)) ?? 0) > Date.now();
+  }
 
   /**
    * @param pat - A Polarion PAT sent as the Bearer token.
@@ -403,7 +574,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   if (oauth && publicUrl && gptClient) {
-    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
+    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
   }
 
   // Health check (no auth) for load balancers and quick verification.
@@ -550,11 +721,37 @@ function mountCustomGpt(
   publicUrl: URL,
   gptClient: { clientId: string; clientSecret: string },
   bearerChallenge: (error?: string) => string,
+  tokenIpRateLimit: number,
   maxResponseChars: number
 ): void {
   // Same limits the SDK applies to its own /authorize and /token.
-  const authorizeLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: true, legacyHeaders: false });
-  const tokenLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
+  const authorizeLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many authorization requests' }),
+  });
+  const tokenLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 50,
+    skipSuccessfulRequests: true,
+    keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id || gptClient.clientId)),
+    validate: { keyGeneratorIpFallback: false },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests' }),
+  });
+  const tokenIpLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: tokenIpRateLimit,
+    skipSuccessfulRequests: true,
+    keyGenerator: req => ipKeyGenerator(req.ip ?? req.socket.remoteAddress ?? ''),
+    validate: { keyGeneratorIpFallback: false },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests from this IP' }),
+  });
 
   app.get(GPT_AUTHORIZE_PATH, authorizeLimit, (req: Request, res: Response) => {
     const param = (name: string) => (typeof req.query[name] === 'string' ? (req.query[name] as string) : '');
@@ -575,7 +772,7 @@ function mountCustomGpt(
     oauth.authorizeGpt(gptClient.clientId, redirectUri, param('state'), res);
   });
 
-  app.post(GPT_TOKEN_PATH, tokenLimit, express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+  app.post(GPT_TOKEN_PATH, express.urlencoded({ extended: false }), tokenIpLimit, tokenLimit, async (req: Request, res: Response) => {
     res.set('Cache-Control', 'no-store');
     const body = (req.body ?? {}) as Record<string, string | undefined>;
     const credentials = basicCredentials(req.get('authorization')) ?? { clientId: body.client_id ?? '', clientSecret: body.client_secret ?? '' };
@@ -604,7 +801,7 @@ function mountCustomGpt(
   const authenticate = (req: Request, res: Response, next: NextFunction): void => {
     const credential = bearerCredential(req.get('authorization'));
     const pat = credential ? oauth.polarionTokenFor(credential) : undefined;
-    if (!pat) {
+    if (!pat || !credential || oauth.audienceFor(credential) !== new URL(MCP_PATH, publicUrl).href) {
       res.set('WWW-Authenticate', bearerChallenge(credential ? 'The access token is invalid or expired' : undefined));
       res.status(401).json({ success: false, error: 'Authentication required', message: 'Log in through the GPT again.' });
       return;
@@ -628,6 +825,13 @@ function mountCustomGpt(
     unauthorizedDescription: 'Not logged in, or the login expired',
     maxResponseChars,
   }));
+}
+
+/** Compares secrets through fixed-size digests so timingSafeEqual always sees equal-length input. */
+function constantTimeSecretEqual(actual: string, expected: string): boolean {
+  const actualDigest = createHash('sha256').update(actual).digest();
+  const expectedDigest = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(actualDigest, expectedDigest);
 }
 
 /**
@@ -661,27 +865,43 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
  *
  * @returns The underlying Node HTTP server once it is listening.
  */
-export function startMcpHttpServer(): HttpServer {
+export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } = {}): HttpServer {
   const port = Number(process.env.MCP_HTTP_PORT || process.env.PORT || process.env.HTTP_PORT || 3000);
   const allowedHosts = (process.env.MCP_ALLOWED_HOSTS || '')
     .split(',')
     .map(h => h.trim())
     .filter(Boolean);
+  const configuredAllowedOrigins = (process.env.MCP_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
   const publicUrl = parsePublicUrl(process.env.MCP_PUBLIC_URL);
   const tokenSecret = process.env.MCP_TOKEN_SECRET || undefined;
+  const previousTokenSecrets = (process.env.MCP_TOKEN_SECRET_PREVIOUS || '').split(',').map(secret => secret.trim()).filter(Boolean);
   const gptClient = process.env.GPT_CLIENT_ID && process.env.GPT_CLIENT_SECRET
     ? { clientId: process.env.GPT_CLIENT_ID, clientSecret: process.env.GPT_CLIENT_SECRET }
     : undefined;
 
   const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
+  if (publicUrl && trustProxy === undefined) {
+    (options.logger ?? console).warn('[SECURITY WARNING] MCP_PUBLIC_URL is set while TRUST_PROXY is unset. Behind a reverse proxy, rate limits see one shared IP and can lock out users; set TRUST_PROXY to the trusted proxy hop count or address.');
+  }
   const idleMinutes = Number(process.env.MCP_SESSION_IDLE_MINUTES);
   const sessionIdleMs = idleMinutes > 0 ? idleMinutes * 60_000 : undefined;
   const maxSessions = Number(process.env.MCP_MAX_SESSIONS) > 0 ? Number(process.env.MCP_MAX_SESSIONS) : undefined;
+  const configuredRegisterLimit = Number(process.env.MCP_RATE_LIMIT_REGISTER);
+  const registerRateLimit = Number.isInteger(configuredRegisterLimit) && configuredRegisterLimit > 0 ? configuredRegisterLimit : 100;
+  const configuredTokenIpLimit = Number(process.env.MCP_RATE_LIMIT_TOKEN_IP);
+  const tokenIpRateLimit = Number.isInteger(configuredTokenIpLimit) && configuredTokenIpLimit > 0 ? configuredTokenIpLimit : 500;
+  const configuredRefreshTokenTtl = Number(process.env.MCP_REFRESH_TOKEN_TTL);
+  const refreshTokenTtlSeconds = Number.isInteger(configuredRefreshTokenTtl) && configuredRefreshTokenTtl > 0
+    ? configuredRefreshTokenTtl
+    : 14 * 24 * 60 * 60;
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
   const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, gptClient, trustProxy, allowedRedirectUris, sessionIdleMs, maxSessions, maxResponseChars,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, maxResponseChars,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

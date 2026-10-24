@@ -3,7 +3,8 @@ import assert from "node:assert/strict"
 import type { AddressInfo } from "node:net"
 import { createHash, randomBytes } from "node:crypto"
 
-import { createMcpHttpApp } from "../src/mcp-http-server.js"
+import { createMcpHttpApp, patFailureRateLimitKey } from "../src/mcp-http-server.js"
+import { Sealer } from "../src/sealed.js"
 import type { TokenCheck } from "../src/oauth.js"
 
 const PUBLIC_URL = "http://127.0.0.1"
@@ -20,8 +21,19 @@ async function validateToken(token: string): Promise<TokenCheck> {
 }
 
 /** Starts the app with the OAuth login enabled, sealing tokens with `tokenSecret`. */
-async function startApp(tokenSecret = SECRET) {
-  const { app, closeAllSessions } = createMcpHttpApp({ publicUrl: new URL(PUBLIC_URL), validateToken, tokenSecret })
+async function startApp(
+  tokenSecret = SECRET,
+  refreshTokenTtlSeconds?: number,
+  publicUrl = PUBLIC_URL,
+  previousTokenSecrets: string[] = [],
+  trustProxy?: string | number,
+) {
+  const options = {
+    publicUrl: new URL(publicUrl), validateToken, tokenSecret, previousTokenSecrets,
+    ...(trustProxy === undefined ? {} : { trustProxy }),
+    ...(refreshTokenTtlSeconds === undefined ? {} : { refreshTokenTtlSeconds }),
+  } as Parameters<typeof createMcpHttpApp>[0]
+  const { app, closeAllSessions } = createMcpHttpApp(options)
   const server = app.listen(0)
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const { port } = server.address() as AddressInfo
@@ -44,7 +56,12 @@ async function register(base: string, body: Record<string, unknown> = {}) {
 }
 
 /** Runs register → authorize → login → code, returning what the token call needs. */
-async function loginForCode(base: string, pat: string, client?: { client_id: string; client_secret?: string }) {
+async function loginForCode(
+  base: string,
+  pat: string,
+  client?: { client_id: string; client_secret?: string },
+  resource: string | null = `${PUBLIC_URL}/mcp`,
+) {
   const registered = client ?? (await register(base))
   const verifier = randomBytes(32).toString("base64url")
   const authorize = new URL(`${base}/authorize`)
@@ -54,7 +71,7 @@ async function loginForCode(base: string, pat: string, client?: { client_id: str
   authorize.searchParams.set("code_challenge", createHash("sha256").update(verifier).digest("base64url"))
   authorize.searchParams.set("code_challenge_method", "S256")
   authorize.searchParams.set("state", "s")
-  authorize.searchParams.set("resource", `${PUBLIC_URL}/mcp`)
+  if (resource !== null) authorize.searchParams.set("resource", resource)
   const page = await fetch(authorize, { redirect: "manual" })
   assert.equal(page.status, 200)
   const loginId = /name="login_id" value="([^"]+)"/.exec(await page.text())?.[1] as string
@@ -71,8 +88,8 @@ async function loginForCode(base: string, pat: string, client?: { client_id: str
 
 type Tokens = { access_token: string; refresh_token: string; expires_in: number }
 
-async function login(base: string, pat: string) {
-  const { client, code, verifier } = await loginForCode(base, pat)
+async function login(base: string, pat: string, resource: string | null = `${PUBLIC_URL}/mcp`) {
+  const { client, code, verifier } = await loginForCode(base, pat, undefined, resource)
   const res = await fetch(`${base}/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -169,16 +186,91 @@ test("an expired access token gets a 401 invalid_token challenge, and the refres
   }
 })
 
-test("a refresh token keeps working long after the old 8 h limit, as long as Polarion accepts the PAT", async () => {
+test("refresh tokens slide across the default 14-day lifetime while staying within the family cap", async () => {
   const pat = freshPat()
   const { base, stop } = await startApp()
   mock.timers.enable({ apis: ["Date"], now: Date.now() })
   try {
     const { client, tokens } = await login(base, pat)
-    mock.timers.tick(60 * 24 * 60 * 60 * 1000)
-    assert.equal((await refresh(base, client.client_id, tokens.refresh_token)).status, 200)
+    mock.timers.tick(13 * 24 * 60 * 60 * 1000)
+    const first = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(first.status, 200)
+    const rotated = (await first.json()) as Tokens
+    mock.timers.tick(13 * 24 * 60 * 60 * 1000)
+    assert.equal((await refresh(base, client.client_id, rotated.refresh_token)).status, 200)
   } finally {
     mock.timers.reset()
+    await stop()
+  }
+})
+
+test("an expired refresh token is rejected with invalid_grant", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, 60)
+  mock.timers.enable({ apis: ["Date"], now: Date.now() })
+  try {
+    const { client, tokens } = await login(base, pat)
+    mock.timers.tick(61_000)
+    const res = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(res.status, 400)
+    assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
+  } finally {
+    mock.timers.reset()
+    await stop()
+  }
+})
+
+test("a refresh-token family expires at its 90-day absolute cap", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp()
+  mock.timers.enable({ apis: ["Date"], now: Date.now() })
+  try {
+    const { client, tokens } = await login(base, pat)
+    mock.timers.tick(90 * 24 * 60 * 60 * 1000 + 1_000)
+    const res = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(res.status, 400)
+    assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
+  } finally {
+    mock.timers.reset()
+    await stop()
+  }
+})
+
+test("refresh rotates the refresh token and each old token keeps its own expiry", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, 3600)
+  mock.timers.enable({ apis: ["Date"], now: Date.now() })
+  try {
+    const { client, tokens } = await login(base, pat)
+    mock.timers.tick(30 * 60 * 1000)
+    const res = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(res.status, 200)
+    const rotated = (await res.json()) as Tokens
+    assert.notEqual(rotated.refresh_token, tokens.refresh_token)
+
+    mock.timers.tick(31 * 60 * 1000)
+    const oldResponse = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(oldResponse.status, 400)
+    assert.equal(((await oldResponse.json()) as { error: string }).error, "invalid_grant")
+    assert.equal((await refresh(base, client.client_id, rotated.refresh_token)).status, 200)
+  } finally {
+    mock.timers.reset()
+    await stop()
+  }
+})
+
+test("a rotated refresh token remains usable until its own expiry", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, 3600)
+  try {
+    const { client, tokens } = await login(base, pat)
+    const first = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(first.status, 200)
+    const rotated = (await first.json()) as Tokens
+    const replayedOld = await refresh(base, client.client_id, tokens.refresh_token)
+    assert.equal(replayedOld.status, 200)
+    assert.notEqual(((await replayedOld.json()) as Tokens).refresh_token, rotated.refresh_token)
+  } finally {
     await stop()
   }
 })
@@ -194,6 +286,80 @@ test("a PAT revoked in Polarion ends the session at the next refresh with invali
     assert.equal(((await res.json()) as { error: string }).error, "invalid_grant")
   } finally {
     await stop()
+  }
+})
+
+test("authorization rejects a resource outside this MCP server", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const client = await register(base)
+    const authorize = new URL(`${base}/authorize`)
+    for (const [key, value] of Object.entries({
+      response_type: "code",
+      client_id: client.client_id,
+      redirect_uri: REDIRECT,
+      code_challenge: createHash("sha256").update("resource-test").digest("base64url"),
+      code_challenge_method: "S256",
+      state: "s",
+      resource: "https://foreign.example/mcp",
+    })) authorize.searchParams.set(key, value)
+    const response = await fetch(authorize, { redirect: "manual" })
+    assert.equal(response.status, 302)
+    assert.equal(new URL(response.headers.get("location") as string).searchParams.get("error"), "invalid_request")
+  } finally {
+    await stop()
+  }
+})
+
+test("OAuth tokens are audience-bound to their public URL, while omitted and trailing-slash resources work", async () => {
+  const first = await startApp(SECRET, undefined, "https://mcp-a.example")
+  const pat = freshPat()
+  try {
+    const { tokens } = await login(first.base, pat, "https://mcp-a.example/mcp/")
+    const other = await startApp(SECRET, undefined, "https://mcp-b.example")
+    try {
+      assert.equal((await initialize(other.base, tokens.access_token)).status, 401)
+    } finally {
+      await other.stop()
+    }
+    const withoutResource = await login(first.base, freshPat(), null)
+    assert.equal((await initialize(first.base, withoutResource.tokens.access_token)).status, 200)
+  } finally {
+    await first.stop()
+  }
+})
+
+test("tokens sealed for a different API base URL fail the authenticated-data check", () => {
+  const ContextSealer = Sealer as unknown as new (secret: string, aadContext: string) => Sealer
+  const issuer = new ContextSealer(SECRET, "https://polarion-a.example/polarion/rest/v1")
+  const otherDeployment = new ContextSealer(SECRET, "https://polarion-b.example/polarion/rest/v1")
+  const token = issuer.seal("a", { aud: "https://mcp.example/mcp" })
+  assert.equal(otherDeployment.open("a", token), undefined)
+})
+
+test("a previous sealing secret opens existing tokens until it is removed", async () => {
+  const oldSecret = "a-previous-server-token-secret-long-enough-1234"
+  const first = await startApp(oldSecret)
+  const { client, tokens } = await login(first.base, freshPat())
+  await first.stop()
+
+  const rotated = await startApp(SECRET, undefined, PUBLIC_URL, [oldSecret])
+  let newlySealedTokens: Tokens
+  try {
+    assert.equal((await initialize(rotated.base, tokens.access_token)).status, 200)
+    const refreshResponse = await refresh(rotated.base, client.client_id, tokens.refresh_token)
+    assert.equal(refreshResponse.status, 200)
+    newlySealedTokens = (await refreshResponse.json()) as Tokens
+  } finally {
+    await rotated.stop()
+  }
+
+  const withoutPrevious = await startApp(SECRET)
+  try {
+    assert.equal((await initialize(withoutPrevious.base, tokens.access_token)).status, 401)
+    assert.equal((await initialize(withoutPrevious.base, newlySealedTokens.access_token)).status, 200)
+  } finally {
+    await withoutPrevious.stop()
   }
 })
 
@@ -329,7 +495,45 @@ test("protected-resource metadata is also served at the root path ChatGPT probes
     const root = await fetch(`${base}/.well-known/oauth-protected-resource`)
     const scoped = await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)
     assert.equal(root.status, 200)
-    assert.deepEqual(await root.json(), await scoped.json())
+    const rootMetadata = await root.json() as { resource: string }
+    const pathMetadata = await scoped.json() as { resource: string }
+    assert.equal(rootMetadata.resource, `${PUBLIC_URL}/mcp`)
+    assert.equal(pathMetadata.resource, `${PUBLIC_URL}/mcp`)
+    assert.deepEqual(rootMetadata, pathMetadata)
+  } finally {
+    await stop()
+  }
+})
+
+test("authorization-server metadata advertises client_secret_basic supported by the token shim", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const res = await fetch(`${base}/.well-known/oauth-authorization-server`)
+    assert.equal(res.status, 200)
+    const metadata = await res.json() as { token_endpoint_auth_methods_supported: string[] }
+    assert.ok(metadata.token_endpoint_auth_methods_supported.includes("client_secret_basic"))
+  } finally {
+    await stop()
+  }
+})
+
+test("invalid Basic client credentials return 401 and a Basic challenge from /token", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp()
+  try {
+    const client = await register(base, { token_endpoint_auth_method: "client_secret_basic" })
+    const { code, verifier } = await loginForCode(base, pat, client)
+    const res = await fetch(`${base}/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: `Basic ${Buffer.from(`${client.client_id}:wrong`).toString("base64")}`,
+      },
+      body: new URLSearchParams({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    })
+    assert.equal(res.status, 401)
+    assert.equal(((await res.json()) as { error: string }).error, "invalid_client")
+    assert.match(res.headers.get("www-authenticate") ?? "", /^Basic\b/)
   } finally {
     await stop()
   }
@@ -369,12 +573,81 @@ test("a flood of made-up bearers is cut off by the failure limiter, valid PATs a
     const good = freshPat()
     for (let i = 0; i < 60; i++) assert.equal((await initialize(base, good)).status, 200)
     const statuses: number[] = []
-    for (let i = 0; i < 55; i++) statuses.push((await initialize(base, `garbage-${i}`)).status)
+    for (let i = 0; i < 55; i++) statuses.push((await initialize(base, "garbage-pat")).status)
     assert.equal(statuses.filter(status => status === 401).length, 50)
     assert.equal(statuses.at(-1), 429)
   } finally {
     await stop()
   }
+})
+
+test("six OAuth clients behind one IP can each refresh without sharing a limiter bucket", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const users = await Promise.all(Array.from({ length: 6 }, async () => login(base, freshPat())))
+    const responses = await Promise.all(users.flatMap(({ client, tokens }) =>
+      Array.from({ length: 9 }, () => refresh(base, client.client_id, tokens.refresh_token))))
+    assert.ok(responses.every(response => response.status === 200), "refresh limits should be scoped to each OAuth client")
+  } finally {
+    await stop()
+  }
+})
+
+test("600 successful refreshes from one trusted client IP do not hit the per-IP failure ceiling", async () => {
+  const pat = freshPat()
+  const { base, stop } = await startApp(SECRET, undefined, PUBLIC_URL, [], "loopback")
+  try {
+    const { client, tokens } = await login(base, pat)
+    for (let i = 0; i < 600; i++) {
+      const response = await fetch(`${base}/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "203.0.113.11" },
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tokens.refresh_token, client_id: client.client_id }),
+      })
+      assert.equal(response.status, 200, `successful refresh ${i + 1}`)
+    }
+  } finally {
+    await stop()
+  }
+})
+
+test("failed PAT attempts for one caller do not block another valid caller", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    for (let i = 0; i < 51; i++) assert.equal((await initialize(base, "bad-user-a-pat")).status, i < 50 ? 401 : 429)
+    const validPat = freshPat()
+    const response = await initialize(base, validPat)
+    assert.equal(response.status, 200)
+  } finally {
+    await stop()
+  }
+})
+
+test("the per-IP failed-PAT ceiling caps token spraying and returns JSON-RPC", async () => {
+  polarion.reachable = true
+  const { base, stop } = await startApp()
+  try {
+    const cachedPat = freshPat()
+    assert.equal((await initialize(base, cachedPat)).status, 200)
+    let response: Response | undefined
+    for (let i = 0; i < 501; i++) response = await initialize(base, `spray-${i}`)
+    assert.equal(response?.status, 429)
+    const body = (await response?.json()) as { jsonrpc?: string; error?: { code?: number } }
+    assert.equal(body.jsonrpc, "2.0")
+    assert.equal(body.error?.code, -32000)
+    assert.equal((await initialize(base, cachedPat)).status, 200, "a cached valid PAT must bypass both failure limiters")
+  } finally {
+    await stop()
+  }
+})
+
+test("failed-PAT limiter keys contain only an IP and the truncated token hash", () => {
+  const pat = "secret-pat-must-not-appear-in-rate-limit-key"
+  const key = patFailureRateLimitKey("203.0.113.7", pat)
+  assert.match(key, /^203\.0\.113\.7:[a-f0-9]{32}$/)
+  assert.equal(key.includes(pat), false)
 })
 
 test("a valid user with stale session ids is never counted as a failure and never locked out", async () => {
