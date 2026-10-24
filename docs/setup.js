@@ -27,7 +27,10 @@
     code.textContent = client.snippet ?? setup.snippet;
     text('snippet-language', setup.language);
     text('setup-note', [client.note, setup.note].filter(Boolean).join(' '));
-    document.getElementById('setup-source').href = client.source;
+    const source = document.getElementById('setup-source');
+    const sourceUrl = new URL(client.source, location.href);
+    // Only https links may reach the DOM; the manifest is data, not trusted markup.
+    if (sourceUrl.protocol === 'https:') source.href = sourceUrl.href; else source.removeAttribute('href');
     document.querySelectorAll('[data-client]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.client === id)));
     clearTimeout(copyReset);
     copy.textContent = 'Copy snippet';
