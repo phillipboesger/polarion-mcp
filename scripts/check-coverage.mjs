@@ -39,6 +39,7 @@ const targets = [
   'src/composite-jobs.ts',
   'src/composite-trace.ts',
   'src/composite-documents.ts',
+  'src/composite-upload.ts',
   'src/metadata-cache.ts',
 ]
 const sourceFiles = [...files].filter(([file]) => file.startsWith('src/') && file !== 'src/tools.ts')
