@@ -89,7 +89,7 @@ function requiresConfirmation(toolName: string, annotations: import('./types.js'
 }
 
 function actionSummary(toolName: string, args: Record<string, unknown>): string {
-  const safe = JSON.stringify(args, (key, value) => /token|secret|password|authorization|pat/i.test(key) ? '[REDACTED]' : value);
+  const safe = JSON.stringify(args, (key, value) => /^(?:pat|token|secret|password|authorization)$/i.test(key) || /(?:token|secret)$/i.test(key) ? '[REDACTED]' : value);
   return `${toolName} ${safe ?? '{}'}`.slice(0, 800);
 }
 
