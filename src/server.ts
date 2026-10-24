@@ -78,6 +78,7 @@ interface ToolCallPipelineOptions {
   rateLimiter: ToolCallRateLimiter;
   markUntrusted: boolean;
   telemetry: TelemetryHooks;
+  transport: 'stdio' | 'http';
   correlationId?: string;
   server: Server;
   reportProgress?: (progress: { progress: number; total?: number; message?: string }) => Promise<void>;
@@ -155,6 +156,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
           requestBearerToken: bearerToken,
           userScope,
           apiBaseUrl: resolved.apiBaseUrl,
+          transport: options.transport,
           logger: options.logger,
           signal: options.signal ?? new AbortController().signal,
           reportProgress: options.reportProgress ?? (async () => undefined),
@@ -304,6 +306,8 @@ export interface PolarionServerOptions {
   metadataCache?: MetadataCache;
   /** Wrap user-authored Polarion strings in untrusted-content markers. */
   markUntrusted?: boolean;
+  /** Current transport; local file uploads are restricted to stdio. Defaults to HTTP-safe. */
+  transport?: 'stdio' | 'http';
 }
 
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {
@@ -384,6 +388,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
         maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
         logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
         telemetry: options.telemetry ?? NOOP_TELEMETRY,
+        transport: options.transport ?? 'http',
         correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined), server,
         reportProgress: progressToken === undefined ? undefined : async progress => {
           await extra.sendNotification({
@@ -407,7 +412,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    */
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;
-    if (uri.startsWith('polarion://project/')) return await readProjectResource(uri, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, server });
+    if (uri.startsWith('polarion://project/')) return await readProjectResource(uri, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: options.transport ?? 'http', server });
     return await readPolarionResource(request.params.uri);
   });
 
@@ -455,7 +460,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
             : kind === 'statuses' ? { projectId, fieldId, type: context?.arguments?.workItemType ?? '~' }
             : kind === 'enums' ? { projectId, fieldId, type: context?.arguments?.workItemType ?? '~' }
             : { projectId, resourceType: 'workitems' };
-          const result = await callToolPipeline(tool, args, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, server });
+          const result = await callToolPipeline(tool, args, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: options.transport ?? 'http', server });
           const raw = result.structuredContent ?? result.content?.map(item => item.type === 'text' ? item.text : '').join(' ') ?? '';
           let parsed: unknown = raw;
           if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = raw; } }

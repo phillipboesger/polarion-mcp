@@ -8,6 +8,7 @@ export interface VirtualToolContext {
   requestBearerToken?: string;
   userScope?: string;
   apiBaseUrl: string;
+  transport?: 'stdio' | 'http';
   logger: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
   signal: AbortSignal;
   reportProgress(progress: { progress: number; total?: number; message?: string }): Promise<void>;

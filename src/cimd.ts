@@ -1,11 +1,10 @@
 /** SSRF-safe retrieval and bounded caching for OAuth Client ID Metadata Documents. */
 
-import { lookup as dnsLookup } from 'node:dns/promises';
 import type { LookupAddress } from 'node:dns';
 import https from 'node:https';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { LookupFunction } from 'node:net';
-import ipaddr from 'ipaddr.js';
+import { isPublicIpAddress, resolvePublicHost } from './ssrf.js';
 
 const MAX_DOCUMENT_BYTES = 64 * 1024;
 const FETCH_TIMEOUT_MS = 5_000;
@@ -14,12 +13,6 @@ const MAX_CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 500;
 const MAX_IN_FLIGHT_FETCHES = 8;
 const FAILURE_CACHE_TTL_MS = 30 * 1000;
-const EXTRA_DENYLIST_CIDRS: Array<[ipaddr.IPv4 | ipaddr.IPv6, number]> = [
-  '198.18.0.0/15', '192.31.196.0/24', '192.52.193.0/24', '192.175.48.0/24',
-  '192.0.0.0/24', '192.0.2.0/24', '198.51.100.0/24', '203.0.113.0/24', '240.0.0.0/4',
-  '64:ff9b:1::/48', '100::/64', '2001:10::/28', '2001:20::/28', '5f00::/16',
-  '2620:4f:8000::/48', '3fff::/20', '2001:db8::/32',
-].map(cidr => ipaddr.parseCIDR(cidr));
 let activeFetches = 0;
 
 export interface CimdClientMetadata {
@@ -62,24 +55,7 @@ interface CacheEntry {
 
 /** Checks whether an address is safe to connect to as a public Internet host. */
 export function isPublicCimdAddress(address: string): boolean {
-  try {
-    let parsed = ipaddr.parse(address.replace(/^\[|\]$/g, ''));
-    if (parsed.kind() === 'ipv6') {
-      const ipv6 = parsed as ipaddr.IPv6;
-      if (ipv6.isIPv4MappedAddress()) parsed = ipv6.toIPv4Address();
-    }
-    // ipaddr.js uses real byte parsing and marks special-purpose ranges (private,
-    // loopback, link-local, CGNAT, multicast, unspecified and reserved) separately.
-    if (parsed.range() !== 'unicast') return false;
-    return !EXTRA_DENYLIST_CIDRS.some(([network, prefix]) => {
-      if (parsed.kind() !== network.kind()) return false;
-      return parsed.kind() === 'ipv4'
-        ? (parsed as ipaddr.IPv4).match(network as ipaddr.IPv4, prefix)
-        : (parsed as ipaddr.IPv6).match(network as ipaddr.IPv6, prefix);
-    });
-  } catch {
-    return false;
-  }
+  return isPublicIpAddress(address);
 }
 
 /** Validates a CIMD URL before DNS lookup or network access. */
@@ -157,19 +133,17 @@ async function fetchDocument(clientId: string, options: CimdFetchOptions): Promi
   const url = parseClientIdentifierUrl(clientId);
   const timeoutMs = options.testOnlyTimeoutMs ?? FETCH_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
-  const hostname = url.hostname.replace(/^\[|\]$/g, '');
-  const resolved = await withDeadline(
-    ipaddr.isValid(hostname)
-      ? Promise.resolve([{ address: hostname, family: ipaddr.parse(hostname).kind() === 'ipv6' ? 6 : 4 }])
-      : (options.resolver ?? (host => dnsLookup(host, { all: true, verbatim: true })))(hostname),
-    deadline
-  );
-  if (resolved.length === 0) throw new Error('Client identifier hostname resolved to no addresses');
-  for (const entry of resolved) {
-    if (!ipaddr.isValid(entry.address)) throw new Error('Client identifier hostname resolved to an invalid IP address');
-    if (!options.testOnlyAllowPrivateIps && !isPublicCimdAddress(entry.address)) {
-      throw new Error('Client identifier hostname resolved to a non-public address');
+  let resolved: readonly LookupAddress[];
+  try {
+    resolved = await withDeadline(resolvePublicHost(url, options.resolver, options.testOnlyAllowPrivateIps), deadline);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('URL hostname resolved')) {
+      throw new Error(error.message.replace('URL hostname', 'Client identifier hostname'), { cause: error });
     }
+    throw error;
+  }
+  if (!options.testOnlyAllowPrivateIps && resolved.some(entry => !isPublicCimdAddress(entry.address))) {
+    throw new Error('Client identifier hostname resolved to a non-public address');
   }
 
   const response = await requestDocument(url, resolved, deadline, options.testOnlyCa, options.testOnlyConnectPort);

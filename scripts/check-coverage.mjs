@@ -21,6 +21,7 @@ for (const line of report.split(/\r?\n/)) {
 const targets = [
   'src/oauth.ts',
   'src/cimd.ts',
+  'src/ssrf.ts',
   'src/sealed.ts',
   'src/guards.ts',
   'src/tool-filter.ts',
@@ -38,6 +39,7 @@ const targets = [
   'src/composite-jobs.ts',
   'src/composite-trace.ts',
   'src/composite-documents.ts',
+  'src/composite-upload.ts',
   'src/metadata-cache.ts',
 ]
 const sourceFiles = [...files].filter(([file]) => file.startsWith('src/') && file !== 'src/tools.ts')

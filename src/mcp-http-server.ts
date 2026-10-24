@@ -782,7 +782,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, rateLimiter, metadataCache, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
+      const server = createPolarionServer({ transport: 'http', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, rateLimiter, metadataCache, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
