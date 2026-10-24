@@ -25,7 +25,7 @@ const FAST = { minIntervalMs: 0, initialBackoffMs: 0, postMutationDelayMs: 0 }
 
 async function startApp(opts: Record<string, unknown> = {}) {
   const { app, closeAllSessions } = createMcpHttpApp({ publicUrl: new URL("http://127.0.0.1"), tokenSecret: SECRET, validateToken: async () => true, ...opts })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((r) => server.once("listening", () => r()))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   return { base, stop: async () => { await closeAllSessions(); await new Promise<void>((r) => server.close(() => r())) } }

@@ -11,7 +11,7 @@ const LIST = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", param
 
 async function startApp(options: McpHttpAppOptions = {}) {
   const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true, ...options })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const stop = async () => {

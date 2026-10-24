@@ -22,7 +22,7 @@ test("REST wrapper hides internal errors, redacts logged credentials, and rate l
     rateLimit: { windowMs: 60_000, limit: 1 },
     executeTool: async () => { throw new Error("secret Authorization: Bearer leaked-token") },
   })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>(resolve => server.once("listening", resolve))
   try {
     const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -83,7 +83,7 @@ test("built REST wrapper listens when invoked as http-server.js and copied index
 
 test("REST wrapper only sends CORS headers to configured origins", async () => {
   const app = createHttpApp({ apiKey: "test-key", env: { HTTP_CORS_ORIGINS: "https://allowed.example" }, port: 3000 })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>(resolve => server.once("listening", resolve))
   try {
     const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/health`
@@ -102,7 +102,7 @@ test("REST wrapper returns a truncated tool result as parseable JSON text", asyn
     port: 3000,
     executeTool: async () => ({ content: [{ type: "text", text: JSON.stringify(envelope) }] }),
   })
-  const server = app.listen(0)
+  const server = app.listen(0, "127.0.0.1")
   await new Promise<void>(resolve => server.once("listening", resolve))
   try {
     const toolName = enabledTools.keys().next().value as string
