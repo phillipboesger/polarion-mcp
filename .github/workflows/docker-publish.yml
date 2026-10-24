@@ -51,7 +51,7 @@ jobs:
           image: tonistiigi/binfmt:qemu-v7.0.0-28
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Smoke-test the image before anything is pushed (amd64, loaded locally).
       - name: Build image for the smoke test
