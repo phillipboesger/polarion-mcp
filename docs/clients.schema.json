@@ -171,6 +171,27 @@
           }
         }
       }
+    },
+    "faqMore": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "q",
+          "a"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1
+          },
+          "a": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -320,7 +341,7 @@
             "minLength": 1
           },
           "minItems": 2,
-          "maxItems": 4
+          "maxItems": 6
         },
         "sources": {
           "type": "array",

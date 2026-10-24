@@ -27,7 +27,7 @@
     const connection = client.connections[mode];
     const setup = data.setups.find(setup => setup.id === connection.setup);
     selectedClient = id;
-    text('setup-kind', `${data.serverModes.find(item => item.id === mode).label} · ${setup.kind}`);
+    text('setup-kind', data.serverModes.find(item => item.id === mode).label);
     text('setup-title', client.name);
     select.value = id;
     text('setup-compatibility', `${client.name} · ${setup.title}`);
@@ -53,12 +53,9 @@
       return details;
     }));
     const needs = connection.needs || [];
-    document.getElementById('setup-steps').replaceChildren(...needs.map(need => {
-      const item = document.createElement('li');
-      item.className = 'need';
-      item.textContent = `You need: ${need}`;
-      return item;
-    }), ...connection.steps.map(step => {
+    document.getElementById('setup-needs').hidden = !needs.length;
+    text('setup-needs', `Needs: ${needs.join(' · ')}`);
+    document.getElementById('setup-steps').replaceChildren(...connection.steps.map(step => {
       const item = document.createElement('li');
       item.textContent = step;
       return item;

@@ -61,7 +61,8 @@ test('every client shows its default, disabled reasons and every supported serve
       await expect(input).toBeChecked();
       const setup = manifest.setups.find(setup => setup.id === connection.setup);
       await expect(page.locator('#setup-code')).toHaveText(connection.snippet ?? setup.snippet);
-      await expect(page.locator('#setup-steps li')).toHaveText([...(connection.needs ?? []).map(need => `You need: ${need}`), ...connection.steps]);
+      await expect(page.locator('#setup-steps li')).toHaveText(connection.steps);
+      if (connection.needs?.length) await expect(page.locator('#setup-needs')).toHaveText(`Needs: ${connection.needs.join(' · ')}`);
       if (connection.serverSetup) {
         const server = manifest.setups.find(setup => setup.id === connection.serverSetup);
         await expect(page.locator('#server-command')).toBeVisible();
@@ -171,8 +172,9 @@ test('every setup shows prerequisites, a check and a fix for failures', async ({
       await expect(page.locator('#before-items details').first()).toBeAttached();
       await expect(page.locator('#setup-verify')).toBeVisible();
       await expect(page.locator('#verify-expect')).not.toBeEmpty();
-      await expect(page.locator('#setup-fails dt').first()).toBeVisible();
-      await expect(page.locator('#setup-steps li')).toHaveCount(connection.steps.length + (connection.needs?.length ?? 0));
+      await expect(page.locator('#setup-fails summary')).toBeVisible();
+      await expect(page.locator('#setup-fails dt').first()).toBeAttached();
+      await expect(page.locator('#setup-steps li')).toHaveCount(connection.steps.length);
     }
   }
   await noOverflow(page);
