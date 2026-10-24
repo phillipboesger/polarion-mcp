@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { AxiosError } from "axios"
-import { extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, redact, sanitizeInputSchema } from "../src/utils.js"
+import { compileZodSchema, extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, redact, sanitizeInputSchema } from "../src/utils.js"
 import { toolDefinitionMap } from "../src/tools.js"
 
 test("redact removes authorization credentials and query API keys", () => {
@@ -297,4 +297,11 @@ test("getZodSchemaFromJsonSchema lets null clear a field on a JSON:API update (v
   // Only attributes are widened: a null path/query argument is still refused.
   assert.throws(() => schema.parse({ page_size_: null }))
   assert.throws(() => schema.parse({ requestBody: { data: { type: null } } }))
+})
+
+test("compiled constrained arrays reject oversized input before accumulating item errors", () => {
+  const schema = compileZodSchema({ type: "array", maxItems: 8, items: { type: "string" } })
+  const oversizedInput = Array.from({ length: 250_000 }, () => 0)
+
+  assert.throws(() => schema.parse(oversizedInput))
 })
