@@ -534,8 +534,8 @@ function summarizeMultipartForPreview(requestBody: unknown): unknown {
  */
 function issueBranch(issue: ZodIssue): ZodIssue | undefined {
   if (issue.code !== 'invalid_union') return undefined;
-  const last = issue.unionErrors.at(-1)?.issues[0];
-  return last?.code === 'invalid_type' && last.expected === 'null' ? issue.unionErrors[0]?.issues[0] : undefined;
+  const last = issue.errors.at(-1)?.[0];
+  return last?.code === 'invalid_type' && last.expected === 'null' ? issue.errors[0]?.[0] : undefined;
 }
 const issueCode = (issue: ZodIssue): string => issueBranch(issue)?.code ?? issue.code;
 const issueMessage = (issue: ZodIssue): string => issueBranch(issue)?.message ?? issue.message;
@@ -628,11 +628,11 @@ export async function executeApiTool(
     let validatedArgs: JsonObject;
     try {
       const zodSchema = getZodSchemaFromJsonSchema(definition.inputSchema, toolName);
-      validatedArgs = zodSchema.parse(argsForValidation);
+      validatedArgs = zodSchema.parse(argsForValidation) as JsonObject;
     } catch (error: unknown) {
       if (error instanceof ZodError) {
         // Format Zod validation errors for readability
-        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.errors.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${issueCode(e)}): ${issueMessage(e)}`).join(', ')}`;
+        const validationErrorMessage = `Invalid arguments for tool '${toolName}': ${error.issues.map(e => `${[typeof e.path[0] === 'string' ? advertisedName(e.path[0]) : e.path[0], ...e.path.slice(1)].join('.')} (${issueCode(e)}): ${issueMessage(e)}`).join(', ')}`;
         return { content: [{ type: 'text', text: validationErrorMessage }], isError: true };
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error);
