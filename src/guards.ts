@@ -137,6 +137,8 @@ export interface WorkItemEnumCheckTarget {
   attributes: Record<string, unknown>;
   /** JSON:API relationships object, if the write includes one -- consumed by checkWorkItemUserReferences. */
   relationships?: Record<string, unknown>;
+  /** Refuses writes whose global bulk-update id lacks the required project prefix. */
+  unresolvedReason?: string;
 }
 
 async function fetchOptions(
@@ -145,7 +147,7 @@ async function fetchOptions(
   requestContext: EnumGuardRequestContext,
   sendOpts: SendWithRetryOpts,
   cacheTtlMs: number
-): Promise<{ options: Set<string> } | { error: string }> {
+): Promise<{ options: Set<string>; capped?: boolean } | { error: string }> {
   const scope = target.workItemId ? `${target.projectId}/${target.workItemId}` : `${target.projectId}::type=${target.type}`;
   const cacheKey = `${callerCacheScope()}::${requestContext.baseUrl}::${scope}::${field}`;
   const cached = _optionsCache.get(cacheKey);
@@ -172,9 +174,15 @@ async function fetchOptions(
     // Options are paged; a value on a later page must not be refused.
     const options = new Set<string>();
     for (let page = 1; page <= MAX_OPTION_PAGES; page++) {
-      const response = await sendWithRetry({ ...config, params: { ...config.params, 'page[number]': page } }, sendOpts);
+      const response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
       for (const id of extractOptionIds(response.data)) options.add(id);
-      if (!(response.data as { links?: { next?: unknown } } | undefined)?.links?.next) break;
+      const hasNext = !!(response.data as { links?: { next?: unknown } } | undefined)?.links?.next;
+      if (!hasNext) break;
+      if (page === MAX_OPTION_PAGES) {
+        // The lookup is incomplete; warn and fail open for this field rather than reject a valid option beyond the safety cap.
+        console.warn(`[WARN] Enum options for '${field}' exceeded the ${MAX_OPTION_PAGES}-page lookup cap; skipping validation for this field.`);
+        return { options, capped: true };
+      }
     }
     cacheSet(_optionsCache, cacheKey, { options, expiresAt: Date.now() + cacheTtlMs });
     return { options };
@@ -191,6 +199,7 @@ async function checkOneTarget(
   cacheTtlMs: number
 ): Promise<EnumGuardResult> {
   const scopeLabel = target.workItemId ? `Work Item ${target.projectId}/${target.workItemId}` : `a new '${target.type}' Work Item in ${target.projectId}`;
+  if (target.unresolvedReason) return { ok: false, reason: target.unresolvedReason };
 
   for (const field of STANDARD_WORK_ITEM_ENUM_FIELDS) {
     const value = target.attributes[field];
@@ -206,6 +215,8 @@ async function checkOneTarget(
           `Retry once Polarion is reachable, or omit '${field}' from this write.`,
       };
     }
+
+    if (result.capped) continue;
 
     if (!result.options.has(value)) {
       const optionList = result.options.size > 0 ? [...result.options].join(', ') : '(none returned -- this field may not be a validated enumeration)';

@@ -1,6 +1,9 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { toolDefinitionMap } from "../src/tools.js"
+import { enabledTools } from "../src/tool-filter.js"
+import { executeApiTool } from "../src/executor.js"
+import type { McpToolDefinition } from "../src/types.js"
 
 // Generated OpenAPI summaries that don't tell an agent what the tool is for.
 // scripts/lib/tool-guidance.mjs replaces them; a regeneration must not bring them back.
@@ -45,6 +48,49 @@ test("relationshipId is described as a relationship name on every relationship t
     const property = (tool.inputSchema.properties as Record<string, { description?: string }>).relationshipId
     assert.match(property.description ?? "", /relationship's name/, tool.name)
   }
+})
+
+test("effect wording never contradicts corrected tool annotations", () => {
+  const conflicts = [...enabledTools.values()].flatMap(tool => {
+    const text = tool.description.toLowerCase()
+    const a = tool.annotations
+    const bad: string[] = []
+    if (a?.destructiveHint && !text.includes("irreversible")) bad.push("missing destructive warning")
+    if (!a?.destructiveHint && text.includes("irreversible")) bad.push("claims destructive while annotation is false")
+    if (a?.idempotentHint && (text.includes("not guaranteed idempotent") || text.includes("not idempotent"))) bad.push("claims non-idempotent")
+    if (a?.idempotentHint === false && text.includes("effect: idempotent")) bad.push("claims idempotent")
+    return bad.map(reason => `${tool.name}: ${reason}`)
+  })
+  assert.deepEqual(conflicts, [])
+})
+
+test("dry_run tip matches a real executor preview", async () => {
+  const definition: McpToolDefinition = {
+    name: "create_fixture", description: "Create fixture", method: "post", pathTemplate: "/things",
+    executionParameters: [], requestBodyContentType: "application/json", securityRequirements: [],
+    inputSchema: { type: "object", properties: { requestBody: { type: "object" } }, required: ["requestBody"] },
+    outputSchema: { type: "object", properties: {} },
+  }
+  const result = await executeApiTool("create_fixture", definition, { requestBody: { title: "preview" }, dry_run: true }, {}, { httpClient: async () => { throw new Error("dry run must not send") }, minIntervalMs: 0 })
+  assert.equal(result.isError, undefined)
+  assert.equal((result.structuredContent as { dry_run: boolean }).dry_run, true)
+  const tips = [...toolDefinitionMap.values()].filter(tool => tool.inputSchema.properties?.dry_run).map(tool => tool.description)
+  assert.ok(tips.length > 0)
+  for (const tip of tips) {
+    assert.match(tip, /preview/i)
+    assert.doesNotMatch(tip, /error-flagged|isError/i)
+  }
+})
+
+test("targetType and attachment descriptions match the executor's request shapes", () => {
+  const targetType = [...toolDefinitionMap.values()].find(tool => tool.inputSchema.properties?.targetType)?.inputSchema.properties?.targetType as { description?: string }
+  assert.match(targetType.description ?? "", /requirement/)
+  assert.doesNotMatch(targetType.description ?? "", /workitem/)
+  const upload = toolDefinitionMap.get("postWorkItemAttachments")
+  assert.ok(upload)
+  assert.match(upload.description, /same array index/)
+  assert.doesNotMatch(upload.description, /via each entry's `lid`|same order/)
+  assert.doesNotMatch([...toolDefinitionMap.values()].map(tool => tool.description).join("\n"), /creates a duplicate/i)
 })
 
 test("the Custom GPT spec stays within GPT Action limits: at most 30 operations, descriptions of at most 300 characters", async () => {

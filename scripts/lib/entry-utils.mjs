@@ -112,6 +112,15 @@ export function annotationsForMethod(method) {
   }
 }
 
+/** Correct method defaults using the operation's known structural semantics. */
+export function correctedAnnotations(method, annotations, { name = '', pathTemplate = '', hasWorkflowAction = false } = {}) {
+  const corrected = { ...annotations };
+  if (method.toLowerCase() === 'patch' && hasWorkflowAction) corrected.idempotentHint = false;
+  if (method.toLowerCase() === 'patch' && /\/relationships\/\{relationshipId\}$/.test(pathTemplate)) corrected.destructiveHint = true;
+  if (new Set(['overwriteDocumentParts', 'mergeDocumentToMaster', 'mergeDocumentFromMaster', 'setLicense', 'moveProjectAction']).has(name)) corrected.destructiveHint = true;
+  return corrected;
+}
+
 /**
  * Finds a tool entry's `inputSchema: {...}` field, JSON-parses it, lets
  * `transform` mutate (or reject) it, and writes it back into the entry text
@@ -208,7 +217,7 @@ export const PARAM_DESCRIPTIONS = {
   pageName: "The Rich Page's ID/name within its space — its stable identifier, not its display title.",
   relationshipId: "The relationship's name as it appears under `relationships` in the owning resource (e.g. `assignee`, `author`, `watches`, `linkedWorkItems`), not an ID of an individual link entry.",
   fieldId: "The ID of an enumeration-typed field (e.g. `status`, `severity`, `priority`, or a custom enum field ID), not its display label. Use the matching getFieldsMetadataFor* tool to discover field IDs.",
-  targetType: "Identifies the target resource type this operation applies to (e.g. `workitem`). Use `~` (no quotes) to mean no specific target type.",
+  targetType: "The configured subtype for this enumeration or custom field (e.g. `requirement` for a Work Item type). Use `~` (without quotes) when the configuration applies to every subtype.",
   iconId: "The icon's ID, as returned by the corresponding icon-listing endpoint (getDefaultIcons/getGlobalIcons/getProjectIcons).",
   jobId: "The asynchronous job's ID, returned when the triggering call responds with a `jobs` resource. Poll getJob with this ID to check completion status.",
   templates: "If true, only return template resources; if false or omitted, return only actual (non-template) instances.",
@@ -265,7 +274,7 @@ export function effectNoteForAnnotations(method, annotations, context = {}) {
     if (pathTemplate.includes('/actions/')) {
       return 'Effect: triggers a server-side action rather than a plain resource creation — whether repeating it is safe, a no-op, or rejected depends on the specific action; treat it as not guaranteed idempotent.';
     }
-    return 'Effect: creates a new resource on each call — calling it again with the same input creates a duplicate; it is not idempotent.';
+    return 'Effect: creates a new resource. Repeating this call may create additional resources; it is not guaranteed idempotent.';
   }
   return null;
 }
