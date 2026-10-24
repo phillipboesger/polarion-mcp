@@ -21,7 +21,7 @@ test('hero breathes and the landing page follows the complete user journey', asy
   await page.goto('/');
   await page.evaluate(() => globalThis.document.fonts.ready);
   await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
-  for (const text of ['284', 'Preview', 'Open source', 'Signed']) await expect(page.locator('.proof').getByText(text, { exact: false })).toBeInViewport();
+  for (const text of ['284', 'Preview', 'Open source', 'Release', 'Stars']) await expect(page.locator('.proof').getByText(text, { exact: false })).toBeInViewport();
   await expect(page.locator('.hero .outcomes')).toHaveCount(0);
   await expect(page.locator('.hero .button')).toHaveCount(2);
   await expect(page.locator('body')).not.toContainText(/unverified|Web connector/i);
