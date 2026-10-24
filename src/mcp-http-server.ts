@@ -58,7 +58,7 @@ import { ToolCallRateLimiter } from './tool-rate-limit.js';
 import { MetadataCache } from './metadata-cache.js';
 export { parseTrustProxy } from './utils.js';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const MCP_PATH = '/mcp';
 const DEFAULT_ALLOWED_ORIGINS = ['https://claude.ai', 'https://chatgpt.com', 'https://chat.openai.com'];

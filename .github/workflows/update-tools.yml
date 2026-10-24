@@ -27,7 +27,7 @@ jobs:
       tools: ${{ steps.count.outputs.tools }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -70,10 +70,10 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Take the regenerated file
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: tools-ts
           path: src

@@ -9,6 +9,13 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # Stay on the Node 22 type definitions that match "engines".
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # 2.x replaces the module API; migrate deliberately, not through a bump.
+      - dependency-name: "pdf-parse"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
   - package-ecosystem: github-actions
     directory: "/"

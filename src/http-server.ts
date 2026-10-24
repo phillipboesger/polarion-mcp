@@ -162,7 +162,7 @@ return app;
  * Start the server
  */
 function startHttpServer(env: NodeJS.ProcessEnv): void {
-dotenv.config();
+dotenv.config({ quiet: true });
 const PORT = env.PORT || env.HTTP_PORT || 3000;
 const HTTP_API_KEY = env.HTTP_API_KEY;
 if (!HTTP_API_KEY) throw new Error('HTTP_API_KEY is required');
