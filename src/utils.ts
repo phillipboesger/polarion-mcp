@@ -29,6 +29,15 @@ import type { NameMap } from './types.js';
 const INPUT_KEY_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
 
 /** Removes credentials from error text before it reaches logs. */
+/**
+ * @param value - Any value that may carry caller-controlled text.
+ * @returns A single-line string safe to write to a log: line breaks and other
+ *   control characters (which could forge log entries) become spaces.
+ */
+export function logSafe(value: unknown): string {
+  return String(value).replace(/\p{Cc}+/gu, ' ');
+}
+
 export function redact(value: string): string {
   return value
     .replace(/\b(Bearer|Basic)\s+[^\s"'&,;]+/ig, '$1 [REDACTED]')
@@ -245,7 +254,8 @@ function decodeBufferBody(data: unknown): unknown {
  *   case-insensitively (RFC 7235) and spaces or tabs may separate it.
  */
 export function bearerCredential(header: string | undefined): string | undefined {
-  const value = /^Bearer[ \t]+(.+)$/i.exec(header ?? '')?.[1]?.trim();
+  const prefix = /^Bearer[ \t]+/i.exec(header ?? '');
+  const value = prefix ? header!.slice(prefix[0].length).trim() : '';
   return value || undefined;
 }
 
@@ -454,7 +464,7 @@ export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z
     return compileZodSchema(jsonSchema);
   } catch (err: any) {
     // A test compiles every generated tool, so this only guards hand-written definitions.
-    console.error(`Failed to generate/evaluate Zod schema for '${toolName}':`, err);
+    console.error("Failed to generate/evaluate Zod schema for '%s':", logSafe(toolName), err);
     return z.object({}).passthrough();
   }
 }

@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { AxiosError } from "axios"
-import { compileZodSchema, extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, readArg, redact, sanitizeInputSchema } from "../src/utils.js"
+import { compileZodSchema, extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, bearerCredential, logSafe, readArg, redact, sanitizeInputSchema } from "../src/utils.js"
 import { toolDefinitionMap } from "../src/tools.js"
 
 test("redact removes authorization credentials and query API keys", () => {
@@ -304,4 +304,19 @@ test("compiled constrained arrays reject oversized input before accumulating ite
   const oversizedInput = Array.from({ length: 250_000 }, () => 0)
 
   assert.throws(() => schema.parse(oversizedInput))
+})
+
+test("logSafe turns line breaks and control characters into spaces so input cannot forge log lines", () => {
+  assert.equal(logSafe("a\n[ERROR] forged\r\nb\u0000c"), "a [ERROR] forged b c")
+  assert.equal(logSafe(42), "42")
+})
+
+test("bearerCredential reads the token and stays linear on long whitespace runs", () => {
+  assert.equal(bearerCredential("Bearer \t abc "), "abc")
+  assert.equal(bearerCredential("bearer abc"), "abc")
+  assert.equal(bearerCredential("Basic abc"), undefined)
+  assert.equal(bearerCredential("Bearer   "), undefined)
+  const started = Date.now()
+  assert.equal(bearerCredential(`bearer\t${"\t".repeat(200000)}`), undefined)
+  assert.ok(Date.now() - started < 1000)
 })

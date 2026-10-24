@@ -96,7 +96,7 @@ export async function acquireOAuth2Token(schemeName: string, scheme: any): Promi
       formData.append('scope', scopes);
     }
 
-    console.error(`[INFO] Requesting OAuth2 token from ${tokenUrl}`);
+    console.error(`[INFO] Requesting OAuth2 token for '${schemeName}'`);
 
     // Make the token request
     // Authentication uses Basic Auth with client credentials
