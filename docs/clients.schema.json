@@ -126,6 +126,48 @@
           "description": {
             "type": "string",
             "minLength": 1
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "title",
+                "how"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "how": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "faq": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "q",
+          "a"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1
+          },
+          "a": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -352,6 +394,13 @@
               "$ref": "#/$defs/connection"
             }
           }
+        },
+        "unverified": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -389,7 +438,7 @@
                 "minLength": 1
               },
               "minItems": 2,
-              "maxItems": 4
+              "maxItems": 20
             },
             "snippet": {
               "type": "string",
@@ -405,6 +454,60 @@
             "description": {
               "type": "string",
               "minLength": 1
+            },
+            "language": {
+              "type": "string",
+              "minLength": 1
+            },
+            "needs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "verify": {
+              "type": "object",
+              "required": [
+                "prompt",
+                "expect"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "prompt": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "expect": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "fails": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "symptom",
+                  "fix"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "symptom": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fix": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "teamNote": {
+              "type": "string"
             }
           }
         }

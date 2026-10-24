@@ -125,36 +125,133 @@ Keep credentials out of Git. There is no public Polarion relay. Finish with a re
 
 ## FAQ
 
+<!-- faq:start -->
 <details><summary>Which setup do I need?</summary>
 
-Start with npx for a local desktop or coding client. Use Docker to host a server, or Remote URL if your team already runs one. claude.ai and ChatGPT’s hosted connector path need HTTPS and OAuth. Custom GPT Actions uses the REST wrapper. The picker shows supported choices per client.
+For a desktop or coding client, start with npm / npx: your client launches the server and holds the Polarion URL and token in private settings. To share one server with a team, use Docker. For claude.ai or a ChatGPT connector you need the public HTTPS address of a server with OAuth login; if your team already runs one, pick Remote URL. Custom GPT Actions use the separate REST wrapper.
+
+</details>
+<details><summary>How do I create a Polarion personal access token (PAT)?</summary>
+
+Log in to Polarion, open your user page and click Personal Access Token (direct link: `https://YOUR-POLARION/polarion/#/user_tokens?id=YOUR_USERNAME`). Enter a name and an expiry date, click Create Token and copy the token at once: Polarion shows it only once. If the page says `X-Rest-Token generation is not allowed on the server`, your Polarion administrator must set `com.siemens.polarion.rest.enabled=true` and `com.siemens.polarion.rest.security.restApiToken.enabled=true` in polarion.properties and restart Polarion. The message to forward is in Before you start.
+
+</details>
+<details><summary>What does Bearer mean in an Authorization header?</summary>
+
+It is just the word Bearer, one space, then your token: `Bearer YOUR_POLARION_PAT`. Without the word Bearer the server answers 401.
+
+</details>
+<details><summary>Where do I keep my token safely?</summary>
+
+In your personal client settings or an environment variable, never in a file inside a shared project or repository. Anyone who can read the file can act as you in Polarion. With the OAuth connectors you type the token only on the server's login page and the AI client never stores it.
 
 </details>
 <details><summary>Is my data safe? Which permissions apply?</summary>
 
-Polarion enforces the token owner’s permissions. Stdio uses the configured PAT; remote MCP uses each caller’s PAT directly or through OAuth login. REST calls use the deployment PAT. Results go back to your AI client, so provider data policies and your organization’s rules apply. Use HTTPS remotely and grant only the access you need.
+Polarion enforces the token owner's permissions. Local stdio uses your configured token; remote MCP uses each caller's own token, directly or through the server's OAuth login, and the server stores no credentials. The REST wrapper is different: all callers share one deployment token. Tool results go to your AI client, so your provider's data handling and your organization's policies still apply.
 
 </details>
-<details><summary>Can I use read-only mode?</summary>
+<details><summary>Can I limit the server to read-only?</summary>
 
-Set `MCP_READ_ONLY=1` in the server environment and restart or reconnect. Only read-only tools are exposed and writes are blocked. In a write-enabled session, `dry_run: true` previews a mutating REST request without saving it.
+Yes. Set `MCP_READ_ONLY=1` in the server environment and restart or reconnect. It exposes only tools marked read-only and blocks writes. In write-enabled sessions, mutating tools offer a preview (`dry_run: true`) that shows the request without saving it.
 
 </details>
 <details><summary>Which Polarion versions work?</summary>
 
-Live integration tests have passed on **Polarion 2506 and 2606**. Generated tools do not guarantee identical coverage on every version. REST enablement, available endpoints and permissions affect behavior; verify the operations you rely on. See [version support](docs/polarion-versioning.md).
+Live integration tests have passed on Polarion 2506 and 2606. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
 
 </details>
 <details><summary>Which AI clients can I use?</summary>
 
-Use any compatible MCP stdio or Streamable HTTP client, or the separate REST/OpenAPI wrapper. The picker includes major assistants, IDEs and a generic provider entry. Account permissions and tool budgets vary; restrict the exposed toolset when needed.
+Any client that supports MCP over stdio or Streamable HTTP. The setup guide above lists the tested paths for Claude, ChatGPT and Codex, Copilot Studio, VS Code, Gemini, Cursor, Windsurf and JetBrains. Other clients can use the generic stdio or HTTP entries, or the REST wrapper.
 
 </details>
-<details><summary>How do I update?</summary>
+<details><summary>It says 401 "Polarion did not accept this token".</summary>
 
-For local npx, refresh the package and reconnect. Use `npx -y polarion-mcp@latest` through your client, or pin a release for predictable updates. For Docker, pull your chosen release tag and recreate the container with the same configuration and stable OAuth secret. A team server’s administrator updates it; clients refresh the tool list or reconnect. OpenAPI regeneration is a maintainer task.
+Polarion does not know the token. It was copied with a line break or space, has expired or was revoked, or the REST address points to another Polarion. Run the curl test from Before you start, and create a new token if needed.
 
 </details>
+<details><summary>It says 403 "Polarion denied access".</summary>
+
+Polarion knows the token but refuses it, so a new token will not help. Check in this order: the REST API is enabled (`com.siemens.polarion.rest.enabled=true`, then restart); your user has a license and read access to at least one project; no proxy, firewall or single sign-on in front of Polarion blocks `/polarion/rest` or the Authorization header. A bare 403 without Polarion's message in `docker logs` usually comes from such a proxy.
+
+</details>
+<details><summary>It says 503 "Polarion could not be reached".</summary>
+
+The server got no usable answer from Polarion. Read the log line `Polarion token check failed` (`docker logs polarion-mcp`). Usual causes: the address does not end in `/polarion/rest/v1`, a firewall between server and Polarion, Polarion is down, `localhost` was used inside Docker, or a certificate error. Run the curl test on the machine that hosts the server, not on your laptop.
+
+</details>
+<details><summary>My AI client says "Disconnected" or "Failed to connect".</summary>
+
+npm mode: run `npx -y polarion-mcp` in a terminal with the same values to see the real error. The usual causes are Node.js older than 22, a client that cannot find `npx` (see the Windows question), or a typo in the JSON file; restart the client completely after fixing it. Docker or remote: open `https://YOUR-SERVER/health` in a browser first, then run the initialize curl from Before you start, then read `docker logs polarion-mcp`.
+
+</details>
+<details><summary>The connector login in claude.ai or ChatGPT fails or loops.</summary>
+
+Check in this order: `MCP_PUBLIC_URL` is exactly your public https address without a path; the browser shows a padlock; your proxy forwards everything (a plain Caddy `reverse_proxy` does); the callback of your client is allowed (`MCP_ALLOWED_REDIRECT_PRESETS=claude`, or the exact ChatGPT callback in `MCP_ALLOWED_REDIRECT_PREFIXES`; the server log says `redirect_uri rejected` otherwise); `MCP_TOKEN_SECRET` did not change between restarts. After changing `MCP_PUBLIC_URL` everyone has to sign in again.
+
+</details>
+<details><summary>Can claude.ai or ChatGPT connect to a server on my own laptop?</summary>
+
+No. These connectors connect from the provider's cloud, so the address must be reachable on the public internet with HTTPS. On your own computer use the npm mode in Claude Desktop, Claude Code or Codex instead. Desktop and command-line tools such as VS Code, Cursor, Windsurf and Gemini CLI can use `http://localhost:3000/mcp`.
+
+</details>
+<details><summary>What is the difference between the ChatGPT connector and a Custom GPT?</summary>
+
+The ChatGPT connector speaks MCP and everyone signs in with their own Polarion token. A Custom GPT uses the separate REST wrapper with one shared key (`HTTP_API_KEY`), so every call runs as the one Polarion user whose token the wrapper holds.
+
+</details>
+<details><summary>Certificate errors: the public HTTPS address does not work.</summary>
+
+DNS must point to the server, ports 80 and 443 must be reachable from the internet and no other program may use them. Caddy's log (`journalctl -u caddy`, or the terminal) says why the certificate failed. Never switch certificate checking off for the public side.
+
+</details>
+<details><summary>My Polarion uses a company or self-signed certificate.</summary>
+
+Give Node your company root certificate as a PEM file with `NODE_EXTRA_CA_CERTS=/path/ca.pem`. npm mode: add `"NODE_EXTRA_CA_CERTS": "/path/ca.pem"` to the `env` block of the client config. Docker: `-v /path/ca.pem:/certs/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/ca.pem`. As a last resort on a trusted internal network, `NODE_TLS_REJECT_UNAUTHORIZED=0` works but turns off all certificate checks.
+
+</details>
+<details><summary>Should I use polarion-mcp@latest or a pinned version?</summary>
+
+The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.0` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client.
+
+</details>
+<details><summary>How do I update the Docker server?</summary>
+
+Choose the new tag on the GitHub package page, then run `docker pull ghcr.io/phillipboesger/polarion-mcp:NEWTAG`, `docker rm -f polarion-mcp`, and the same `docker run` command with the new tag. Keep `MCP_TOKEN_SECRET` unchanged so users stay signed in. With a team URL the administrator updates the server and you only reconnect.
+
+</details>
+<details><summary>It says "Unsupported engine" or the Node version is too old.</summary>
+
+The package needs Node.js 22 or newer: `node -v` must print v22 or higher. Install the LTS from nodejs.org and open a new terminal; with nvm run `nvm install 22 && nvm use 22`. Desktop apps can use a different Node than your terminal, so install Node system-wide and fully restart the app. Docker avoids this because the image bundles Node 22.
+
+</details>
+<details><summary>Windows: the client cannot start npx.</summary>
+
+Typical symptoms are `spawn npx ENOENT` or a server that never starts. Use `cmd` as the command with the arguments `/c`, `npx`, `-y`, `polarion-mcp`, because npx is `npx.cmd` on Windows. Backslashes in JSON paths must be doubled (`C:\\path\\ca.pem`). Restart the app completely after every change.
+
+</details>
+<details><summary>Port 3000 is already in use.</summary>
+
+Change only the left number of the port mapping: `-p 127.0.0.1:3100:3000`, then use `http://localhost:3100/mcp` and set `MCP_ALLOWED_HOSTS=localhost:3100,127.0.0.1:3100`. Remove an old container with `docker rm -f polarion-mcp`. On macOS and Linux `lsof -i :3000` shows who uses the port; on Windows use `netstat -ano | findstr :3000`.
+
+</details>
+<details><summary>It says 429 "Too many requests".</summary>
+
+The server limits requests per address. Behind a proxy set `TRUST_PROXY=1`, otherwise all users share one counter, then wait 15 minutes for the window to reset. The REST wrapper has a fixed limit per 15 minutes.
+
+</details>
+<details><summary>Gemini CLI says it was replaced. Which tool should I use?</summary>
+
+Google's page says Gemini CLI was replaced by Antigravity CLI on 18 June 2026 for no-cost-tier and Google One users. If your Gemini CLI still runs, for example with an API key or a company license, the steps in this guide work. Antigravity CLI has its own setup that this guide does not cover yet.
+
+</details>
+<details><summary>Windsurf now says Devin. Which steps do I follow?</summary>
+
+The vendor docs moved to docs.devin.ai and describe this configuration only for the legacy Cascade agent. If your tab uses the Devin Local agent, MCP servers are set up in Devin CLI config files, which this guide does not cover yet.
+
+</details>
+<!-- faq:end -->
 
 ## Feedback and community
 

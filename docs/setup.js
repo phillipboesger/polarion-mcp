@@ -11,6 +11,15 @@
   let selectedClient = data.clients[0].id;
   select.replaceChildren(...data.clients.map(client => new Option(client.name, client.id)));
 
+  // "how" texts may contain ```fenced``` blocks; everything is written with textContent only.
+  function richText(container, value) {
+    container.replaceChildren(...value.split(/```(?:\w+)?\n?/).map((part, i) => {
+      const node = document.createElement(i % 2 ? 'pre' : 'p');
+      if (i % 2) { const codeEl = document.createElement('code'); codeEl.textContent = part.trim(); node.append(codeEl); node.tabIndex = 0; }
+      else node.textContent = part.trim();
+      return node;
+    }).filter(node => node.textContent));
+  }
   function show(id, navigate = false, requestedMode) {
     const client = data.clients.find(client => client.id === id);
     if (!client) return;
@@ -31,13 +40,44 @@
       text(`description-${input.value}`, client.connections[input.value].description || data.serverModes.find(mode => mode.id === input.value).description);
       text(`reason-${input.value}`, reason || (input.value === client.defaultMode ? 'Recommended for this client' : 'Supported'));
     });
-    document.getElementById('setup-steps').replaceChildren(...connection.steps.map(step => {
+    const before = data.serverModes.find(item => item.id === mode).before || [];
+    document.getElementById('setup-before').hidden = !before.length;
+    text('before-title', `Before you start (${data.serverModes.find(item => item.id === mode).label})`);
+    document.getElementById('before-items').replaceChildren(...before.map(entry => {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = entry.title;
+      const body = document.createElement('div');
+      richText(body, entry.how);
+      details.append(summary, body);
+      return details;
+    }));
+    const needs = connection.needs || [];
+    document.getElementById('setup-steps').replaceChildren(...needs.map(need => {
+      const item = document.createElement('li');
+      item.className = 'need';
+      item.textContent = `You need: ${need}`;
+      return item;
+    }), ...connection.steps.map(step => {
       const item = document.createElement('li');
       item.textContent = step;
       return item;
     }));
+    const verify = connection.verify;
+    document.getElementById('setup-verify').hidden = !verify;
+    text('verify-prompt', verify ? `Ask: \u201c${verify.prompt}\u201d` : '');
+    text('verify-expect', verify ? verify.expect : '');
+    const fails = connection.fails || [];
+    document.getElementById('setup-fails').hidden = !fails.length;
+    document.getElementById('fails-list').replaceChildren(...fails.flatMap(fail => {
+      const term = document.createElement('dt');
+      const detail = document.createElement('dd');
+      term.textContent = fail.symptom;
+      detail.textContent = fail.fix;
+      return [term, detail];
+    }));
     code.textContent = connection.snippet ?? setup.snippet;
-    text('snippet-language', `${setup.language} · client configuration`);
+    text('snippet-language', `${connection.language || setup.language} · client configuration`);
     text('setup-note', connection.note || setup.note);
     const serverSetup = data.setups.find(setup => setup.id === connection.serverSetup);
     document.getElementById('server-command').hidden = !serverSetup;

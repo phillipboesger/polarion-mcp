@@ -43,6 +43,7 @@ export function renderSiteClientsBlock(manifest) {
         <label for="setup-client">2. Connect your client</label>
         <select id="setup-client">${manifest.clients.map(client => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join('')}</select>
         <p class="compatibility" id="setup-compatibility">${escapeHtml(first.name)} · ${escapeHtml(setup.title)}</p>
+        <div id="setup-before" class="setup-before" hidden><h4 id="before-title">Before you start</h4><div id="before-items"></div></div>
         <ol class="setup-steps" id="setup-steps">${connection.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
         <div id="server-command" hidden>
           <div class="snippet-header"><span>Start your server · bash</span><button type="button" class="copy-snippet" data-copy="server-code">Copy server command</button></div>
@@ -50,6 +51,8 @@ export function renderSiteClientsBlock(manifest) {
         </div>
         <div class="snippet-header"><span id="snippet-language">${escapeHtml(setup.language)} · client configuration</span><button type="button" id="copy-setup" class="copy-snippet" data-copy="setup-code">Copy snippet</button></div>
         <pre tabindex="0" aria-label="Client setup snippet"><code id="setup-code">${escapeHtml(connection.snippet ?? setup.snippet)}</code></pre>
+        <div id="setup-verify" class="setup-verify" hidden><h4>Check that it works</h4><p id="verify-prompt"></p><p id="verify-expect"></p></div>
+        <div id="setup-fails" class="setup-fails" hidden><h4>If it does not work</h4><dl id="fails-list"></dl></div>
         <p class="setup-note" id="setup-note">${escapeHtml(connection.note || setup.note)}</p>
         <div class="setup-links"><a id="setup-source" href="${httpsUrl(first.sources[0])}" target="_blank" rel="noopener noreferrer">Client documentation ↗</a><a href="#faq">Setup questions ↓</a></div>
         <p id="setup-status" class="sr-only" role="status" aria-live="polite"></p>
@@ -101,6 +104,9 @@ export function renderDailyUse(scenarios) {
   return `<div class="daily-layout"><div class="day-tabs" role="tablist" aria-label="Daily workflows" aria-orientation="vertical">${scenarios.map((scenario, i) => `<button type="button" role="tab" id="tab-${scenario.id}" aria-controls="day-${scenario.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}"><span>${scenario.time}</span>${escapeHtml(scenario.label)}</button>`).join('')}</div><div class="day-panels">${scenarios.map(scenario => `<article class="day-chat" id="day-${scenario.id}" role="tabpanel" aria-labelledby="tab-${scenario.id}" tabindex="0"><h3>${escapeHtml(scenario.title)}</h3><div class="chat-message user"><span>You</span><p>${escapeHtml(scenario.prompt)}</p></div><div class="tool-trail"><p class="eyebrow">Tools called by your assistant</p><ol>${scenario.calls.map(call => `<li><code>${escapeHtml(call.tool)}</code><p>${escapeHtml(call.detail)}</p></li>`).join('')}</ol></div><div class="chat-message assistant"><span>Assistant · illustrative result</span><p>${escapeHtml(scenario.result)}</p></div><div class="approval"><span aria-hidden="true">⌁</span><p>${escapeHtml(scenario.guard)}</p></div></article>`).join('')}</div></div>`;
 }
 
+// Answers may carry `code` spans; everything else is escaped.
+export const renderFaq = manifest => manifest.faq.map(item => `<details><summary>${escapeHtml(item.q)}</summary><p>${escapeHtml(item.a).replace(/`([^`]+)`/g, '<code>$1</code>')}</p></details>`).join('\n      ');
+
 function replaceBlock(html, name, body) {
   const start = `<!-- ${name}:start -->`, end = `<!-- ${name}:end -->`;
   if (html.split(start).length !== 2 || html.split(end).length !== 2 || html.indexOf(start) > html.indexOf(end)) throw new Error(`docs/index.html must contain exactly one ordered ${name} marker block`);
@@ -113,6 +119,7 @@ export function renderSite(rootDir = root) {
   const toolsSource = fs.readFileSync(path.join(rootDir, 'src/tools.ts'), 'utf8');
   let html = fs.readFileSync(htmlPath, 'utf8');
   html = replaceBlock(html, 'clients', renderSiteClientsBlock(manifest));
+  if (html.includes('<!-- faq:start -->')) html = replaceBlock(html, 'faq', renderFaq(manifest));
   // Minimal fixtures used by the docs checker may only contain the clients block.
   if (html.includes('<!-- domains:start -->')) html = replaceBlock(html, 'domains', renderDomains(toolsSource));
   if (html.includes('<!-- daily:start -->')) html = replaceBlock(html, 'daily', renderDailyUse(JSON.parse(fs.readFileSync(path.join(rootDir, 'docs/daily-use.json'), 'utf8'))));

@@ -249,3 +249,18 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   footer div { justify-content:start; }
 }
 
+
+/* Setup panel: prerequisites, verification, troubleshooting */
+.setup-before, .setup-verify, .setup-fails { margin:16px 0 22px; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:rgba(98,214,255,.04); }
+.setup-before h4, .setup-verify h4, .setup-fails h4 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+.setup-before details { border-top:1px solid var(--line); }
+.setup-before details:first-of-type { border-top:0; }
+.setup-before summary { cursor:pointer; padding:9px 0; font-size:13px; color:#e1edf7; }
+.setup-before details > div { padding:0 0 12px; display:grid; gap:8px; }
+.setup-before p, .setup-verify p, .setup-fails dd { color:#b4ccdf; font-size:12px; line-height:1.65; overflow-wrap:anywhere; }
+.setup-before pre { margin:0; padding:10px 12px; overflow-x:auto; font-size:11px; border-radius:8px; background:rgba(0,0,0,.28); }
+.setup-fails dt { color:#e1edf7; font-size:12px; font-weight:600; margin-top:10px; }
+.setup-fails dt:first-of-type { margin-top:0; }
+.setup-steps li.need::before { content:'✓'; counter-increment:none; }
+.faq-list details p { overflow-wrap:anywhere; }
+.faq-list code { overflow-wrap:anywhere; }

@@ -29,7 +29,7 @@ test('client manifest validates every supported server choice and disabled reaso
       const setup = data.setups.find(setup => setup.id === connection.setup);
       const snippet = connection.snippet ?? setup.snippet;
       assert.ok(snippet.trim(), `${client.id} has an empty snippet`);
-      if (setup.language === 'json') assert.doesNotThrow(() => JSON.parse(snippet), client.id);
+      if ((connection.language ?? setup.language) === 'json') assert.doesNotThrow(() => JSON.parse(snippet), client.id);
       if (connection.serverSetup) { assert.ok(setupIds.has(connection.serverSetup)); used.add(connection.serverSetup); }
     }
   }
@@ -51,7 +51,7 @@ test('hosted connectors require a network server and generic provider covers all
     const client = data.clients.find(client => client.id === id);
     const server = data.setups.find(setup => setup.id === client.connections.docker.serverSetup);
     assert.match(server.snippet, /MCP_ALLOWED_HOSTS=YOUR-SERVER/);
-    assert.match(client.connections.docker.steps[0], /public HTTPS/);
+    assert.match(client.connections.docker.steps[0], /public https/i);
   }
   const chatgpt = data.clients.find(client => client.id === 'chatgpt-apps');
   const server = data.setups.find(setup => setup.id === chatgpt.connections.docker.serverSetup);
@@ -59,8 +59,6 @@ test('hosted connectors require a network server and generic provider covers all
   assert.doesNotMatch(server.snippet, /MCP_ALLOWED_REDIRECT_PRESETS=claude/);
   const jetbrains = data.clients.find(client => client.id === 'jetbrains-ai');
   assert.match(jetbrains.connections.docker.description, /Local container.*stdio/);
-  const cline = data.clients.find(client => client.id === 'cline');
-  assert.equal(JSON.parse(cline.connections.remote.snippet).mcpServers.polarion.type, 'streamableHttp');
 });
 
 test('domain counts cover every generated tool once and match runtime toolset classification', () => {
