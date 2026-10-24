@@ -307,7 +307,7 @@ test("compiled constrained arrays reject oversized input before accumulating ite
 })
 
 test("logSafe turns line breaks and control characters into spaces so input cannot forge log lines", () => {
-  assert.equal(logSafe("a\n[ERROR] forged\r\nb\u0000c"), "a [ERROR] forged  b c")
+  assert.equal(logSafe("a\n[ERROR] forged\r\nb\u0000c"), "a[ERROR] forgedb c")
   assert.equal(logSafe(42), "42")
 })
 

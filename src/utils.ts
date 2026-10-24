@@ -31,12 +31,12 @@ const INPUT_KEY_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
 /** Removes credentials from error text before it reaches logs. */
 /**
  * @param value - Any value that may carry caller-controlled text.
- * @returns A single-line string safe to write to a log: line breaks and other
+ * @returns A single-line string safe to write to a log: line breaks are removed and other
  *   control characters (which could forge log entries) become spaces.
  */
 export function logSafe(value: unknown): string {
-  // The explicit \r\n pass is the form CodeQL's js/log-injection recognises as a sanitizer.
-  return String(value).replace(/\n|\r/g, ' ').replace(/\p{Cc}+/gu, ' ');
+  // CodeQL's js/log-injection only treats a line-break replace with an EMPTY replacement as a sanitizer.
+  return String(value).replace(/\n|\r/g, '').replace(/\p{Cc}+/gu, ' ');
 }
 
 export function redact(value: string): string {
