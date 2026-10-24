@@ -125,7 +125,8 @@ footer div { display:flex; gap:20px; }
 .domain-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:28px; }
 .domain-grid article { padding:20px 0 0; }
 .domain-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-.domain-icon { font:26px/1 var(--mono); color:var(--accent); }
+.domain-icon { display:inline-flex; color:var(--accent); }
+.domain-icon svg { display:block; }
 .domain-count { font:10px var(--mono); color:var(--warm); white-space:nowrap; }
 .domain-grid h3 { font-size:17px; margin-top:20px; }
 .domain-grid p { font-size:13px; line-height:1.65; }
@@ -218,7 +219,7 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .domain-grid h3 { font-size:16px; }
   .domain-grid p { font-size:12px; }
   .domain-count { font-size:9px; }
-  .domain-icon { font-size:23px; }
+  .domain-icon svg { width:23px; height:23px; }
   .daily-layout { grid-template-columns:minmax(0,1fr); }
   .day-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
   .day-tabs button { padding:12px; gap:4px; font-size:12px; border-color:var(--line); }
