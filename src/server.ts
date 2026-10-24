@@ -253,7 +253,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     try { options.telemetry.onSpanEnd(span, { correlationId, tool: toolName, outcome, durationMs }); } catch { /* telemetry must not change the tool result */ }
     options.logger.toolCall?.({ correlationId, tool: toolName, outcome, durationMs, msg: outcome === 'success' ? 'Tool call completed' : 'Tool call ended', secrets: bearerToken ? [bearerToken] : [] });
   }
-  if (!result!.isError) {
+  if (options.markUntrusted && !result!.isError) {
     result!.content = result!.content.map(item => item.type === 'text'
       ? { ...item, text: annotateToolText(item.text, options.markUntrusted) }
       : item);
