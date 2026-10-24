@@ -248,3 +248,11 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   footer { margin:0 20px; padding:24px 0; }
   footer div { justify-content:start; }
 }
+
+/* Pass 5: visible client compatibility in the hero. */
+.works-with { margin:18px auto 0; max-width:760px; }
+.works-with p { font:11px var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--warm); margin-bottom:12px; }
+.works-with ul { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; list-style:none; padding:0; margin:0; }
+.works-with a { display:inline-block; padding:7px 14px; border:1px solid var(--line); border-radius:999px; background:rgba(9,37,64,.45); color:var(--ink); font-size:14px; text-decoration:none; }
+.works-with a:hover,.works-with a:focus-visible { border-color:var(--accent); color:var(--accent); }
+@media(max-width:700px) { .works-with a { padding:6px 11px; font-size:13px; } }

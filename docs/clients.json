@@ -60,9 +60,13 @@
           "id": "other",
           "name": "Other / Custom",
           "mark": "+",
-          "description": "Any other AI provider or MCP client",
+          "description": "Docker, HTTP, REST/OpenAPI, n8n or any other client",
           "clients": [
             "generic-stdio",
+            "docker",
+            "generic-http",
+            "rest-wrapper",
+            "n8n",
             "openai-api",
             "openai-agents"
           ]
@@ -85,24 +89,6 @@
             "jetbrains-ai",
             "zed",
             "cline"
-          ]
-        }
-      ]
-    },
-    {
-      "id": "custom",
-      "title": "Custom / self-hosted",
-      "cards": [
-        {
-          "id": "self-hosted",
-          "name": "Run it your way",
-          "mark": ">_",
-          "description": "A team server, an HTTP client, or a workflow.",
-          "clients": [
-            "docker",
-            "generic-http",
-            "rest-wrapper",
-            "n8n"
           ]
         }
       ]

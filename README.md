@@ -14,6 +14,8 @@ An open-source [Model Context Protocol](https://modelcontextprotocol.io) server 
 
 [**Connect your assistant**](https://polarion-mcp.boesger.com/#clients) · [Daily workflows](https://polarion-mcp.boesger.com/#daily-use) · [Tool catalog](src/tools.ts)
 
+<img src="docs/assets/site-hero.png" alt="Polarion MCP works with Claude, ChatGPT, Gemini, VS Code, Copilot, Cursor and Codex." width="900" />
+
 </div>
 
 On this page:
@@ -28,12 +30,16 @@ On this page:
 
 ## What the connector does for you
 
+![Your AI client sends tool calls to Polarion MCP, which turns them into REST requests against your Polarion](docs/assets/site-flow.png)
+
 **Your AI client → Polarion MCP → your Polarion REST API.** Ask a question; the assistant chooses tools, reads the returned data and proposes an answer or change.
 
 - **Find answers:** search requirements and defects, read LiveDocs and inspect traceability links.
 - **Prepare work:** draft test cases, prepare runs and record the test outcomes your team supplies.
 - **Change data, safely:** the assistant can create and update Polarion data, and every write can be previewed first (`dry_run: true` shows the exact request without sending it). Prefer read access only? `MCP_READ_ONLY=1` blocks all writes. Set approval rules in your AI client; previews do not create an approval lock.
 - **Inspect what you run:** MIT source, release SBOMs, build provenance and signed container images. See [supply-chain verification](docs/quality/supply-chain.md).
+
+![Topic cards: work items, test management, plans, documents and more, covering every Polarion REST operation](docs/assets/site-coverage.png)
 
 | Domain | Outcome |
 |---|---|
@@ -46,6 +52,8 @@ On this page:
 The [landing page](https://polarion-mcp.boesger.com/#features) shows counts by domain, computed from `src/tools.ts`. The **284 tools** count covers generated REST operations; configured toolsets and additional helpers change the exposed catalog. Selected Work Item writes validate enumeration values, custom-field keys and user references. [Features and limits](docs/features.md) describe the scope.
 
 ## A day with Polarion MCP
+
+![Five example conversations: release triage, document review, test preparation, release status and traceability gaps](docs/assets/site-daily.png)
 
 These are illustrative conversations using real tools, not recorded outputs. Project types, link roles and permissions vary.
 
@@ -60,6 +68,8 @@ These are illustrative conversations using real tools, not recorded outputs. Pro
 [Explore the chat-style walkthroughs](https://polarion-mcp.boesger.com/#daily-use). For larger work, follow the [worked task](docs/example-task.md): read items one by one, check existing coverage, propose changes, then verify the result.
 
 ## Get connected
+
+![Pick your AI provider, choose npm, Docker or Remote URL, and copy the matching configuration](docs/assets/site-setup.png)
 
 **First: how do you run the server?** You need a REST-enabled Polarion instance and a PAT.
 
