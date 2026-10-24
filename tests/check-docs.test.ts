@@ -38,6 +38,19 @@ test('clean documentation fixture passes every rule', t => {
   assert.match(result.output, /no findings/);
 });
 
+test('strict mode catches container examples that drift from the release version', t => {
+  const root = fixtureRoot();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(root, 'package.json'), '{"version":"1.4.0"}');
+  const readme = path.join(root, 'README.md');
+  fs.appendFileSync(readme, '\nContainer: `ghcr.io/phillipboesger/polarion-mcp:1.4.0`\n');
+  assert.equal(run(root, true).status, 0);
+  fs.writeFileSync(readme, fs.readFileSync(readme, 'utf8').replace(':1.4.0', ':1.3.0'));
+  const result = run(root, true);
+  assert.equal(result.status, 1);
+  assert.match(result.output, /container example pins 1\.3\.0; package version is 1\.4\.0/);
+});
+
 const expectedRules = [
   'env-vars', 'tool-references', 'prompt-resource-references', 'markdown-links-toc',
   'tool-call-examples', 'crlf', 'website-counts', 'client-references',

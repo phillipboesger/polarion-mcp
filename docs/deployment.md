@@ -25,6 +25,26 @@ The Dockerfile runs the Streamable HTTP MCP server on port 3000. Set `API_BASE_U
 
 Render's checked-in `render.yaml` builds and starts the REST wrapper. To deploy Streamable HTTP on Render, change the start command to `node build/mcp-http-server.js` and configure MCP environment variables. Configure `TRUST_PROXY` based on the actual trusted proxy chain. Without it, all requests may appear to share Render's proxy egress IP; a single user's failed logins can exhaust the shared IP rate limit and lock out other users. Confirm the platform's forwarded-header behavior before trusting a hop count.
 
+## Docker
+
+The published image runs Streamable HTTP by default. A local PAT-authenticated server:
+
+```bash
+docker run -d --name polarion-mcp \
+  -p 127.0.0.1:3000:3000 \
+  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \
+  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
+  ghcr.io/phillipboesger/polarion-mcp:1.4.0
+```
+
+Connect to `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. The image holds no shared Polarion credentials in this mode. Each caller supplies their own PAT.
+
+For team access, proxy HTTPS to the loopback port and include the public hostname in `MCP_ALLOWED_HOSTS`. For OAuth connectors, set `MCP_PUBLIC_URL` to the HTTPS origin, provide a stable `MCP_TOKEN_SECRET` of at least 32 characters, and configure exact redirect allowlists. Claude can use `MCP_ALLOWED_REDIRECT_PRESETS=claude`; add the callback supplied by ChatGPT as an exact `MCP_ALLOWED_REDIRECT_PREFIXES` entry. Use dynamic client registration (DCR) unless CIMD was explicitly enabled. Configure `TRUST_PROXY` for the actual trusted proxy chain. The Apache example below explains proxying and OAuth in more detail.
+
+For stdio, run the same image with `docker run -i --rm`, pass `API_BASE_URL` and `BEARER_TOKEN`, and override the command with `node build/index.js`. Do not detach a stdio container.
+
+For REST/OpenAPI, override the command with `node build/http-server.js`, configure `API_BASE_URL`, `BEARER_TOKEN`, `HTTP_API_KEY` and `PUBLIC_URL`, and keep the loopback port mapping. REST callers authenticate with `HTTP_API_KEY`; calls run under the deployment PAT. The [inline REST setup](https://polarion-mcp.boesger.com/#setup/rest-wrapper) contains the complete command.
+
 ## Other Platforms
 
 - REST HTTP deployments run node build/http-server.js (or build/index.js after `npm run build:http`).

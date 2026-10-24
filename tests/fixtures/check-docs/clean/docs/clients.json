@@ -1,1 +1,1 @@
-{"clients":[{"id":"known","name":"Known Client","transports":["stdio"],"authModes":["none"],"config":{"transport":"stdio"},"confidence":"verified"}]}
+{"clients": [{"id": "known", "name": "Known Client", "transports": ["stdio"], "authModes": ["none"], "config": {"transport": "stdio"}, "confidence": "verified"}], "readmeGroups": [{"name": "Known Client", "summary": "Local stdio setup.", "client": "known"}]}
