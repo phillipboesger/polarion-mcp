@@ -277,6 +277,10 @@ export interface PolarionServerOptions {
   rateLimitTools?: number;
   /** Clock injection for deterministic sliding-window tests. */
   now?: () => number;
+  /** Shared across HTTP sessions to enforce a deployment-wide per-user budget. */
+  rateLimiter?: ToolCallRateLimiter;
+  /** Shared across HTTP sessions; keys remain scoped by caller and deployment. */
+  metadataCache?: MetadataCache;
   /** Wrap user-authored Polarion strings in untrusted-content markers. */
   markUntrusted?: boolean;
 }
@@ -308,9 +312,9 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
-  const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
+  const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
   const completionsEnabled = /^(1|true|yes|on)$/i.test(process.env.MCP_COMPLETIONS ?? '');
-  const metadataCache = new MetadataCache();
+  const metadataCache = options.metadataCache ?? new MetadataCache();
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {

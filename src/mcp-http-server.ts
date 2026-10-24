@@ -54,6 +54,8 @@ import { bearerCredential, parseTrustProxy } from './utils.js';
 import type { PolarionExtensions } from './extensions.js';
 import type { LogFormat, LogLevel } from './logger.js';
 import type { TelemetryHooks } from './telemetry.js';
+import { ToolCallRateLimiter } from './tool-rate-limit.js';
+import { MetadataCache } from './metadata-cache.js';
 export { parseTrustProxy } from './utils.js';
 
 dotenv.config();
@@ -292,6 +294,10 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const checkToken: TokenValidator = validateToken ?? validatePolarionToken;
   const sessionIdleMs = options.sessionIdleMs ?? DEFAULT_SESSION_IDLE_MS;
   const maxSessions = options.maxSessions ?? DEFAULT_MAX_SESSIONS;
+  // These instances are app-wide so opening additional MCP sessions cannot
+  // multiply a caller's tool-call budget or fragment metadata cache entries.
+  const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0);
+  const metadataCache = new MetadataCache();
 
   /**
    * Active sessions by MCP session id. A Map iterates in insertion order and
@@ -776,7 +782,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
+      const server = createPolarionServer({ filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, rateLimiter, metadataCache, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
