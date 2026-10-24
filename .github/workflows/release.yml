@@ -126,9 +126,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
-          TARBALL="polarion-mcp-${GITHUB_REF_NAME#v}.tgz"
           npm pack --pack-destination .
-          mv "polarion-mcp-${GITHUB_REF_NAME#v}.tgz" "${TARBALL}"
+          # npm pack names the file polarion-mcp-<version>.tgz itself
           npx --yes @cyclonedx/cyclonedx-npm --output-file "polarion-mcp-${GITHUB_REF_NAME}.bom.json"
 
       - name: Attest release artifacts
