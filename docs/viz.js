@@ -72,9 +72,9 @@
     size();
   }
   var q = function (id) { return document.getElementById(id); };
-  /* Hero: five AI clients around a ring of tool points. A question flies in, a tool answers. */
+  /* Hero: six AI clients around a ring of tool points. A question flies in, a tool answers. */
   function heroMcp(canvas) {
-    var clients = [["Claude Code", C.warm], ["Claude Desktop", C.warm], ["Copilot", C.blue], ["ChatGPT", C.mint], ["Claude.ai", C.coral]];
+    var clients = [["Claude", C.warm], ["ChatGPT", C.mint], ["Gemini", C.cyan], ["VS Code", C.blue], ["Copilot", C.coral], ["Cursor", C.ice]];
     var R = rng(5);
     var N = 284;
     var ring = [];
@@ -132,8 +132,9 @@
         ctx.beginPath(); ctx.arc(x, y, 3.4, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
       }
       ctx.font = MONO; ctx.textAlign = "center";
-      if (w >= 1600) cpos.forEach(function (c, k3) {
+      if (w >= 760) cpos.forEach(function (c, k3) {
         var tw = ctx.measureText(clients[k3][0].toUpperCase()).width + 22;
+        c[0] = Math.min(w - tw / 2 - 8, Math.max(tw / 2 + 8, c[0]));
         ctx.fillStyle = "rgba(11,42,76,0.9)";
         roundRect(ctx, c[0] - tw / 2, c[1] - 13, tw, 26, 13); ctx.fill();
         ctx.strokeStyle = rgba(clients[k3][1], 0.85); ctx.lineWidth = 1.2; ctx.stroke();

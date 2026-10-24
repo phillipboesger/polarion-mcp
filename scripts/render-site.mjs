@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -115,7 +116,12 @@ export function renderSite(rootDir = root) {
   // Minimal fixtures used by the docs checker may only contain the clients block.
   if (html.includes('<!-- domains:start -->')) html = replaceBlock(html, 'domains', renderDomains(toolsSource));
   if (html.includes('<!-- daily:start -->')) html = replaceBlock(html, 'daily', renderDailyUse(JSON.parse(fs.readFileSync(path.join(rootDir, 'docs/daily-use.json'), 'utf8'))));
-  return html.replaceAll('{{TOOL_COUNT}}', countDomains(toolsSource).total);
+  html = html.replaceAll('{{TOOL_COUNT}}', countDomains(toolsSource).total);
+  // Pages caches assets for hours: tie each asset URL to its content so a new HTML never meets old CSS/JS.
+  return html.replace(/(href|src)="(site\.css|viz\.js|setup\.js|carousel\.js)(\?v=[0-9a-f]+)?"/g, (_, attr, file) => {
+    const hash = createHash('sha1').update(fs.readFileSync(path.join(rootDir, 'docs', file))).digest('hex').slice(0, 8);
+    return `${attr}="${file}?v=${hash}"`;
+  });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
