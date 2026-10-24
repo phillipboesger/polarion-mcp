@@ -1,8 +1,9 @@
 # Throwaway values used only by tests; none of them is a real credential.
+# Uses the singular [allowlist] table: the gitleaks-action pins 8.24.x, which predates [[allowlists]].
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Test-only TLS fixtures and fixed token secrets"
 paths = [
   '''tests/fixtures/cimd-test-(key|cert)\.pem''',
