@@ -51,6 +51,7 @@ h2 { font-weight:550; font-size:clamp(31px,3.5vw,46px); letter-spacing:-.045em; 
 .client-group>h3 { color:var(--sub); font:11px var(--mono); letter-spacing:.1em; text-transform:uppercase; margin-bottom:12px; }
 .provider-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .provider-grid.wide { grid-template-columns:minmax(0,1fr); }
+.provider-grid:not(.wide) .provider-card:last-child:nth-child(odd) { grid-column:1 / -1; }
 .provider-card { border:1px solid var(--line); border-radius:12px; padding:18px; background:rgba(15,48,80,.65); }
 .provider-heading { display:flex; align-items:center; gap:12px; }
 .monogram { width:35px; height:35px; border-radius:8px; display:grid; place-items:center; flex-shrink:0; font-size:21px; font-weight:600; background:#284e71; color:white; }
@@ -117,19 +118,29 @@ footer div { display:flex; gap:20px; }
 .flow-arrow { display:flex; flex-direction:column; align-items:center; color:var(--accent); font-size:28px; }
 .flow-arrow small { font:9px var(--mono); color:var(--sub); letter-spacing:.08em; }
 .guard-chips { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
+.polarion-mark { display:block; }
 .guard-chips span { border:1px solid var(--line); border-radius:4px; padding:4px 7px; font-size:10px; color:var(--accent); }
 .flow-caption { max-width:860px; margin:18px auto 0; text-align:center; font-size:12px; color:var(--sub); }
-.catalog-heading { display:flex; justify-content:space-between; align-items:end; gap:28px; margin:58px 0 24px; }
-.catalog-heading h3 { font-size:24px; }
-.catalog-heading p { font-size:12px; color:var(--sub); max-width:420px; }
-.domain-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:28px; }
-.domain-grid article { padding:20px 0 0; }
+.coverage { max-width:760px; margin:64px auto 28px; text-align:center; }
+.coverage h3 { font-size:clamp(26px,4vw,40px); line-height:1.15; margin:8px 0 14px; }
+.coverage h3 strong { color:var(--accent); }
+.coverage p:not(.eyebrow) { color:var(--sub); font-size:14px; line-height:1.7; }
+.carousel { position:relative; }
+.carousel-track { display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; padding:4px 2px 8px; }
+.carousel-track::-webkit-scrollbar { display:none; }
+.domain-card { flex:0 0 calc((100% - 48px) / 4); min-width:0; scroll-snap-align:start; padding:22px; border:1px solid var(--line); border-radius:12px; background:rgba(9,37,64,.55); }
 .domain-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
 .domain-icon { display:inline-flex; color:var(--accent); }
 .domain-icon svg { display:block; }
 .domain-count { font:10px var(--mono); color:var(--warm); white-space:nowrap; }
-.domain-grid h3 { font-size:17px; margin-top:20px; }
-.domain-grid p { font-size:13px; line-height:1.65; }
+.domain-card h3 { font-size:18px; margin-top:20px; }
+.domain-card p { font-size:13px; line-height:1.65; color:var(--sub); margin-top:8px; }
+.carousel-controls { display:flex; align-items:center; justify-content:center; gap:14px; margin-top:16px; }
+.carousel-controls button { font:inherit; color:var(--ink); cursor:pointer; }
+.carousel-prev,.carousel-next { width:36px; height:36px; border:1px solid var(--line); border-radius:50%; background:transparent; }
+.carousel-dots { display:flex; gap:8px; }
+.carousel-dot { width:9px; height:9px; padding:0; border:1px solid var(--accent); border-radius:50%; background:transparent; }
+.carousel-dot[aria-current="true"] { background:var(--accent); }
 .daily-section { border-top:1px solid var(--line); }
 .daily-layout { display:grid; grid-template-columns:240px minmax(0,1fr); gap:36px; align-items:start; }
 .day-tabs { display:flex; flex-direction:column; gap:8px; }
@@ -164,8 +175,8 @@ footer div { display:flex; gap:20px; }
 .setup-panel select { width:100%; }
 .server-picker { border:0; min-width:0; margin:0 0 26px; }
 .server-picker legend { font-size:13px; font-weight:600; margin-bottom:12px; }
-.server-options { display:grid; gap:8px; }
-.setup-panel .server-option { display:flex; align-items:start; gap:10px; padding:12px; margin:0; border:1px solid var(--line); border-radius:7px; cursor:pointer; background:#12385f; }
+.server-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(138px,1fr)); gap:8px; }
+.setup-panel .server-option { display:flex; align-items:start; gap:10px; padding:12px; min-width:0; margin:0; border:1px solid var(--line); border-radius:7px; cursor:pointer; background:#12385f; }
 .server-option input { margin-top:5px; accent-color:var(--accent); flex-shrink:0; }
 .server-option strong { font:600 13px Geist,sans-serif; color:white; }
 .server-option small { display:block; font:11px/1.55 Geist,sans-serif; color:var(--sub); margin-top:2px; }
@@ -197,7 +208,7 @@ footer { max-width:1264px; padding:28px 32px; align-items:start; }
 footer>p { max-width:320px; }
 footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 @media(max-width:1000px) {
-  .domain-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .domain-card { flex-basis:calc((100% - 16px) / 2); }
   .flow { padding:20px 12px; grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr) 28px minmax(0,1fr); }
   .flow-node h3 { font-size:20px; }
   .daily-layout { grid-template-columns:190px minmax(0,1fr); gap:20px; }
@@ -212,13 +223,8 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .flow-arrow { font-size:0; padding:12px 0; }
   .flow-arrow::before { content:'↓'; font-size:24px; }
   .flow-caption { text-align:left; font-size:11px; }
-  .catalog-heading { display:block; margin-top:40px; }
-  .catalog-heading h3 { font-size:22px; }
-  .catalog-heading p { margin-top:12px; }
-  .domain-grid { gap:24px 20px; }
-  .domain-grid h3 { font-size:16px; }
-  .domain-grid p { font-size:12px; }
-  .domain-count { font-size:9px; }
+  .coverage { margin-top:44px; text-align:left; }
+  .domain-card { flex-basis:82%; padding:18px; }
   .domain-icon svg { width:23px; height:23px; }
   .daily-layout { grid-template-columns:minmax(0,1fr); }
   .day-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }

@@ -21,7 +21,7 @@ test('hero breathes and the landing page follows the complete user journey', asy
   await page.goto('/');
   await page.evaluate(() => globalThis.document.fonts.ready);
   await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
-  for (const text of ['284', 'Read-only', 'Open source', 'Signed']) await expect(page.locator('.proof').getByText(text, { exact: false })).toBeInViewport();
+  for (const text of ['284', 'Preview', 'Open source', 'Signed']) await expect(page.locator('.proof').getByText(text, { exact: false })).toBeInViewport();
   await expect(page.locator('.hero .outcomes')).toHaveCount(0);
   await expect(page.locator('.hero .button')).toHaveCount(2);
   await expect(page.locator('body')).not.toContainText(/unverified|Web connector/i);
@@ -36,7 +36,7 @@ test('hero breathes and the landing page follows the complete user journey', asy
   await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
   await expect(page.locator('.client-group > h3')).toHaveText(['AI providers', 'Tools / IDEs', 'Custom / self-hosted']);
   await expect(page.locator('[data-client="claude-web-desktop"]')).toHaveText('claude.ai');
-  await expect(page.locator('[data-client="generic-stdio"]')).toHaveText('Other AI provider / any MCP client');
+  await expect(page.locator('[data-client="generic-stdio"]')).toHaveText('Any MCP client');
   expect(errors).toEqual([]);
 });
 
@@ -207,4 +207,20 @@ test('canvas stops for reduced motion and when the hero leaves the viewport', as
   const reduced = await page.evaluate(() => globalThis.canvasFrames);
   await page.waitForTimeout(150);
   expect(await page.evaluate(() => globalThis.canvasFrames)).toEqual(reduced);
+});
+
+test('topic carousel advances on its own, responds to controls and honors reduced motion', async ({ page }) => {
+  await page.goto('/');
+  const track = page.locator('.carousel-track');
+  await track.scrollIntoViewIfNeeded();
+  await expect(page.locator('.carousel-dot[aria-current="true"]')).toHaveAttribute('data-slide', '0');
+  await expect.poll(() => track.evaluate(el => el.scrollLeft), { timeout: 9000 }).toBeGreaterThan(0);
+  await page.locator('.carousel-dot').nth(2).click();
+  await expect(page.locator('.carousel-dot[aria-current="true"]')).toHaveAttribute('data-slide', '2');
+  await noOverflow(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await track.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(5500);
+  expect(await track.evaluate(el => el.scrollLeft)).toBeLessThan(10);
 });

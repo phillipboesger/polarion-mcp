@@ -12,14 +12,14 @@ Choose **npm / npx** for a local stdio subprocess, **Docker** to deploy a server
 
 - **Local MCP configuration:** [Claude Desktop](https://polarion-mcp.boesger.com/#setup/claude-desktop), [Cursor](https://polarion-mcp.boesger.com/#setup/cursor), [Windsurf / Cascade](https://polarion-mcp.boesger.com/#setup/windsurf), [JetBrains AI Assistant](https://polarion-mcp.boesger.com/#setup/jetbrains-ai), [Cline](https://polarion-mcp.boesger.com/#setup/cline), [Other AI provider / any MCP client](https://polarion-mcp.boesger.com/#setup/generic-stdio).
 - **Add from your terminal:** [Claude Code](https://polarion-mcp.boesger.com/#setup/claude-code), [Codex](https://polarion-mcp.boesger.com/#setup/codex-cli), [Gemini CLI](https://polarion-mcp.boesger.com/#setup/gemini-cli).
-- **Connect to your team server:** [Claude Desktop](https://polarion-mcp.boesger.com/#setup/claude-desktop), [claude.ai](https://polarion-mcp.boesger.com/#setup/claude-web-desktop), [ChatGPT connector](https://polarion-mcp.boesger.com/#setup/chatgpt-apps), [Microsoft Copilot Studio](https://polarion-mcp.boesger.com/#setup/copilot-studio), [Docker team server](https://polarion-mcp.boesger.com/#setup/docker), [Generic HTTP client](https://polarion-mcp.boesger.com/#setup/generic-http), [REST wrapper / OpenAPI](https://polarion-mcp.boesger.com/#setup/rest-wrapper).
+- **Connect to your team server:** [Claude Desktop](https://polarion-mcp.boesger.com/#setup/claude-desktop), [claude.ai](https://polarion-mcp.boesger.com/#setup/claude-web-desktop), [ChatGPT connector](https://polarion-mcp.boesger.com/#setup/chatgpt-apps), [Microsoft Copilot Studio](https://polarion-mcp.boesger.com/#setup/copilot-studio), [Gemini Enterprise](https://polarion-mcp.boesger.com/#setup/gemini-enterprise), [Docker team server](https://polarion-mcp.boesger.com/#setup/docker), [Generic HTTP client](https://polarion-mcp.boesger.com/#setup/generic-http), [REST wrapper / OpenAPI](https://polarion-mcp.boesger.com/#setup/rest-wrapper).
 - **VS Code MCP configuration:** [VS Code / GitHub Copilot](https://polarion-mcp.boesger.com/#setup/vscode-copilot).
 - **Zed context server:** [Zed](https://polarion-mcp.boesger.com/#setup/zed).
 - **Claude Messages API:** [Claude API](https://polarion-mcp.boesger.com/#setup/claude-api).
 - **OpenAI Responses API:** [OpenAI Responses API](https://polarion-mcp.boesger.com/#setup/openai-api).
 - **OpenAI Agents SDK:** [OpenAI Agents SDK](https://polarion-mcp.boesger.com/#setup/openai-agents).
 - **Custom GPT Actions:** [Custom GPT Actions](https://polarion-mcp.boesger.com/#setup/custom-gpt).
-- **Docker team server:** [Claude Code](https://polarion-mcp.boesger.com/#setup/claude-code), [OpenAI Agents SDK](https://polarion-mcp.boesger.com/#setup/openai-agents), [Codex](https://polarion-mcp.boesger.com/#setup/codex-cli), [Microsoft Copilot Studio](https://polarion-mcp.boesger.com/#setup/copilot-studio), [VS Code / GitHub Copilot](https://polarion-mcp.boesger.com/#setup/vscode-copilot), [Gemini CLI](https://polarion-mcp.boesger.com/#setup/gemini-cli), [Cursor](https://polarion-mcp.boesger.com/#setup/cursor), [Windsurf / Cascade](https://polarion-mcp.boesger.com/#setup/windsurf), [Zed](https://polarion-mcp.boesger.com/#setup/zed), [Cline](https://polarion-mcp.boesger.com/#setup/cline), [Docker team server](https://polarion-mcp.boesger.com/#setup/docker), [Other AI provider / any MCP client](https://polarion-mcp.boesger.com/#setup/generic-stdio), [Generic HTTP client](https://polarion-mcp.boesger.com/#setup/generic-http).
+- **Docker team server:** [Claude Code](https://polarion-mcp.boesger.com/#setup/claude-code), [OpenAI Agents SDK](https://polarion-mcp.boesger.com/#setup/openai-agents), [Codex](https://polarion-mcp.boesger.com/#setup/codex-cli), [Microsoft Copilot Studio](https://polarion-mcp.boesger.com/#setup/copilot-studio), [VS Code / GitHub Copilot](https://polarion-mcp.boesger.com/#setup/vscode-copilot), [Gemini CLI](https://polarion-mcp.boesger.com/#setup/gemini-cli), [Gemini Enterprise](https://polarion-mcp.boesger.com/#setup/gemini-enterprise), [Cursor](https://polarion-mcp.boesger.com/#setup/cursor), [Windsurf / Cascade](https://polarion-mcp.boesger.com/#setup/windsurf), [Zed](https://polarion-mcp.boesger.com/#setup/zed), [Cline](https://polarion-mcp.boesger.com/#setup/cline), [Docker team server](https://polarion-mcp.boesger.com/#setup/docker), [Other AI provider / any MCP client](https://polarion-mcp.boesger.com/#setup/generic-stdio), [Generic HTTP client](https://polarion-mcp.boesger.com/#setup/generic-http).
 - **REST wrapper / OpenAPI:** [Custom GPT Actions](https://polarion-mcp.boesger.com/#setup/custom-gpt), [REST wrapper / OpenAPI](https://polarion-mcp.boesger.com/#setup/rest-wrapper), [n8n REST workflow](https://polarion-mcp.boesger.com/#setup/n8n).
 - **n8n HTTP Request:** [n8n REST workflow](https://polarion-mcp.boesger.com/#setup/n8n).
 - **HTTPS team server with OAuth:** [Claude Desktop](https://polarion-mcp.boesger.com/#setup/claude-desktop), [claude.ai](https://polarion-mcp.boesger.com/#setup/claude-web-desktop).
@@ -180,6 +180,18 @@ Default: **npm / npx**.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
 - [Official documentation](https://geminicli.com/docs/tools/mcp-server/)
+
+### Gemini Enterprise
+
+An administrator may need to override the organization policy that blocks custom MCP data stores. Tools are disabled until you enable them.
+
+Default: **Remote URL**.
+
+- **npm / npx:** This connector cannot launch npx; use a reachable HTTPS server.
+- **Docker:** Deploy the server, then use the client configuration shown inline.
+- **Remote URL:** Supported; use the configuration and steps shown inline.
+
+- [Official documentation](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
 
 ### Cursor
 
