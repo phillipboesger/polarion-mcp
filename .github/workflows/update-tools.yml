@@ -32,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22.x
           cache: npm
@@ -55,7 +55,7 @@ jobs:
           echo "tools=$(grep -c 'name: "' src/tools.ts)" >> "$GITHUB_OUTPUT"
 
       - name: Keep the regenerated file
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tools-ts
           path: src/tools.ts
@@ -82,7 +82,7 @@ jobs:
       # explicitly so the bot branch receives the full CI gate.
       - name: Open pull request if tools changed
         id: cpr
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: bot/update-polarion-tools
           base: main
