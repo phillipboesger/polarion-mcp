@@ -16,6 +16,8 @@ codex mcp add polarion -- npx -y polarion-mcp (set API_BASE_URL and BEARER_TOKEN
 
 This is the exact client snippet recorded in [clients.json](../clients.json). It is unverified (check the vendor docs).
 
+For a source build instead of npm, use the [source-build alternative](../../README.md#quickstart) with the same environment variables.
+
 ## Authentication
 
 **PAT static header:** send `Authorization: Bearer YOUR_POLARION_PAT` on MCP requests or configure the PAT in the client auth UI.

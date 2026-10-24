@@ -3,1405 +3,321 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Polarion MCP | Connect AI clients to Polarion</title>
-  <meta name="description" content="Open-source Model Context Protocol server for the Polarion ALM REST API, with generated tools, multiple client transports, and OAuth support." />
+  <title>Polarion MCP | Connect your AI assistant to Polarion ALM</title>
+  <meta name="description" content="Open-source MCP server with 284 tools generated from the Polarion REST API. Set up a client, deploy for a team, or contribute." />
   <link rel="canonical" href="https://polarion-mcp.boesger.com/" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%2312385f%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2244%22 text-anchor=%22middle%22 fill=%22%2362d6ff%22%3EP%3C/text%3E%3C/svg%3E" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://polarion-mcp.boesger.com/" />
-  <meta property="og:title" content="Polarion MCP | Connect AI clients to Polarion" />
-  <meta property="og:description" content="Open-source Model Context Protocol server for the Polarion ALM REST API." />
+  <meta property="og:title" content="Polarion MCP | Connect your AI assistant to Polarion ALM" />
+  <meta property="og:description" content="Open-source MCP server with 284 tools generated from the Polarion REST API. Set up a client, deploy for a team, or contribute." />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:url" content="https://polarion-mcp.boesger.com/" />
-  <meta name="twitter:title" content="Polarion MCP | Connect AI clients to Polarion" />
-  <meta name="twitter:description" content="Open-source Model Context Protocol server for the Polarion ALM REST API." />
+  <meta name="twitter:title" content="Polarion MCP | Connect your AI assistant to Polarion ALM" />
+  <meta name="twitter:description" content="Open-source MCP server with 284 tools generated from the Polarion REST API. Set up a client, deploy for a team, or contribute." />
   <style>
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:         #12385f;
-      --bg-card:    #174470;
-      --bg-card-2:  #134069;
-      --accent:     #62d6ff;
+      --bg: #12385f;
+      --bg-card: #174470;
+      --accent: #62d6ff;
       --accent-dim: rgba(98,214,255,0.14);
-      --accent-glow:rgba(98,214,255,0.35);
-      --text:       #ffffff;
-      --text-sub:   rgba(255,255,255,0.74);
-      --text-dim:   rgba(255,255,255,0.5);
-      --border:     rgba(255,255,255,0.12);
-      --border-acc: rgba(98,214,255,0.3);
-      --warm:       #ffc266;
-      --radius:     12px;
-      --radius-lg:  20px;
-      --font:       -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --mono:       ui-monospace, 'SF Mono', Menlo, monospace;
+      --text: #ffffff;
+      --text-sub: #c9dbea;
+      --border: rgba(255,255,255,0.16);
+      --border-acc: rgba(98,214,255,0.4);
+      --warm: #ffc266;
+      --radius: 12px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: ui-monospace, 'SF Mono', Menlo, monospace;
     }
-
-    html { scroll-behavior: smooth; }
-
+    html { scroll-behavior: smooth; scroll-padding-top: 90px; }
     body {
-      background-color: #12385f;
-      background-image:
-        radial-gradient(ellipse 70% 60% at 18% 0%, rgba(140,210,255,0.28) 0%, transparent 70%),
-        radial-gradient(ellipse 60% 50% at 84% 100%, rgba(98,214,255,0.16) 0%, transparent 70%),
-        linear-gradient(180deg, #174470 0%, #12385f 55%, #0f3050 100%);
-      background-attachment: fixed;
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 16px;
-      line-height: 1.6;
-      overflow-x: hidden;
+      background: radial-gradient(ellipse 80% 700px at 25% 0%, rgba(140,210,255,0.24), transparent 75%),
+        linear-gradient(180deg, #174470, var(--bg) 45%, #0f3050);
+      color: var(--text); font-family: var(--font); font-size: 16px; line-height: 1.6;
+    }
+    a { color: var(--accent); text-underline-offset: 4px; }
+    a:hover { color: white; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid var(--warm); outline-offset: 5px; }
+    p + p { margin-top: 16px; }
+    code { font-family: var(--mono); font-size: 0.88em; }
+    pre { max-width: 100%; overflow-x: auto; padding: 18px; background: #0b2a4c; border: 1px solid var(--border); border-radius: var(--radius); text-align: left; }
+    pre code { color: var(--accent); font-size: 13px; }
+    .skip-link { position: absolute; left: 16px; top: -100px; z-index: 10; padding: 10px; background: var(--bg); }
+    .skip-link:focus { top: 12px; }
+    nav { border-bottom: 1px solid var(--border); background: var(--bg); }
+    .nav-inner { max-width: 1280px; margin: auto; min-height: 72px; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+    .nav-brand { color: white; font-weight: 700; text-decoration: none; letter-spacing: -0.02em; white-space: nowrap; }
+    .nav-brand span { color: var(--accent); }
+    .nav-links { display: flex; gap: 26px; flex-wrap: wrap; }
+    .nav-links a { font-size: 14px; color: var(--text-sub); text-decoration: none; }
+    .nav-links a:hover { color: white; text-decoration: underline; }
+    .hero { padding: 44px 24px 38px; text-align: center; }
+    .eyebrow { font: 12px var(--mono); color: var(--warm); letter-spacing: 0.12em; text-transform: uppercase; }
+    h1 { font-size: clamp(54px, 7.5vw, 100px); font-weight: 750; letter-spacing: -0.065em; line-height: 1.12; margin: 12px 0 16px; }
+    h1 span { color: var(--accent); }
+    .hero-sub { font-size: clamp(20px, 2.5vw, 27px); font-weight: 500; line-height: 1.35; text-wrap: balance; }
+    .hero-description { max-width: 700px; margin: 12px auto 0; color: var(--text-sub); }
+    .project-badges { max-width: 900px; margin: 24px auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+    .project-badges a { display: inline-flex; min-height: 20px; }
+    .project-badges img { height: 20px; max-width: 100%; }
+    .client-picker { max-width: 760px; margin: 0 auto; border: 1px solid var(--border-acc); border-radius: var(--radius); background: var(--bg); text-align: left; }
+    .client-picker summary { cursor: pointer; padding: 15px 24px; font-size: 18px; font-weight: 700; color: #0b2a4c; background: var(--accent); border-radius: 11px; text-align: center; }
+    .client-picker[open] summary { border-radius: 11px 11px 0 0; }
+    .picker-note { padding: 20px 24px 0; color: var(--text-sub); font-size: 14px; }
+    .client-guide-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; padding: 8px 24px 24px; gap: 0 24px; }
+    .client-row { min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .client-guide { display: block; font-size: 14px; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+    .client-guide:hover { text-decoration: underline; }
+    .client-status { display: block; font: 11px var(--mono); color: var(--warm); margin-top: 4px; }
+    .github-link { display: inline-block; margin-top: 16px; font-size: 14px; color: var(--text-sub); }
+    .quickstart { max-width: 1120px; margin: 30px auto 0; }
+    .quickstart h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+    .quickstart-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; list-style: none; text-align: left; margin-top: 20px; }
+    .quickstart-steps li { border-top: 1px solid var(--border-acc); padding-top: 12px; min-width: 0; }
+    .step-title { font-size: 17px; font-weight: 650; }
+    .step-number { color: var(--warm); margin-right: 8px; font: 12px var(--mono); }
+    .quickstart-steps p { font-size: 14px; color: var(--text-sub); margin-top: 6px; }
+    .team-note { color: var(--text-sub); font-size: 13px; margin-top: 20px; }
+    .source-build { max-width: 760px; margin: 16px auto 0; text-align: left; color: var(--text-sub); font-size: 13px; }
+    .source-build summary { cursor: pointer; text-align: center; }
+    .source-build p { margin: 16px 0; }
+    .section-inner { max-width: 1184px; padding: 64px 32px; margin: auto; }
+    .section-label { font: 12px var(--mono); color: var(--warm); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
+    h2 { font-size: clamp(28px, 4vw, 42px); letter-spacing: -0.035em; line-height: 1.2; text-wrap: balance; }
+    .section-sub { color: var(--text-sub); max-width: 820px; margin-top: 20px; }
+    .demo .section-inner { padding-top: 26px; }
+    .demo-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+    .demo-header a { font-size: 14px; }
+    .demo img { display: block; width: 100%; height: auto; border: 1px solid var(--border-acc); border-radius: 16px; box-shadow: 0 20px 60px rgba(7,28,52,0.35); }
+    figcaption { margin-top: 16px; font-size: 13px; text-align: center; color: var(--text-sub); }
+    .features-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 56px; margin-top: 32px; }
+    .feature { border-top: 1px solid var(--border); padding-top: 20px; }
+    h3 { font-size: 20px; letter-spacing: -0.02em; }
+    .feature p { color: var(--text-sub); margin-top: 10px; font-size: 15px; }
+    .feature a { display: inline-block; margin-top: 12px; font-size: 14px; }
+    .operations { background: rgba(7,28,52,0.2); border-block: 1px solid var(--border); }
+    .reference-links { display: flex; flex-wrap: wrap; gap: 12px 26px; margin-top: 24px; }
+    .trust-strip { list-style: none; display: flex; flex-wrap: wrap; gap: 12px 30px; padding-top: 28px; margin-top: 28px; border-top: 1px solid var(--border); font-size: 14px; }
+    .supply-note { font-size: 13px; color: var(--text-sub); margin-top: 20px; max-width: 860px; }
+    .docs-list { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 56px; }
+    .docs-list div { padding: 18px 0; border-bottom: 1px solid var(--border); }
+    dt { font-weight: 600; margin-bottom: 6px; }
+    dd { color: var(--text-sub); font-size: 14px; }
+    .community { border-top: 1px solid var(--border); }
+    .community .section-inner { padding-block: 48px; }
+    .credits { font-size: 14px; color: var(--text-sub); margin-top: 24px; }
+    footer { max-width: 1280px; margin: auto; padding: 30px 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; font-size: 13px; color: var(--text-sub); }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 20px; }
+    @media (max-width: 760px) {
+      html { scroll-padding-top: 24px; }
+      .nav-inner { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 20px; }
+      .nav-links { gap: 12px 20px; }
+      .nav-links a { font-size: 13px; }
+      .hero { padding: 32px 20px; }
+      h1 { font-size: clamp(46px, 13vw, 80px); }
+      .hero-description { font-size: 15px; }
+      .project-badges { margin-block: 20px; gap: 8px 6px; }
+      .client-picker summary { padding: 14px 18px; }
+      .client-guide-list { grid-template-columns: minmax(0, 1fr); padding-inline: 18px; }
+      .picker-note { padding-inline: 18px; }
+      .quickstart-steps { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+      .quickstart { margin-top: 28px; }
+      .team-note { font-size: 13px; }
+      .section-inner { padding: 48px 20px; }
+      .demo .section-inner { padding-top: 12px; }
+      .demo-header { display: block; }
+      .demo-header a { display: inline-block; margin-top: 12px; }
+      .demo img { border-radius: 10px; }
+      .features-grid, .docs-list { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+      .docs-list { gap: 0; }
+      .trust-strip { flex-direction: column; }
+      footer { padding: 28px 20px; }
     }
-
-    /* ─── CANVAS BACKGROUND ─── */
-    #particles {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      opacity: 0.35;
-      transform: translateZ(0);
-      will-change: transform;
-    }
-
-    /* ─── NAV ─── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 48px;
-      background: rgba(18,56,95,0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-      transform: translateZ(0);
-      will-change: transform;
-    }
-
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: var(--text);
-    }
-
-    .nav-brand-logo {
-      width: 28px; height: 28px;
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden;
-    }
-
-    .nav-brand-logo img {
-      width: 100%; height: 100%;
-      object-fit: contain;
-    }
-
-    .nav-brand span {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-sub);
-      letter-spacing: 0.01em;
-    }
-
-    .nav-brand strong {
-      color: var(--text);
-    }
-
-    .nav-links {
-      display: flex; align-items: center; gap: 8px;
-    }
-
-    .nav-link {
-      color: var(--text-sub);
-      text-decoration: none;
-      font-size: 14px;
-      padding: 6px 14px;
-      border-radius: 8px;
-      transition: color 0.2s, background 0.2s;
-    }
-    .nav-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-
-    .nav-cta {
-      display: flex; align-items: center; gap: 6px;
-      background: var(--accent);
-      color: #fff;
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 600;
-      padding: 8px 18px;
-      border-radius: 8px;
-      transition: opacity 0.2s, transform 0.15s;
-    }
-    .nav-cta:hover { opacity: 0.88; transform: translateY(-1px); }
-
-    /* ─── HERO ─── */
-    .hero {
-      position: relative;
-      z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
-      overflow: hidden;
-    }
-
-    .hero::before {
-      content: '';
-      position: absolute;
-      top: -30%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 800px;
-      height: 800px;
-      background: radial-gradient(ellipse at center, rgba(98,214,255,0.18) 0%, transparent 65%);
-      pointer-events: none;
-    }
-
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--accent-dim);
-      border: 1px solid var(--border-acc);
-      border-radius: 100px;
-      padding: 6px 14px;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--accent);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      margin-bottom: 28px;
-    }
-
-    .hero-badge::before {
-      content: '';
-      width: 6px; height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-      box-shadow: 0 0 8px var(--accent);
-    }
-
-    .hero h1 {
-      font-size: clamp(52px, 8vw, 96px);
-      font-weight: 700;
-      font-family: var(--mono);
-      letter-spacing: -0.04em;
-      line-height: 1;
-      color: #fff;
-      text-shadow: 0 0 80px rgba(98,214,255,0.3);
-      margin-bottom: 10px;
-    }
-
-    .hero h1 span {
-      color: var(--accent);
-    }
-
-    .hero-sub {
-      font-size: clamp(18px, 2.5vw, 24px);
-      color: var(--text-sub);
-      font-weight: 300;
-      max-width: 640px;
-      margin: 16px auto 0;
-      line-height: 1.5;
-    }
-
-    .hero-meta {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-      margin-top: 32px;
-      font-size: 13px;
-      color: var(--text-dim);
-    }
-
-    .hero-meta-item {
-      display: flex; align-items: center; gap: 6px;
-    }
-
-    .hero-meta-sep {
-      width: 1px; height: 14px;
-      background: var(--border);
-    }
-
-    .hero-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 44px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--accent);
-      color: #fff;
-      text-decoration: none;
-      font-size: 15px;
-      font-weight: 600;
-      padding: 13px 28px;
-      border-radius: 10px;
-      border: none;
-      cursor: pointer;
-      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-      box-shadow: 0 4px 20px rgba(98,214,255,0.35);
-    }
-    .btn-primary:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(98,214,255,0.4); }
-
-    .btn-ghost {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(255,255,255,0.06);
-      color: var(--text);
-      text-decoration: none;
-      font-size: 15px;
-      font-weight: 500;
-      padding: 13px 28px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s, transform 0.15s;
-    }
-    .btn-ghost:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
-
-    .hero-install {
-      margin-top: 44px;
-      background: rgba(0,0,0,0.4);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      max-width: 520px;
-      width: 100%;
-    }
-
-    .install-label {
-      font-size: 11px;
-      font-family: var(--mono);
-      color: var(--accent);
-      font-weight: 500;
-      white-space: nowrap;
-    }
-
-    .install-cmd {
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--text-sub);
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .copy-btn {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 11px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-family: var(--font);
-    }
-    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-    .hero-scroll {
-      position: absolute;
-      bottom: 36px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      color: var(--text-dim);
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .hero-scroll-line {
-      width: 1px;
-      height: 36px;
-      background: linear-gradient(to bottom, var(--accent), transparent);
-      animation: scrollpulse 2s ease-in-out infinite;
-    }
-
-    @keyframes scrollpulse {
-      0%, 100% { opacity: 0.3; }
-      50%       { opacity: 1; }
-    }
-
-    /* ─── STATS BAR ─── */
-    .stats-bar {
-      position: relative; z-index: 1;
-      background: rgba(98,214,255,0.06);
-      border-top: 1px solid var(--border-acc);
-      border-bottom: 1px solid var(--border-acc);
-      padding: 28px 24px;
-    }
-
-    .stats-inner {
-      max-width: 960px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-around;
-      gap: 32px;
-      flex-wrap: wrap;
-    }
-
-    .stat {
-      text-align: center;
-    }
-
-    .stat-num {
-      font-size: 36px;
-      font-weight: 700;
-      font-family: var(--mono);
-      color: var(--accent);
-      line-height: 1;
-      display: block;
-    }
-
-    .stat-label {
-      font-size: 12px;
-      color: var(--text-dim);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-top: 6px;
-      display: block;
-    }
-
-    .stat-sep {
-      width: 1px;
-      height: 40px;
-      background: var(--border);
-    }
-
-    /* ─── SECTIONS ─── */
-    section {
-      position: relative;
-      z-index: 1;
-    }
-
-    .section-inner {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 96px 24px;
-    }
-
-    .section-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 16px;
-    }
-
-    .section-heading {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      color: var(--text);
-      margin-bottom: 16px;
-    }
-
-    .section-sub {
-      font-size: 17px;
-      color: var(--text-sub);
-      max-width: 560px;
-      line-height: 1.65;
-    }
-
-    /* ─── VIDEO / DEMO ─── */
-    .demo-section .section-inner {
-      padding-top: 80px;
-    }
-
-    .demo-header {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      margin-bottom: 48px;
-    }
-
-    /* ─── DEMO TABS ─── */
-    .demo-tabs {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-    .demo-tab {
-      padding: 8px 20px;
-      border-radius: 100px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-sub);
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .demo-tab .tab-icon { font-size: 15px; }
-    .demo-tab:hover { border-color: var(--border-acc); color: var(--text); }
-    .demo-tab.active {
-      background: rgba(98,214,255,0.12);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    .demo-wrap {
-      position: relative;
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      border: 1px solid var(--border-acc);
-      box-shadow: 0 0 80px rgba(98,214,255,0.12), 0 32px 64px rgba(0,0,0,0.5);
-      background: #0b2a4c;
-      aspect-ratio: 900 / 560;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    .demo-panel { display: none; width: 100%; height: 100%; }
-    .demo-panel.active { display: block; }
-    .demo-panel--terminal { padding: 0; background: #0b2a4c; }
-    .demo-panel--terminal .terminal { margin: 0; border: none; border-radius: var(--radius-lg); height: 100%; }
-
-    .demo-placeholder {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      background: linear-gradient(135deg, #0a0e1a 0%, #134069 100%);
-    }
-
-    .demo-placeholder-grid {
-      position: absolute;
-      inset: 0;
-      background-image: linear-gradient(rgba(98,214,255,0.04) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(98,214,255,0.04) 1px, transparent 1px);
-      background-size: 40px 40px;
-    }
-
-    .play-btn {
-      width: 80px; height: 80px;
-      background: var(--accent);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: 0 0 40px rgba(98,214,255,0.5);
-      position: relative; z-index: 1;
-    }
-    .play-btn:hover { transform: scale(1.08); box-shadow: 0 0 60px rgba(98,214,255,0.7); }
-
-    .play-btn svg { margin-left: 5px; }
-
-    .demo-caption {
-      position: relative; z-index: 1;
-      font-size: 15px;
-      color: var(--text-sub);
-      font-family: var(--mono);
-    }
-
-    /* ─── TERMINAL MOCK ─── */
-    .terminal {
-      background: #0b2a4c;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      margin-top: 48px;
-    }
-
-    .terminal-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 16px;
-      background: rgba(255,255,255,0.03);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .dot { width: 10px; height: 10px; border-radius: 50%; }
-    .dot-r { background: #ff5f57; }
-    .dot-y { background: #febc2e; }
-    .dot-g { background: #28c840; }
-
-    .terminal-title {
-      flex: 1;
-      text-align: center;
-      font-size: 12px;
-      color: var(--text-dim);
-      font-family: var(--mono);
-    }
-
-    .terminal-body {
-      padding: 20px 24px;
-      font-family: var(--mono);
-      font-size: 13px;
-      line-height: 1.8;
-    }
-
-    .t-prompt { color: var(--accent); }
-    .t-cmd    { color: #e2e8f0; }
-    .t-out    { color: var(--text-sub); }
-    .t-key    { color: #f9a8d4; }
-    .t-val    { color: #86efac; }
-    .t-str    { color: #fde68a; }
-    .t-comment{ color: var(--text-dim); }
-
-    /* ─── FEATURES ─── */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-      margin-top: 56px;
-    }
-
-    .feature-card {
-      background: var(--bg-card-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 32px;
-      transition: border-color 0.3s, transform 0.2s, box-shadow 0.3s;
-      cursor: default;
-    }
-
-    .feature-card:hover {
-      border-color: var(--border-acc);
-      transform: translateY(-4px);
-      box-shadow: 0 16px 48px rgba(0,0,0,0.4), 0 0 40px rgba(98,214,255,0.06);
-    }
-
-    .feature-icon {
-      width: 48px; height: 48px;
-      background: var(--accent-dim);
-      border: 1px solid var(--border-acc);
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-      margin-bottom: 20px;
-    }
-
-    .feature-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 10px;
-      line-height: 1.3;
-    }
-
-    .feature-desc {
-      font-size: 14px;
-      color: var(--text-sub);
-      line-height: 1.65;
-    }
-
-    .feature-tag {
-      display: inline-block;
-      margin-top: 16px;
-      padding: 3px 10px;
-      background: var(--accent-dim);
-      border-radius: 100px;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--accent);
-      font-family: var(--mono);
-    }
-
-    /* ─── HOW IT WORKS ─── */
-    .how-section {
-      background: rgba(255,255,255,0.02);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .how-steps {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0;
-      margin-top: 56px;
-      position: relative;
-    }
-
-    .how-steps::before {
-      content: '';
-      position: absolute;
-      top: 32px;
-      left: calc(33.33% / 2 + 16px);
-      right: calc(33.33% / 2 + 16px);
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      opacity: 0.3;
-    }
-
-    .how-step {
-      padding: 0 32px;
-      text-align: center;
-    }
-
-    .step-num {
-      width: 64px; height: 64px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-acc);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px;
-      font-weight: 700;
-      font-family: var(--mono);
-      color: var(--accent);
-      margin: 0 auto 24px;
-    }
-
-    .step-title {
-      font-size: 17px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 10px;
-    }
-
-    .step-desc {
-      font-size: 14px;
-      color: var(--text-sub);
-      line-height: 1.65;
-    }
-
-    .step-code {
-      display: inline-block;
-      margin-top: 12px;
-      padding: 4px 10px;
-      background: rgba(0,0,0,0.4);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--text-sub);
-    }
-
-    /* ─── CLIENTS ─── */
-    .clients-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-top: 52px;
-    }
-
-    .client-card {
-      background: var(--bg-card-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px 20px;
-      text-align: center;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .client-card:hover { border-color: var(--border-acc); transform: translateY(-3px); }
-
-    .client-icon {
-      width: 52px; height: 52px;
-      border-radius: 14px;
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 16px;
-    }
-
-    .client-icon svg { width: 26px; height: 26px; }
-
-    .client-icon--claude {
-      background: rgba(98,214,255,0.14);
-      border: 1px solid rgba(98,214,255,0.3);
-      color: #62d6ff;
-    }
-
-    .client-icon--copilot {
-      background: rgba(137,87,229,0.14);
-      border: 1px solid rgba(137,87,229,0.3);
-      color: #8957e5;
-    }
-
-    .client-icon--openai {
-      background: rgba(16,163,127,0.14);
-      border: 1px solid rgba(16,163,127,0.3);
-      color: #10a37f;
-    }
-
-    .client-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 4px;
-    }
-
-    .client-type {
-      font-size: 11px;
-      color: var(--text-dim);
-    }
-
-    .client-transport {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 2px 8px;
-      background: var(--accent-dim);
-      border-radius: 100px;
-      font-size: 10px;
-      font-weight: 500;
-      color: var(--accent);
-      font-family: var(--mono);
-    }
-
-    /* ─── INSTALL TABS ─── */
-    .install-section .section-inner { padding-bottom: 80px; }
-
-    .tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      margin-top: 52px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 0;
-    }
-
-    .tab-btn {
-      padding: 10px 18px;
-      background: none;
-      border: none;
-      color: var(--text-dim);
-      font-size: 13px;
-      font-weight: 500;
-      font-family: var(--font);
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      transition: color 0.2s, border-color 0.2s;
-      margin-bottom: -1px;
-    }
-    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .tab-btn:hover:not(.active) { color: var(--text-sub); }
-
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    .code-block {
-      background: #080b13;
-      border: 1px solid var(--border);
-      border-top: none;
-      border-radius: 0 0 var(--radius) var(--radius);
-      padding: 24px 24px;
-      position: relative;
-    }
-
-    .code-block pre {
-      font-family: var(--mono);
-      font-size: 13px;
-      line-height: 1.7;
-      color: var(--text-sub);
-      overflow-x: auto;
-    }
-
-    .code-copy {
-      position: absolute;
-      top: 14px; right: 14px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-      border-radius: 6px;
-      padding: 5px 12px;
-      font-size: 11px;
-      cursor: pointer;
-      font-family: var(--font);
-      transition: all 0.2s;
-    }
-    .code-copy:hover { border-color: var(--accent); color: var(--accent); }
-
-    /* ─── ABOUT ─── */
-    .about-section {
-      background: transparent;
-      border-top: 1px solid var(--border);
-    }
-
-    .about-inner {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 96px 24px;
-      display: flex;
-      gap: 48px;
-      align-items: center;
-    }
-
-    .about-avatar {
-      flex-shrink: 0;
-      width: 100px; height: 100px;
-      border-radius: 50%;
-      background: var(--bg-card);
-      border: 2px solid var(--border-acc);
-      overflow: hidden;
-      box-shadow: 0 0 30px rgba(98,214,255,0.2);
-    }
-
-    .about-avatar img {
-      width: 100%; height: 100%;
-      object-fit: cover;
-    }
-
-    .about-text h3 {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 6px;
-    }
-
-    .about-role {
-      font-size: 13px;
-      color: var(--accent);
-      font-weight: 500;
-      margin-bottom: 14px;
-      letter-spacing: 0.03em;
-    }
-
-    .about-bio {
-      font-size: 15px;
-      color: var(--text-sub);
-      line-height: 1.65;
-      margin-bottom: 20px;
-    }
-
-    .about-links {
-      display: flex; gap: 12px; flex-wrap: wrap;
-    }
-
-    .about-link {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 7px 16px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      text-decoration: none;
-      color: var(--text-sub);
-      font-size: 13px;
-      transition: all 0.2s;
-    }
-    .about-link:hover { border-color: var(--border-acc); color: var(--text); background: rgba(98,214,255,0.08); }
-
-    /* ─── CTA BANNER ─── */
-    .cta-section {
-      background: transparent;
-      border-top: 1px solid var(--border);
-    }
-
-    .cta-inner {
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 96px 24px;
-      text-align: center;
-    }
-
-    .cta-inner h2 {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      color: var(--text);
-      margin-bottom: 16px;
-    }
-
-    .cta-inner p {
-      font-size: 17px;
-      color: var(--text-sub);
-      margin-bottom: 36px;
-    }
-
-    .cta-actions {
-      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
-    }
-
-    /* ─── FOOTER ─── */
-    footer {
-      position: relative; z-index: 1;
-      border-top: 1px solid var(--border);
-      padding: 32px 48px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      flex-wrap: wrap;
-    }
-
-    .footer-brand {
-      display: flex; align-items: center; gap: 10px;
-      text-decoration: none; color: var(--text-sub);
-      font-size: 13px;
-    }
-
-    .footer-brand-logo {
-      width: 22px; height: 22px;
-      border-radius: 5px;
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden;
-    }
-
-    .footer-brand-logo img {
-      width: 100%; height: 100%;
-      object-fit: contain;
-    }
-
-    .footer-links {
-      display: flex; gap: 24px; align-items: center;
-    }
-
-    .footer-link {
-      color: var(--text-dim);
-      text-decoration: none;
-      font-size: 13px;
-      transition: color 0.2s;
-    }
-    .footer-link:hover { color: var(--text); }
-
-    .footer-copy {
-      color: var(--text-dim);
-      font-size: 12px;
-    }
-
-    /* ─── UTILS ─── */
-    .highlight { color: var(--accent); }
-    .mono { font-family: var(--mono); }
-
-    @media (max-width: 768px) {
-      nav { padding: 16px 20px; }
-      .nav-links { display: none; }
-      .how-steps { grid-template-columns: 1fr; gap: 40px; }
-      .how-steps::before { display: none; }
-      .about-inner { flex-direction: column; text-align: center; }
-      .about-links { justify-content: center; }
-      footer { flex-direction: column; text-align: center; }
-    }
-  
-/* ─── VISUAL EXPLAINER ─── */
-.viz-hero { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-.hero > *:not(.viz-hero):not(.hero-scroll) { position: relative; z-index: 1; }
-.hero::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(ellipse 46% 44% at 50% 50%, rgba(18,56,95,0.82), rgba(18,56,95,0) 100%); }
-.viz-section .section-heading { text-wrap: balance; }
-.viz-section { position: relative; z-index: 1; padding: 96px 24px 24px; }
-.viz-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(28px, 5vw, 72px); align-items: center; }
-.viz-frame { position: relative; aspect-ratio: 16 / 10; border-radius: 26px; border: 1px solid rgba(255,255,255,0.14); background: linear-gradient(165deg, rgba(98,214,255,0.08), rgba(11,42,76,0.7) 60%); box-shadow: 0 18px 50px rgba(7,28,52,0.35), inset 0 1px 0 rgba(255,255,255,0.12); overflow: hidden; }
-.viz-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-@media (max-width: 820px) { .viz-inner { grid-template-columns: 1fr; } .viz-frame { aspect-ratio: 4 / 3.4; } .hero::after { background: radial-gradient(ellipse 80% 50% at 50% 50%, rgba(18,56,95,0.8), rgba(18,56,95,0) 100%); } }
-
-.editor-demo { position: absolute; inset: 0; display: flex; flex-direction: column; font-family: var(--mono); font-size: 13px; background: #0b2a4c; }
-.ed-bar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.04); }
-.ed-bar .dots { display: flex; gap: 6px; }
-.ed-bar .dots i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f57; }
-.ed-bar .dots i:nth-child(2) { background: #febc2e; }
-.ed-bar .dots i:nth-child(3) { background: #28c840; }
-.ed-tabs { display: flex; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
-.ed-tabs b { font-weight: 500; font-size: 11.5px; padding: 4px 10px; border-radius: 6px 6px 0 0; color: var(--text-dim); white-space: nowrap; }
-.ed-tabs b.on { color: #fff; background: rgba(98,214,255,0.14); box-shadow: inset 0 -2px 0 var(--accent); }
-.ed-status { font-size: 11px; color: var(--text-dim); transition: color .2s; }
-.is-saved .ed-status { color: #7be0b0; }
-.ed-body { display: grid; grid-template-columns: 34% 1fr; flex: 1; min-height: 0; }
-.ed-tree { border-right: 1px solid var(--border); padding: 12px 12px; font-size: 11.5px; color: var(--text-sub); }
-.ed-tree p { font-size: 10px; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 8px; }
-.ed-tree li { list-style: none; padding: 3px 0 3px 12px; }
-.ed-tree li.on { color: #fff; background: rgba(98,214,255,0.12); border-radius: 4px; }
-.ed-tree li.dir { padding-left: 0; color: #fff; }
-.ed-code { margin: 0; padding: 14px 16px; overflow: hidden; color: #e6e9ff; line-height: 1.75; white-space: pre; }
-.ed-code .kw { color: #ff8fa3; } .ed-code .fn { color: #62d6ff; } .ed-code .vr { color: #ffc266; } .ed-code .tg { color: #7be0b0; } .ed-code .pn { color: #bdeeff; } .ed-code .cm { color: #9db8d3; }
-.ed-code .caret { display: inline-block; width: 7px; height: 1.1em; vertical-align: text-bottom; background: var(--accent); margin-left: 1px; animation: blink 1s steps(2) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .ed-code .caret { animation: none; } }
-
-  
-/* ─── ONE NAV: boesger.com links plus this page's own sections ─── */
-html { scroll-padding-top: 90px; }
-.nav-link.nav-site { color: #fff; font-weight: 500; }
-.nav-sep { width: 1px; height: 18px; background: var(--border); margin: 0 10px; }
-@media (max-width: 1180px) { .nav-local, .nav-sep { display: none; } }
-@media (max-width: 768px) {
-  nav { padding: 12px 16px; }
-  .nav-links { display: flex; gap: 0; }
-  .nav-link { padding: 6px 7px; font-size: 13px; }
-  .nav-brand span { display: none; }
-  .nav-cta { padding: 8px 10px; margin-left: 6px; }
-  .nav-cta .cta-text { display: none; }
-}
-
-
-/* ─── DEMO MOCKUPS (animated by demo.js) ─── */
-.pl-hide { opacity: 0; transform: translateY(6px); }
-[data-step], [data-play-lines] > * { transition: opacity .35s ease, transform .35s ease; }
-.pl-caret::after { content: ''; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--accent); animation: plblink 1s steps(2) infinite; }
-@keyframes plblink { 50% { opacity: 0; } }
-.mk { position: absolute; inset: 0; display: flex; flex-direction: column; background: #0d2440; font-size: 13px; color: #e6eefa; }
-.mk-bar { display: flex; align-items: center; gap: 7px; padding: 10px 14px; background: #0a1e36; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.mk-bar i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
-.mk-bar i:nth-child(2) { background: #febc2e; } .mk-bar i:nth-child(3) { background: #28c840; }
-.mk-bar span { margin-left: 10px; font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); }
-.mk-bar .mk-url { margin: 0 auto; padding: 4px 60px; border-radius: 8px; background: rgba(255,255,255,0.06); color: var(--text-sub); }
-.mk-body, .mk-cbody { flex: 1; display: flex; min-height: 0; }
-.mk-act { width: 44px; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 14px; background: #0a1e36; border-right: 1px solid rgba(255,255,255,0.06); }
-.mk-act b { width: 18px; height: 18px; border-radius: 5px; background: rgba(255,255,255,0.12); }
-.mk-act b.on { background: var(--accent); }
-.mk-chat { width: 46%; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.08); min-width: 0; }
-.mk-chat-h { padding: 10px 14px; font-weight: 600; font-size: 12.5px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.mk-ok { font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: #7be0b0; }
-.mk-feed { flex: 1; overflow: hidden; padding: 14px; display: flex; flex-direction: column; gap: 9px; }
-.mk-msg { line-height: 1.5; }
-.mk-user { align-self: flex-end; max-width: 88%; padding: 9px 12px; border-radius: 12px 12px 4px 12px; background: rgba(98,214,255,0.16); border: 1px solid rgba(98,214,255,0.3); min-height: 1.5em; }
-.mk-ai code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
-.mk-tool { align-self: flex-start; font-family: var(--mono); font-size: 11.5px; padding: 6px 10px; border-radius: 8px; color: #7be0b0; background: rgba(123,224,176,0.08); border: 1px solid rgba(123,224,176,0.3); }
-.mk-tool::before { content: '✓ '; }
-.mk-tool.pl-pending { color: var(--warm); background: rgba(255,194,102,0.08); border-color: rgba(255,194,102,0.35); }
-.mk-tool.pl-pending::before { content: ''; display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; border: 2px solid var(--warm); border-right-color: transparent; animation: plspin .8s linear infinite; vertical-align: -1px; }
-@keyframes plspin { to { transform: rotate(360deg); } }
-.mk-row { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); font-size: 12.5px; }
-.mk-row b { font-family: var(--mono); color: var(--accent); }
-.mk-row span { color: var(--text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mk em { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; }
-.p-crit { color: #1a0b10; background: #ff8fa3; } .p-high { color: #2a1a00; background: #ffc266; } .p-med { color: #0b2a4c; background: #bdeeff; }
-.mk-input { margin: 10px 14px 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); color: var(--text-dim); font-size: 12.5px; }
-.mk-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #0b1f38; }
-.mk-tabs { display: flex; font-family: var(--mono); font-size: 11.5px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.mk-tabs span { padding: 9px 14px; color: var(--text-dim); }
-.mk-tabs span.on { color: #fff; box-shadow: inset 0 -2px 0 var(--accent); background: rgba(255,255,255,0.03); }
-.mk-code { margin: 0; padding: 12px 0; font-family: var(--mono); font-size: 12px; line-height: 1.85; color: #cfe3f7; white-space: pre; overflow: hidden; }
-.mk-code i { display: inline-block; width: 36px; padding-right: 12px; text-align: right; font-style: normal; color: rgba(255,255,255,0.25); }
-.mk-code k { color: #ff8fa3; } .mk-code f { color: #62d6ff; } .mk-code c { color: #7f9bb8; } .mk-code n { color: #ffc266; }
-.mk-code .hl { background: rgba(255,194,102,0.12); }
-.mk-status { display: flex; gap: 18px; padding: 5px 14px; font-family: var(--mono); font-size: 11px; color: #0b2a4c; background: var(--accent); }
-.mk-cside { width: 190px; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; background: #0a1e36; border-right: 1px solid rgba(255,255,255,0.06); }
-.mk-new { padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,0.08); font-size: 12.5px; font-weight: 600; }
-.mk-cside b { height: 9px; border-radius: 4px; background: rgba(255,255,255,0.1); margin: 4px 4px 0; }
-.mk-cside b.s { width: 60%; }
-.mk-conn { margin-top: auto; font-family: var(--mono); font-size: 10.5px; color: #7be0b0; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(123,224,176,0.3); }
-.mk-cchat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.mk-cchat .mk-feed { max-width: 620px; width: 100%; margin: 0 auto; }
-@media (max-width: 760px) {
-  .demo-wrap { aspect-ratio: auto; height: 540px; }
-  .mk-editor, .mk-act, .mk-cside { display: none; }
-  .mk-chat { width: 100%; border-right: 0; }
-  .mk-bar .mk-url { padding: 4px 24px; }
-}
-@media (prefers-reduced-motion: reduce) { .pl-caret::after, .mk-tool.pl-pending::before { animation: none; } }
-
-.mk-feed > * { flex-shrink: 0; }
-.mk-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-@media (max-width: 760px) { .demo-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; padding-bottom: 4px; } .demo-tabs::-webkit-scrollbar { display: none; } .demo-tab { white-space: nowrap; flex-shrink: 0; } }
-/* ─── AUDIT FIXES ─── */
-.tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-.tabs::-webkit-scrollbar { display: none; }
-.tab-btn { white-space: nowrap; }
-.paths { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 36px; }
-.path-card { text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 16px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); transition: border-color .2s, background .2s, transform .2s; }
-.path-card:hover { transform: translateY(-2px); border-color: var(--border-acc); }
-.path-card.is-active { border-color: var(--accent); background: var(--accent-dim); }
-.path-k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warm); }
-.path-card strong { font-size: 15px; color: #fff; }
-.path-d { font-size: 13px; line-height: 1.5; color: var(--text-sub); }
-.path-card em { margin-top: auto; padding-top: 6px; font-style: normal; font-family: var(--mono); font-size: 11.5px; color: var(--accent); }
-.paths + .tabs { margin-top: 28px; }
-@media (max-width: 980px) { .paths { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .paths { grid-template-columns: 1fr; } }
-
-.cta-inner h2 { line-height: 1.08; text-wrap: balance; }
-
-    /* Mobile section menu */
-    .nav-toggle {
-      display: none;
-      width: 42px;
-      height: 42px;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-      border: 1px solid var(--border-acc);
-      border-radius: 10px;
-      background: var(--accent-dim);
-      color: var(--accent);
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
-    }
-    .nav-toggle:hover { background: var(--accent-glow); border-color: var(--accent); }
-    .nav-toggle svg { width: 20px; height: 20px; }
-    .nav-toggle:focus-visible, .nav-links a:focus-visible {
-      outline: 3px solid var(--accent);
-      outline-offset: 3px;
-    }
-    @media (max-width: 900px) {
-      nav { position: fixed; }
-      .nav-toggle { display: inline-flex; }
-      .nav-links, .nav-links.is-open {
-        display: none;
-        position: absolute;
-        top: calc(100% + 1px);
-        left: 12px;
-        right: 12px;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 4px;
-        padding: 12px;
-        border: 1px solid var(--border-acc);
-        border-radius: 12px;
-        background: var(--bg-card);
-        box-shadow: 0 16px 40px rgba(0,0,0,0.32);
-        max-height: calc(100vh - 80px);
-        overflow-y: auto;
-      }
-      .nav-links.is-open { display: flex; }
-      .nav-links .nav-cta .cta-text { display: inline; }
-      .nav-links .nav-link, .nav-links .nav-cta {
-        display: flex;
-        align-items: center;
-        min-height: 44px;
-        margin: 0;
-        padding: 10px 12px;
-        border-radius: 8px;
-      }
-      .nav-links .nav-local, .nav-links .nav-sep { display: none; }
-      .nav-links.is-open .nav-local { display: flex; }
-      .nav-links .nav-sep { display: none; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      .nav-toggle { transition: none; }
-    }
-    .hero-meta { flex-wrap: wrap; }
-    .quickstart-code { margin-top: 24px; padding: 20px; overflow-wrap: anywhere; white-space: pre-wrap; background: rgba(0,0,0,.32); border: 1px solid var(--border); border-radius: var(--radius); color: var(--accent); font-family: var(--mono); font-size: 14px; }
-    .client-card { text-align: left; min-width: 0; overflow-wrap: anywhere; }
-    .client-name { font-size: 16px; }
-    .client-status { display: inline-block; color: var(--warm); font-size: 11px; margin-bottom: 10px; }
-    .client-detail { color: var(--text-sub); font-size: 13px; margin-top: 8px; }
-    .client-detail strong { color: var(--text); }
-    .client-guide { display: inline-block; margin-top: 16px; color: var(--accent); text-decoration: none; }
-    .client-guide:hover, .section-sub a:hover { text-decoration: underline; }
-    .section-sub a { color: var(--accent); }
-    .link-grid { margin-top: 28px; }
-    .feature-link { display: block; color: var(--text); text-decoration: none; }
-    .feature-link:hover { border-color: var(--border-acc); transform: translateY(-2px); }
-    .footer-links { display: flex; gap: 18px; }
-    .footer-links a { color: var(--text-sub); text-decoration: none; }
-    @media (max-width: 900px) { nav { padding: 14px 20px; } .nav-links { gap: 2px; flex-wrap: wrap; justify-content: flex-end; } .nav-link { padding: 6px 8px; } }
-    @media (max-width: 600px) { nav { align-items: flex-start; flex-direction: column; gap: 10px; padding: 12px 16px; } .nav-links { display: flex; position: static; flex-direction: row; align-items: center; justify-content: flex-start; gap: 4px; padding: 0; border: 0; background: transparent; box-shadow: none; max-height: none; overflow: visible; } .nav-cta { padding: 6px 10px; } .hero { min-height: 80vh; padding: 150px 18px 64px; } .hero h1 { font-size: clamp(38px, 12vw, 64px); } .hero-meta { gap: 10px; } .hero-meta-sep { display: none; } .section-inner { padding-left: 18px; padding-right: 18px; } .clients-grid, .features-grid { grid-template-columns: minmax(0, 1fr); } .quickstart-code { font-size: 12px; } footer { gap: 12px; flex-wrap: wrap; } }
-
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   </style>
 </head>
 <body>
-<nav>
-  <a href="https://polarion-mcp.boesger.com/" class="nav-brand" aria-label="Polarion MCP home">
-    <span class="nav-brand-logo" aria-hidden="true">P</span>
-    <span><strong>polarion-mcp</strong></span>
-  </a>
-  <div class="nav-links" aria-label="Page sections">
-    <a href="#what" class="nav-link">What</a>
-    <a href="#quickstart" class="nav-link">Quickstart</a>
-    <a href="#clients" class="nav-link">Clients</a>
-    <a href="#features" class="nav-link">Features</a>
-    <a href="#auth" class="nav-link">Authentication</a>
-    <a href="#links" class="nav-link">Links</a>
-    <a href="https://github.com/phillipboesger/polarion-mcp" class="nav-cta">GitHub</a>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="https://polarion-mcp.boesger.com/" class="nav-brand" aria-label="Polarion MCP home">polarion<span>-mcp</span></a>
+    <div class="nav-links">
+      <a href="#clients">Get started</a>
+      <a href="#features">Features</a>
+      <a href="#links">Documentation</a>
+      <a href="https://github.com/phillipboesger/polarion-mcp">GitHub ↗</a>
+    </div>
   </div>
 </nav>
-
-<main>
-  <section class="hero" id="what">
-    <div class="hero-badge">Open source · MIT license</div>
-    <h1>polarion<span>-mcp</span></h1>
-    <p class="hero-sub">An open-source Model Context Protocol server for the Polarion ALM REST API. Connect AI clients to Polarion through stdio or Streamable HTTP, with a separate REST wrapper for integrations using OpenAPI actions.</p>
-    <div class="hero-meta" aria-label="Project facts">
-      <div class="hero-meta-item">284 tools</div><div class="hero-meta-sep" aria-hidden="true"></div>
-      <div class="hero-meta-item">Node.js 22+</div><div class="hero-meta-sep" aria-hidden="true"></div>
-      <div class="hero-meta-item">MIT license</div>
+<main id="main">
+  <section class="hero" id="what" aria-labelledby="project-title">
+    <p class="eyebrow">Open source · MIT · Built for Polarion</p>
+    <h1 id="project-title">polarion<span>-mcp</span></h1>
+    <p class="hero-sub">Connect your AI assistant to Polarion ALM.</p>
+    <p class="hero-description">An open-source Model Context Protocol server with <strong>284 tools</strong> generated from the Polarion REST API.</p>
+    <div class="project-badges" aria-label="Project badges">
+      <a href="https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml"><img src="https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml/badge.svg" alt="CI status" width="88" height="20" /></a>
+      <a href="https://www.npmjs.com/package/polarion-mcp"><img src="https://img.shields.io/npm/v/polarion-mcp" alt="npm version" width="82" height="20" /></a>
+      <a href="https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp"><img src="https://img.shields.io/badge/ghcr.io-polarion--mcp-2496ED?logo=docker&amp;logoColor=white" alt="Docker image on GHCR" width="154" height="20" /></a>
+      <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license" width="78" height="20" /></a>
+      <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/package.json"><img src="https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&amp;logoColor=white" alt="Node.js 22 or newer" width="96" height="20" /></a>
+      <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-server-6E56CF" alt="Model Context Protocol server" width="80" height="20" /></a>
+      <a href="https://github.com/phillipboesger/polarion-mcp/stargazers"><img src="https://img.shields.io/github/stars/phillipboesger/polarion-mcp?style=flat" alt="GitHub stars" width="88" height="20" /></a>
     </div>
-    <div class="hero-actions"><a href="#quickstart" class="btn-primary">Quickstart</a><a href="https://github.com/phillipboesger/polarion-mcp" class="btn-ghost">View on GitHub</a></div>
-  </section>
-
-  <section class="install-section" id="quickstart">
-    <div class="section-inner">
-      <p class="section-label">Quickstart</p>
-      <h2 class="section-heading">Connect a remote or local client</h2>
-      <p class="section-sub">For a remote MCP client, use your server's MCP URL (for example, <code>https://YOUR-SERVER/mcp</code>) and authenticate with your Polarion personal access token (PAT). OAuth login is available when enabled by the server administrator. See the <a href="README.md#client-setup">client setup guides</a>.</p>
-      <p class="section-sub">For a local stdio client, set the Polarion REST API URL and PAT in its environment, then run:</p>
-      <pre class="quickstart-code"><code>API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 BEARER_TOKEN=YOUR_POLARION_PAT npx -y polarion-mcp</code></pre>
-    </div>
-  </section>
-
-  <section id="clients">
-    <div class="section-inner">
-      <p class="section-label">Pick your client</p>
-      <h2 class="section-heading">Client setup guides</h2>
-      <p class="section-sub">Choose a client to see its supported transports, authentication options, and setup guide.</p>
-      <div class="clients-grid">
+    <details class="client-picker" id="clients">
+      <summary>Pick your client</summary>
+      <p class="picker-note">Choose a setup guide. “Unverified” entries need confirmation against current vendor documentation; this list does not certify every client integration.</p>
+      <ul class="client-guide-list">
         <!-- clients:start -->
-      <article class="client-card">
-        <h3 class="client-name">Claude.ai / Claude Desktop (custom connectors)</h3>
-        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
-        <a class="client-guide" href="clients/claude-web-desktop.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Claude Code</h3>
+      <li class="client-row">
+        <a class="client-guide" href="clients/claude-web-desktop.html" aria-label="Set up Claude.ai / Claude Desktop (custom connectors)">Claude.ai / Claude Desktop (custom connectors) <span aria-hidden="true">→</span></a>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/claude-code.html" aria-label="Set up Claude Code">Claude Code <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
-        <a class="client-guide" href="clients/claude-code.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Claude API MCP connector</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/claude-api.html" aria-label="Set up Claude API MCP connector">Claude API MCP connector <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · preregistered client</p>
-        <a class="client-guide" href="clients/claude-api.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">ChatGPT connectors / Apps</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/chatgpt-apps.html" aria-label="Set up ChatGPT connectors / Apps">ChatGPT connectors / Apps <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> oauth dcr · cimd · preregistered client</p>
-        <a class="client-guide" href="clients/chatgpt-apps.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Custom GPT (Actions)</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/custom-gpt.html" aria-label="Set up Custom GPT (Actions)">Custom GPT (Actions) <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> REST action</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · preregistered client</p>
-        <a class="client-guide" href="clients/custom-gpt.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">OpenAI Responses API / Agents SDK</h3>
-        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · preregistered client</p>
-        <a class="client-guide" href="clients/openai-api.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Codex CLI</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/openai-api.html" aria-label="Set up OpenAI Responses API / Agents SDK">OpenAI Responses API / Agents SDK <span aria-hidden="true">→</span></a>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/codex-cli.html" aria-label="Set up Codex CLI">Codex CLI <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
-        <a class="client-guide" href="clients/codex-cli.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">VS Code Copilot</h3>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
-        <a class="client-guide" href="clients/vscode-copilot.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Microsoft Copilot Studio</h3>
-        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
-        <a class="client-guide" href="clients/copilot-studio.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Cursor</h3>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
-        <a class="client-guide" href="clients/cursor.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Windsurf</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/vscode-copilot.html" aria-label="Set up VS Code Copilot">VS Code Copilot <span aria-hidden="true">→</span></a>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/copilot-studio.html" aria-label="Set up Microsoft Copilot Studio">Microsoft Copilot Studio <span aria-hidden="true">→</span></a>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/cursor.html" aria-label="Set up Cursor">Cursor <span aria-hidden="true">→</span></a>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/windsurf.html" aria-label="Set up Windsurf">Windsurf <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
-        <a class="client-guide" href="clients/windsurf.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">JetBrains AI Assistant</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/jetbrains-ai.html" aria-label="Set up JetBrains AI Assistant">JetBrains AI Assistant <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> none</p>
-        <a class="client-guide" href="clients/jetbrains-ai.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Gemini CLI</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/gemini-cli.html" aria-label="Set up Gemini CLI">Gemini CLI <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
-        <a class="client-guide" href="clients/gemini-cli.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Zed</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/zed.html" aria-label="Set up Zed">Zed <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
-        <a class="client-guide" href="clients/zed.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">Cline</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/cline.html" aria-label="Set up Cline">Cline <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> stdio · Streamable HTTP · SSE</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr</p>
-        <a class="client-guide" href="clients/cline.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
-      <article class="client-card">
-        <h3 class="client-name">n8n</h3>
+      </li>
+      <li class="client-row">
+        <a class="client-guide" href="clients/n8n.html" aria-label="Set up n8n">n8n <span aria-hidden="true">→</span></a>
         <span class="client-status">Unverified</span>
-        <p class="client-detail"><strong>Transport:</strong> Streamable HTTP</p>
-        <p class="client-detail"><strong>Auth:</strong> static header · oauth dcr · preregistered client</p>
-        <a class="client-guide" href="clients/n8n.md">Setup guide <span aria-hidden="true">→</span></a>
-      </article>
+      </li>
     <!-- clients:end -->
-      </div>
+      </ul>
+    </details>
+    <a class="github-link" href="https://github.com/phillipboesger/polarion-mcp">View on GitHub ↗</a>
+    <div class="quickstart" id="quickstart">
+      <h2>Start in 3 steps</h2>
+      <ol class="quickstart-steps">
+        <li><h3 class="step-title"><span class="step-number">01</span>Choose</h3><p>Open the client picker above for your setup guide. For local setup, you need Node.js 22+, a Polarion REST API URL, and a personal access token (PAT).</p></li>
+        <li><h3 class="step-title"><span class="step-number">02</span>Connect</h3><p>Local clients launch <code>npx -y polarion-mcp</code>. Set <code>API_BASE_URL</code> to <code>https://YOUR-POLARION/polarion/rest/v1</code> and <code>BEARER_TOKEN</code> to your PAT in the client's configuration.</p></li>
+        <li><h3 class="step-title"><span class="step-number">03</span>Ask</h3><p>Confirm that the client lists Polarion tools, then ask: “List the Polarion projects I can access.”</p></li>
+      </ol>
+      <p class="team-note">Already have a team MCP URL? Use it in your client guide. Cloud clients need a deployed server. Hosting one? Read the <a href="deployment.html">deployment guide</a>.</p>
+      <details class="source-build">
+        <summary>Alternative: build from source</summary>
+        <p>With Git and Node.js 22+, build the server:</p>
+        <pre><code>git clone https://github.com/phillipboesger/polarion-mcp.git
+cd polarion-mcp
+npm ci --ignore-scripts
+npm run build</code></pre>
+        <p>In your client's local configuration, use command <code>node</code> and argument <code>/absolute/path/to/polarion-mcp/build/index.js</code> instead of <code>npx -y polarion-mcp</code>. Keep the same environment variables. See the <a href="https://github.com/phillipboesger/polarion-mcp#quickstart">configuration example</a>.</p>
+      </details>
     </div>
   </section>
-
-  <section id="features">
+  <section class="demo" aria-labelledby="demo-title">
     <div class="section-inner">
-      <p class="section-label">Features</p>
-      <h2 class="section-heading">Polarion tools for AI clients</h2>
+      <div class="demo-header"><h2 id="demo-title">See it in action</h2><a href="example-task.html">Follow a worked example →</a></div>
+      <figure>
+        <img src="assets/demo.gif" alt="Illustrated workflow: an AI assistant queries Polarion work items and presents the results" width="850" height="529" />
+        <figcaption>Illustrated workflow: an AI assistant queries Polarion work items and presents the results.</figcaption>
+      </figure>
+    </div>
+  </section>
+  <section id="features" aria-labelledby="features-title">
+    <div class="section-inner">
+      <p class="section-label">What you can do</p>
+      <h2 id="features-title">Bring Polarion into the conversation</h2>
       <div class="features-grid">
-        <article class="feature-card"><h3 class="feature-title">284 generated tools</h3><p class="feature-desc">Tools are generated from the Polarion REST API definition.</p></article>
-        <article class="feature-card"><h3 class="feature-title">Guarded operations</h3><p class="feature-desc">Guard selected risky changes and optionally limit access to read-only or allowlisted tools.</p></article>
-        <article class="feature-card"><h3 class="feature-title">Dry run support</h3><p class="feature-desc">Preview supported guarded operations before applying a change.</p></article>
-        <article class="feature-card"><h3 class="feature-title">Markdown rendering</h3><p class="feature-desc">Render supported Polarion content as Markdown for AI clients.</p></article>
-        <article class="feature-card"><h3 class="feature-title">Toolsets</h3><p class="feature-desc">Select groups of tools to match the task and client.</p></article>
-        <article class="feature-card"><h3 class="feature-title">REST wrapper</h3><p class="feature-desc">Use the reduced OpenAPI document for action clients.</p></article>
+        <article class="feature"><h3>Work with Polarion data</h3><p>284 tools generated from the REST API cover work items, documents, test management, plans, projects, and more.</p><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/src/tools.ts">Browse the tool catalog →</a></article>
+        <article class="feature"><h3>Choose the tools you expose</h3><p>Named toolsets, allowlists, and read-only mode narrow the callable surface. The enabled list depends on your configuration.</p><a href="configuration.html">Configure tools →</a></article>
+        <article class="feature"><h3>Preview changes</h3><p>Mutating REST tools support dry-run request previews. Selected Work Item changes also have validation guards for enumeration values, custom-field keys, and user references.</p><a href="features.html">Explore features →</a></article>
+        <article class="feature"><h3>Read rich text</h3><p>Supported HTML response values include a Markdown representation alongside the original content.</p><a href="usage.html">Read the usage guide →</a></article>
       </div>
+      <p class="section-sub">Connect locally over stdio or remotely over Streamable HTTP. A separate REST wrapper serves OpenAPI Actions. The tool count covers generated REST tools; optional helpers and filters change the enabled list.</p>
     </div>
   </section>
-
-  <section class="install-section" id="auth">
+  <section class="operations" id="auth" aria-labelledby="security-title">
     <div class="section-inner">
-      <p class="section-label">Authentication overview</p>
-      <h2 class="section-heading">Use a PAT directly or sign in with OAuth</h2>
-      <p class="section-sub">MCP clients can use a Polarion PAT directly as a bearer token, or use the server's OAuth login when enabled. OAuth lets users enter their PAT through the server login flow. The REST wrapper uses its configured server-side credentials and API key.</p>
-      <p class="section-sub">Read <a href="security.md">Authentication and security</a>, <a href="configuration.md">configuration</a>, and the individual client guides.</p>
+      <p class="section-label">For teams and administrators</p>
+      <h2 id="security-title">Security and team deployment</h2>
+      <p class="section-sub">Polarion controls each user's permissions. Remote MCP accepts a user's PAT directly or through the server's OAuth login. The REST wrapper uses the deployment's Polarion credentials and a separate API key.</p>
+      <p class="section-sub">Plan TLS and reverse proxies, redirect allowlists, token lifetimes, rate limits, and tool restrictions. Extension interfaces support custom policy, audit, authentication, and instance resolution integrations.</p>
+      <div class="reference-links"><a href="deployment.html">Deployment</a><a href="configuration.html">Configuration</a><a href="security.html">Security</a><a href="extensions.html">Extension interfaces</a></div>
+      <ul class="trust-strip">
+        <li><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE">Open source · MIT</a></li>
+        <li><a href="https://github.com/phillipboesger/polarion-mcp/actions/workflows/live-polarion.yml">Tested against Polarion 2506 and 2606</a> · <a href="polarion-versioning.html">Scope</a></li>
+        <li><a href="quality/supply-chain.html">Supply-chain verification</a></li>
+      </ul>
+      <p class="supply-note">Release workflows generate CycloneDX SBOMs and GitHub build provenance, and sign tagged container images with cosign. Check the artifacts available for each <a href="https://github.com/phillipboesger/polarion-mcp/releases">release</a>.</p>
     </div>
   </section>
-
-  <section id="links">
+  <section id="links" aria-labelledby="docs-title">
     <div class="section-inner">
-      <p class="section-label">Links</p>
-      <h2 class="section-heading">Project documentation</h2>
-      <div class="features-grid link-grid">
-        <a class="feature-card feature-link" href="README.md">Documentation index</a>
-        <a class="feature-card feature-link" href="features.md">Features</a>
-        <a class="feature-card feature-link" href="usage.md">Usage</a>
-        <a class="feature-card feature-link" href="architecture.md">Architecture</a>
-        <a class="feature-card feature-link" href="deployment.md">Deployment</a>
-        <a class="feature-card feature-link" href="https://github.com/phillipboesger/polarion-mcp">GitHub repository</a>
-      </div>
+      <p class="section-label">Documentation</p>
+      <h2 id="docs-title">Find what you need</h2>
+      <dl class="docs-list">
+        <div><dt>Find a guide</dt><dd><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/README.md">Documentation index</a> · <a href="troubleshooting.html">Troubleshooting</a></dd></div>
+        <div><dt>Configure the server</dt><dd><a href="configuration.html">Environment, toolsets, and settings</a></dd></div>
+        <div><dt>Host it for a team</dt><dd><a href="deployment.html">Docker, remote MCP, and reverse proxies</a></dd></div>
+        <div><dt>Review authentication and controls</dt><dd><a href="security.html">Security</a> · <a href="quality/supply-chain.html">Supply chain</a></dd></div>
+        <div><dt>Use tools and prompts</dt><dd><a href="usage.html">Usage</a> · <a href="resources-and-prompts.html">Resources and prompts</a></dd></div>
+        <div><dt>Inspect API coverage</dt><dd><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/src/tools.ts">Tool catalog</a> · <a href="quality/rest-coverage.html">REST coverage</a></dd></div>
+        <div><dt>Understand or extend it</dt><dd><a href="architecture.html">Architecture</a> · <a href="extensions.html">Extension interfaces</a></dd></div>
+        <div><dt>Check version support</dt><dd><a href="polarion-versioning.html">Polarion versions</a> · <a href="live-tests.html">Live tests</a></dd></div>
+      </dl>
+    </div>
+  </section>
+  <section class="community" aria-labelledby="contribute-title">
+    <div class="section-inner">
+      <p class="section-label">Made in the open</p>
+      <h2 id="contribute-title">Contribute</h2>
+      <p class="section-sub">Bug reports, documentation fixes, and focused pull requests are welcome.</p>
+      <div class="reference-links"><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/CONTRIBUTING.md">Contributing guide</a><a href="https://github.com/phillipboesger/polarion-mcp/issues">Issues</a><a href="https://github.com/phillipboesger/polarion-mcp/releases">Releases</a></div>
+      <p class="credits">Built by <a href="https://github.com/phillipboesger">Phillip Bösger</a>, building on the work of <a href="https://github.com/Jonasdero">@Jonasdero</a>.</p>
     </div>
   </section>
 </main>
-
 <footer>
-  <a href="https://polarion-mcp.boesger.com/" class="footer-brand">polarion-mcp</a>
-  <div class="footer-links"><a href="https://github.com/phillipboesger/polarion-mcp">GitHub</a><a href="README.md">Documentation</a></div>
-  <span class="footer-copy">© 2026 Phillip Bösger</span>
+  <span>polarion-mcp · © Phillip Bösger</span>
+  <div class="footer-links"><a href="https://github.com/phillipboesger/polarion-mcp">GitHub</a><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/README.md">Documentation</a><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE">MIT license</a></div>
 </footer>
 </body>
 </html>

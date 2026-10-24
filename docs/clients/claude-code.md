@@ -11,10 +11,12 @@
 ## Configuration
 
 ```json
-{"mcpServers":{"polarion":{"command":"npx","args":["-y","polarion-mcp"],"env":{"API_BASE_URL":"https://YOUR-POLARION","BEARER_TOKEN":"YOUR_POLARION_PAT"}}}}
+{"mcpServers":{"polarion":{"command":"npx","args":["-y","polarion-mcp"],"env":{"API_BASE_URL":"https://YOUR-POLARION/polarion/rest/v1","BEARER_TOKEN":"YOUR_POLARION_PAT"}}}}
 ```
 
 This is the exact client snippet recorded in [clients.json](../clients.json). It is unverified (check the vendor docs).
+
+For a source build instead of npm, use the [source-build alternative](../../README.md#quickstart) with the same environment variables.
 
 ## Authentication
 

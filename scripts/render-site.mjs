@@ -10,12 +10,8 @@ const escapeHtml = value => String(value).replaceAll('&', '&amp;').replaceAll('<
 
 export function renderSiteClientsBlock(clients) {
   return clients.map(client => {
-    const transports = client.transports.length
-      ? client.transports.map(value => value === 'streamable-http' ? 'Streamable HTTP' : value.toUpperCase() === 'SSE' ? 'SSE' : value).join(' · ')
-      : 'REST action';
-    const auth = client.authModes.map(value => value.replaceAll('-', ' ')).join(' · ');
-    const statusLine = client.confidence === 'unverified' ? '        <span class="client-status">Unverified</span>\n' : '';
-    return `      <article class="client-card">\n        <h3 class="client-name">${escapeHtml(client.name)}</h3>\n${statusLine}        <p class="client-detail"><strong>Transport:</strong> ${escapeHtml(transports)}</p>\n        <p class="client-detail"><strong>Auth:</strong> ${escapeHtml(auth)}</p>\n        <a class="client-guide" href="clients/${escapeHtml(client.id)}.md">Setup guide <span aria-hidden="true">→</span></a>\n      </article>`;
+    const status = client.confidence === 'unverified' ? '\n        <span class="client-status">Unverified</span>' : '';
+    return `      <li class="client-row">\n        <a class="client-guide" href="clients/${escapeHtml(client.id)}.html" aria-label="Set up ${escapeHtml(client.name)}">${escapeHtml(client.name)} <span aria-hidden="true">→</span></a>${status}\n      </li>`;
   }).join('\n');
 }
 
