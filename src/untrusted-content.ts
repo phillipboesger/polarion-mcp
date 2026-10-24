@@ -6,6 +6,7 @@ const CLOSE = '</polarion-untrusted>';
 function markValue(value: unknown, parentKey?: string, inherited = false): unknown {
   if (typeof value === 'string') {
     if (!inherited && (!parentKey || !UNTRUSTED_KEY.test(parentKey))) return value;
+    if (value.startsWith(OPEN) && value.endsWith(CLOSE)) return value;
     const safe = value.replace(/<\/polarion-untrusted/gi, '&lt;/polarion-untrusted');
     return `${OPEN}${safe}${CLOSE}`;
   }
@@ -18,13 +19,16 @@ function markValue(value: unknown, parentKey?: string, inherited = false): unkno
 export function annotatePolarionResult(result: unknown, markUntrusted: boolean): unknown {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   const annotated = markUntrusted ? markValue(result) as Record<string, unknown> : { ...result as Record<string, unknown> };
-  return { ...annotated, _notice: UNTRUSTED_CONTENT_NOTICE };
+  return { ...annotated, _notice: typeof annotated._notice === 'string' ? annotated._notice : UNTRUSTED_CONTENT_NOTICE };
 }
 
-/** Annotates JSON object text without changing non-JSON or non-object responses. */
+/** Annotates JSON object text, optionally following an executor status prefix. */
 export function annotateToolText(text: string, markUntrusted: boolean): string {
+  const newline = text.indexOf('\n');
+  const prefix = newline >= 0 ? text.slice(0, newline + 1) : '';
+  const payload = prefix ? text.slice(newline + 1) : text;
   let parsed: unknown;
-  try { parsed = JSON.parse(text); } catch { return text; }
+  try { parsed = JSON.parse(payload); } catch { return text; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return text;
-  return JSON.stringify(annotatePolarionResult(parsed, markUntrusted));
+  return `${prefix}${JSON.stringify(annotatePolarionResult(parsed, markUntrusted))}`;
 }

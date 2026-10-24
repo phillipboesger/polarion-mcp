@@ -41,7 +41,7 @@ import { renderRichTextFieldsAsMarkdown } from './markdown.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
-import { annotateToolText } from './untrusted-content.js';
+import { annotatePolarionResult, annotateToolText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
@@ -254,6 +254,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     options.logger.toolCall?.({ correlationId, tool: toolName, outcome, durationMs, msg: outcome === 'success' ? 'Tool call completed' : 'Tool call ended', secrets: bearerToken ? [bearerToken] : [] });
   }
   if (options.markUntrusted && !result!.isError) {
+    if (result!.structuredContent !== undefined) result!.structuredContent = annotatePolarionResult(result!.structuredContent, true) as Record<string, unknown>;
     result!.content = result!.content.map(item => item.type === 'text'
       ? { ...item, text: annotateToolText(item.text, options.markUntrusted) }
       : item);
