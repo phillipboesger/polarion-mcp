@@ -6,11 +6,13 @@ export const runJobAndWait: VirtualTool = {
   description: 'Executes a Polarion job and polls until it finishes, fails, times out, or this request is cancelled. The job itself is not cancelled when polling stops. Job semantics vary by jobId, so this tool is conservatively marked destructive.',
   inputSchema: { type: 'object', properties: {
     requestBody: { type: 'object', description: 'Parameters passed to executeJob.', properties: { jobId: { type: 'string' }, name: { type: 'string' }, nodeId: { type: ['string', 'null'] }, params: { type: ['object', 'null'] }, scope: { type: ['string', 'null'] } }, required: ['jobId'] },
+    dry_run: { type: 'boolean', description: 'Preview the job request without executing it.' },
     max_wait_seconds: { type: 'number', description: 'Maximum polling time; defaults to 120 seconds and is capped at 600.' },
     log_tail_chars: { type: 'number', description: 'Maximum log tail length (default 4000, capped at 20000).' },
   }, required: ['requestBody'] },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   async handler(args, ctx) {
+    if (args.dry_run === true) return textResult({ dryRun: true, requestBody: args.requestBody, message: 'Preview only; executeJob was not called.' });
     const waitSeconds = boundedNumber(args.max_wait_seconds, 120, 600);
     const logLimit = Math.floor(boundedNumber(args.log_tail_chars, 4000, 20000));
     const started = Date.now();
