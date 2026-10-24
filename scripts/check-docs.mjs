@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderClientsBlock, renderClientReference } from './render-clients.mjs';
+import { renderClientsBlock, renderClientReference, renderReadmeFaq } from './render-clients.mjs';
 import { renderSite } from './render-site.mjs';
 
 const RULES = {
@@ -74,6 +74,22 @@ function checker(root) {
       if (actual !== expected) add('clients', 'README.md', lineAt(readme, startAt), 'client marker block differs from docs/clients.json; run npm run docs:clients');
       if (manifest.groups) {
         if (read(root, 'docs/clients.md') !== renderClientReference(manifest)) add('clients', 'docs/clients.md', 1, 'source reference is stale; run npm run docs:clients');
+        if (!readme.includes(`<!-- faq:start -->\n${renderReadmeFaq(manifest)}\n<!-- faq:end -->`)) add('clients', 'README.md', 1, 'FAQ block differs from docs/clients.json; run npm run docs:clients');
+        // Idiot-proof rule: every supported client x mode needs prerequisites, steps, a verification and a failure fix.
+        for (const mode of manifest.serverModes) if (!mode.before?.length) add('clients', 'docs/clients.json', 1, `server mode ${mode.id} has no "Before you start" items`);
+        for (const client of manifest.clients) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(client.checked || '')) add('clients', 'docs/clients.json', 1, `${client.id} has no checked date`);
+          for (const source of client.sources || []) if (!/^https:\/\/\S+$/.test(source)) add('clients', 'docs/clients.json', 1, `${client.id} has a source that is not a plain https URL: ${source}`);
+          for (const [mode, connection] of Object.entries(client.connections)) {
+            if (connection.reason) continue;
+            const missing = [];
+            if ((connection.steps || []).length < 3) missing.push('at least 3 steps');
+            if (!connection.verify?.prompt || !connection.verify?.expect) missing.push('a verify prompt and expected result');
+            if (!(connection.fails || []).length) missing.push('an "if it fails" entry');
+            if (!Array.isArray(connection.needs)) missing.push('a needs list');
+            if (missing.length) add('clients', 'docs/clients.json', 1, `${client.id} / ${mode} is missing ${missing.join(', ')}`);
+          }
+        }
         if (read(root, 'docs/index.html') !== renderSite(root)) add('clients', 'docs/index.html', 1, 'inline setup differs from docs/clients.json; run npm run docs:site');
       }
     } catch (error) {

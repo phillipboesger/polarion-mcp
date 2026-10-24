@@ -61,7 +61,7 @@ test('every client shows its default, disabled reasons and every supported serve
       await expect(input).toBeChecked();
       const setup = manifest.setups.find(setup => setup.id === connection.setup);
       await expect(page.locator('#setup-code')).toHaveText(connection.snippet ?? setup.snippet);
-      await expect(page.locator('#setup-steps li')).toHaveText(connection.steps);
+      await expect(page.locator('#setup-steps li')).toHaveText([...(connection.needs ?? []).map(need => `You need: ${need}`), ...connection.steps]);
       if (connection.serverSetup) {
         const server = manifest.setups.find(setup => setup.id === connection.serverSetup);
         await expect(page.locator('#server-command')).toBeVisible();
@@ -77,13 +77,13 @@ test('client switcher and mode deep links restore configurations with safe defau
   await page.goto('/#setup/cursor/remote');
   await expect(page.locator('#setup-title')).toHaveText('Cursor');
   await expect(page.locator('#setup-code')).toContainText('https://YOUR-SERVER/mcp');
-  await page.locator('#setup-client').selectOption('cline');
+  await page.locator('#setup-client').selectOption('windsurf');
   await expect(page.locator('#setup-code')).toContainText('"command": "npx"');
   await page.locator('[name="server-mode"][value="remote"]').check();
-  await expect(page.locator('#setup-code')).toContainText('"type": "streamableHttp"');
+  await expect(page.locator('#setup-code')).toContainText('"serverUrl"');
   await page.reload();
   await expect(page.locator('[name="server-mode"][value="remote"]')).toBeChecked();
-  await expect(page.locator('#setup-code')).toContainText('"type": "streamableHttp"');
+  await expect(page.locator('#setup-code')).toContainText('"serverUrl"');
   await page.goto('/#setup/chatgpt-apps/npm');
   await expect(page.locator('[name="server-mode"][value="remote"]')).toBeChecked();
   await page.goto('/#setup/claude-desktop/invalid-mode');
@@ -145,7 +145,7 @@ test('daily conversations support keyboard tabs without shifting the next sectio
 test('FAQ is usable inline and community links match enabled repository features', async ({ page }, info) => {
   await page.goto('/');
   const questions = page.locator('#faq details');
-  await expect(questions).toHaveCount(6);
+  await expect(questions).toHaveCount(manifest.faq.length);
   for (const item of await questions.all()) {
     await item.locator('summary').click();
     await expect(item).toHaveAttribute('open', '');
@@ -159,6 +159,23 @@ test('FAQ is usable inline and community links match enabled repository features
   await page.locator('#faq details').nth(1).locator('summary').click();
   await page.locator('#faq').scrollIntoViewIfNeeded();
   await screenshot(page, `after-${info.project.name}-faq-open.png`);
+});
+
+test('every setup shows prerequisites, a check and a fix for failures', async ({ page }) => {
+  await page.goto('/');
+  for (const client of manifest.clients) {
+    for (const [mode, connection] of Object.entries(client.connections)) {
+      if (connection.reason) continue;
+      await page.goto(`/#setup/${client.id}/${mode}`);
+      await expect(page.locator('#setup-title')).toHaveText(client.name);
+      await expect(page.locator('#before-items details').first()).toBeAttached();
+      await expect(page.locator('#setup-verify')).toBeVisible();
+      await expect(page.locator('#verify-expect')).not.toBeEmpty();
+      await expect(page.locator('#setup-fails dt').first()).toBeVisible();
+      await expect(page.locator('#setup-steps li')).toHaveCount(connection.steps.length + (connection.needs?.length ?? 0));
+    }
+  }
+  await noOverflow(page);
 });
 
 test('unsafe or malformed manifest source URLs never reach the DOM link', async ({ page }) => {
