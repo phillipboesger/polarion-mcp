@@ -8,7 +8,6 @@ const response = (data: unknown, extra: Record<string, unknown> = {}): CallToolR
 function context(call: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>, signal = new AbortController().signal, progress: unknown[] = []): VirtualToolContext {
   return { callPolarionTool: call, signal, logger: console, reportProgress: async item => { progress.push(item); } };
 }
-const job = (state: string, status?: string) => response([{ id: 'job-1', attributes: { state, status: status ? { type: status, message: 'done' } : undefined } }]);
 import { traceLinks } from '../src/composite-trace.js';
 function link(source: string, target: string, role = 'relates_to') {
   return { attributes: { role }, relationships: { sourceWorkItem: { data: { id: source } }, workItem: { data: { id: target } } } };

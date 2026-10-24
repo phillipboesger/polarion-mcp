@@ -55,5 +55,5 @@ test("stdio server default exposes all deployment-enabled tools when MCP_TOOLSET
     encoding: "utf8",
   })
   assert.equal(result.status, 0, result.stderr)
-  assert.equal(Number(result.stdout.trim()), 284)
+  assert.equal(Number(result.stdout.trim()), 289)
 })

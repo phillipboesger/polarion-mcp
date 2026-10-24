@@ -37,6 +37,16 @@ Mutating tools accept `dry_run: true`. This validates and prepares the request, 
 
 Read tools accept `response_format: "concise" | "detailed"`. It defaults to `detailed`, which preserves the complete response. `concise` drops rich-text HTML when a `value_markdown` sibling exists, removes JSON:API links and metadata except `links.next` and `meta.totalCount`, and applies a small default sparse fieldset to large list tools when `fields` is omitted. Any caller-supplied `fields` value is preserved. Successful responses add `value_markdown` for HTML rich-text fields. Write guards fail closed when supported enum, custom-field key, or Work Item user-reference validation cannot confirm a value. See [Features](./features.md) for coverage details.
 
+## Composite tools
+
+The `composites` toolset adds higher-level tools that call existing Polarion REST operations through the normal executor. Select it with `MCP_TOOLSETS=composites` or a request toolset selector. `MCP_READ_ONLY=true` exposes the read-only trace and LiveDoc tools but blocks `run_job_and_wait`.
+
+- `run_job_and_wait` accepts the `executeJob` `requestBody`, then polls `getJob` with a 1 to 5 second backoff. `max_wait_seconds` defaults to 120 and is capped at 600; `log_tail_chars` defaults to 4000 and is capped at 20000. Job factory IDs can represent different operations, so the tool is conservatively marked destructive. Cancelling the MCP request stops polling; it does not cancel the Polarion job.
+- `trace_links` performs a cycle-safe breadth-first traversal. `direction` is `up`, `down`, or `both`; `roles` filters link roles; `depth` defaults to 3 and is capped at 6; `node_cap` defaults to 200 and is capped at 1000. At most four REST operations are in flight at once. The result includes nodes, edges, and a `truncated` flag.
+- `read_document_markdown`, `get_document_outline`, and `read_document_section` read LiveDoc parts in order and render rich text with the same Markdown helper used by normal tool responses. Section lookup accepts a heading path (an array, or a string separated by ` > `) or a part ID. `max_chars` defaults to 20000 and is capped at 100000.
+
+When a client sends `_meta.progressToken`, `run_job_and_wait` emits MCP progress notifications. Without a progress token, it emits none.
+
 ## Quality checks
 
 Run `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as applicable. See [quality/e2e.md](./quality/e2e.md), [quality/mutation-baseline.md](./quality/mutation-baseline.md), [quality/sonar.md](./quality/sonar.md), and [quality/distribution.md](./quality/distribution.md).
