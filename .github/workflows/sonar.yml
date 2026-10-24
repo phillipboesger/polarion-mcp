@@ -26,6 +26,9 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --ignore-scripts
+      - name: Build (the wrapper test runs the compiled server)
+        run: npm run build
+
       - name: Run coverage
         run: npm run test:coverage
       - name: Skip Sonar scan without token or for fork pull requests

@@ -59,6 +59,34 @@ function nameMapFor(definition: McpToolDefinition): Record<string, string> {
 // imported `sendWithRetry` from `executor.js` before it moved to `httpClient.js`.
 export { sendWithRetry };
 
+export const DEFAULT_MAX_RESPONSE_CHARS = 100_000;
+const MIN_RESPONSE_CHARS = JSON.stringify({ truncated: true, totalChars: Number.MAX_SAFE_INTEGER, preview: '', hint: 'Use fields and page_size_ to shrink the response.' }).length;
+
+function truncateResponse(text: string, maxChars: number, definition: McpToolDefinition): string {
+  const properties = definition.inputSchema?.properties ?? {};
+  const suggestions = [
+    properties.fields ? 'fields' : undefined,
+    properties['page[size]'] || properties.page_size_ ? 'page_size_' : undefined,
+  ].filter(Boolean);
+  const hint = suggestions.length ? `Use ${suggestions.join(' and ')} to shrink the response.` : 'Narrow the query to shrink the response.';
+  const codePoints = Array.from(text);
+  let previewLength = Math.min(codePoints.length, maxChars);
+  while (previewLength >= 0) {
+    const envelope = JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, previewLength).join(''), hint });
+    if (envelope.length <= maxChars || previewLength === 0) return envelope;
+    previewLength--;
+  }
+  return JSON.stringify({ truncated: true, totalChars: text.length, preview: '', hint });
+}
+
+/** Parses the response text cap from the entry-point environment. */
+export function parseMaxResponseChars(value: string | undefined): number {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= MIN_RESPONSE_CHARS
+    ? parsed
+    : DEFAULT_MAX_RESPONSE_CHARS;
+}
+
 /**
  * Builds the enum-guard targets for a Work Item write tool, or `null` if
  * `definition` isn't one of the (small, explicit) set of tools the guard
@@ -95,6 +123,12 @@ function buildWorkItemEnumTargets(
     const attributes = writtenAttributes(dataItems[0]);
     const relationships = (dataItems[0] as any)?.relationships;
     if (typeof projectId !== 'string' || typeof workItemId !== 'string' || !attributes) return null;
+    const changeTypeTo = readArg(validatedArgs, 'changeTypeTo', nameMap);
+    // Polarion changes the workflow when this action changes an item's type.
+    // Status options therefore belong to the destination type, not the current item.
+    if (typeof changeTypeTo === 'string' && changeTypeTo) {
+      return [{ projectId, type: changeTypeTo, attributes, relationships }];
+    }
     return [{ projectId, workItemId, attributes, relationships }];
   }
 
@@ -128,8 +162,12 @@ function buildWorkItemEnumTargets(
       const attributes = writtenAttributes(item);
       const relationships = (item as any)?.relationships;
       if (typeof id !== 'string' || !attributes) continue;
-      const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' ? fallbackProjectId : undefined);
+      const split = splitWorkItemId(id, typeof fallbackProjectId === 'string' && definition.pathTemplate !== '/all/workitems' ? fallbackProjectId : undefined);
       if (split) targets.push({ projectId: split.projectId, workItemId: split.workItemId, attributes, relationships });
+      else if (definition.pathTemplate === '/all/workitems') targets.push({
+        projectId: '', workItemId: id, attributes, relationships,
+        unresolvedReason: `Cannot resolve global patchWorkItems id '${id}': ids must include their project prefix (for example 'PROJECT/WI-1'). Refusing the write.`,
+      });
     }
     return targets.length > 0 ? targets : null;
   }
@@ -528,7 +566,8 @@ export async function executeApiTool(
   definition: McpToolDefinition,
   toolArgs: JsonObject,
   allSecuritySchemes: Record<string, any>,
-  sendOpts?: SendWithRetryOpts
+  sendOpts?: SendWithRetryOpts,
+  maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS
 ): Promise<CallToolResult> {
   try {
     // ===== STEP 0: Strip dry_run before validation =====
@@ -537,6 +576,10 @@ export async function executeApiTool(
     // transition period, and it never leaks into `validatedArgs` sent to Polarion.
     const isMutating = MUTATING_METHODS.has(definition.method.toLowerCase());
     const argsForValidation: JsonObject = (typeof toolArgs === 'object' && toolArgs !== null) ? { ...toolArgs } : {};
+    if (definition.requestBodyContentType?.toLowerCase().startsWith('multipart/form-data')
+      && argsForValidation.requestBody && typeof argsForValidation.requestBody === 'object' && !Array.isArray(argsForValidation.requestBody)) {
+      argsForValidation.requestBody = JSON.stringify(argsForValidation.requestBody);
+    }
     // Models often send booleans as strings; an unreadable value must never
     // fall through to the real (possibly irreversible) write.
     const rawDryRun = argsForValidation.dry_run;
@@ -982,8 +1025,7 @@ export async function executeApiTool(
         // field so the model gets readable Markdown alongside the raw HTML, without
         // losing or altering anything in the original response.
         const renderedData = renderRichTextFieldsAsMarkdown(response.data);
-        // Pretty-print JSON with 2-space indentation
-        responseText = JSON.stringify(renderedData, null, 2);
+        responseText = JSON.stringify(renderedData);
         // Safe: this branch already checked `response.data` is a non-null object,
         // and renderRichTextFieldsAsMarkdown preserves the top-level shape.
         structuredContent = renderedData as JsonObject;
@@ -1004,13 +1046,17 @@ export async function executeApiTool(
       responseText = `(Status: ${response.status} - No body content)`;
     }
 
-    // An SSO login or proxy page answers with 200 text/html; that is not the API confirming a write.
-    if (isMutating && contentType.includes('text/html')) {
+    // JSON-declared tools can receive an SSO/proxy page; HTML-declared exports are valid.
+    const htmlPage = typeof response.data === 'string' && /^\s*(?:<!doctype\b|<html\b)/i.test(response.data);
+    const successIsJson = definition.responseContentType
+      ? definition.responseContentType.toLowerCase().includes('json')
+      : Boolean(definition.outputSchema);
+    if (successIsJson && contentType.includes('text/html') && htmlPage) {
       return {
         content: [{
           type: 'text',
-          text: `Polarion answered with an HTML page (status ${response.status}) instead of the API, probably a login or proxy page. ` +
-            `The write may not have happened; check the item before retrying.\n${responseText.slice(0, 500)}`,
+          text: `A login/SSO page returned, check API_BASE_URL/token. Polarion answered with HTML (status ${response.status}) instead of the API.` +
+            (isMutating ? ' The write may not have happened; check the item before retrying.' : '') + `\n${responseText.slice(0, 500)}`,
         }],
         isError: true,
       };
@@ -1022,13 +1068,18 @@ export async function executeApiTool(
     // non-JSON answer to a successful call has none to offer, so it gets an empty
     // object, which the advertised (lenient) schema accepts. isError would
     // report a write that worked as failed and invite a duplicating retry.
+    const fullResponseText = `API Response (Status: ${response.status}):\n${responseText}`;
+    const boundedResponseText = fullResponseText.length > maxResponseChars
+      ? truncateResponse(fullResponseText, maxResponseChars, definition)
+      : fullResponseText;
     return {
       content: [
         {
           type: "text",
-          text: `API Response (Status: ${response.status}):\n${responseText}`
+          text: boundedResponseText
         }
       ],
+      // MCP_MAX_RESPONSE_CHARS caps text content only; structuredContent stays unchanged by design.
       ...(definition.outputSchema ? { structuredContent: structuredContent ?? {} } : {}),
     };
 

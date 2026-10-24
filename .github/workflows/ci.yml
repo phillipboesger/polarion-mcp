@@ -186,6 +186,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      - name: Build (the wrapper test runs the compiled server)
+        run: npm run build
+
       - name: Run coverage and thresholds
         run: npm run test:coverage
 

@@ -4,6 +4,7 @@ import { AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios"
 
 import {
   checkWorkItemEnumFields,
+  checkWorkItemsEnumFields,
   checkWorkItemUserReferences,
   invalidateWorkItemOptions,
   MAX_CACHE_ENTRIES,
@@ -32,6 +33,39 @@ test("enum options on a later page are accepted, not refused", async () => {
   const result = await checkWorkItemEnumFields("P", "P-1", { status: "closed" }, ctx, { ...fast, httpClient })
   assert.deepEqual(result, { ok: true })
   assert.deepEqual(requested, ["1", "2"])
+})
+
+test("type change validates status against the new type and requests 100 options per page", async () => {
+  _optionsCache.clear()
+  let requested: AxiosRequestConfig | undefined
+  const result = await checkWorkItemsEnumFields([{ projectId: "P", type: "defect", attributes: { status: "closed" } }], ctx, {
+    ...fast,
+    httpClient: async (config) => {
+      requested = config
+      return ok({ data: [{ id: "closed" }] })
+    },
+  })
+  assert.deepEqual(result, { ok: true })
+  assert.match(String(requested?.url), /workitems\/fields\/status\/actions\/getAvailableOptions$/)
+  assert.equal((requested?.params as Record<string, unknown>)?.type, "defect")
+  assert.equal((requested?.params as Record<string, unknown>)?.["page[size]"], 100)
+})
+
+test("enum guard warns and fails open when the 20 page safety cap is reached", async () => {
+  _optionsCache.clear()
+  const warnings: string[] = []
+  const originalWarn = console.warn
+  console.warn = (...args: unknown[]) => warnings.push(args.join(" "))
+  try {
+    const result = await checkWorkItemEnumFields("P", "P-2", { status: "unseen" }, ctx, {
+      ...fast,
+      httpClient: async (config) => ({ ...ok({ data: [{ id: `option-${(config.params as any)?.["page[number]"]}` }], links: { next: "/next" } }), config } as AxiosResponse),
+    })
+    assert.deepEqual(result, { ok: true })
+    assert.ok(warnings.some((message) => message.includes("20")))
+  } finally {
+    console.warn = originalWarn
+  }
 })
 
 test("a missing user is not remembered: once created, the next write is accepted", async () => {

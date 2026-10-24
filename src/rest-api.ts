@@ -18,7 +18,7 @@ import express, { type Request, type RequestHandler, type Response } from 'expre
 import { executeApiTool } from './executor.js';
 import { toolDefinitionMap, securitySchemes } from './tools.js';
 import { enabledTools } from './tool-filter.js';
-import { sanitizeInputSchema } from './utils.js';
+import { redact, sanitizeInputSchema } from './utils.js';
 import { SERVER_VERSION } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import type { JsonObject } from './types.js';
@@ -72,6 +72,9 @@ export interface RestToolsOptions {
   securityScheme: Record<string, unknown>;
   /** What a 401 means, as documented in the specs. */
   unauthorizedDescription: string;
+  executeTool?: typeof executeApiTool;
+  /** Maximum characters returned in a tool's text content. */
+  maxResponseChars?: number;
 }
 
 /**
@@ -182,6 +185,7 @@ const HEALTH_RESPONSE = {
 export function createRestToolsRouter(options: RestToolsOptions): express.Router {
   const { authenticate, serverUrl, securityScheme, unauthorizedDescription } = options;
   const router = express.Router();
+  const executeTool = options.executeTool ?? executeApiTool;
 
   /**
    * List all available tools
@@ -230,7 +234,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       }
 
       // Execute the tool
-      const result = await executeApiTool(toolName, toolDefinition, toolArgs, securitySchemes);
+      const result = await executeTool(toolName, toolDefinition, toolArgs, securitySchemes, undefined, options.maxResponseChars);
 
       // Extract text content from MCP response format
       const textContent = result.content
@@ -254,14 +258,13 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       });
 
     } catch (error: unknown) {
-      console.error(`[ERROR] Error executing tool '${toolName}':`, error);
-
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const detail = redact(String(error instanceof Error ? error.message : error));
+      console.error(`[ERROR] Error executing tool '${toolName}': ${detail}`);
 
       res.status(500).json({
         success: false,
         error: 'Tool execution failed',
-        message: errorMessage,
+        message: 'Tool execution failed',
         tool: toolName,
         timestamp: new Date().toISOString()
       });
