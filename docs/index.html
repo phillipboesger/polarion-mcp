@@ -34,7 +34,7 @@
       <p class="eyebrow">Polarion ALM × your AI assistant</p>
       <h1 id="hero-title">Your Polarion work.<br /><span>One conversation away.</span></h1>
       <p class="hero-sub">Find the right requirements. Review a document.<br class="desktop-break" /> Prepare your next test run. Just ask your AI.</p>
-      <p class="hero-explainer">An open-source MCP server connecting Polarion to Claude, ChatGPT,<br class="desktop-break" /> Copilot, Gemini and the tools you already use.</p>
+      <div class="works-with" aria-label="Works with"><p>Works with</p><ul><li><a href="#setup/claude-desktop">Claude</a></li><li><a href="#setup/chatgpt-apps">ChatGPT</a></li><li><a href="#setup/gemini-cli">Gemini</a></li><li><a href="#setup/vscode-copilot">VS Code</a></li><li><a href="#setup/copilot-studio">Copilot</a></li><li><a href="#setup/cursor">Cursor</a></li><li><a href="#setup/codex-cli">Codex</a></li><li><a href="#setup/generic-stdio">any MCP client</a></li></ul></div>
       <div class="hero-actions"><a class="button primary" href="#clients">Connect your assistant <span aria-hidden="true">↗</span></a><a class="button secondary" href="#setup/docker">Run with Docker <span aria-hidden="true">→</span></a></div>
       <ul class="proof" aria-label="Project features">
         <li><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/src/tools.ts"><strong>284</strong> tools</a></li>
@@ -107,8 +107,8 @@
               <div class="client-buttons"><button type="button" data-client="gemini-cli" aria-controls="setup" aria-pressed="false">Gemini CLI</button><button type="button" data-client="gemini-enterprise" aria-controls="setup" aria-pressed="false">Gemini Enterprise</button></div>
             </article>
             <article class="provider-card other">
-              <div class="provider-heading"><span class="monogram" aria-hidden="true">+</span><div><h4>Other / Custom</h4><p>Any other AI provider or MCP client</p></div></div>
-              <div class="client-buttons"><button type="button" data-client="generic-stdio" aria-controls="setup" aria-pressed="false">Any MCP client</button><button type="button" data-client="openai-api" aria-controls="setup" aria-pressed="false">OpenAI API</button><button type="button" data-client="openai-agents" aria-controls="setup" aria-pressed="false">OpenAI Agents SDK</button></div>
+              <div class="provider-heading"><span class="monogram" aria-hidden="true">+</span><div><h4>Other / Custom</h4><p>Docker, HTTP, REST/OpenAPI, n8n or any other client</p></div></div>
+              <div class="client-buttons"><button type="button" data-client="generic-stdio" aria-controls="setup" aria-pressed="false">Any MCP client</button><button type="button" data-client="docker" aria-controls="setup" aria-pressed="false">Docker</button><button type="button" data-client="generic-http" aria-controls="setup" aria-pressed="false">HTTP</button><button type="button" data-client="rest-wrapper" aria-controls="setup" aria-pressed="false">REST / OpenAPI</button><button type="button" data-client="n8n" aria-controls="setup" aria-pressed="false">n8n</button><button type="button" data-client="openai-api" aria-controls="setup" aria-pressed="false">OpenAI API</button><button type="button" data-client="openai-agents" aria-controls="setup" aria-pressed="false">OpenAI Agents SDK</button></div>
             </article>
           </div>
         </section>
@@ -118,15 +118,6 @@
             <article class="provider-card editors">
               <div class="provider-heading"><span class="monogram" aria-hidden="true">&lt;/&gt;</span><div><h4>Your development workspace</h4><p>Use the client you already work in.</p></div></div>
               <div class="client-buttons"><button type="button" data-client="vscode-copilot" aria-controls="setup" aria-pressed="false">VS Code Copilot</button><button type="button" data-client="cursor" aria-controls="setup" aria-pressed="false">Cursor</button><button type="button" data-client="windsurf" aria-controls="setup" aria-pressed="false">Windsurf</button><button type="button" data-client="jetbrains-ai" aria-controls="setup" aria-pressed="false">JetBrains</button><button type="button" data-client="zed" aria-controls="setup" aria-pressed="false">Zed</button><button type="button" data-client="cline" aria-controls="setup" aria-pressed="false">Cline</button></div>
-            </article>
-          </div>
-        </section>
-        <section class="client-group" aria-labelledby="group-custom">
-          <h3 id="group-custom">Custom / self-hosted</h3>
-          <div class="provider-grid wide">
-            <article class="provider-card self-hosted">
-              <div class="provider-heading"><span class="monogram" aria-hidden="true">&gt;_</span><div><h4>Run it your way</h4><p>A team server, an HTTP client, or a workflow.</p></div></div>
-              <div class="client-buttons"><button type="button" data-client="docker" aria-controls="setup" aria-pressed="false">Docker</button><button type="button" data-client="generic-http" aria-controls="setup" aria-pressed="false">HTTP</button><button type="button" data-client="rest-wrapper" aria-controls="setup" aria-pressed="false">REST / OpenAPI</button><button type="button" data-client="n8n" aria-controls="setup" aria-pressed="false">n8n</button></div>
             </article>
           </div>
         </section></div>

@@ -34,7 +34,7 @@ test('hero breathes and the landing page follows the complete user journey', asy
     await screenshot(page, `after-${info.project.name}-${section}.png`);
   }
   await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
-  await expect(page.locator('.client-group > h3')).toHaveText(['AI providers', 'Tools / IDEs', 'Custom / self-hosted']);
+  await expect(page.locator('.client-group > h3')).toHaveText(['AI providers', 'Tools / IDEs']);
   await expect(page.locator('[data-client="claude-web-desktop"]')).toHaveText('claude.ai');
   await expect(page.locator('[data-client="generic-stdio"]')).toHaveText('Any MCP client');
   expect(errors).toEqual([]);
