@@ -41,6 +41,8 @@ const targets = [
   'src/composite-documents.ts',
   'src/composite-upload.ts',
   'src/metadata-cache.ts',
+  'src/generated-from.ts',
+  'src/version-check.ts',
 ]
 const sourceFiles = [...files].filter(([file]) => file.startsWith('src/') && file !== 'src/tools.ts')
 if (sourceFiles.length === 0) throw new Error('coverage/lcov.info contains no eligible src/*.ts files')

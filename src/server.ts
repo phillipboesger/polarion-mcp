@@ -43,6 +43,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
 import { annotatePolarionResult, annotateToolText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
+import { createVersionCheck } from './version-check.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
 import { decodePolarionIdentifier, registerCompositeTools } from './composite-search.js';
@@ -336,6 +337,9 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   if (unknown.length > 0) logger.warn(`[WARN] MCP_TOOLS names unknown tools, ignored: ${unknown.join(', ')}`);
     if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
+  const checkVersion = process.env.MCP_VERSION_CHECK?.trim().toLowerCase() === 'true'
+    ? createVersionCheck({ apiBaseUrl, bearerToken: process.env.BEARER_TOKEN, logger })
+    : undefined;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
   const completionsEnabled = /^(1|true|yes|on)$/i.test(process.env.MCP_COMPLETIONS ?? '');
@@ -378,6 +382,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * call, response formatting) to {@link executeApiTool}.
    */
   server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
+    checkVersion?.();
     const requestHeader = extra?.requestInfo?.headers['x-request-id'];
     const progressToken = extra?._meta?.progressToken;
     return callToolPipeline(
