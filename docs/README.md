@@ -42,6 +42,7 @@ Choose a client guide for its connection and authentication steps:
 | [Supply chain verification](quality/supply-chain.md) | Release SBOMs, provenance, image signatures, and verification commands. |
 | [Agent evals](quality/evals.md) | Offline validation and optional agent tool-selection evals. |
 | [Mutation baseline](quality/mutation-baseline.md) | Mutation testing baseline and results. |
+| [REST API coverage](quality/rest-coverage.md) | Generated operation coverage and Polarion version differences. |
 | [Sonar quality](quality/sonar.md) | Sonar analysis configuration and quality results. |
 | [Repository overview](repository-overview.md) | Repository layout and development entry points. |
 | [Resources and prompts](resources-and-prompts.md) | MCP resources, live resource templates, and prompts. |
