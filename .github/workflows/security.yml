@@ -38,7 +38,7 @@ jobs:
       # Personal accounts do not need a license key. Organizations may need
       # GITLEAKS_LICENSE depending on their Gitleaks plan.
       - name: Scan for leaked secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
