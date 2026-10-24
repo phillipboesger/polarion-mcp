@@ -33,6 +33,13 @@ test('pagination merges pages, retains totalCount, and truncates at item and pag
   }, 100);
   assert.equal(hardPageCap.pagesFetched, 20);
   assert.equal(hardPageCap.truncated, true);
+
+  const stopped = new AbortController();
+  let abortedFetches = 0;
+  stopped.abort();
+  const aborted = await paginate<JsonApiPage>({ data: [{ id: 1 }], links: { next: '?page[number]=2' } }, 10, async () => { abortedFetches++; return { data: [] }; }, 20, stopped.signal);
+  assert.equal(abortedFetches, 0);
+  assert.equal(aborted.truncated, true);
 });
 
 test('pagination handles optional included data and safely extracts only the next page number', async () => {
@@ -41,6 +48,7 @@ test('pagination handles optional included data and safely extracts only the nex
   assert.deepEqual(result.response.included, [{ id: 'related' }]);
   assert.equal(pageNumberFromLink('https://foreign.example/x?page%5Bnumber%5D=9', 'https://polarion.example/api', 2), 9);
   assert.equal(pageNumberFromLink('not a URL', 'bad base', 2), 2);
+  assert.equal(pageNumberFromLink('not a URL', 'bad base'), undefined);
 });
 
 test('generated list tool max_items paginates through a five-page stub and omission fetches one page', async () => {
@@ -71,8 +79,10 @@ test('generated list tool max_items paginates through a five-page stub and omiss
     assert.ok((tool?.inputSchema as any)?.properties?.max_items);
     const collected = await client.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', page_size_: 1, max_items: 5 } });
     assert.equal(requests, 5);
-    assert.deepEqual((collected.structuredContent as any).data.map((item: any) => item.id), ['PRJ/WI-1', 'PRJ/WI-2', 'PRJ/WI-3', 'PRJ/WI-4', 'PRJ/WI-5']);
+    assert.deepEqual((collected.structuredContent as any).data.map((item: any) => item.id), ['PRJ/WI-1']);
     assert.equal((collected.structuredContent as any).meta.totalCount, 5);
+    assert.equal((collected.structuredContent as any).truncated, true);
+    assert.ok(JSON.stringify(collected.structuredContent).length <= 220);
     const collectedText = (collected as any).content[0].text as string;
     assert.ok(collectedText.length <= 220);
     requests = 0;

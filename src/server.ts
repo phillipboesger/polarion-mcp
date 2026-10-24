@@ -184,14 +184,18 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             result = first;
           } else {
             const { response, truncated } = await paginate(body as JsonApiPage, maxItems as number, async next => {
+              const retryAfter = options.rateLimiter.check(principal.id);
+              if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
               const nextArgs = { ...firstArgs };
-              const nextPageNumber = pageNumberFromLink(next, resolved.apiBaseUrl, Number(nextArgs.page_number_ ?? 1) + 1);
+              const currentPageNumber = Number(nextArgs.page_number_ ?? 1);
+              const nextPageNumber = pageNumberFromLink(next, resolved.apiBaseUrl);
+              if (nextPageNumber === undefined || nextPageNumber <= currentPageNumber) throw new Error(`Pagination stopped for ${toolName}: next page number is missing or did not advance.`);
               nextArgs.page_number_ = nextPageNumber;
               const page = await executeApiTool(toolName, generated, nextArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
               if (page.isError || !page.structuredContent || typeof page.structuredContent !== 'object') throw new Error(`Pagination failed for ${toolName}: ${page.content.find(item => item.type === 'text')?.text ?? 'invalid page response'}`);
               return page.structuredContent as JsonApiPage;
-            });
-            const structuredContent = { ...response, ...(truncated ? { truncated: true } : {}) };
+            }, undefined, options.signal);
+            const structuredContent = capPagedStructuredContent({ ...response, ...(truncated ? { truncated: true } : {}) }, options.maxResponseChars);
             const firstText = first.content.find(item => item.type === 'text');
             const prefix = firstText?.type === 'text' ? (firstText.text.split('\n', 1)[0] ?? 'API Response') : 'API Response';
             const fullText = `${prefix}\n${JSON.stringify(structuredContent)}`;
@@ -265,6 +269,18 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       : item);
   }
   return result!;
+}
+
+function capPagedStructuredContent(page: JsonApiPage, maxChars: number): JsonApiPage {
+  const bounded: JsonApiPage = { ...page, data: Array.isArray(page.data) ? [...page.data] : [] };
+  let text = JSON.stringify(bounded);
+  while (text.length > maxChars && (bounded.data as unknown[]).length > 0) {
+    (bounded.data as unknown[]).pop();
+    bounded.truncated = true;
+    text = JSON.stringify(bounded);
+  }
+  if (text.length > maxChars) return { data: [], truncated: true };
+  return bounded;
 }
 
 export interface PolarionServerOptions {
@@ -428,11 +444,12 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     let values: string[] = [];
     try {
       if (kind) {
-        const cached = metadataCache.get(apiBaseUrl, scope, kind, projectId);
+        const fieldId = String(context?.arguments?.fieldId ?? (kind === 'work-item-types' ? 'type' : kind === 'statuses' ? 'status' : ''));
+        const workItemType = String(context?.arguments?.workItemType ?? '');
+        const cached = metadataCache.get(apiBaseUrl, scope, kind, projectId, fieldId, workItemType);
         if (cached) values = cached;
         else {
-          const tool = kind === 'projects' ? 'getProjects' : kind === 'users' ? 'getUsers' : kind === 'work-item-types' || kind === 'statuses' || kind === 'enums' ? 'getAvailableEnumOptionsForWorkItemType' : 'getProjectFieldsMetadata';
-          const fieldId = kind === 'work-item-types' ? 'type' : kind === 'statuses' ? 'status' : context?.arguments?.fieldId ?? '';
+          const tool = kind === 'projects' ? 'getProjects' : kind === 'users' ? 'getUsers' : 'getAvailableEnumOptionsForWorkItemType';
           const args: Record<string, unknown> = kind === 'projects' || kind === 'users' ? {}
             : kind === 'work-item-types' ? { projectId, fieldId, type: '~' }
             : kind === 'statuses' ? { projectId, fieldId, type: context?.arguments?.workItemType ?? '~' }
@@ -443,7 +460,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
           let parsed: unknown = raw;
           if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = raw; } }
           values = extractCompletionValues(parsed, argument.name);
-          metadataCache.set(apiBaseUrl, scope, kind, values, projectId);
+          metadataCache.set(apiBaseUrl, scope, kind, values, projectId, fieldId, workItemType);
         }
       }
     } catch { values = []; }
