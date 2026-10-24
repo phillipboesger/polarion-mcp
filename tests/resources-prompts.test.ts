@@ -86,3 +86,16 @@ test("initialize hands the client the server instructions", async () => {
   ])
   await client.close()
 })
+
+test('project resources reject encoded separators and traversal identifiers before fetching', async () => {
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
+  const server = createPolarionServer()
+  await server.connect(serverSide)
+  const client = new Client({ name: 'resource-url-security', version: '1' })
+  await client.connect(clientSide)
+  try {
+    for (const uri of ['polarion://project/P%2Fother', 'polarion://project/%2E%2E', 'polarion://project/P%5Cevil']) {
+      await assert.rejects(client.readResource({ uri }), /Malformed Polarion entity ID/)
+    }
+  } finally { await client.close(); await server.close() }
+})

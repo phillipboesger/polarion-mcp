@@ -45,7 +45,7 @@ import { annotatePolarionResult, annotateToolText } from './untrusted-content.js
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
-import { registerCompositeTools } from './composite-search.js';
+import { decodePolarionIdentifier, registerCompositeTools } from './composite-search.js';
 import { MAX_AUTO_ITEMS, paginate, pageNumberFromLink, type JsonApiPage } from './pagination.js';
 
 /**
@@ -490,9 +490,9 @@ const MAX_DYNAMIC_RESOURCE_CHARS = 100_000;
 async function readProjectResource(uri: string, pipelineOptions: ToolCallPipelineOptions) {
   let match = /^polarion:\/\/project\/([^/]+)\/workitem\/([^/]+)$/.exec(uri);
   let name: string; let args: Record<string, unknown>;
-  if (match) { name = 'getWorkItem'; args = { projectId: decodeURIComponent(match[1]), workItemId: decodeURIComponent(match[2]) }; }
-  else if ((match = /^polarion:\/\/project\/([^/]+)\/document\/([^/]+)\/([^/]+)$/.exec(uri))) { name = 'getDocument'; args = { projectId: decodeURIComponent(match[1]), spaceId: decodeURIComponent(match[2]), documentName: decodeURIComponent(match[3]) }; }
-  else if ((match = /^polarion:\/\/project\/([^/]+)$/.exec(uri))) { name = 'getProject'; args = { projectId: decodeURIComponent(match[1]) }; }
+  if (match) { name = 'getWorkItem'; args = { projectId: decodePolarionIdentifier(match[1]), workItemId: decodePolarionIdentifier(match[2], true) }; }
+  else if ((match = /^polarion:\/\/project\/([^/]+)\/document\/([^/]+)\/([^/]+)$/.exec(uri))) { name = 'getDocument'; args = { projectId: decodePolarionIdentifier(match[1]), spaceId: decodePolarionIdentifier(match[2]), documentName: decodePolarionIdentifier(match[3]) }; }
+  else if ((match = /^polarion:\/\/project\/([^/]+)$/.exec(uri))) { name = 'getProject'; args = { projectId: decodePolarionIdentifier(match[1]) }; }
   else throw new Error(`Invalid Polarion resource URI: ${uri}`);
   const result = await callToolPipeline(name, args, pipelineOptions);
   if (result.isError) throw new Error(result.content.map(item => item.type === 'text' ? item.text : '').join('\n'));

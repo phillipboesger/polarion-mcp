@@ -302,6 +302,23 @@ test("executeApiTool reports unresolved path parameters before any network reque
   }
 })
 
+test('executeApiTool percent-encodes path parameters before dispatch', async () => {
+  const definition: McpToolDefinition = {
+    ...emptyDefinition,
+    name: 'project_lookup',
+    method: 'get',
+    pathTemplate: '/projects/{projectId}',
+    executionParameters: [{ name: 'projectId', in: 'path' }],
+    inputSchema: { type: 'object', properties: { projectId: { type: 'string' } }, required: ['projectId'] },
+  };
+  let requestUrl = '';
+  await executeApiTool('project_lookup', definition, { projectId: 'P/1' }, {}, {
+    httpClient: async config => { requestUrl = String(config.url); return { data: { data: [] }, status: 200, statusText: 'OK', headers: {}, config: {} as any }; },
+    minIntervalMs: 0,
+  });
+  assert.match(requestUrl, /\/projects\/P%2F1$/);
+});
+
 test("sendWithRetry retries once on a 503-then-200 sequence and returns the successful response", async () => {
   let calls = 0
   const httpClient = async (_config: AxiosRequestConfig): Promise<AxiosResponse> => {
