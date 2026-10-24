@@ -36,7 +36,7 @@ const INPUT_KEY_RE = /^[a-zA-Z0-9_.-]{1,64}$/;
  */
 export function logSafe(value: unknown): string {
   // The explicit \r\n pass is the form CodeQL's js/log-injection recognises as a sanitizer.
-  return String(value).replace(/[\r\n]+/g, ' ').replace(/\p{Cc}+/gu, ' ');
+  return String(value).replace(/\n|\r/g, ' ').replace(/\p{Cc}+/gu, ' ');
 }
 
 export function redact(value: string): string {
