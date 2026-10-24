@@ -1,0 +1,12 @@
+{
+  "generatedFromPolarionVersion": "2606",
+  "offline": true,
+  "specs": {
+    "generated-tools-only": {
+      "total": 284,
+      "covered": 284,
+      "missing": []
+    }
+  },
+  "diffs": {}
+}

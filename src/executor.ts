@@ -37,6 +37,7 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+import { conciseDefaultFields, isConciseResponseFormat, shapeConciseResponse } from "./shaping.js";
 import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
 
 /**
@@ -77,6 +78,11 @@ function truncateResponse(text: string, maxChars: number, definition: McpToolDef
     previewLength--;
   }
   return JSON.stringify({ truncated: true, totalChars: text.length, preview: '', hint });
+}
+
+/** Applies the executor's text-size cap to a composed response. */
+export function capToolResponseText(text: string, maxChars: number, definition: McpToolDefinition): string {
+  return text.length > maxChars ? truncateResponse(text, maxChars, definition) : text;
 }
 
 /** Parses the response text cap from the entry-point environment. */
@@ -567,7 +573,8 @@ export async function executeApiTool(
   toolArgs: JsonObject,
   allSecuritySchemes: Record<string, any>,
   sendOpts?: SendWithRetryOpts,
-  maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS
+  maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS,
+  apiBaseUrl = API_BASE_URL
 ): Promise<CallToolResult> {
   try {
     // ===== STEP 0: Strip dry_run before validation =====
@@ -640,6 +647,12 @@ export async function executeApiTool(
       }
     }
 
+    const conciseResponse = !isMutating && isConciseResponseFormat(validatedArgs);
+    if (conciseResponse && validatedArgs.fields === undefined) {
+      const defaultFields = conciseDefaultFields(toolName);
+      if (defaultFields) validatedArgs.fields = defaultFields;
+    }
+
     // ===== STEP 2: Prepare Request Components =====
     let urlPath = definition.pathTemplate; // e.g., "/projects/{projectId}/workitems/{workItemId}"
     const queryParams: Record<string, any> = {}; // e.g., { "page[size]": 10 }
@@ -710,7 +723,7 @@ export async function executeApiTool(
 
     // Construct the full URL
     // Combine base URL (from config) with the path we built
-    const requestUrl = API_BASE_URL ? `${API_BASE_URL}${urlPath}` : urlPath;
+    const requestUrl = apiBaseUrl ? `${apiBaseUrl}${urlPath}` : urlPath;
 
     // ===== STEP 4: Handle Request Body =====
     const requestBody = readArg(validatedArgs, 'requestBody', nameMap);
@@ -933,7 +946,7 @@ export async function executeApiTool(
     // 3. User references (assignee/votes/watches) -- Work Item write tools only.
     // See guards.ts for exactly what's validated and what's an explicit,
     // documented follow-up (categories, module/linkedRevisions existence).
-    const guardRequestContext = { baseUrl: API_BASE_URL, headers, rejectUnauthorized: shouldRejectUnauthorized() };
+    const guardRequestContext = { baseUrl: apiBaseUrl, headers, rejectUnauthorized: shouldRejectUnauthorized() };
 
     const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
     if (enumTargets) {
@@ -1024,7 +1037,8 @@ export async function executeApiTool(
         // Add a `value_markdown` sibling to every rich-text ({type:"text/html", value})
         // field so the model gets readable Markdown alongside the raw HTML, without
         // losing or altering anything in the original response.
-        const renderedData = renderRichTextFieldsAsMarkdown(response.data);
+        const markdownData = renderRichTextFieldsAsMarkdown(response.data);
+        const renderedData = conciseResponse ? shapeConciseResponse(markdownData) : markdownData;
         responseText = JSON.stringify(renderedData);
         // Safe: this branch already checked `response.data` is a non-null object,
         // and renderRichTextFieldsAsMarkdown preserves the top-level shape.
@@ -1069,9 +1083,7 @@ export async function executeApiTool(
     // object, which the advertised (lenient) schema accepts. isError would
     // report a write that worked as failed and invite a duplicating retry.
     const fullResponseText = `API Response (Status: ${response.status}):\n${responseText}`;
-    const boundedResponseText = fullResponseText.length > maxResponseChars
-      ? truncateResponse(fullResponseText, maxResponseChars, definition)
-      : fullResponseText;
+    const boundedResponseText = capToolResponseText(fullResponseText, maxResponseChars, definition);
     return {
       content: [
         {

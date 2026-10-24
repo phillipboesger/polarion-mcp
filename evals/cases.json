@@ -1,0 +1,17 @@
+[
+  {"id":"P1-01","task":"Find work items in project demo using query id:ABC-1.","expectedTools":["getWorkItems"],"readOnly":true},
+  {"id":"P1-02","task":"Search project demo for open defects with query type:defect AND status:open.","expectedTools":["getWorkItems"],"readOnly":true},
+  {"id":"P1-03","task":"Create a task in demo but first validate the payload without sending it.","expectedTools":["postWorkItems"],"readOnly":false},
+  {"id":"P1-04","task":"Create a requirement in demo with the request in dry-run mode.","expectedTools":["postWorkItems"],"readOnly":false},
+  {"id":"P1-05","task":"Link work item ABC-1 to ABC-2 in project demo.","expectedTools":["postWorkItemRelationships","postLinkedWorkItems"],"readOnly":false},
+  {"id":"P1-06","task":"Read document demo/specification and provide its contents as Markdown.","expectedTools":["getDocument"],"readOnly":true},
+  {"id":"P1-07","task":"Find allowed workflow actions for work item ABC-1 before changing its status.","expectedTools":["getWorkflowActionsForWorkItem"],"readOnly":true},
+  {"id":"P1-08","task":"Transition work item ABC-1 to resolved by invoking workflowAction on its update.","expectedTools":["patchWorkItem"],"readOnly":false},
+  {"id":"P1-09","task":"List page one of demo work items with page size 10.","expectedTools":["getWorkItems"],"readOnly":true},
+  {"id":"P1-10","task":"Continue listing demo work items from the next page using pagination parameters.","expectedTools":["getWorkItems"],"readOnly":true},
+  {"id":"P1-11","task":"In read-only mode, inspect a work item and do not call any destructive or mutating tool.","expectedTools":["getWorkItem","getWorkItems"],"readOnly":true},
+  {"id":"P1-12","task":"In read-only mode, explain that deleting work item ABC-1 is unavailable and make no change.","expectedTools":["getWorkItem","getWorkItems"],"readOnly":true},
+  {"id":"P1-13","task":"Get work item ABC-1 from project demo and inspect its status.","expectedTools":["getWorkItem"],"readOnly":true},
+  {"id":"P1-14","task":"List documents in project demo and retrieve the chosen document.","expectedTools":["getDocuments","getDocument"],"readOnly":true},
+  {"id":"P1-15","task":"Find all matching demo work items, requesting page two and sorting by title.","expectedTools":["getWorkItems"],"readOnly":true}
+]

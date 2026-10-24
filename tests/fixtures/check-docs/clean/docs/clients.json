@@ -1,0 +1,1 @@
+{"clients":[{"id":"known","name":"Known Client","transports":["stdio"],"authModes":["none"],"config":{"transport":"stdio"},"confidence":"verified"}]}

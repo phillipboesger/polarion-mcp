@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import type { AddressInfo } from "node:net"
+import { createServer as createHttpServer } from "node:http"
 
 import { createMcpHttpApp, type McpHttpAppOptions } from "../src/mcp-http-server.js"
 
@@ -95,6 +96,30 @@ test("at the session cap the least recently used session is dropped", async () =
     assert.equal(health.activeSessions, 2)
   } finally {
     await app.stop()
+  }
+})
+
+test('tool rate budget is shared across a caller sessions, and separated by token', async () => {
+  const upstream = createHttpServer((_req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ data: [] })) })
+  await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve))
+  const apiBaseUrl = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`
+  const app = await startApp({ apiBaseUrl, rateLimitTools: 1 })
+  const call = async (token: string, sessionId: string, id: number) => {
+    const response = await fetch(`${app.base}/mcp`, { method: 'POST', headers: { ...HEADERS, authorization: `Bearer ${token}`, 'mcp-session-id': sessionId }, body: JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'getProjects', arguments: {} } }) })
+    const text = await response.text()
+    const event = text.split('\n').find(line => line.startsWith('data:'))
+    return JSON.parse(event ? event.slice(5).trim() : text).result
+  }
+  try {
+    const aliceOne = await app.init('pat-alice')
+    const aliceTwo = await app.init('pat-alice')
+    const bob = await app.init('pat-bob')
+    assert.equal((await call('pat-alice', aliceOne, 10)).isError, undefined)
+    assert.match((await call('pat-alice', aliceTwo, 11)).content[0].text, /rate limit exceeded/i)
+    assert.equal((await call('pat-bob', bob, 12)).isError, undefined)
+  } finally {
+    await app.stop()
+    await new Promise<void>((resolve, reject) => upstream.close(error => error ? reject(error) : resolve()))
   }
 })
 

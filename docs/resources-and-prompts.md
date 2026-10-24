@@ -1,31 +1,32 @@
 # Resources and Prompts
 
-## Server Instructions
+## Server instructions
 
-On `initialize` the server sends `instructions`: how to find a projectId, query syntax, paging, sparse fields, composite IDs, the JSON:API write shape, dry_run and workflow actions. Clients that support instructions put them in the model's context.
+The MCP server supplies instructions describing project discovery, query syntax, paging, sparse fields, composite IDs, JSON:API writes, `dry_run`, and workflow actions. Instructions are provided during initialization to clients that support them.
 
 ## Resources
 
-Short offline guides, served from the server itself (no network calls):
+Offline guides served over MCP:
 
-- `polarion://guide/query-syntax`: Lucene query syntax for the `query` parameter.
-- `polarion://guide/writing`: JSON:API bodies for creating and updating Work Items, links, comments, status changes and attachments.
-- `polarion://guide/paging-and-fields`: paging, sparse `fields` and `include`.
+- `polarion://guide/query-syntax`: Lucene query syntax.
+- `polarion://guide/writing`: JSON:API bodies for Work Items, links, comments, status changes, and attachments.
+- `polarion://guide/paging-and-fields`: paging, sparse fields, and includes.
 
-Optional local SDK PDFs (`polarion://local/*`) are listed only when the file is present in `sdk/` (see `sdk/README.md`); their text is extracted with pdf-parse and cut at 200,000 characters.
+Optional SDK PDF text resources use the `polarion://local/*` URI family. A resource is listed only if its corresponding PDF exists in `sdk/`. See [sdk/README.md](../sdk/README.md). Resources are MCP capabilities and are not exposed by the REST wrapper.
 
-Resources are available only through MCP mode because they are part of the MCP capability model. The HTTP wrapper exposes tool execution and OpenAPI documents, not generic MCP resource reads.
+Resource templates provide read-only live views for a project, a Work Item within a project, and a Document within a project and space. They use the caller's Polarion token, require the corresponding read tool to be enabled, render rich text as Markdown, and cap output at 100,000 characters. Set `MCP_RESOURCE_LINKS=true` to append resource links to successful `getWorkItem` and `getDocument` results; it is off by default.
 
 ## Prompts
 
-The server provides guided prompts that work with the real tools:
+The server provides eight guided prompts:
 
-- create-work-item (requires projectId): reads the project's fields and allowed values, previews with dry_run, then creates.
-- search-work-items (requires projectId): builds a Lucene query and pages through the results.
-- update-work-item (requires projectId and workItemId): shows the item, uses workflow actions for status changes, previews, applies and confirms.
+- `create-work-item`: reads field metadata and enum options, then previews a create request before execution.
+- `search-work-items`: builds a Lucene query and pages through results.
+- `update-work-item`: reads the item, checks options, previews the update, applies it, and confirms the result.
+- `review_requirements`: reviews requirement quality and testability without modifying the item.
+- `trace_gap_analysis`: checks linked Work Items and reports traceability gaps.
+- `release_readiness_summary`: summarizes open work and evidence for a project.
+- `test_coverage_report`: groups requirements by linked test coverage.
+- `triage_new_work_items`: reviews recent items and suggests next actions without changing them.
 
-A test checks that every tool and resource named in the instructions, guides and prompts exists.
-
-## read_when
-
-- Use this guide when working with resources, prompts, or server instructions.
+The prompt templates use the real tools in `src/tools.ts`, including `getProjectFieldsMetadata`, `getAvailableEnumOptionsForWorkItemType`, and `getWorkItem`.

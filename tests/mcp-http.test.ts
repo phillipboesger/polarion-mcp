@@ -113,6 +113,48 @@ test("initialize establishes a session and tools/list returns the generated tool
     const listPayload = parseRpc(await listRes.text())
     assert.ok(Array.isArray(listPayload.result.tools), "tools/list should return an array")
     assert.ok(listPayload.result.tools.length > 100, "expected the full generated tool set")
+    const names = listPayload.result.tools.map((tool: { name: string }) => tool.name)
+    assert.deepEqual(names, [...names].sort((a: string, b: string) => a < b ? -1 : a > b ? 1 : 0))
+    const repeated = await fetch(`${base}/mcp`, {
+      method: "POST", headers: sessionHeaders,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }),
+    })
+    assert.deepEqual(parseRpc(await repeated.text()).result.tools.map((tool: { name: string }) => tool.name), names)
+  } finally {
+    await stop()
+  }
+})
+
+test("X-MCP-Readonly is bound at initialization and cannot be disabled by later headers", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const initRes = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: { ...MCP_HEADERS, authorization: `Bearer ${TOKEN}`, "X-MCP-Readonly": "true" },
+      body: JSON.stringify(INIT_BODY),
+    })
+    assert.equal(initRes.status, 200)
+    const sessionId = initRes.headers.get("mcp-session-id") as string
+    const sessionHeaders = { ...MCP_HEADERS, authorization: `Bearer ${TOKEN}`, "mcp-session-id": sessionId }
+
+    const list = async (readOnly: string) => {
+      const res = await fetch(`${base}/mcp`, {
+        method: "POST", headers: { ...sessionHeaders, "X-MCP-Readonly": readOnly },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+      })
+      const tools = parseRpc(await res.text()).result.tools as Array<{ name: string; annotations?: { readOnlyHint?: boolean } }>
+      return tools
+    }
+    const initial = await list("false")
+    assert.ok(initial.length > 0)
+    assert.ok(initial.every(tool => tool.annotations?.readOnlyHint === true))
+    assert.deepEqual(await list("false"), initial)
+
+    const call = await fetch(`${base}/mcp`, {
+      method: "POST", headers: sessionHeaders,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "deleteWorkItems", arguments: { projectId: "p" } } }),
+    })
+    assert.equal(parseRpc(await call.text()).result.isError, true)
   } finally {
     await stop()
   }

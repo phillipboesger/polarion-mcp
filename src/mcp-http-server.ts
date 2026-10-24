@@ -41,13 +41,21 @@ import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets } from './config.js';
 import { createPolarionServer } from './server.js';
+import { parseFlag, type ToolFilter } from './tool-filter.js';
+import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
 import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
-import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, setLoginPageHeaders, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { fetchClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
 import { bearerCredential, parseTrustProxy } from './utils.js';
+import type { PolarionExtensions } from './extensions.js';
+import type { LogFormat, LogLevel } from './logger.js';
+import type { TelemetryHooks } from './telemetry.js';
+import { ToolCallRateLimiter } from './tool-rate-limit.js';
+import { MetadataCache } from './metadata-cache.js';
 export { parseTrustProxy } from './utils.js';
 
 dotenv.config();
@@ -80,6 +88,13 @@ const ORIGIN_PROTECTED_PATHS = new Set([
 
 /** Hosts ChatGPT sends Custom GPT OAuth callbacks from. */
 const GPT_CALLBACK_HOSTS = new Set(['chatgpt.com', 'chat.openai.com']);
+const CIMD_LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/** @returns Whether a callback uses a host for which the SDK relaxes port matching. */
+function isCimdLoopbackRedirect(value: unknown): boolean {
+  if (typeof value !== 'string' || !URL.canParse(value)) return false;
+  return CIMD_LOOPBACK_HOSTS.has(new URL(value).hostname);
+}
 
 /** Builds an opaque failed-PAT limiter key without retaining the credential. */
 export function patFailureRateLimitKey(ip: string, token: string): string {
@@ -131,8 +146,25 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
  * Options for {@link createMcpHttpApp}.
  */
 export interface McpHttpAppOptions {
+  /** Deployment-wide toolset allowlist. Request selectors can only narrow it. */
+  allowedToolsets?: readonly ToolsetName[];
   /** Maximum characters returned in tool text content. */
   maxResponseChars?: number;
+  /** Calls per user per rolling minute; zero disables the limiter. */
+  rateLimitTools?: number;
+  /** Mark user-authored Polarion response fields as untrusted. */
+  markUntrusted?: boolean;
+  logFormat?: LogFormat;
+  logLevel?: LogLevel;
+  telemetry?: TelemetryHooks;
+  /** Enable the default confirmation policy for destructive and bulk calls. */
+  confirmDestructive?: boolean;
+  /** Injected policy, audit, authentication, and instance seams. */
+  extensions?: Partial<PolarionExtensions>;
+  /** Polarion REST API base URL captured by the entry point. */
+  apiBaseUrl?: string;
+  /** Logger shared with synthetic tool handlers. */
+  logger?: Pick<Console, 'debug' | 'info' | 'warn' | 'error'>;
   /** Optional allow-list of Host header values enabling DNS-rebinding protection. */
   allowedHosts?: string[];
   /**
@@ -159,9 +191,16 @@ export interface McpHttpAppOptions {
   maxSessions?: number;
   /**
    * Redirect URIs dynamically registered clients may use, from
-   * {@link parseRedirectAllowlist}. Empty or unset allows any.
+   * {@link parseRedirectAllowlist}. Empty or unset allows any when no presets
+   * are configured.
    */
   allowedRedirectUris?: string[];
+  /** Named redirect allowlist presets from MCP_ALLOWED_REDIRECT_PRESETS. */
+  allowedRedirectPresets?: string[];
+  /** Enable OAuth Client ID Metadata Documents. Defaults to false. */
+  cimdEnabled?: boolean;
+  /** Client metadata fetcher; injectable for tests. */
+  fetchClientMetadata?: CimdMetadataFetcher;
   /**
    * Express `trust proxy` setting, for running behind a reverse proxy: rate
    * limits then count per client (X-Forwarded-For) instead of one shared
@@ -184,8 +223,8 @@ export interface McpHttpAppOptions {
  * @param message - Human-readable error message.
  * @returns A JSON-RPC 2.0 error envelope with a null id.
  */
-function jsonRpcError(message: string) {
-  return { jsonrpc: '2.0' as const, error: { code: -32000, message }, id: null };
+function jsonRpcError(message: string, code = -32000) {
+  return { jsonrpc: '2.0' as const, error: { code, message }, id: null };
 }
 
 /**
@@ -202,20 +241,25 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   closeAllSessions: () => Promise<void>;
 } {
   const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris, maxResponseChars } = options;
+  const allowedPresets = parseRedirectAllowlist(undefined, options.allowedRedirectPresets);
+  const effectiveAllowedRedirectUris = [...(allowedRedirectUris ?? []), ...allowedPresets];
+  const allowedToolsets = options.allowedToolsets ?? TOOLSET_NAMES;
+  const cimdEnabled = options.cimdEnabled ?? false;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   const allowedOrigins = options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
   const corsMiddleware = cors({
     origin: true,
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'X-MCP-Toolsets', 'X-MCP-Readonly'],
     exposedHeaders: ['mcp-session-id', 'mcp-protocol-version', 'www-authenticate'],
     optionsSuccessStatus: 204,
   });
   app.use((req: Request, res: Response, next: NextFunction) => {
     const path = req.path.toLowerCase().replace(/\/+$/, '') || '/';
     const isOAuthMetadata = path.startsWith('/.well-known/oauth-protected-resource');
-    if (!ORIGIN_PROTECTED_PATHS.has(path) && !isOAuthMetadata) return next();
+    const isMcpRequestPath = path === MCP_PATH || path.startsWith(`${MCP_PATH}/`);
+    if (!ORIGIN_PROTECTED_PATHS.has(path) && !isOAuthMetadata && !isMcpRequestPath) return next();
 
     const origin = req.get('origin');
     if (!origin) return next();
@@ -230,7 +274,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       }
     }
     if (!allowedOrigins.includes(origin) && origin !== publicUrl?.origin && origin !== configuredRequestOrigin) {
-      if (path === MCP_PATH) res.status(403).json(jsonRpcError('Origin is not allowed'));
+      if (isMcpRequestPath) res.status(403).json(jsonRpcError('Origin is not allowed'));
       else res.status(403).json({ error: 'origin_not_allowed' });
       return;
     }
@@ -250,6 +294,10 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const checkToken: TokenValidator = validateToken ?? validatePolarionToken;
   const sessionIdleMs = options.sessionIdleMs ?? DEFAULT_SESSION_IDLE_MS;
   const maxSessions = options.maxSessions ?? DEFAULT_MAX_SESSIONS;
+  // These instances are app-wide so opening additional MCP sessions cannot
+  // multiply a caller's tool-call budget or fragment metadata cache entries.
+  const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0);
+  const metadataCache = new MetadataCache();
 
   /**
    * Active sessions by MCP session id. A Map iterates in insertion order and
@@ -316,7 +364,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     : undefined;
   const resourceAudience = publicUrl ? new URL(MCP_PATH, publicUrl).href : undefined;
   const oauth = publicUrl && sealer
-    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, allowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience)
+    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, effectiveAllowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience, cimdEnabled, options.fetchClientMetadata ?? fetchClientMetadata)
     : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
@@ -354,6 +402,11 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response, next: NextFunction) => {
       const basic = basicCredentials(req.get('authorization'));
       if (basic) {
+        if (isCimdClientIdentifier(basic.clientId)) {
+          res.set('WWW-Authenticate', 'Basic realm="MCP OAuth"');
+          res.status(401).json({ error: 'invalid_client', error_description: 'CIMD clients cannot use shared client secrets' });
+          return;
+        }
         const client = await oauth.clientsStore.getClient(basic.clientId);
         const matches = constantTimeSecretEqual(basic.clientSecret, client?.client_secret ?? '');
         if (!client || client.token_endpoint_auth_method !== 'client_secret_basic' || !matches) {
@@ -372,16 +425,55 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     app.use('/.well-known/oauth-authorization-server', (_req: Request, res: Response, next: NextFunction) => {
       const sendJson = res.json.bind(res);
       res.json = ((body: unknown) => {
-        if (body && typeof body === 'object' && 'token_endpoint_auth_methods_supported' in body) {
-          const methods = body.token_endpoint_auth_methods_supported;
-          if (Array.isArray(methods)) {
-            body = { ...body, token_endpoint_auth_methods_supported: [...new Set([...methods, 'client_secret_basic'])] };
-          }
+        if (body && typeof body === 'object') {
+          const metadata = body as Record<string, unknown>;
+          const methods = metadata.token_endpoint_auth_methods_supported;
+          body = {
+            ...metadata,
+            ...(Array.isArray(methods) ? { token_endpoint_auth_methods_supported: [...new Set([...methods, 'client_secret_basic'])] } : {}),
+            client_id_metadata_document_supported: cimdEnabled,
+          };
         }
         return sendJson(body);
       }) as Response['json'];
       next();
     });
+    if (cimdEnabled) {
+      // CIMD uses exact redirect string matching. The SDK permits alternate
+      // loopback ports for native registrations, so enforce the document's
+      // literal URI before its router applies the broader RFC 8252 rule. Keep
+      // metadata fetching behind a limit because this check precedes the SDK's.
+      const cimdAuthorizeLimit = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        limit: 100,
+        skip: req => {
+          const params = req.method === 'GET' ? req.query : req.body;
+          return typeof params?.client_id !== 'string' || !isCimdClientIdentifier(params.client_id) || !isCimdLoopbackRedirect(params?.redirect_uri);
+        },
+        standardHeaders: true,
+        legacyHeaders: false,
+        handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many CIMD authorization requests' }),
+      });
+      app.use('/authorize', express.urlencoded({ extended: false }), cimdAuthorizeLimit, async (req: Request, res: Response, next: NextFunction) => {
+        const params = req.method === 'GET' ? req.query : req.body;
+        const clientId = params?.client_id;
+        const redirectUri = params?.redirect_uri;
+        if (typeof clientId !== 'string' || !isCimdClientIdentifier(clientId) || typeof redirectUri !== 'string' || !isCimdLoopbackRedirect(redirectUri)) {
+          next();
+          return;
+        }
+        const client = await oauth.clientsStore.getClient(clientId);
+        if (!client) {
+          res.status(400).json({ error: 'invalid_client', error_description: 'Invalid client_id' });
+          return;
+        }
+        if (!client.redirect_uris.includes(redirectUri)) {
+          res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri must exactly match the CIMD document' });
+          return;
+        }
+        withCimdClientMemo(client, next);
+      });
+    }
     app.use(
       mcpAuthRouter({
         provider: oauth,
@@ -600,6 +692,39 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   /**
+   * Parses request selectors for validation and computes a deployment-bounded
+   * filter. A session only consumes this value during initialization.
+   *
+   * @param req - Incoming MCP request.
+   * @returns The tool filter to bind to a newly initialized session.
+   * @throws Error when a selector is unknown or malformed.
+   */
+  const requestToolFilter = (req: Request): ToolFilter => {
+    const pathToolsets = req.params.toolsets;
+    const headerToolsets = req.get('X-MCP-Toolsets');
+    const pathSelection = pathToolsets === undefined ? undefined : parseToolsetNames(Array.isArray(pathToolsets) ? pathToolsets.join(',') : pathToolsets, 'MCP path');
+    const headerSelection = headerToolsets === undefined ? undefined : parseToolsetNames(headerToolsets, 'X-MCP-Toolsets');
+    const requested = pathSelection && headerSelection
+      ? pathSelection.filter(name => headerSelection.includes(name))
+      : pathSelection ?? headerSelection;
+    const allowed = new Set(allowedToolsets);
+    return {
+      toolsets: requested ? requested.filter(name => allowed.has(name)) : [...allowed],
+      readOnly: parseFlag('X-MCP-Readonly', req.get('X-MCP-Readonly')),
+    };
+  };
+
+  /** Reject invalid selectors while leaving existing session filters immutable. */
+  const validateToolSelectors = (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      res.locals.toolFilter = requestToolFilter(req);
+      next();
+    } catch (error) {
+      res.status(400).json(jsonRpcError(error instanceof Error ? error.message : 'Invalid toolset selector', -32602));
+    }
+  };
+
+  /**
    * Handles MCP requests on an existing session (GET for the SSE stream, DELETE
    * to terminate the session).
    *
@@ -631,7 +756,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   // POST: initialize a new session, or dispatch into an existing one.
-  app.post(MCP_PATH, requireBearer, jsonBody, async (req: Request, res: Response) => {
+  app.post([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, jsonBody, async (req: Request, res: Response) => {
     const sessionId = req.header('mcp-session-id');
     const existing = sessionId ? useSession(sessionId) : undefined;
     let transport: StreamableHTTPServerTransport;
@@ -657,7 +782,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer({ maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS });
+      const server = createPolarionServer({ transport: 'http', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, rateLimitTools: options.rateLimitTools, rateLimiter, metadataCache, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
@@ -670,8 +795,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     await transport.handleRequest(req, res, req.body);
   });
 
-  app.get(MCP_PATH, requireBearer, handleSessionRequest);
-  app.delete(MCP_PATH, requireBearer, handleSessionRequest);
+  app.get([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, handleSessionRequest);
+  app.delete([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, handleSessionRequest);
 
   /**
    * Closes every active transport. Used on shutdown and by tests.
@@ -860,6 +985,9 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
  * `MCP_HTTP_PORT` (or `HTTP_PORT`), `MCP_HTTP_HOST`, `MCP_ALLOWED_HOSTS`
  * (comma-separated), `TRUST_PROXY` (e.g. "loopback" behind a same-host proxy),
  * `MCP_ALLOWED_REDIRECT_PREFIXES` (comma-separated OAuth redirect URI allowlist),
+ * `MCP_ALLOWED_REDIRECT_PRESETS` (comma-separated client presets: claude, chatgpt,
+ * vscode, cursor, copilot-studio, gemini, loopback),
+ * `MCP_CIMD_ENABLED` (`true` enables Client ID Metadata Documents; default false),
  * `MCP_SESSION_IDLE_MINUTES` (default 60), `MCP_MAX_SESSIONS` (default 1000). No Polarion credentials are read here — each client
  * brings its own Polarion PAT.
  *
@@ -898,10 +1026,24 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
     ? configuredRefreshTokenTtl
     : 14 * 24 * 60 * 60;
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
+  const allowedRedirectPresets = (process.env.MCP_ALLOWED_REDIRECT_PRESETS ?? '').split(',').map(preset => preset.trim()).filter(Boolean);
+  const cimdEnabled = process.env.MCP_CIMD_ENABLED?.trim().toLowerCase() === 'true';
+  const knownRedirectPresets = new Set(Object.keys(REDIRECT_PRESET_URIS));
+  for (const preset of allowedRedirectPresets) {
+    if (!knownRedirectPresets.has(preset)) (options.logger ?? console).warn(`[WARN] Ignoring unknown MCP_ALLOWED_REDIRECT_PRESETS entry: ${preset}`);
+  }
+  const allowedToolsets = configuredToolsets(process.env);
   const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
+  const configuredToolRateLimit = Number(process.env.MCP_RATE_LIMIT_TOOLS ?? 0);
+  const rateLimitTools = Number.isSafeInteger(configuredToolRateLimit) && configuredToolRateLimit >= 0 ? configuredToolRateLimit : 0;
+  const markUntrusted = process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true';
+  const logFormat = process.env.MCP_LOG_FORMAT?.trim().toLowerCase() === 'json' ? 'json' : 'text';
+  const configuredLogLevel = process.env.MCP_LOG_LEVEL?.trim().toLowerCase();
+  const logLevel = ['debug', 'info', 'warn', 'error'].includes(configuredLogLevel ?? '') ? configuredLogLevel as LogLevel : 'info';
+  const confirmDestructive = process.env.MCP_CONFIRM_DESTRUCTIVE?.trim().toLowerCase() === 'true';
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, sessionIdleMs, maxSessions, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, maxResponseChars,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
@@ -919,11 +1061,13 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
       if (!tokenSecret) {
         console.log('[WARN] MCP_TOKEN_SECRET is not set: every login and client registration ends when the server restarts.');
       }
-      if (allowedRedirectUris.length > 0) {
-        console.log(`[INFO] OAuth redirect URIs limited to: ${allowedRedirectUris.join(', ')}`);
+      if (allowedRedirectUris.length > 0 || allowedRedirectPresets.length > 0) {
+        if (allowedRedirectUris.length > 0) console.log(`[INFO] OAuth redirect URIs limited to: ${allowedRedirectUris.join(', ')}`);
+        if (allowedRedirectPresets.length > 0) console.log(`[INFO] OAuth redirect presets configured: ${allowedRedirectPresets.join(', ')}`);
       } else {
         console.log('[WARN] MCP_ALLOWED_REDIRECT_PREFIXES is not set: any client may register any redirect URI.');
       }
+      if (cimdEnabled) console.log('[INFO] OAuth Client ID Metadata Documents are enabled.');
       if (gptClient) {
         console.log(`[INFO] Custom GPT OAuth enabled: authorize ${new URL(GPT_AUTHORIZE_PATH, publicUrl).href}, token ${new URL(GPT_TOKEN_PATH, publicUrl).href}`);
       }

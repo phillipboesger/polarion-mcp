@@ -144,7 +144,7 @@ test("over the REST wrapper a filtered tool is neither listed nor callable", asy
 test("startup fails loudly when the filter leaves no tools or a flag is invalid", async () => {
   const { spawnSync } = await import("node:child_process")
   const load = (env: Record<string, string>) =>
-    spawnSync(process.execPath, ["-e", "import('./build-tests/src/tool-filter.js').then(m => console.log(m.enabledTools.size))"], {
+    spawnSync(process.execPath, ["-e", "import('./build-tests/src/server.js').then(m => { m.createPolarionServer(); console.log('1') })"], {
       env: { ...process.env, MCP_TOOLS: "", MCP_READ_ONLY: "", MCP_OMIT_OUTPUT_SCHEMA: "", ...env },
       encoding: "utf8",
     })

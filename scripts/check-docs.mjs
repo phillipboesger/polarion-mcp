@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderClientsBlock } from './render-clients.mjs';
 
 const RULES = {
   env: 'env-vars', tools: 'tool-references', prompts: 'prompt-resource-references',
@@ -45,6 +46,25 @@ function checker(root) {
   const add = (rule, file, line, message) => findings.push({ rule: RULES[rule], file, line, message });
   const markdown = ['README.md', ...filesUnder(root, 'docs').filter(f => f.endsWith('.md'))];
   const contents = new Map(markdown.map(f => [f, read(root, f)]));
+
+  // 0. The landing page client matrix must match the clients manifest exactly.
+  const readme = read(root, 'README.md');
+  const startMarker = '<!-- clients:start -->';
+  const endMarker = '<!-- clients:end -->';
+  const startAt = readme.indexOf(startMarker);
+  const endAt = readme.indexOf(endMarker);
+  if (startAt < 0 || endAt < startAt || readme.indexOf(startMarker, startAt + startMarker.length) >= 0 || readme.indexOf(endMarker, endAt + endMarker.length) >= 0) {
+    add('clients', 'README.md', 1, 'expected exactly one ordered client marker block');
+  } else {
+    try {
+      const manifest = JSON.parse(read(root, 'docs/clients.json'));
+      const expected = `${startMarker}\n${renderClientsBlock(manifest.clients)}\n${endMarker}`;
+      const actual = readme.slice(startAt, endAt + endMarker.length);
+      if (actual !== expected) add('clients', 'README.md', lineAt(readme, startAt), 'client marker block differs from docs/clients.json; run npm run docs:clients');
+    } catch (error) {
+      add('clients', 'docs/clients.json', 1, `cannot render client table: ${error.message}`);
+    }
+  }
 
   // 1. Source/.env declarations and documented names must agree.
   const sourceEnv = new Map();
@@ -198,7 +218,7 @@ function checker(root) {
   }
 
   // 7. Website tool counts must agree with README and the source tool map.
-  const website = read(root, 'docs/index.html'); const readme = read(root, 'README.md');
+  const website = read(root, 'docs/index.html');
   const countRx = /\b(\d{2,4})\s+(?:Polarion\s+REST\s+)?(?:operations|tools)\b/gi;
   const readmeCounts = [...readme.matchAll(countRx)].map(m => +m[1]);
   for (const m of website.matchAll(countRx)) if (+m[1] !== actualCount || (readmeCounts.length && +m[1] !== readmeCounts[0])) add('website', 'docs/index.html', lineAt(website, m.index), `website cites ${m[1]}; README/source count is ${readmeCounts[0] ?? actualCount}/${actualCount}`);
@@ -215,10 +235,16 @@ function checker(root) {
     if (!valid) add('clients', 'docs/clients.json', 1, 'expected {"clients":[{"name":"..."}]}');
     else for (const file of markdown) {
       const text = contents.get(file);
-      for (const row of text.matchAll(/^\|\s*([^|]+?)\s*\|([^\n]*)$/gm)) {
-        const first = row[1].trim();
-        if (/client/i.test(text.slice(0, row.index).split('\n').slice(-4).join('\n')) && !/^[-: ]+$/.test(first) && !/^(client|name)$/i.test(first) && !listed.has(first)) add('clients', file, lineAt(text, row.index), `client table references unlisted client ${first}`);
-      }
+      // Only tables whose header's first cell is "Client"/"MCP client" are client matrices.
+      let inClientTable = false;
+      text.split('\n').forEach((line, i) => {
+        const cells = line.match(/^\|\s*([^|]+?)\s*\|/);
+        if (!cells) { inClientTable = false; return; }
+        const first = cells[1].trim();
+        if (/^(mcp )?clients?$/i.test(first)) { inClientTable = true; return; }
+        const clientName = first.replace(/\s+\(unverified\)$/i, '');
+        if (inClientTable && !/^[-: ]+$/.test(first) && !listed.has(clientName)) add('clients', file, i + 1, `client table references unlisted client ${first}`);
+      });
     }
   }
   return findings;

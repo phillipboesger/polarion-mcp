@@ -1,46 +1,30 @@
 # Workflows
 
-## Local Onboarding Workflow
+## Local setup
 
-1. Install dependencies with npm.
-2. Copy .env.example to .env.
-3. Set API_BASE_URL and BEARER_TOKEN.
-4. Add HTTP_API_KEY only if you plan to use HTTP mode.
-5. Build the project with npm run build.
-6. Start either MCP stdio mode or HTTP mode.
+1. Install dependencies with `npm ci`.
+2. Configure `API_BASE_URL` and the authentication required by the selected transport. See [configuration.md](./configuration.md).
+3. Build with `npm run build`.
+4. Start stdio MCP with `node build/index.js`, Streamable HTTP with `npm run start:mcp-http`, or the REST wrapper with `npm run start:http`.
 
-## MCP Runtime Workflow
+## MCP tool call
 
-1. The assistant client starts build/index.js as an MCP server.
-2. The client lists tools, resources, and prompts.
-3. Input schemas are sanitized for MCP-safe keys.
-4. The server validates incoming arguments.
-5. The executor applies the appropriate OpenAPI security scheme.
-6. The Polarion REST API response is formatted and returned to the client.
+1. The client initializes and discovers enabled tools, resources, and prompts.
+2. The server validates arguments and applies configured tool filters.
+3. The executor runs supported write guards, authentication, request pacing, and retries.
+4. The response includes text and, where declared, structured content. Text responses are subject to `MCP_MAX_RESPONSE_CHARS`.
 
-## HTTP Runtime Workflow
+## HTTP tool call
 
-1. The HTTP wrapper starts with Express and validates HTTP_API_KEY on incoming requests.
-2. The client discovers tools through GET /api/tools or imports an OpenAPI document.
-3. The wrapper resolves the tool name and sanitizes the input schema.
-4. The shared executor runs the underlying Polarion request.
-5. The wrapper returns a JSON response with flattened text output.
+1. The REST wrapper authenticates the request with `HTTP_API_KEY`, or Streamable HTTP MCP authenticates with the caller's Polarion token or OAuth access token.
+2. The client discovers the enabled tools from `/api/tools` or an OpenAPI document.
+3. The server validates and executes the named tool through the shared executor.
+4. The REST wrapper returns JSON; Streamable HTTP uses MCP responses.
 
-## Regeneration Workflow
+## Regeneration
 
-1. Download openapi.json from the Polarion definition endpoint.
-2. Apply the sparse fields patch.
-3. Regenerate src/tools.ts.
-4. Run post-generation normalization scripts.
-5. Build the project and verify handwritten modules still align with generated output.
+Run `npm run regenerate` to download the selected OpenAPI spec, patch sparse fields, generate and enrich `src/tools.ts`, build, and run tests. Review the generated diff and verify representative operations. See [openapi-and-generation.md](./openapi-and-generation.md).
 
-## Validation Workflow
+## Quality gate
 
-1. Run npm test.
-2. Run npm run typecheck.
-3. If the HTTP wrapper changed, validate /health and /api/tools locally.
-4. If documentation changed, verify README and docs remain consistent.
-
-## read_when
-
-- Use this guide when onboarding, debugging runtime behavior, or updating the generation pipeline.
+Use `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as appropriate. Details are in [quality/e2e.md](./quality/e2e.md), [quality/mutation-baseline.md](./quality/mutation-baseline.md), [quality/static-analysis.md](./quality/static-analysis.md), and [quality/distribution.md](./quality/distribution.md).

@@ -142,6 +142,7 @@ Follow this systematic approach for each Stakeholder Requirement:
 
 #### 6.2 Tools and Documentation
 - [ ] Use the Polarion MCP (Model Context Protocol) for all operations
+- For large list results, set `max_items` (up to 1000) on supported list tools such as `getWorkItems`; without it, each call returns only the requested page.
 - [ ] Document every action taken during the process
 - [ ] Verify each created work item for completeness
 - [ ] Perform final review to ensure all requirements are met

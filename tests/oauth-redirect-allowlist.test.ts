@@ -2,19 +2,26 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import type { AddressInfo } from "node:net"
 import { createHash, randomBytes } from "node:crypto"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 
 import { createMcpHttpApp } from "../src/mcp-http-server.js"
-import { isRedirectAllowed, parseRedirectAllowlist } from "../src/oauth.js"
+import { REDIRECT_PRESET_URIS, isRedirectAllowed, parseRedirectAllowlist } from "../src/oauth.js"
+
+const clients = JSON.parse(readFileSync(resolve("docs/clients.json"), "utf8")) as {
+  clients: Array<{ id: string; redirectUris: Array<{ uri: string; verified: boolean }> }>
+}
 
 const CLAUDE = "https://claude.ai/api/mcp/auth_callback"
 const SECRET = randomBytes(32).toString("base64url")
 
-async function startApp(allowedRedirectUris?: string[]) {
+async function startApp(allowedRedirectUris?: string[], allowedRedirectPresets?: string[]) {
   const { app, closeAllSessions } = createMcpHttpApp({
     publicUrl: new URL("http://127.0.0.1"),
     tokenSecret: SECRET,
     validateToken: async () => true,
     allowedRedirectUris,
+    allowedRedirectPresets,
   })
   const server = app.listen(0)
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
@@ -25,6 +32,77 @@ async function startApp(allowedRedirectUris?: string[]) {
   }
   return { base: `http://127.0.0.1:${port}`, stop }
 }
+
+test("redirect preset constants match verified literal callbacks in the client matrix", () => {
+  const clientByPreset = {
+    claude: "claude-web-desktop",
+    chatgpt: "chatgpt-apps",
+    vscode: "vscode-copilot",
+    cursor: "cursor",
+    "copilot-studio": "copilot-studio",
+    gemini: "gemini-cli",
+  } as const
+  const expected = Object.fromEntries(Object.entries(clientByPreset).map(([preset, clientId]) => {
+    const client = clients.clients.find(entry => entry.id === clientId)
+    return [preset, client?.redirectUris.filter(entry => entry.verified && URL.canParse(entry.uri)).map(entry => entry.uri) ?? []]
+  }))
+  assert.deepEqual(Object.fromEntries(Object.entries(REDIRECT_PRESET_URIS).filter(([name]) => name !== "loopback")), expected)
+})
+
+test("each client preset permits only its verified callback URIs", () => {
+  const cases = [
+    ["claude", CLAUDE, ["https://claude.ai.evil.example/api/mcp/auth_callback", "https://attacker.example/api/mcp/auth_callback", "https://claude.ai/api/mcp/auth_callback/extra", "https://claude.ai@evil.example/api/mcp/auth_callback"]],
+    ["cursor", "https://www.cursor.com/agents/mcp/oauth/callback", ["https://www.cursor.com.evil.example/agents/mcp/oauth/callback", "https://www.cursor.com/agents/mcp/oauth/callback/extra", "https://www.cursor.com@evil.example/agents/mcp/oauth/callback"]],
+  ] as const
+  for (const [preset, callback, lookalikes] of cases) {
+    const allowlist = parseRedirectAllowlist(undefined, [preset])
+    assert.equal(isRedirectAllowed(callback, allowlist), true, `${preset} callback`)
+    for (const lookalike of lookalikes) assert.equal(isRedirectAllowed(lookalike, allowlist), false, `${preset}: ${lookalike}`)
+  }
+  for (const preset of ["chatgpt", "vscode", "copilot-studio", "gemini"]) {
+    const allowlist = parseRedirectAllowlist(undefined, [preset])
+    assert.equal(isRedirectAllowed("https://attacker.example/callback", allowlist), false, `${preset} has no verified fixed callback`)
+  }
+})
+
+test("loopback preset accepts any port only for exact loopback hosts over HTTP", () => {
+  const allowlist = parseRedirectAllowlist(undefined, ["loopback"])
+  for (const host of ["127.0.0.1", "[::1]", "localhost"]) {
+    assert.equal(isRedirectAllowed(`http://${host}:45678/callback`, allowlist), true, host)
+    assert.equal(isRedirectAllowed(`http://${host}:1/callback`, allowlist), true, `${host} port 1`)
+  }
+  for (const uri of [
+    "http://evil.example:45678/callback",
+    "https://localhost:45678/callback",
+    "http://localhost.evil.example:45678/callback",
+    "http://127.0.0.1@evil.example:45678/callback",
+    "http://localhost:45678/callback#fragment",
+  ]) assert.equal(isRedirectAllowed(uri, allowlist), false, uri)
+})
+
+test("unknown presets fail closed and known presets are passed through the HTTP app", async () => {
+  const unknown = parseRedirectAllowlist(undefined, ["not-a-preset"])
+  assert.equal(isRedirectAllowed("https://attacker.example/callback", unknown), false)
+
+  const { base, stop } = await startApp(undefined, ["claude"])
+  try {
+    assert.equal((await register(base, CLAUDE)).status, 201)
+    assert.equal((await register(base, "https://claude.ai.evil.example/api/mcp/auth_callback")).status, 400)
+  } finally {
+    await stop()
+  }
+
+  const loopback = await startApp(undefined, ["loopback"])
+  try {
+    const accepted = await register(loopback.base, "http://localhost:31415/callback")
+    assert.equal(accepted.status, 201)
+    const { client_id } = await accepted.json() as { client_id: string }
+    assert.notEqual((await authorize(loopback.base, client_id, "http://localhost:31415/other")).status, 200)
+    assert.equal((await register(loopback.base, "http://localhost.evil.example:31415/callback")).status, 400)
+  } finally {
+    await loopback.stop()
+  }
+})
 
 function register(base: string, redirectUri: string) {
   return fetch(`${base}/register`, {

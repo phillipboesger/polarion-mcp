@@ -1,0 +1,15 @@
+{
+  "name": "polarion-mcp",
+  "version": "1.0.0",
+  "description": "Polarion ALM MCP tools and workflow guidance",
+  "mcpServers": {
+    "polarion": {
+      "command": "npx",
+      "args": ["-y", "polarion-mcp"],
+      "env": {
+        "API_BASE_URL": "${API_BASE_URL}",
+        "BEARER_TOKEN": "${BEARER_TOKEN}"
+      }
+    }
+  }
+}

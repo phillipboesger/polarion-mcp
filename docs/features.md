@@ -1,33 +1,25 @@
 # Features
 
-## Core Capabilities
+## Core capabilities
 
-- Generated Polarion REST tool surface based on the OpenAPI definition.
-- MCP stdio server for assistants that support Model Context Protocol.
-- Optional HTTP wrapper for HTTP-only assistant clients.
-- Input validation through JSON Schema to Zod conversion.
-- Security handling for bearer, API key, basic auth, OAuth2, and OpenID-based OpenAPI schemes.
+- 284 generated Polarion REST tools from the committed OpenAPI-derived map.
+- MCP over stdio and Streamable HTTP, plus an optional REST HTTP wrapper.
+- Runtime input validation, OpenAPI authentication schemes, and output schemas where the operation defines a JSON response.
+- Tool filtering by name and read-only status; HTTP MCP also supports named toolsets.
+- Response text cap controlled by `MCP_MAX_RESPONSE_CHARS` (default 100,000 characters). Structured response content is not truncated.
 
-## Polarion-Specific Additions
+## Polarion-specific behavior
 
-- Server instructions and offline guide resources (query syntax, write bodies, paging and fields).
-- Prompt templates for common work-item tasks.
-- Custom GPT OpenAPI subset limited to the most important operations.
+- MCP instructions, offline guides, and prompts for common Work Item tasks.
+- Fail-closed write guards for supported enumeration values, custom-field keys, and Work Item user references.
+- Mutating tools support `dry_run` request previews.
+- HTML rich-text response values gain a `value_markdown` sibling. The original value is preserved.
+- Optional local PDF text resources can be enabled by providing the files listed in [sdk/README.md](../sdk/README.md).
+- The Custom GPT OpenAPI document uses a curated tool subset in `src/gpt-tools.ts`.
 
-## Operational Features
+## Limits
 
-- Environment-based configuration through .env or runtime variables.
-- Support for multiple Polarion environments through separate MCP client entries.
-- Optional local PDF extraction from sdk/ for offline documentation access.
-- TLS override support for trusted internal instances with self-signed certificates.
-
-## Non-Goals
-
-- This repository is not a full Polarion UI.
-- It does not replace Polarion permission management.
-- It does not provide durable storage for project configuration beyond in-memory runtime caching.
-- It does not maintain manually curated endpoint definitions; generated tool definitions come from Polarion OpenAPI.
-
-## read_when
-
-- Use this guide when you need a concise view of what the application supports.
+- Polarion remains the source of truth for permissions and data.
+- Runtime caches are in-memory and are not durable storage.
+- Guards cover only the validations described above; they do not validate arbitrary field values or every relationship type.
+- Local SDK PDFs are optional and are not included in the repository.

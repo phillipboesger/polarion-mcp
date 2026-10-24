@@ -15,6 +15,10 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,15 +106,63 @@ jobs:
 
           echo "Release ZIP verified: production install succeeds, server starts, MCP initialize works."
 
+      - name: Pack Claude Desktop Extension
+        id: mcpb
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          STAGE="${RUNNER_TEMP}/polarion-mcp-mcpb"
+          BUNDLE="${RUNNER_TEMP}/polarion-mcp-v${VERSION}.mcpb"
+          rm -rf "${STAGE}"
+          mkdir -p "${STAGE}"
+          npm prune --omit=dev
+          cp -r build node_modules package.json "${STAGE}/"
+          cp mcpb/manifest.json "${STAGE}/manifest.json"
+          npx --yes @anthropic-ai/mcpb pack "${STAGE}" "${BUNDLE}"
+          echo "bundle=${BUNDLE}" >> "$GITHUB_OUTPUT"
+          ls -lh "${BUNDLE}"
+
+      - name: Generate CycloneDX SBOM
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          TARBALL="polarion-mcp-${GITHUB_REF_NAME#v}.tgz"
+          npm pack --pack-destination .
+          mv "polarion-mcp-${GITHUB_REF_NAME#v}.tgz" "${TARBALL}"
+          npx --yes @cyclonedx/cyclonedx-npm --output-file "polarion-mcp-${GITHUB_REF_NAME}.bom.json"
+
+      - name: Attest release artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            ${{ steps.pack.outputs.zip }}
+            ${{ steps.mcpb.outputs.bundle }}
+            polarion-mcp-${{ github.ref_name }}.tgz
+            polarion-mcp-${{ github.ref_name }}.bom.json
+
+      - name: Publish to npm
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "NPM_TOKEN not set, skipping npm publish"
+            exit 0
+          fi
+          npm config set //registry.npmjs.org/:_authToken "${NODE_AUTH_TOKEN}"
+          npm publish --provenance --access public
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" --clobber
+            gh release upload "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" "${{ steps.mcpb.outputs.bundle }}" "polarion-mcp-${GITHUB_REF_NAME#v}.tgz" "polarion-mcp-${GITHUB_REF_NAME}.bom.json" --clobber
           else
-            gh release create "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" \
+            gh release create "${GITHUB_REF_NAME}" "${{ steps.pack.outputs.zip }}" "${{ steps.mcpb.outputs.bundle }}" "polarion-mcp-${GITHUB_REF_NAME#v}.tgz" "polarion-mcp-${GITHUB_REF_NAME}.bom.json" \
               --title "${GITHUB_REF_NAME}" \
               --generate-notes
           fi

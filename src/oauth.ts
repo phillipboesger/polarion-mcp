@@ -17,6 +17,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import https from 'node:https';
 import axios from 'axios';
 import type { Response } from 'express';
@@ -28,6 +29,7 @@ import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, Inv
 import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
+import { fetchClientMetadata, parseClientIdentifierUrl, type CimdClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, safeEqual } from './sealed.js';
 
 /** Scope advertised by this server; the PAT itself carries the real permissions. */
@@ -41,6 +43,12 @@ export const LOGIN_PATH = '/polarion-login';
  * silent and is where a revoked PAT is noticed.
  */
 const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
+const cimdRequestClientMemo = new AsyncLocalStorage<Map<string, OAuthClientInformationFull>>();
+
+/** Reuses a prevalidated CIMD client throughout one authorization request. */
+export function withCimdClientMemo(client: OAuthClientInformationFull, callback: () => void): void {
+  cimdRequestClientMemo.run(new Map([[client.client_id, client]]), callback);
+}
 
 /** Default sliding refresh-token lifetime; deployments may override in seconds. */
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 14 * 24 * 60 * 60;
@@ -160,19 +168,61 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
 /** Hosts whose redirect URIs may use any port (RFC 8252 section 7.3). */
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
+export type RedirectPresetName = 'claude' | 'chatgpt' | 'vscode' | 'cursor' | 'copilot-studio' | 'gemini' | 'loopback';
+
 /**
- * Parses the redirect URI allowlist (`MCP_ALLOWED_REDIRECT_PREFIXES`).
+ * Verified literal callback URIs from docs/clients.json. Entries that are
+ * generated per installation or not verified stay empty and fail closed.
+ */
+export const REDIRECT_PRESET_URIS = {
+  claude: ['https://claude.ai/api/mcp/auth_callback'],
+  chatgpt: [],
+  vscode: [],
+  cursor: ['https://www.cursor.com/agents/mcp/oauth/callback', 'http://localhost:8787/callback'],
+  'copilot-studio': [],
+  gemini: [],
+  loopback: [],
+} as const satisfies Readonly<Record<RedirectPresetName, readonly string[]>>;
+
+const LOOPBACK_PRESET = 'urn:polarion-mcp:loopback-any-port';
+const DENY_ALL_PRESET = 'urn:polarion-mcp:deny-all';
+
+/**
+ * Parses the URI allowlist and expands named redirect presets.
  *
  * @param value - Comma-separated entries. One ending in "/" is a prefix,
  *   any other must match exactly (a loopback one on any port).
- * @returns The entries, prefixes normalized; empty when unset.
+ * @param presets - Recognized client presets from `MCP_ALLOWED_REDIRECT_PRESETS`.
+ * @returns The entries, prefixes normalized; empty when both settings are unset.
  * @throws Error for an entry that is not an absolute URL.
  */
-export function parseRedirectAllowlist(value: string | undefined): string[] {
-  return (value ?? '').split(',').map(entry => entry.trim()).filter(Boolean).map(entry => {
+export function parseRedirectAllowlist(value: string | undefined, presets: readonly string[] = []): string[] {
+  const entries = (value ?? '').split(',').map(entry => entry.trim()).filter(Boolean).map(entry => {
     if (!URL.canParse(entry)) throw new Error(`Redirect URI allowlist entry is not an absolute URL: ${entry}`);
     return entry.endsWith('/') ? loopbackAnyPort(new URL(entry)).href : entry;
   });
+  const knownPresets = new Set<string>(Object.keys(REDIRECT_PRESET_URIS));
+  let hasLoopbackPreset = false;
+  for (const preset of presets) {
+    if (!knownPresets.has(preset)) continue;
+    if (preset === 'loopback') hasLoopbackPreset = true;
+    else entries.push(...REDIRECT_PRESET_URIS[preset as Exclude<RedirectPresetName, 'loopback'>]);
+  }
+  if (hasLoopbackPreset) entries.push(LOOPBACK_PRESET);
+  // A configured preset list must never accidentally turn into the historical
+  // empty-list allow-all mode, including when all names are unknown or a
+  // known client has no verified fixed callback yet.
+  if (presets.length > 0 && entries.length === 0) entries.push(DENY_ALL_PRESET);
+  return entries;
+}
+
+/** @returns Whether this identifier uses CIMD's HTTPS URL form. */
+export function isCimdClientIdentifier(clientId: string): boolean {
+  try {
+    return new URL(clientId).protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -195,8 +245,16 @@ function loopbackAnyPort(url: URL): URL {
 export function isRedirectAllowed(uri: string, allowlist: readonly string[]): boolean {
   if (allowlist.length === 0) return true;
   if (!URL.canParse(uri)) return false;
+  const parsed = new URL(uri);
   const normalized = loopbackAnyPort(new URL(uri)).href;
-  return allowlist.some(entry => (entry.endsWith('/') ? normalized.startsWith(entry) : redirectUriMatches(uri, entry)));
+  return allowlist.some(entry => {
+    if (entry === DENY_ALL_PRESET) return false;
+    if (entry === LOOPBACK_PRESET) {
+      return parsed.protocol === 'http:' && LOOPBACK_HOSTS.has(parsed.hostname)
+        && !parsed.username && !parsed.password && !parsed.hash;
+    }
+    return entry.endsWith('/') ? normalized.startsWith(entry) : redirectUriMatches(uri, entry);
+  });
 }
 
 /**
@@ -214,15 +272,42 @@ class SealedClientsStore implements OAuthRegisteredClientsStore {
   /**
    * @param sealer - Seals and opens client ids.
    * @param redirectAllowlist - Allowed redirect URIs; empty allows any.
+   * @param cimdEnabled - Whether HTTPS client identifier URLs may be fetched.
+   * @param metadataFetcher - SSRF-guarded client metadata fetcher.
    */
-  constructor(private readonly sealer: Sealer, private readonly redirectAllowlist: readonly string[]) {}
+  constructor(
+    private readonly sealer: Sealer,
+    private readonly redirectAllowlist: readonly string[],
+    private readonly cimdEnabled = false,
+    private readonly metadataFetcher: CimdMetadataFetcher = fetchClientMetadata
+  ) {}
 
   /**
    * @param clientId - The client id handed out at registration.
    * @returns The registered client, or undefined if this server never issued
    *   it or its redirect URIs are no longer allowed.
    */
-  getClient(clientId: string): OAuthClientInformationFull | undefined {
+  async getClient(clientId: string): Promise<OAuthClientInformationFull | undefined> {
+    if (isCimdClientIdentifier(clientId)) {
+      const requestMemo = cimdRequestClientMemo.getStore()?.get(clientId);
+      if (requestMemo) return requestMemo;
+      if (!this.cimdEnabled) return undefined;
+      try {
+        parseClientIdentifierUrl(clientId);
+        const metadata: CimdClientMetadata = await this.metadataFetcher(clientId);
+        if (metadata.client_id !== clientId || !this.redirectsAllowed(metadata.redirect_uris)) return undefined;
+        return {
+          client_id: clientId,
+          client_id_issued_at: 0,
+          redirect_uris: metadata.redirect_uris,
+          token_endpoint_auth_method: 'none',
+          ...(metadata.client_name ? { client_name: metadata.client_name } : {}),
+        };
+      } catch {
+        // A failed or invalid metadata fetch is an invalid client, not a server error.
+        return undefined;
+      }
+    }
     const client = this.sealer.open<SealedClient>('c', clientId);
     // A sealed registration never expires, so one issued before the allowlist was set is checked again here.
     if (!client || !this.redirectsAllowed(client.redirect_uris)) return undefined;
@@ -453,6 +538,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param redirectAllowlist - Redirect URIs registered clients may use; empty allows any.
    * @param refreshTokenTtlSeconds - Sliding refresh-token lifetime in seconds.
    * @param resourceAudience - Canonical protected-resource URL for issued tokens.
+   * @param cimdEnabled - Whether HTTPS client identifier URLs may be fetched.
+   * @param metadataFetcher - SSRF-guarded metadata fetcher; injectable for tests.
    */
   constructor(
     private readonly polarionUrl: string,
@@ -460,9 +547,11 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     private readonly validateToken: TokenValidator = validatePolarionToken,
     redirectAllowlist: readonly string[] = [],
     private readonly refreshTokenTtlSeconds = DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
-    private readonly resourceAudience?: string
+    private readonly resourceAudience?: string,
+    cimdEnabled = false,
+    metadataFetcher: CimdMetadataFetcher = fetchClientMetadata
   ) {
-    this.clients = new SealedClientsStore(sealer, redirectAllowlist);
+    this.clients = new SealedClientsStore(sealer, redirectAllowlist, cimdEnabled, metadataFetcher);
   }
 
   /** @returns The registry of dynamically registered MCP clients. */

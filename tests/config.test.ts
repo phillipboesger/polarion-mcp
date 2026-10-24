@@ -77,6 +77,14 @@ test("config drops trailing slashes and whitespace from API_BASE_URL, so request
   }
 })
 
+test("configuredToolsets defaults to all and validates the deployment allowlist", async () => {
+  const { configuredToolsets } = await importFreshConfig("toolsets")
+  assert.equal(configuredToolsets({}), undefined)
+  assert.deepEqual(configuredToolsets({ MCP_TOOLSETS: "work-items, documents,work-items" }), ["work-items", "documents"])
+  assert.throws(() => configuredToolsets({ MCP_TOOLSETS: "work-itemz" }), /Unknown toolset.*Valid toolsets/)
+  assert.throws(() => configuredToolsets({ MCP_TOOLSETS: "," }), /lists no toolsets/)
+})
+
 test("configurationWarnings tells a stdio user what is missing, and an HTTP deployment only about the base URL", async () => {
   const { configurationWarnings } = await importFreshConfig("warnings")
   const none = configurationWarnings({ API_BASE_URL: "https://polarion.test/polarion/rest/v1", BEARER_TOKEN: "pat" }, { needsToken: true })

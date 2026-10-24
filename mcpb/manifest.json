@@ -1,0 +1,36 @@
+{
+  "manifest_version": "0.3",
+  "name": "polarion-mcp",
+  "version": "1.4.0",
+  "description": "Model Context Protocol (MCP) server for the Polarion ALM REST API.",
+  "author": {
+    "name": "Phillip Bösger"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "build/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/build/index.js"],
+      "env": {
+        "API_BASE_URL": "${user_config.api_base_url}",
+        "BEARER_TOKEN": "${user_config.bearer_token}"
+      }
+    }
+  },
+  "user_config": {
+    "api_base_url": {
+      "type": "string",
+      "title": "Polarion REST API URL",
+      "description": "Base URL for the Polarion REST API, ending in /polarion/rest/v1.",
+      "required": true
+    },
+    "bearer_token": {
+      "type": "string",
+      "title": "Polarion Personal Access Token",
+      "description": "Personal Access Token (PAT) for authenticating with the Polarion REST API.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

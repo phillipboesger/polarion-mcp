@@ -47,6 +47,20 @@ test("an unlisted Origin is refused on /mcp", async () => {
   }
 })
 
+test("an unlisted Origin is refused on a toolset-specific MCP path", async () => {
+  const { base, stop } = await startApp(["https://trusted.example"])
+  try {
+    const res = await fetch(`${base}/mcp/work-items`, {
+      method: "POST",
+      headers: { origin: "https://evil.example", authorization: "Bearer pat", "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify(INIT_BODY),
+    })
+    assert.equal(res.status, 403)
+  } finally {
+    await stop()
+  }
+})
+
 test("uppercase /MCP does not bypass Origin rejection", async () => {
   const { base, stop } = await startApp(["https://trusted.example"])
   try {
@@ -379,8 +393,8 @@ test("distinct OAuth client ids from one IP hit the per-IP token ceiling", async
   }
 })
 
-test("public OAuth startup warns when no trusted proxy is configured and reads the token IP limit", async () => {
-  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_RATE_LIMIT_TOKEN_IP", "TRUST_PROXY"] as const
+test("public OAuth startup warns when no trusted proxy is configured, ignores unknown presets and reads the token IP limit", async () => {
+  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_ALLOWED_REDIRECT_PRESETS", "MCP_RATE_LIMIT_TOKEN_IP", "TRUST_PROXY"] as const
   const previous = new Map(envKeys.map(key => [key, process.env[key]]))
   const warnings: string[] = []
   const originalLog = console.log
@@ -391,13 +405,21 @@ test("public OAuth startup warns when no trusted proxy is configured and reads t
     process.env.MCP_PUBLIC_URL = "https://mcp.example"
     process.env.MCP_TOKEN_SECRET = "a-secret-long-enough-for-startup-warning-test"
     process.env.MCP_ALLOWED_REDIRECT_PREFIXES = "https://claude.ai/api/mcp/auth_callback"
+    process.env.MCP_ALLOWED_REDIRECT_PRESETS = "unknown-client"
     process.env.MCP_RATE_LIMIT_TOKEN_IP = "1"
     delete process.env.TRUST_PROXY
     console.log = () => undefined
     server = startMcpHttpServer({ logger: { warn: message => warnings.push(message) } })
     await new Promise<void>((resolve) => server?.once("listening", resolve))
     assert.ok(warnings.some(message => /shared IP|shared egress|TRUST_PROXY/i.test(message)))
+    assert.ok(warnings.some(message => /Ignoring unknown MCP_ALLOWED_REDIRECT_PRESETS entry: unknown-client/.test(message)))
     const { port } = server?.address() as AddressInfo
+    const registration = await fetch(`http://127.0.0.1:${port}/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ client_name: "test", redirect_uris: ["https://attacker.example/callback"], token_endpoint_auth_method: "none" }),
+    })
+    assert.equal(registration.status, 400)
     const post = (clientId: string) => fetch(`http://127.0.0.1:${port}/token`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -408,6 +430,37 @@ test("public OAuth startup warns when no trusted proxy is configured and reads t
   } finally {
     console.log = originalLog
     if (server?.listening) await new Promise<void>((resolve) => server?.close(() => resolve()))
+    for (const key of envKeys) {
+      const value = previous.get(key)
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
+
+test("MCP_CIMD_ENABLED is read in the start function and exposed in OAuth discovery", async () => {
+  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_CIMD_ENABLED", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_ALLOWED_REDIRECT_PRESETS"] as const
+  const previous = new Map(envKeys.map(key => [key, process.env[key]]))
+  const originalLog = console.log
+  let server: ReturnType<typeof startMcpHttpServer> | undefined
+  try {
+    process.env.MCP_HTTP_PORT = "0"
+    process.env.MCP_HTTP_HOST = "127.0.0.1"
+    process.env.MCP_PUBLIC_URL = "https://mcp.example"
+    process.env.MCP_TOKEN_SECRET = "a-secret-long-enough-for-cimd-env-test"
+    process.env.MCP_CIMD_ENABLED = "true"
+    process.env.MCP_ALLOWED_REDIRECT_PREFIXES = ""
+    process.env.MCP_ALLOWED_REDIRECT_PRESETS = ""
+    console.log = () => undefined
+    server = startMcpHttpServer({ logger: { warn: () => undefined } })
+    await new Promise<void>(resolve => server?.once("listening", resolve))
+    const { port } = server.address() as AddressInfo
+    const discovery = await fetch(`http://127.0.0.1:${port}/.well-known/oauth-authorization-server`)
+    assert.equal(discovery.status, 200)
+    assert.equal((await discovery.json() as { client_id_metadata_document_supported?: boolean }).client_id_metadata_document_supported, true)
+  } finally {
+    console.log = originalLog
+    if (server?.listening) await new Promise<void>(resolve => server?.close(() => resolve()))
     for (const key of envKeys) {
       const value = previous.get(key)
       if (value === undefined) delete process.env[key]
