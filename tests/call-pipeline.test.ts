@@ -7,6 +7,10 @@ import { createMcpHttpApp } from '../src/mcp-http-server.js'
 import { listVirtualTools, registerVirtualTool } from '../src/virtual-tools.js'
 import { enabledTools } from '../src/tool-filter.js'
 import { sanitizeInputSchema } from '../src/utils.js'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
+import { createPolarionServer } from '../src/server.js'
+import { COMPOSITE_TOOLS } from '../src/composite-tools.js'
 
 const TOKEN = 'request-secret-token'
 const HEADERS = { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }
@@ -77,8 +81,11 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
     const app = await start()
     try {
       const actual = (await app.request(2, 'tools/list')).result.tools.map((tool: { name: string; inputSchema: unknown }) => ({ name: tool.name, inputSchema: tool.inputSchema }))
-      const expected = [...enabledTools.values()].map(tool => ({ name: tool.name, inputSchema: sanitizeInputSchema(tool.inputSchema) })).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
-      assert.equal(expected.length, 284)
+      const expected = [
+        ...[...enabledTools.values()].map(tool => ({ name: tool.name, inputSchema: sanitizeInputSchema(tool.inputSchema) })),
+        ...COMPOSITE_TOOLS.map(tool => ({ name: tool.name, inputSchema: tool.inputSchema })),
+      ].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+      assert.equal(expected.length, enabledTools.size + COMPOSITE_TOOLS.length)
       assert.equal(JSON.stringify(actual), JSON.stringify(expected))
     } finally { await app.stop() }
   })
@@ -100,7 +107,10 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
       const app = await start({ allowedToolsets: ['composites'] }, 'composites', true)
       try {
         const listed = (await app.request(2, 'tools/list')).result.tools
-        assert.deepEqual(listed.map((tool: { name: string }) => tool.name), ['test_ping'])
+        const names = listed.map((tool: { name: string }) => tool.name)
+        assert.ok(names.includes('test_ping'))
+        assert.ok(names.includes('trace_links'))
+        assert.ok(!names.includes('test_write'))
         assert.equal((await app.request(3, 'tools/call', { name: 'test_ping', arguments: { echo: 'ok' } })).result.content[0].text, 'ok')
         assert.equal(handlerCalls, 1)
         assert.equal((await app.request(4, 'tools/call', { name: 'test_write', arguments: {} })).result.isError, true)
@@ -141,4 +151,38 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
       await new Promise<void>(resolve => upstream.close(() => resolve()))
     }
   })
+})
+
+test('progress notifications reach an SDK client only when the request sends a progress token', async t => {
+  const unregister = registerVirtualTool({
+    name: 'progress_probe', title: 'Progress probe', description: 'Test progress forwarding',
+    inputSchema: { type: 'object' }, annotations: { readOnlyHint: true }, toolset: 'composites',
+    handler: async (_args, ctx) => {
+      await ctx.reportProgress({ progress: 1, total: 2, message: 'working' })
+      return { content: [{ type: 'text', text: 'done' }] }
+    },
+  })
+  const server = createPolarionServer({ filter: { toolsets: ['composites'] } })
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+  const client = new Client({ name: 'progress-test', version: '1' })
+  await server.connect(serverTransport)
+  await client.connect(clientTransport)
+  try {
+    await t.test('token receives progress notification', async () => {
+      const received: unknown[] = []
+      await client.callTool({ name: 'progress_probe', arguments: {}, _meta: { progressToken: 'progress-1' } }, undefined, { onprogress: progress => received.push(progress) })
+      assert.equal(received.length, 1)
+      assert.equal((received[0] as { message?: string }).message, 'working')
+    })
+    await t.test('missing token emits no progress notification', async () => {
+      const received: unknown[] = []
+      const { ProgressNotificationSchema } = await import('@modelcontextprotocol/sdk/types.js')
+      client.setNotificationHandler(ProgressNotificationSchema, notification => { received.push(notification.params) })
+      await client.callTool({ name: 'progress_probe', arguments: {} })
+      assert.equal(received.length, 0)
+    })
+  } finally {
+    await client.close()
+    unregister()
+  }
 })

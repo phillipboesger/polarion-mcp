@@ -40,6 +40,7 @@ import { ToolCallRateLimiter } from './tool-rate-limit.js';
 import { annotateToolText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
+import './composite-tools.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -73,6 +74,7 @@ interface ToolCallPipelineOptions {
   telemetry: TelemetryHooks;
   correlationId?: string;
   server: Server;
+  reportProgress?: (progress: { progress: number; total?: number; message?: string }) => Promise<void>;
 }
 
 function requiresConfirmation(toolName: string, annotations: import('./types.js').McpToolAnnotations | undefined): boolean {
@@ -173,7 +175,10 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       const resolved = await options.extensions.instanceResolver.resolve(principal);
       result = await virtual.handler(callArgs, {
         callPolarionTool: async (name, callArgs) => {
-          const definition = options.clientTools.get(name);
+          // Composite dependencies remain callable when a request narrows the
+          // visible toolset to `composites`; deployment-level MCP_TOOLS and
+          // MCP_READ_ONLY filtering has already been applied to enabledTools.
+          const definition = enabledTools.get(name);
           if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
           return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
         },
@@ -181,7 +186,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
         userScope,
         logger: options.logger,
         signal: options.signal ?? new AbortController().signal,
-        reportProgress: async () => undefined,
+        reportProgress: options.reportProgress ?? (async () => undefined),
       });
       outcome = result.isError ? 'error' : 'success';
     } else if (generated) {
@@ -297,10 +302,23 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    */
   server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
     const requestHeader = extra?.requestInfo?.headers['x-request-id'];
+    const progressToken = extra?._meta?.progressToken;
     return callToolPipeline(
       request.params.name,
       (request.params.arguments ?? {}) as Record<string, unknown>,
-      { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined), server },
+      {
+        clientTools, virtualTools, extensions,
+        maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
+        logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
+        telemetry: options.telemetry ?? NOOP_TELEMETRY,
+        correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined), server,
+        reportProgress: progressToken === undefined ? undefined : async progress => {
+          await extra.sendNotification({
+            method: 'notifications/progress',
+            params: { progressToken, ...progress },
+          });
+        },
+      },
     );
   });
 
