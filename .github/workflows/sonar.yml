@@ -33,6 +33,6 @@ jobs:
         run: echo "::notice::Sonar scan skipped because SONAR_TOKEN is missing or this is a fork pull request."
       - name: Sonar scan
         if: ${{ env.SONAR_TOKEN != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
