@@ -114,6 +114,16 @@ async function requestDestructiveConfirmation(server: Server, toolName: string, 
 
 /** Applies auth, policy, execution, and audit once for every MCP tools/call request. */
 async function callToolPipeline(toolName: string, args: Record<string, unknown>, options: ToolCallPipelineOptions): Promise<CallToolResult> {
+  // Discover mode is a wrapper for the real tool. Dispatch before the pipeline
+  // so only the target call consumes policy, limiter, audit, telemetry, and marking.
+  if (options.virtualTools.some(tool => tool.name === 'call_tool')) {
+    const virtual = options.virtualTools.find(tool => tool.name === 'call_tool');
+    if (toolName === virtual?.name) {
+      const target = String(args.name ?? '');
+      if (!options.clientTools.has(target)) return { content: [{ type: 'text', text: `Error: Unknown or filtered tool: ${target}` }], isError: true };
+      return callToolPipeline(target, (args.arguments ?? {}) as Record<string, unknown>, options);
+    }
+  }
   const started = Date.now();
   const correlationId = options.correlationId ?? randomUUID();
   const virtual = options.virtualTools.find(tool => tool.name === toolName);
@@ -131,12 +141,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     try { return options.telemetry.onSpanStart({ name: 'polarion.tools.call', correlationId, tool: toolName }); } catch { return undefined; }
   })();
     const execute = async (): Promise<void> => {
-      if (virtual?.name === 'call_tool') {
-        const target = String(args.name ?? '');
-        if (!options.clientTools.has(target)) result = { content: [{ type: 'text', text: `Error: Unknown or filtered tool: ${target}` }], isError: true };
-        else result = await callToolPipeline(target, (args.arguments ?? {}) as Record<string, unknown>, options);
-        outcome = result.isError ? 'error' : 'success';
-      } else if (virtual) {
+      if (virtual) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
         result = await virtual.handler(callArgs, {
           callPolarionTool: async (name, callArgs) => {
