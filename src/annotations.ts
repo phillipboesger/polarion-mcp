@@ -20,6 +20,8 @@ export const DESTRUCTIVE_ACTIONS = new Set([
   'moveProjectAction',
 ]);
 
+const REPLACE_LIST_PATH = /\/(enumerations\/\{enumContext\}\/\{enumName\}|customfields\/\{resourceType\})\/\{targetType\}$/;
+
 /**
  * @param def - A generated tool definition.
  * @returns The definition with corrected annotations (a copy if anything changed).
@@ -35,6 +37,11 @@ export function correctAnnotations(def: McpToolDefinition): McpToolDefinition {
   }
   // PATCH on a relationship replaces the whole set; links not sent are dropped.
   if (method === 'patch' && /\/relationships\/\{relationshipId\}$/.test(def.pathTemplate)) {
+    corrected.destructiveHint = true;
+  }
+  // Verified on Polarion 2606: PATCH on an enumeration or custom-field list
+  // replaces the whole list; options or fields not sent are removed.
+  if (method === 'patch' && REPLACE_LIST_PATH.test(def.pathTemplate)) {
     corrected.destructiveHint = true;
   }
   if (DESTRUCTIVE_ACTIONS.has(def.name)) {

@@ -20,6 +20,13 @@ test("PATCH on a relationship is destructive: it replaces the whole set", () => 
   }
 })
 
+test("PATCH on an enumeration or custom-field list is destructive: it replaces the whole list", () => {
+  for (const name of ["patchGlobalEnumeration", "patchProjectEnumeration", "patchGlobalCustomFields", "patchCustomField"]) {
+    assert.equal(annotations(name)?.destructiveHint, true, name)
+  }
+  assert.notEqual(annotations("getGlobalEnumeration")?.destructiveHint, true)
+})
+
 test("overwrite and merge actions are destructive, and every listed action exists", () => {
   for (const name of DESTRUCTIVE_ACTIONS) {
     assert.ok(toolDefinitionMap.has(name), `${name} no longer exists`)

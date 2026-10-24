@@ -20,6 +20,7 @@
 
 - Tool descriptions match their annotations; `dry_run` text matches executor behaviour.
 - `changeTypeTo` validates status against the new type; enum lookups paginate; `patchAllWorkItems` refuses ids without a project prefix.
+- `patchGlobalEnumeration`, `patchProjectEnumeration`, `patchGlobalCustomFields` and `patchCustomField` replace the whole option or field list (verified on Polarion 2606). They are now annotated destructive and their descriptions say to send the complete list.
 - Responses are compact and capped (`MCP_MAX_RESPONSE_CHARS`); multipart bodies accept objects; HTML login pages on reads become errors.
 
 ### Features

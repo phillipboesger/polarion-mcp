@@ -44,6 +44,15 @@ function attachmentPost(owner, patchTool, listTool) {
 const ENUM_FIELD_HINT = '`fieldId` must be an enumeration-typed field (e.g. `status`, `severity`, or a custom enum field).';
 
 export const TOOL_GUIDANCE = {
+  // --- Whole-list replacement (verified on Polarion 2606) -------------------
+  patchGlobalEnumeration:
+    'Replaces the entire option list of one global Enumeration: options missing from `requestBody` are deleted, not merged. Read the current list with `getGlobalEnumeration` first and send every option you want to keep.',
+  patchProjectEnumeration:
+    'Replaces the entire option list of one Enumeration in a project: options missing from `requestBody` are deleted, not merged. Read the current list with `getProjectEnumeration` first and send every option you want to keep.',
+  patchGlobalCustomFields:
+    'Replaces the entire list of global Custom Fields for one resource type and target type: fields missing from `requestBody` are deleted, not merged. Read the current list with `getGlobalCustomFields` first and send every field you want to keep.',
+  patchCustomField:
+    'Replaces the entire list of Custom Fields of one project for one resource type and target type: fields missing from `requestBody` are deleted, not merged. Read the current list with `getProjectCustomFields` first and send every field you want to keep.',
   // --- Enumeration options -------------------------------------------------
   getAvailableEnumOptionsForWorkItem:
     `Returns the enumeration options that may be set on one field of one existing Work Item (ID, name, and presentation such as color/icon), already narrowed by that item's type and any dependent enumerations. ${ENUM_FIELD_HINT} Call it before patchWorkItem to pick a valid value; for the value(s) currently set use \`getCurrentEnumOptionsForWorkItem\`, and for an item that does not exist yet use \`getAvailableEnumOptionsForWorkItemType\`.`,

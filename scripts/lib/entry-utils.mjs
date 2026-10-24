@@ -117,6 +117,7 @@ export function correctedAnnotations(method, annotations, { name = '', pathTempl
   const corrected = { ...annotations };
   if (method.toLowerCase() === 'patch' && hasWorkflowAction) corrected.idempotentHint = false;
   if (method.toLowerCase() === 'patch' && /\/relationships\/\{relationshipId\}$/.test(pathTemplate)) corrected.destructiveHint = true;
+  if (method.toLowerCase() === 'patch' && /\/(enumerations\/\{enumContext\}\/\{enumName\}|customfields\/\{resourceType\})\/\{targetType\}$/.test(pathTemplate)) corrected.destructiveHint = true;
   if (new Set(['overwriteDocumentParts', 'mergeDocumentToMaster', 'mergeDocumentFromMaster', 'setLicense', 'moveProjectAction']).has(name)) corrected.destructiveHint = true;
   return corrected;
 }
