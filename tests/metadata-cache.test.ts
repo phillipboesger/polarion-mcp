@@ -42,3 +42,11 @@ test('metadata cache scopes users, deployments, and evicts least recently used e
   copy.push('leak')
   assert.deepEqual(cache.get('d', 'alice', 'projects'), ['A'])
 })
+
+test('metadata cache separates enum options by field and work item type', () => {
+  const cache = new MetadataCache()
+  cache.set('d', 'alice', 'statuses', ['open'], 'P', 'status', 'bug')
+  cache.set('d', 'alice', 'statuses', ['draft'], 'P', 'status', 'requirement')
+  assert.deepEqual(cache.get('d', 'alice', 'statuses', 'P', 'status', 'bug'), ['open'])
+  assert.deepEqual(cache.get('d', 'alice', 'statuses', 'P', 'status', 'requirement'), ['draft'])
+})

@@ -59,3 +59,14 @@ test('run_job_and_wait emits virtual progress and is conservatively destructive'
   assert.equal(runJobAndWait.annotations?.destructiveHint, true);
   assert.match(runJobAndWait.description, /semantics vary/i);
 });
+
+test('run_job_and_wait dry_run previews without executing the job', async () => {
+  const calls: string[] = [];
+  const result = await runJobAndWait.handler({ requestBody: { jobId: 'jobs.cleanup' }, dry_run: true }, context(async name => {
+    calls.push(name);
+    return response([]);
+  }));
+  assert.deepEqual(calls, []);
+  assert.match(text(result), /"dryRun":true/);
+  assert.match(text(result), /"jobId":"jobs\.cleanup"/);
+});

@@ -21,6 +21,7 @@ export async function paginate<T extends JsonApiPage>(
   maxItems: number,
   fetchNext: (nextLink: string) => Promise<T>,
   maxPages = MAX_AUTO_PAGES,
+  signal?: AbortSignal,
 ): Promise<PaginationResult<T>> {
   const limit = Math.max(1, Math.min(MAX_AUTO_ITEMS, Math.floor(maxItems)));
   const pageLimit = Math.max(1, Math.min(MAX_AUTO_PAGES, Math.floor(maxPages)));
@@ -34,6 +35,7 @@ export async function paginate<T extends JsonApiPage>(
     truncated = true;
   }
   while (next && !truncated) {
+    if (signal?.aborted) { truncated = true; break; }
     if ((merged.data as unknown[]).length >= limit || pagesFetched >= pageLimit) {
       truncated = true;
       break;
@@ -60,7 +62,7 @@ export async function paginate<T extends JsonApiPage>(
 }
 
 /** Extracts the next page number from an untrusted API link without following its host/path. */
-export function pageNumberFromLink(nextLink: string, baseUrl: string, fallback: number): number {
+export function pageNumberFromLink(nextLink: string, baseUrl: string, fallback?: number): number | undefined {
   try {
     const url = new URL(nextLink, baseUrl);
     const value = url.searchParams.get('page[number]') ?? url.searchParams.get('page_number');

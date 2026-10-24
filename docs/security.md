@@ -36,7 +36,7 @@ Limits are in-memory per process. OAuth authorization is 100 requests per IP per
 
 ## Destructive tool confirmation
 
-`MCP_CONFIRM_DESTRUCTIVE=true` enables the default policy hook for destructive and bulk operations. Clients that advertise form elicitation receive a server-side confirmation request with a concise action summary. Other clients receive an error and must first inspect a `dry_run: true` preview, then repeat the call with `confirm: true`. The default is `false` to preserve existing deployment behavior; enterprise packages can replace the policy hook. Read-only tools do not prompt.
+`MCP_CONFIRM_DESTRUCTIVE=true` enables the default policy hook for destructive and bulk operations. Clients that advertise form elicitation receive a server-side confirmation request with a concise action summary. Other clients receive an error; repeat the call with `confirm: true`; use `dry_run: true` first to preview. The server accepts `confirm: true` on the first call and does not enforce that a preview happened. The default is `false` to preserve existing deployment behavior; enterprise packages can replace the policy hook. Read-only tools do not prompt.
 
 ## Logging and telemetry
 
@@ -51,3 +51,4 @@ Telemetry callbacks receive span start and end metadata through the optional ext
 ## read_when
 
 - Use this guide when reviewing deployment security or handling credentials.
+Tool-call rate limits and metadata caches are shared across MCP sessions in one HTTP app and keyed by caller token. Requests without a token use the single shared `no-token` bucket/cache scope.

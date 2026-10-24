@@ -46,6 +46,11 @@ test('resolves same-host URL forms and rejects foreign or malformed URLs', () =>
   assert.throws(() => parsePolarionUrl('https://evil.example/polarion/#/project/PRJ/workitem?id=WI-1', base), /host does not match/);
   assert.throws(() => parsePolarionUrl('not a url', base), /Malformed/);
   assert.throws(() => parsePolarionUrl('https://polarion.example/polarion/#/project/PRJ/unknown?id=x', base), /Unsupported/);
+  assert.throws(() => parsePolarionUrl('https://polarion.example/polarion/#/project/PRJ%2Fother/workitem?id=WI-1', base), /Malformed/);
+  assert.equal(parsePolarionUrl('https://polarion.example/polarion/#/project/PRJ%252Fother/workitem?id=WI-1', base).projectId, 'PRJ%2Fother');
+  assert.throws(() => parsePolarionUrl('https://polarion.example/polarion/#/project/PRJ/workitem?id=%2E%2E', base), /Malformed/);
+  assert.throws(() => parsePolarionUrl('https://polarion.example/polarion/#/project/PRJ/workitem?id=WI%5Cevil', base), /Malformed/);
+  assert.equal(parsePolarionUrl('https://polarion.example/polarion/#/project/PRJ/workitem?id=PRJ%2FWI-1', base).id, 'PRJ/WI-1');
 });
 
 test('search tool queries through callPolarionTool and includes generated query', async () => {
