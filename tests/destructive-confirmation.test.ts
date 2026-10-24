@@ -42,13 +42,19 @@ test('elicitation accept executes and decline/cancel never execute', async () =>
   assert.match((cancelled.result.content as Array<{ text: string }>)[0].text, /cancelled/);
 });
 
-test('clients without elicitation must preview and repeat with confirm true', async () => {
+test('clients without elicitation can confirm in one step and receive preview guidance', async () => {
   const blocked = await invoke({ confirmDestructive: true, capabilities: {}, name: 'bulk_probe' });
   assert.equal(blocked.calls, 0);
   assert.equal(blocked.result.isError, true);
-  assert.match((blocked.result.content as Array<{ text: string }>)[0].text, /dry_run: true.*confirm: true/);
+  assert.equal((blocked.result.content as Array<{ text: string }>)[0].text, 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.');
   const confirmed = await invoke({ confirmDestructive: true, capabilities: {}, name: 'bulk_probe', args: { confirm: true } });
   assert.equal(confirmed.calls, 1);
+});
+
+test('dry_run on a destructive virtual tool without preview support still requires confirmation', async () => {
+  const result = await invoke({ confirmDestructive: true, capabilities: {}, name: 'bulk_probe', args: { dry_run: true } });
+  assert.equal(result.calls, 0);
+  assert.equal(result.result.isError, true);
 });
 
 test('read-only tools never prompt and the flag-off default preserves execution', async () => {

@@ -24,6 +24,8 @@ export interface VirtualTool {
     idempotentHint?: boolean;
     openWorldHint?: boolean;
   };
+  /** The handler guarantees dry_run has no write effects and returns a preview. */
+  dryRunSafe?: boolean;
   toolset: ToolsetName | 'composites';
   handler(args: Record<string, unknown>, ctx: VirtualToolContext): Promise<CallToolResult> | CallToolResult;
 }

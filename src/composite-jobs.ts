@@ -11,6 +11,7 @@ export const runJobAndWait: VirtualTool = {
     log_tail_chars: { type: 'number', description: 'Maximum log tail length (default 4000, capped at 20000).' },
   }, required: ['requestBody'] },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  dryRunSafe: true,
   async handler(args, ctx) {
     if (args.dry_run === true) return textResult({ dryRun: true, requestBody: args.requestBody, message: 'Preview only; executeJob was not called.' });
     const waitSeconds = boundedNumber(args.max_wait_seconds, 120, 600);

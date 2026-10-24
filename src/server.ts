@@ -225,12 +225,12 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     if (decision.action === 'deny') {
       outcome = 'denied';
       result = { content: [{ type: 'text', text: decision.reason }], isError: true };
-    } else if (decision.action === 'requireConfirmation' && args.dry_run !== true) {
+    } else if (decision.action === 'requireConfirmation' && !(args.dry_run === true && (generated?.inputSchema?.properties?.dry_run !== undefined || virtual?.dryRunSafe === true))) {
       const confirmation = await requestDestructiveConfirmation(options.server, toolName, args, options.signal);
       if (confirmation !== 'accepted') {
         outcome = 'confirmation-required';
         const text = confirmation === 'fallback'
-          ? 'This destructive tool requires confirmation. First repeat the call with dry_run: true to review its preview, then repeat the same call with confirm: true.'
+          ? 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.'
           : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
         result = { content: [{ type: 'text', text }], isError: true };
       } else {

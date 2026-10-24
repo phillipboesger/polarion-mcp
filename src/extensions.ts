@@ -42,7 +42,7 @@ export interface PolarionExtensions {
 
 export function createDefaultExtensions(apiBaseUrl: string, confirmDestructive = false): PolarionExtensions {
   return {
-    policyHook: { beforeCall: ({ destructive, args }) => confirmDestructive && destructive && args.dry_run !== true ? { action: 'requireConfirmation' } : { action: 'allow' } },
+    policyHook: { beforeCall: ({ destructive }) => confirmDestructive && destructive ? { action: 'requireConfirmation' } : { action: 'allow' } },
     auditSink: { record: () => undefined },
     authProvider: { validateRequest: ({ userScope }) => ({ id: userScope ?? 'anonymous' }) },
     instanceResolver: { resolve: () => ({ apiBaseUrl }) },
