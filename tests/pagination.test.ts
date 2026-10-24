@@ -55,11 +55,13 @@ test('generated list tool max_items paginates through a five-page stub and omiss
   process.env.BEARER_TOKEN = 'pagination-test-token';
   let baseUrl = '';
   let requests = 0;
+  let nextBehavior: 'normal' | 'unparseable' | 'repeat' = 'normal';
   const upstream = createHttpServer((req, res) => {
     requests++;
     const url = new URL(req.url ?? '/', baseUrl);
     const number = Number(url.searchParams.get('page[number]') ?? 1);
-    const next = number < 5 ? `${baseUrl}/projects/PRJ/workitems?page%5Bsize%5D=1&page%5Bnumber%5D=${number + 1}` : undefined;
+    const nextPage = nextBehavior === 'unparseable' ? 'oops' : nextBehavior === 'repeat' ? number : number + 1;
+    const next = number < 5 ? `${baseUrl}/projects/PRJ/workitems?page%5Bsize%5D=1&page%5Bnumber%5D=${nextPage}` : undefined;
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ data: [{ type: 'workitems', id: `PRJ/WI-${number}` }], links: { next }, meta: { totalCount: 5 } }));
   });
@@ -94,6 +96,30 @@ test('generated list tool max_items paginates through a five-page stub and omiss
     assert.equal(requests, 1);
     const expectedPage = { data: [{ type: 'workitems', id: 'PRJ/WI-1' }], links: { next: `${baseUrl}/projects/PRJ/workitems?page%5Bsize%5D=1&page%5Bnumber%5D=2` }, meta: { totalCount: 5 } };
     assert.equal((baseline as any).content[0].text, `API Response (Status: 200):\n${JSON.stringify(expectedPage)}`);
+
+    for (const behavior of ['unparseable', 'repeat'] as const) {
+      nextBehavior = behavior;
+      requests = 0;
+      const stopped = await client.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', page_size_: 1, max_items: 4 } });
+      assert.equal(requests, 1, `${behavior} link must not trigger another page request`);
+      assert.equal(stopped.isError, true);
+      assert.match((stopped as any).content[0].text, /Pagination stopped/);
+    }
+
+    nextBehavior = 'normal';
+    requests = 0;
+    const limiter = { checks: 0, check() { return ++this.checks === 3 ? 1 : undefined; } };
+    const limitedServer = createPolarionServer({ apiBaseUrl: baseUrl, rateLimiter: limiter as any, filter: { toolsets: ['work-items'] } });
+    const [limitedClientTransport, limitedServerTransport] = InMemoryTransport.createLinkedPair();
+    const limitedClient = new Client({ name: 'pagination-rate-test', version: '1' });
+    await Promise.all([limitedServer.connect(limitedServerTransport), limitedClient.connect(limitedClientTransport)]);
+    try {
+      const limitedPage = await limitedClient.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', page_size_: 1, max_items: 5 } });
+      assert.equal(requests, 2);
+      assert.equal(limiter.checks, 3);
+      assert.equal(limitedPage.isError, true);
+      assert.match((limitedPage as any).content[0].text, /rate limit exceeded/i);
+    } finally { await limitedClient.close(); await limitedServer.close(); }
   } finally {
     await client.close();
     await server.close();
