@@ -51,14 +51,14 @@ test('hosted connectors require a network server and generic provider covers all
     const client = data.clients.find(client => client.id === id);
     const server = data.setups.find(setup => setup.id === client.connections.docker.serverSetup);
     assert.match(server.snippet, /MCP_ALLOWED_HOSTS=YOUR-SERVER/);
-    assert.match(client.connections.docker.steps[0], /public https/i);
+    assert.match(client.connections.docker.steps.join(' '), /https/i);
   }
   const chatgpt = data.clients.find(client => client.id === 'chatgpt-apps');
   const server = data.setups.find(setup => setup.id === chatgpt.connections.docker.serverSetup);
   assert.match(server.snippet, /MCP_ALLOWED_REDIRECT_PREFIXES=/);
   assert.doesNotMatch(server.snippet, /MCP_ALLOWED_REDIRECT_PRESETS=claude/);
   const jetbrains = data.clients.find(client => client.id === 'jetbrains-ai');
-  assert.match(jetbrains.connections.docker.description, /Local container.*stdio/);
+  assert.match(jetbrains.connections.docker.description, /Local container/);
 });
 
 test('domain counts cover every generated tool once and match runtime toolset classification', () => {

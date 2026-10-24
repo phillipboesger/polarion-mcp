@@ -55,7 +55,7 @@ On Team / Enterprise, an owner adds the connector under Organization settings > 
 
 Default: **Remote URL**.
 
-- **npm / npx:** claude.ai custom connectors connect from Anthropic's cloud to a public HTTPS address, so they cannot start npx on your computer. Use Claude Desktop or Claude Code for local npm mode, or use the Docker or Remote mode.
+- **npm / npx:** claude.ai connects from Anthropic's cloud, so it cannot start npx.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -90,7 +90,7 @@ Add these fields to your Messages request. Enable the mcp-client-2025-11-20 beta
 
 Default: **Remote URL**.
 
-- **npm / npx:** The MCP connector in the Messages API only talks to servers exposed publicly over HTTP (Streamable HTTP or SSE). Local stdio servers cannot be connected directly.
+- **npm / npx:** Only public HTTP servers work; local stdio cannot connect.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -108,7 +108,7 @@ Custom MCP access depends on your ChatGPT workspace permissions. Use DCR for thi
 
 Default: **Remote URL**.
 
-- **npm / npx:** ChatGPT runs in OpenAI's cloud and cannot start programs on your computer, so it cannot run npx. Use the Remote URL or Docker mode instead.
+- **npm / npx:** ChatGPT's cloud cannot start npx. Use Remote or Docker mode.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -127,7 +127,7 @@ This uses the REST wrapper and its HTTP_API_KEY, not the MCP endpoint or the use
 
 Default: **Remote URL**.
 
-- **npm / npx:** Custom GPT Actions call a public web address from OpenAI's cloud, so they cannot start npx on your computer. They also need the separate REST wrapper, not the MCP server.
+- **npm / npx:** GPT Actions need a public REST wrapper, not the MCP server or npx.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -147,7 +147,7 @@ Add this tools field to a Responses request. Use your OpenAI API key for the API
 
 Default: **Remote URL**.
 
-- **npm / npx:** OpenAI's cloud calls your MCP server, so it cannot start npx on your computer. Use a public HTTPS server (Remote URL or Docker mode). Secure MCP Tunnel is a separate OpenAI feature for private servers.
+- **npm / npx:** OpenAI's cloud cannot start npx. Use a public HTTPS server.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -207,7 +207,7 @@ Use generative orchestration. This path uses a PAT header and does not require a
 
 Default: **Remote URL**.
 
-- **npm / npx:** Copilot Studio is a cloud service. It cannot start a program on your computer such as npx. It only connects to an MCP server over HTTPS (Streamable transport), so use the Docker or Remote URL mode.
+- **npm / npx:** Cloud service; it cannot run npx. Use the Docker or Remote URL mode.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -267,7 +267,7 @@ An administrator may need to override the organization policy that blocks custom
 
 Default: **Remote URL**.
 
-- **npm / npx:** Gemini Enterprise is a cloud service. It cannot start a program on your computer such as npx. It only connects to an MCP server over HTTPS (Streamable HTTP, certificate from a public authority), so use the Docker or Remote URL mode.
+- **npm / npx:** Cloud service; it cannot run npx. Use the Docker or Remote URL mode.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -327,7 +327,7 @@ Default: **npm / npx**.
 
 - **npm / npx:** Supported; use the configuration and steps shown inline.
 - **Docker:** Supported; use the configuration and steps shown inline.
-- **Remote URL:** JetBrains documents remote Streamable HTTP servers (a url entry) but its AI Assistant MCP page documents no way to send an Authorization header, which this server needs for your PAT. Use the npm mode, or the Docker mode that runs a private container on your computer.
+- **Remote URL:** No documented way to send an Authorization header. Use npm or Docker.
 
 - [Official documentation](https://www.jetbrains.com/help/ai-assistant/mcp.html)
 
@@ -345,7 +345,7 @@ The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends
 
 Default: **Docker**.
 
-- **npm / npx:** This entry deploys a server. Choose your AI client for local npx.
+- **npm / npx:** This entry deploys a server. Pick your AI client for npx.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -388,7 +388,7 @@ All calls use the deployment PAT. Clients send Authorization: Bearer <HTTP_API_K
 
 Default: **Docker**.
 
-- **npm / npx:** npx starts MCP stdio. This integration needs the separate REST wrapper.
+- **npm / npx:** npx starts MCP stdio. This needs the separate REST wrapper.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -403,7 +403,7 @@ Use the HTTP Request node as a workflow step or attach it as a tool to an AI Age
 
 Default: **Remote URL**.
 
-- **npm / npx:** npx starts MCP stdio. This integration needs the separate REST wrapper.
+- **npm / npx:** npx starts MCP stdio. This needs the separate REST wrapper.
 - **Docker:** Deploy the server, then use the client configuration shown inline.
 - **Remote URL:** Supported; use the configuration and steps shown inline.
 
@@ -417,3 +417,73 @@ Steps checked against the vendor documentation on 2026-10-24.
 Cloud connectors need a server reachable by their provider. Deploy Streamable HTTP with TLS, `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, trusted proxy settings, and exact OAuth redirect allowlists. Claude can use `MCP_ALLOWED_REDIRECT_PRESETS=claude`; ChatGPT supplies its callback during setup. Use DCR unless CIMD is explicitly enabled on the server.
 
 The [Docker setup](https://polarion-mcp.boesger.com/#setup/docker) starts a local PAT-authenticated HTTP endpoint. Follow [deployment](deployment.md) for TLS and OAuth. The [REST wrapper](https://polarion-mcp.boesger.com/#setup/rest-wrapper) uses a deployment PAT plus `HTTP_API_KEY`; it is a separate mode from remote MCP. See [security](security.md) and [configuration](configuration.md).
+
+## More questions
+
+### What does Bearer mean in an Authorization header?
+
+It is just the word Bearer, one space, then your token: `Bearer YOUR_POLARION_PAT`. Without the word Bearer the server answers 401.
+
+### Where do I keep my token safely?
+
+In your personal client settings or an environment variable, never in a file inside a shared project or repository. Anyone who can read the file can act as you in Polarion. With the OAuth connectors you type the token only on the server's login page and the AI client never stores it.
+
+### Which Polarion versions work?
+
+Live integration tests have passed on Polarion 2506 and 2606. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
+
+### Which AI clients can I use?
+
+Any client that supports MCP over stdio or Streamable HTTP. The setup guide above lists the tested paths for Claude, ChatGPT and Codex, Copilot Studio, VS Code, Gemini, Cursor, Windsurf and JetBrains. Other clients can use the generic stdio or HTTP entries, or the REST wrapper.
+
+### It says 503 "Polarion could not be reached".
+
+The server got no usable answer from Polarion. Read the log line `Polarion token check failed` (`docker logs polarion-mcp`). Usual causes: the address does not end in `/polarion/rest/v1`, a firewall between server and Polarion, Polarion is down, `localhost` was used inside Docker, or a certificate error. Run the curl test on the machine that hosts the server, not on your laptop.
+
+### Can claude.ai or ChatGPT connect to a server on my own laptop?
+
+No. These connectors connect from the provider's cloud, so the address must be reachable on the public internet with HTTPS. On your own computer use the npm mode in Claude Desktop, Claude Code or Codex instead. Desktop and command-line tools such as VS Code, Cursor, Windsurf and Gemini CLI can use `http://localhost:3000/mcp`.
+
+### What is the difference between the ChatGPT connector and a Custom GPT?
+
+The ChatGPT connector speaks MCP and everyone signs in with their own Polarion token. A Custom GPT uses the separate REST wrapper with one shared key (`HTTP_API_KEY`), so every call runs as the one Polarion user whose token the wrapper holds.
+
+### Certificate errors: the public HTTPS address does not work.
+
+DNS must point to the server, ports 80 and 443 must be reachable from the internet and no other program may use them. Caddy's log (`journalctl -u caddy`, or the terminal) says why the certificate failed. Never switch certificate checking off for the public side.
+
+### My Polarion uses a company or self-signed certificate.
+
+Give Node your company root certificate as a PEM file with `NODE_EXTRA_CA_CERTS=/path/ca.pem`. npm mode: add `"NODE_EXTRA_CA_CERTS": "/path/ca.pem"` to the `env` block of the client config. Docker: `-v /path/ca.pem:/certs/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/ca.pem`. As a last resort on a trusted internal network, `NODE_TLS_REJECT_UNAUTHORIZED=0` works but turns off all certificate checks.
+
+### Should I use polarion-mcp@latest or a pinned version?
+
+The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.0` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client.
+
+### How do I update the Docker server?
+
+Choose the new tag on the GitHub package page, then run `docker pull ghcr.io/phillipboesger/polarion-mcp:NEWTAG`, `docker rm -f polarion-mcp`, and the same `docker run` command with the new tag. Keep `MCP_TOKEN_SECRET` unchanged so users stay signed in. With a team URL the administrator updates the server and you only reconnect.
+
+### It says "Unsupported engine" or the Node version is too old.
+
+The package needs Node.js 22 or newer: `node -v` must print v22 or higher. Install the LTS from nodejs.org and open a new terminal; with nvm run `nvm install 22 && nvm use 22`. Desktop apps can use a different Node than your terminal, so install Node system-wide and fully restart the app. Docker avoids this because the image bundles Node 22.
+
+### Windows: the client cannot start npx.
+
+Typical symptoms are `spawn npx ENOENT` or a server that never starts. Use `cmd` as the command with the arguments `/c`, `npx`, `-y`, `polarion-mcp`, because npx is `npx.cmd` on Windows. Backslashes in JSON paths must be doubled (`C:\\path\\ca.pem`). Restart the app completely after every change.
+
+### Port 3000 is already in use.
+
+Change only the left number of the port mapping: `-p 127.0.0.1:3100:3000`, then use `http://localhost:3100/mcp` and set `MCP_ALLOWED_HOSTS=localhost:3100,127.0.0.1:3100`. Remove an old container with `docker rm -f polarion-mcp`. On macOS and Linux `lsof -i :3000` shows who uses the port; on Windows use `netstat -ano | findstr :3000`.
+
+### It says 429 "Too many requests".
+
+The server limits requests per address. Behind a proxy set `TRUST_PROXY=1`, otherwise all users share one counter, then wait 15 minutes for the window to reset. The REST wrapper has a fixed limit per 15 minutes.
+
+### Gemini CLI says it was replaced. Which tool should I use?
+
+Google's page says Gemini CLI was replaced by Antigravity CLI on 18 June 2026 for no-cost-tier and Google One users. If your Gemini CLI still runs, for example with an API key or a company license, the steps in this guide work. Antigravity CLI has its own setup that this guide does not cover yet.
+
+### Windsurf now says Devin. Which steps do I follow?
+
+The vendor docs moved to docs.devin.ai and describe this configuration only for the legacy Cascade agent. If your tab uses the Devin Local agent, MCP servers are set up in Devin CLI config files, which this guide does not cover yet.

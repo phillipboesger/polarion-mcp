@@ -264,3 +264,9 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .setup-steps li.need::before { content:'✓'; counter-increment:none; }
 .faq-list details p { overflow-wrap:anywhere; }
 .faq-list code { overflow-wrap:anywhere; }
+
+.setup-needs { margin:0 0 12px; color:var(--sub); font-size:13px; }
+details.setup-fails summary { cursor:pointer; color:var(--accent); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+details.setup-fails[open] summary { margin-bottom:10px; }
+.faq-more { margin:18px 0 0; font-size:14px; }
+.server-option small { overflow-wrap:anywhere; }

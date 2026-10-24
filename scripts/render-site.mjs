@@ -35,7 +35,7 @@ export function renderSiteClientsBlock(manifest) {
   return `<div class="setup-layout">
       <div class="client-groups">${groups}</div>
       <section class="setup-panel" id="setup" aria-labelledby="setup-title" tabindex="-1">
-        <p class="eyebrow" id="setup-kind">${escapeHtml(setup.kind)}</p>
+        <p class="eyebrow" id="setup-kind">${escapeHtml(manifest.serverModes.find(mode => mode.id === first.defaultMode).label)}</p>
         <h3 id="setup-title">${escapeHtml(first.name)}</h3>
         <fieldset class="server-picker"><legend>1. How do you run the server?</legend>
           <div class="server-options">${manifest.serverModes.map(mode => `<label class="server-option"><input type="radio" name="server-mode" value="${mode.id}"${mode.id === first.defaultMode ? ' checked' : ''} /><span><strong>${escapeHtml(mode.label)}</strong><small id="description-${mode.id}">${escapeHtml(first.connections[mode.id].description || mode.description)}</small><small id="reason-${mode.id}" class="mode-reason"></small></span></label>`).join('')}</div>
@@ -44,6 +44,7 @@ export function renderSiteClientsBlock(manifest) {
         <select id="setup-client">${manifest.clients.map(client => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join('')}</select>
         <p class="compatibility" id="setup-compatibility">${escapeHtml(first.name)} · ${escapeHtml(setup.title)}</p>
         <div id="setup-before" class="setup-before" hidden><h4 id="before-title">Before you start</h4><div id="before-items"></div></div>
+        <p class="setup-needs" id="setup-needs" hidden></p>
         <ol class="setup-steps" id="setup-steps">${connection.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
         <div id="server-command" hidden>
           <div class="snippet-header"><span>Start your server · bash</span><button type="button" class="copy-snippet" data-copy="server-code">Copy server command</button></div>
@@ -52,9 +53,9 @@ export function renderSiteClientsBlock(manifest) {
         <div class="snippet-header"><span id="snippet-language">${escapeHtml(setup.language)} · client configuration</span><button type="button" id="copy-setup" class="copy-snippet" data-copy="setup-code">Copy snippet</button></div>
         <pre tabindex="0" aria-label="Client setup snippet"><code id="setup-code">${escapeHtml(connection.snippet ?? setup.snippet)}</code></pre>
         <div id="setup-verify" class="setup-verify" hidden><h4>Check that it works</h4><p id="verify-prompt"></p><p id="verify-expect"></p></div>
-        <div id="setup-fails" class="setup-fails" hidden><h4>If it does not work</h4><dl id="fails-list"></dl></div>
+        <details id="setup-fails" class="setup-fails" hidden><summary>If it does not work</summary><dl id="fails-list"></dl></details>
         <p class="setup-note" id="setup-note">${escapeHtml(connection.note || setup.note)}</p>
-        <div class="setup-links"><a id="setup-source" href="${httpsUrl(first.sources[0])}" target="_blank" rel="noopener noreferrer">Client documentation ↗</a><a href="#faq">Setup questions ↓</a></div>
+        <div class="setup-links"><a id="setup-source" href="${httpsUrl(first.sources[0])}" target="_blank" rel="noopener noreferrer">Client documentation ↗</a><a href="#faq">Questions ↓</a></div>
         <p id="setup-status" class="sr-only" role="status" aria-live="polite"></p>
       </section>
     </div>
