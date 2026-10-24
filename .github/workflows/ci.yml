@@ -299,3 +299,19 @@ jobs:
 
       - name: Check documentation
         run: npm run check:docs:strict
+
+      - name: Install documentation browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Test inline client setup on desktop and mobile
+        run: npm run test:docs-ui
+        env:
+          DOCS_SCREENSHOT_DIR: test-results/docs-screenshots
+
+      - name: Upload documentation screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-browser-checks
+          path: test-results/
+          if-no-files-found: warn

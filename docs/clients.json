@@ -1,35 +1,669 @@
 {
-  "verified": "2026-10-23",
+  "checked": "2026-10-24",
   "server": {
     "remoteUrl": "https://YOUR-SERVER/mcp",
     "stdioCommand": "npx -y polarion-mcp",
-    "stdioEnvironment": {"API_BASE_URL":"https://YOUR-POLARION/polarion/rest/v1","BEARER_TOKEN":"YOUR_POLARION_PAT"}
+    "stdioEnvironment": {
+      "API_BASE_URL": "https://YOUR-POLARION/polarion/rest/v1",
+      "BEARER_TOKEN": "YOUR_POLARION_PAT"
+    }
   },
-  "clients": [
-    {"id":"claude-web-desktop","name":"Claude.ai / Claude Desktop (custom connectors)","transports":["streamable-http","sse"],"authModes":["static-header","oauth-dcr","preregistered-client"],"redirectUris":[{"uri":"https://claude.ai/api/mcp/auth_callback","verified":true}],"config":{"transport":"streamable-http","snippet":"Connector URL: https://YOUR-SERVER/mcp; authenticate with OAuth (paste YOUR_POLARION_PAT at Polarion login)"},"toolCountLimit":null,"quirks":["Remote connectors are added in Settings > Connectors; Claude Desktop remote servers are not configured in claude_desktop_config.json.","OAuth accepts DCR; custom client ID/secret can be supplied when DCR is unavailable.","SSE is supported but may be deprecated."],"sources":["https://support.anthropic.com/en/articles/11503834-building-custom-integrations-via-remote-mcp-servers","https://support.anthropic.com/en/articles/11175166-about-custom-integrations-using-remote-mcp"],"verified":"2026-10-23","confidence":"verified"},
-    {"id":"claude-code","name":"Claude Code","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr"],"redirectUris":[],"config":{"transport":"stdio","snippet":"{\"mcpServers\":{\"polarion\":{\"command\":\"npx\",\"args\":[\"-y\",\"polarion-mcp\"],\"env\":{\"API_BASE_URL\":\"https://YOUR-POLARION/polarion/rest/v1\",\"BEARER_TOKEN\":\"YOUR_POLARION_PAT\"}}}}"},"toolCountLimit":null,"quirks":["Remote HTTP can be added with `claude mcp add --transport http polarion https://YOUR-SERVER/mcp`; callback URI is not published in the cited setup reference."],"sources":["https://docs.anthropic.com/en/docs/claude-code/mcp","https://developers.openai.com/learn/docs-mcp"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"claude-api","name":"Claude API MCP connector","transports":["streamable-http","sse"],"authModes":["static-header","preregistered-client"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"Messages API MCP server URL: https://YOUR-SERVER/mcp; pass Authorization: Bearer YOUR_POLARION_PAT in request headers"},"toolCountLimit":null,"quirks":["API connector's OAuth registration and callback behavior are not asserted here; use documented API authentication parameters."],"sources":["https://docs.anthropic.com/en/docs/agents-and-tools/mcp-connector"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"chatgpt-apps","name":"ChatGPT connectors / Apps","transports":["streamable-http","sse"],"authModes":["oauth-dcr","cimd","preregistered-client"],"redirectUris":[{"uri":"ChatGPT provides callback URI in the app setup/authorization metadata; fixed URI not verified","verified":false}],"config":{"transport":"streamable-http","snippet":"Create a custom MCP app with server URL https://YOUR-SERVER/mcp; select OAuth and configure the server authorization metadata."},"toolCountLimit":null,"quirks":["ChatGPT custom MCP apps are remote only; OAuth requires refresh-token support for durable access.","Static API key auth is not a supported custom MCP authentication option in current docs."],"sources":["https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt","https://developers.openai.com/plugins/build/auth","https://developers.openai.com/api/docs/guides/custom-mcp-server"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"custom-gpt","name":"Custom GPT (Actions)","transports":[],"authModes":["static-header","preregistered-client"],"redirectUris":[{"uri":"Platform-specific Custom GPT callback URI not established from official docs","verified":false,"notes":"OAuth is configured with client ID/secret; inspect the GPT editor for the exact callback before registration."}],"config":{"transport":"rest-action","snippet":"Action OpenAPI URL: https://YOUR-SERVER/openapi-gpt.json; configure API key auth with the deployment's HTTP_API_KEY. For GPT OAuth, use the MCP HTTP server's GPT Actions endpoints instead."},"toolCountLimit":30,"quirks":["Custom GPT Actions use REST/OpenAPI rather than MCP transport; project publishes a reduced 30-action document."],"sources":["https://help.openai.com/en/articles/8554397-creating-a-gpt","https://platform.openai.com/docs/actions/authentication"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"openai-api","name":"OpenAI Responses API / Agents SDK","transports":["streamable-http","sse"],"authModes":["static-header","preregistered-client"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"{\"type\":\"mcp\",\"server_label\":\"polarion\",\"server_url\":\"https://YOUR-SERVER/mcp\",\"authorization\":\"YOUR_POLARION_PAT\"}"},"toolCountLimit":null,"quirks":["The API caller supplies OAuth access token in authorization on each response request; no client-side callback URI is part of this API flow.","Accepts Streamable HTTP and HTTP/SSE."],"sources":["https://developers.openai.com/api/docs/guides/tools-connectors-mcp","https://developers.openai.com/api/reference/resources/beta/subresources/agents/subresources/sessions/methods/create"],"verified":"2026-10-23","confidence":"verified"},
-    {"id":"codex-cli","name":"Codex CLI","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr"],"redirectUris":[],"config":{"transport":"stdio","snippet":"codex mcp add polarion -- npx -y polarion-mcp (set API_BASE_URL and BEARER_TOKEN in the process environment)"},"toolCountLimit":null,"quirks":["CLI configuration is shared with the Codex IDE extension; `codex mcp add` is documented."],"sources":["https://developers.openai.com/learn/docs-mcp","https://developers.openai.com/codex/mcp"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"vscode-copilot","name":"VS Code Copilot","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"{\"servers\":{\"polarion\":{\"type\":\"http\",\"url\":\"https://YOUR-SERVER/mcp\",\"headers\":{\"Authorization\":\"Bearer YOUR_POLARION_PAT\"}}}}"},"toolCountLimit":128,"quirks":["Maximum 128 tools per chat request; virtual tools can exceed this limit.","VS Code config uses top-level `servers`; portable Copilot config uses `mcpServers`."],"sources":["https://code.visualstudio.com/docs/agents/reference/mcp-configuration","https://code.visualstudio.com/docs/agents/run/tools","https://code.visualstudio.com/docs/agent-customization/mcp-servers"],"verified":"2026-10-23","confidence":"verified"},
-    {"id":"copilot-studio","name":"Microsoft Copilot Studio","transports":["streamable-http"],"authModes":["static-header","oauth-dcr","preregistered-client"],"redirectUris":[{"uri":"Generated by Copilot Studio tool setup; paste exact generated callback into Entra registration","verified":true}],"config":{"transport":"streamable-http","snippet":"In agent Tools, add Model Context Protocol with URL https://YOUR-SERVER/mcp; choose API key header Authorization, or OAuth 2.0 Dynamic discovery when server metadata supports it."},"toolCountLimit":null,"quirks":["SSE transport is no longer supported after August 2025.","Callback URI is generated per configured connector and must be copied from the UI."],"sources":["https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent"],"verified":"2026-10-23","confidence":"verified"},
-    {"id":"cursor","name":"Cursor","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr","preregistered-client"],"redirectUris":[{"uri":"https://www.cursor.com/agents/mcp/oauth/callback","verified":true},{"uri":"http://localhost:8787/callback","verified":true,"notes":"Desktop callback; loopback fixed port."}],"config":{"transport":"streamable-http","snippet":"{\"mcpServers\":{\"polarion\":{\"url\":\"https://YOUR-SERVER/mcp\",\"headers\":{\"Authorization\":\"Bearer YOUR_POLARION_PAT\"}}}}"},"toolCountLimit":null,"quirks":["Register both web and desktop redirect URIs if both surfaces are used; DCR desktop can hand off to web callback."],"sources":["https://prod.cursor.com/docs/mcp"],"verified":"2026-10-23","confidence":"verified"},
-    {"id":"windsurf","name":"Windsurf","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"{\"mcpServers\":{\"polarion\":{\"serverUrl\":\"https://YOUR-SERVER/mcp\",\"headers\":{\"Authorization\":\"Bearer YOUR_POLARION_PAT\"}}}}"},"toolCountLimit":null,"quirks":["Official MCP configuration URL and exact remote config fields require confirmation against current Windsurf docs; callback URI not verified."],"sources":["https://docs.windsurf.com/windsurf/cascade/mcp"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"jetbrains-ai","name":"JetBrains AI Assistant","transports":["stdio","streamable-http","sse"],"authModes":["none"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"{\"mcpServers\":{\"polarion\":{\"url\":\"https://YOUR-SERVER/mcp\"}}}"},"toolCountLimit":null,"quirks":["Official example documents URL-only remote config; bearer header/OAuth support for this surface is not verified."],"sources":["https://www.jetbrains.com/help/ai-assistant/mcp.html"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"gemini-cli","name":"Gemini CLI","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"{\"mcpServers\":{\"polarion\":{\"httpUrl\":\"https://YOUR-SERVER/mcp\",\"headers\":{\"Authorization\":\"Bearer YOUR_POLARION_PAT\"}}}}"},"toolCountLimit":null,"quirks":["Exact MCP config transport fields and callback behavior not verified from official docs."],"sources":["https://github.com/google-gemini/gemini-cli"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"zed","name":"Zed","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"Zed MCP settings: add server URL https://YOUR-SERVER/mcp and Authorization: Bearer YOUR_POLARION_PAT"},"toolCountLimit":null,"quirks":["When no Authorization header is configured, Zed prompts for standard MCP OAuth; exact callback URI is not specified in cited docs."],"sources":["https://zed.dev/docs/ai/mcp"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"cline","name":"Cline","transports":["stdio","streamable-http","sse"],"authModes":["static-header","oauth-dcr"],"redirectUris":[],"config":{"transport":"streamable-http","snippet":"Cline MCP settings: configure a remote server at https://YOUR-SERVER/mcp with Authorization: Bearer YOUR_POLARION_PAT"},"toolCountLimit":null,"quirks":["Remote transport fields and OAuth callback behavior not verified against official Cline docs."],"sources":["https://docs.cline.bot/mcp/mcp-overview"],"verified":"2026-10-23","confidence":"unverified"},
-    {"id":"n8n","name":"n8n","transports":["streamable-http"],"authModes":["static-header","oauth-dcr","preregistered-client"],"redirectUris":[{"uri":"Generated by n8n OAuth credential setup; copy exact URL from credential UI","verified":false}],"config":{"transport":"streamable-http","snippet":"Use an MCP Client Tool node with server URL https://YOUR-SERVER/mcp and Bearer token credential YOUR_POLARION_PAT"},"toolCountLimit":null,"quirks":["OAuth callback depends on the n8n instance and credential; exact value is instance-specific."],"sources":["https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-langchain.mcpClientTool/","https://docs.n8n.io/integrations/builtin/credentials/httprequest/"],"verified":"2026-10-23","confidence":"unverified"}
+  "groups": [
+    {
+      "id": "providers",
+      "title": "AI providers",
+      "cards": [
+        {
+          "id": "claude",
+          "name": "Claude",
+          "mark": "C",
+          "description": "Desktop, web and developer tools",
+          "clients": [
+            "claude-desktop",
+            "claude-web-desktop",
+            "claude-code",
+            "claude-api"
+          ]
+        },
+        {
+          "id": "openai",
+          "name": "OpenAI / ChatGPT",
+          "mark": "O",
+          "description": "Chat, coding and agents",
+          "clients": [
+            "chatgpt-apps",
+            "custom-gpt",
+            "openai-api",
+            "openai-agents",
+            "codex-cli"
+          ]
+        },
+        {
+          "id": "microsoft",
+          "name": "Microsoft",
+          "mark": "M",
+          "description": "Team agents and your editor",
+          "clients": [
+            "copilot-studio",
+            "vscode-copilot"
+          ]
+        },
+        {
+          "id": "google",
+          "name": "Google",
+          "mark": "G",
+          "description": "Gemini in your terminal",
+          "clients": [
+            "gemini-cli"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "title": "Tools / IDEs",
+      "cards": [
+        {
+          "id": "editors",
+          "name": "Your development workspace",
+          "mark": "</>",
+          "description": "Use the client you already work in.",
+          "clients": [
+            "vscode-copilot",
+            "cursor",
+            "windsurf",
+            "jetbrains-ai",
+            "zed",
+            "cline"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "custom",
+      "title": "Custom / self-hosted",
+      "cards": [
+        {
+          "id": "self-hosted",
+          "name": "Run it your way",
+          "mark": ">_",
+          "description": "A team server, your own client, or a workflow.",
+          "clients": [
+            "docker",
+            "generic-stdio",
+            "generic-http",
+            "rest-wrapper",
+            "n8n"
+          ]
+        }
+      ]
+    }
   ],
-  "redirectPresets": [
-    {"name":"claude","patterns":["https://claude.ai/api/mcp/auth_callback"],"sources":["https://support.anthropic.com/en/articles/11503834-building-custom-integrations-via-remote-mcp-servers"],"confidence":"verified"},
-    {"name":"chatgpt","patterns":["https://chatgpt.com/oauth/client.json","https://chatgpt.com/oauth/{callback_id}/client.json","callback URI shown by ChatGPT app setup (exact redirect depends on callback mode)"],"sources":["https://developers.openai.com/plugins/build/auth"],"confidence":"unverified","notes":"The docs describe client metadata URLs, not one universal redirect URI."},
-    {"name":"vscode","patterns":[],"sources":["https://code.visualstudio.com/docs/agent-customization/mcp-servers"],"confidence":"unverified","notes":"No fixed OAuth redirect URI found in official VS Code MCP docs."},
-    {"name":"cursor","patterns":["https://www.cursor.com/agents/mcp/oauth/callback","http://localhost:8787/callback"],"sources":["https://prod.cursor.com/docs/mcp"],"confidence":"verified","notes":"Desktop uses fixed loopback host and port 8787."},
-    {"name":"copilot-studio","patterns":["Generated callback URI copied from the Copilot Studio OAuth setup UI"],"sources":["https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent"],"confidence":"verified"},
-    {"name":"gemini","patterns":[],"sources":["https://github.com/google-gemini/gemini-cli"],"confidence":"unverified"},
-    {"name":"loopback","patterns":["http://localhost:{port}/{path}","http://127.0.0.1:{port}/{path}","http://[::1]:{port}/{path}"],"sources":["https://datatracker.ietf.org/doc/html/rfc8252#section-7.3"],"confidence":"verified","notes":"Generic native-app loopback convention, not a claim about any client-specific callback."}
+  "setups": [
+    {
+      "id": "local-json",
+      "title": "Local MCP configuration",
+      "kind": "Local \u00b7 JSON",
+      "language": "json",
+      "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+      "note": "Node.js 22+ runs the published npm package on your computer. Replace the URL and PAT locally; keep credentials out of Git."
+    },
+    {
+      "id": "cli",
+      "title": "Add from your terminal",
+      "kind": "Local \u00b7 CLI",
+      "language": "bash",
+      "snippet": "",
+      "note": "Commands shown for macOS, Linux and WSL. Install the selected client and Node.js 22+. Replace the URL and PAT before running; the command stores them in your local client configuration."
+    },
+    {
+      "id": "connector",
+      "title": "Connect to your team server",
+      "kind": "Remote \u00b7 URL",
+      "language": "text",
+      "snippet": "https://YOUR-SERVER/mcp",
+      "note": "Use your own deployed HTTPS URL. There is no public Polarion relay. Your server must be reachable by the client provider; an administrator sets up TLS, OAuth and exact redirect allowlists."
+    },
+    {
+      "id": "vscode-json",
+      "title": "VS Code MCP configuration",
+      "kind": "Local \u00b7 JSON",
+      "language": "json",
+      "snippet": "{\n  \"servers\": {\n    \"polarion\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+      "note": "Node.js 22+ is required. VS Code uses a servers object. Select the tools you need in chat; the full catalog can exceed the client tool budget."
+    },
+    {
+      "id": "zed-json",
+      "title": "Zed context server",
+      "kind": "Local \u00b7 JSON",
+      "language": "json",
+      "snippet": "{\n  \"context_servers\": {\n    \"polarion\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+      "note": "Node.js 22+ is required. Zed uses context_servers, with command, args and env directly inside the server entry."
+    },
+    {
+      "id": "claude-api",
+      "title": "Claude Messages API",
+      "kind": "Remote \u00b7 API",
+      "language": "json",
+      "snippet": "{\n  \"mcp_servers\": [\n    {\n      \"type\": \"url\",\n      \"name\": \"polarion\",\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"authorization_token\": \"YOUR_POLARION_PAT\"\n    }\n  ],\n  \"tools\": [\n    {\n      \"type\": \"mcp_toolset\",\n      \"mcp_server_name\": \"polarion\"\n    }\n  ]\n}",
+      "note": "Add these fields to your Messages request. Enable the mcp-client-2025-11-20 beta header. The Polarion PAT authenticates to this server; your Anthropic API key authenticates the API request."
+    },
+    {
+      "id": "openai-api",
+      "title": "OpenAI Responses API",
+      "kind": "Remote \u00b7 API",
+      "language": "json",
+      "snippet": "{\n  \"tools\": [\n    {\n      \"type\": \"mcp\",\n      \"server_label\": \"polarion\",\n      \"server_url\": \"https://YOUR-SERVER/mcp\",\n      \"authorization\": \"YOUR_POLARION_PAT\",\n      \"require_approval\": \"always\"\n    }\n  ]\n}",
+      "note": "Add this tools field to a Responses request. Use your OpenAI API key for the API request and your Polarion PAT for the MCP server."
+    },
+    {
+      "id": "agents-sdk",
+      "title": "OpenAI Agents SDK",
+      "kind": "Remote \u00b7 Python",
+      "language": "python",
+      "snippet": "from agents.mcp import MCPServerStreamableHttp\n\nasync with MCPServerStreamableHttp(\n    name=\"Polarion\",\n    params={\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n    },\n) as server:\n    agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])",
+      "note": "Use inside your async application with openai-agents installed and Agent imported from agents. Run the agent while the server context is open. Keep API keys and PATs in your application secret store."
+    },
+    {
+      "id": "gpt-actions",
+      "title": "Custom GPT Actions",
+      "kind": "Remote \u00b7 OpenAPI",
+      "language": "text",
+      "snippet": "https://YOUR-SERVER/openapi-gpt.json",
+      "note": "This uses the REST wrapper and its HTTP_API_KEY, not the MCP endpoint or the user PAT. The reduced schema contains 30 actions. A team administrator deploys the REST wrapper first."
+    },
+    {
+      "id": "docker",
+      "title": "Docker team server",
+      "kind": "Self-hosted \u00b7 Docker",
+      "language": "bash",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0",
+      "note": "The image starts Streamable HTTP. Each client sends its own Polarion PAT as Authorization: Bearer <PAT>. Local endpoint: http://localhost:3000/mcp. Add TLS and OAuth before connecting cloud clients."
+    },
+    {
+      "id": "stdio",
+      "title": "Any stdio MCP client",
+      "kind": "Custom \u00b7 stdio",
+      "language": "bash",
+      "snippet": "API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\nBEARER_TOKEN=YOUR_POLARION_PAT \\\nnpx -y polarion-mcp",
+      "note": "Node.js 22+ is required. The client owns stdin and stdout. Configure this as its subprocess; it is not a standalone web service."
+    },
+    {
+      "id": "rest",
+      "title": "REST wrapper / OpenAPI",
+      "kind": "Self-hosted \u00b7 REST",
+      "language": "bash",
+      "snippet": "docker run -d --name polarion-rest \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e BEARER_TOKEN=YOUR_POLARION_PAT \\\n  -e HTTP_API_KEY=YOUR_WRAPPER_API_KEY \\\n  -e PUBLIC_URL=https://YOUR-SERVER \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0 \\\n  node build/http-server.js",
+      "note": "All calls use the deployment PAT. Clients send Authorization: Bearer <HTTP_API_KEY>. Serve this behind HTTPS; schemas are at /openapi.json and /openapi-gpt.json."
+    },
+    {
+      "id": "n8n-rest",
+      "title": "n8n HTTP Request",
+      "kind": "Automation \u00b7 REST",
+      "language": "bash",
+      "snippet": "curl -X POST https://YOUR-SERVER/api/tools/getProjects \\\n  -H \"Authorization: Bearer ${HTTP_API_KEY}\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{}'",
+      "note": "This setup uses the REST wrapper. Its administrator configures API_BASE_URL, BEARER_TOKEN and HTTP_API_KEY. Store the wrapper key in an n8n credential after importing."
+    }
+  ],
+  "clients": [
+    {
+      "id": "claude-desktop",
+      "name": "Claude Desktop",
+      "label": "Desktop",
+      "provider": "claude",
+      "setup": "local-json",
+      "steps": [
+        "Open Claude Desktop Settings > Developer > Edit Config.",
+        "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+        "Save, fully quit and reopen Claude Desktop. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://modelcontextprotocol.io/docs/develop/connect-local-servers"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "claude-web-desktop",
+      "name": "Claude web / Desktop connector",
+      "label": "Web connector",
+      "provider": "claude",
+      "setup": "connector",
+      "steps": [
+        "Get your team\u2019s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.",
+        "Open Customize > Connectors > Add custom connector. Paste the URL below. Choose Register automatically for this server\u2019s DCR flow.",
+        "Connect, enter your Polarion PAT on the server login page, and enable the connector in a conversation."
+      ],
+      "sources": [
+        "https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp",
+        "https://support.claude.com/en/articles/11503834-building-custom-connectors-using-remote-mcp"
+      ],
+      "checked": "2026-10-24",
+      "note": "On Team / Enterprise, an owner adds the connector under Organization settings > Connectors > Add > Custom > Web; members then choose Connect.",
+      "redirectUris": [
+        {
+          "uri": "https://claude.ai/api/mcp/auth_callback",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "label": "Code",
+      "provider": "claude",
+      "setup": "cli",
+      "steps": [
+        "Install Claude Code and Node.js 22+.",
+        "Replace the URL and PAT, then run the command below.",
+        "Start Claude Code, open /mcp, and confirm Polarion is connected. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://code.claude.com/docs/en/mcp"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": [],
+      "snippet": "claude mcp add --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT --transport stdio polarion -- npx -y polarion-mcp"
+    },
+    {
+      "id": "claude-api",
+      "name": "Claude API",
+      "label": "API",
+      "provider": "claude",
+      "setup": "claude-api",
+      "steps": [
+        "Deploy or obtain a reachable HTTPS MCP server.",
+        "Add the snippet to your Messages request and set the beta header named below. Replace URL and PAT.",
+        "Send a request with your model, max_tokens and messages. Check the returned tool results."
+      ],
+      "sources": [
+        "https://platform.claude.com/docs/en/agents-and-tools/mcp-connector"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "chatgpt-apps",
+      "name": "ChatGPT connector",
+      "label": "ChatGPT",
+      "provider": "openai",
+      "setup": "connector",
+      "steps": [
+        "Get your team\u2019s HTTPS MCP URL. The administrator enables OAuth and allowlists the exact callback shown by ChatGPT.",
+        "In ChatGPT Plugins, choose + > Add custom MCP server. Paste the URL and select OAuth with dynamic client registration (DCR).",
+        "Install the resulting plugin, sign in with your Polarion PAT, and select it with @ in a conversation."
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/guides/custom-mcp-server",
+        "https://developers.openai.com/plugins/build/auth"
+      ],
+      "checked": "2026-10-24",
+      "note": "Custom MCP access depends on your ChatGPT workspace permissions. Use DCR for this server unless the administrator explicitly enabled CIMD.",
+      "redirectUris": []
+    },
+    {
+      "id": "custom-gpt",
+      "name": "Custom GPT Actions",
+      "label": "Custom GPT",
+      "provider": "openai",
+      "setup": "gpt-actions",
+      "steps": [
+        "Get your team\u2019s deployed REST wrapper URL and HTTP_API_KEY.",
+        "In the GPT editor, open Actions > Create new action > Import from URL and paste the schema URL below.",
+        "Choose API Key authentication, Bearer type, and enter HTTP_API_KEY. Test getProjects in the editor."
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/actions/getting-started",
+        "https://developers.openai.com/api/docs/actions/authentication"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "openai-api",
+      "name": "OpenAI Responses API",
+      "label": "API",
+      "provider": "openai",
+      "setup": "openai-api",
+      "steps": [
+        "Get a reachable HTTPS MCP server and your Polarion PAT.",
+        "Add the snippet to your Responses request, replacing URL and PAT.",
+        "Send a request with your model and input. Review and approve MCP tool calls."
+      ],
+      "sources": [
+        "https://developers.openai.com/api/docs/guides/tools-connectors-mcp"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "openai-agents",
+      "name": "OpenAI Agents SDK",
+      "label": "Agents SDK",
+      "provider": "openai",
+      "setup": "agents-sdk",
+      "steps": [
+        "Install openai-agents and import Agent from agents in your async app.",
+        "Paste the snippet inside an async function. Replace URL and PAT.",
+        "Run the agent with Runner while the MCP server context is open."
+      ],
+      "sources": [
+        "https://openai.github.io/openai-agents-python/mcp/"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "codex-cli",
+      "name": "Codex",
+      "label": "Codex",
+      "provider": "openai",
+      "setup": "cli",
+      "steps": [
+        "Install Codex and Node.js 22+.",
+        "Replace the URL and PAT, then run the command below.",
+        "Open Codex and inspect /mcp. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://developers.openai.com/codex/mcp"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": [],
+      "snippet": "codex mcp add polarion --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT -- npx -y polarion-mcp"
+    },
+    {
+      "id": "copilot-studio",
+      "name": "Microsoft Copilot Studio",
+      "label": "Copilot Studio",
+      "provider": "microsoft",
+      "setup": "connector",
+      "steps": [
+        "Open your agent\u2019s Tools page, then Add a tool > New tool > Model Context Protocol.",
+        "Enter a name, description and the URL below. Choose API key > Header, named Authorization.",
+        "Create a connection with the value Bearer YOUR_POLARION_PAT. Add the tool and test the agent."
+      ],
+      "sources": [
+        "https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent"
+      ],
+      "checked": "2026-10-24",
+      "note": "Use generative orchestration. This path uses a PAT header and does not require an OAuth callback. Select only the tools your agent needs.",
+      "redirectUris": []
+    },
+    {
+      "id": "vscode-copilot",
+      "name": "VS Code / GitHub Copilot",
+      "label": "VS Code Copilot",
+      "provider": "microsoft",
+      "setup": "vscode-json",
+      "steps": [
+        "Run MCP: Open User Configuration from the Command Palette.",
+        "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+        "Save, start the server and trust it when prompted. In agent chat, select Polarion tools. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://code.visualstudio.com/docs/agents/reference/mcp-configuration",
+        "https://code.visualstudio.com/docs/copilot/customization/mcp-servers"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "gemini-cli",
+      "name": "Gemini CLI",
+      "label": "Gemini CLI",
+      "provider": "google",
+      "setup": "cli",
+      "steps": [
+        "Install Gemini CLI and Node.js 22+.",
+        "Replace the URL and PAT, then run the command below.",
+        "Start Gemini CLI and inspect /mcp. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://geminicli.com/docs/tools/mcp-server/"
+      ],
+      "checked": "2026-10-24",
+      "note": "Run Gemini in a trusted folder. If the server shows Disconnected, use gemini trust to trust that folder.",
+      "redirectUris": [],
+      "snippet": "gemini mcp add --scope user --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT polarion npx -y polarion-mcp"
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "label": "Cursor",
+      "provider": "tools",
+      "setup": "local-json",
+      "steps": [
+        "Open your personal ~/.cursor/mcp.json, or create it. Do not put a PAT in a shared project file.",
+        "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://cursor.com/docs/mcp"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": [
+        {
+          "uri": "https://www.cursor.com/agents/mcp/oauth/callback",
+          "verified": true
+        },
+        {
+          "uri": "http://localhost:8787/callback",
+          "verified": true,
+          "notes": "Desktop callback; loopback fixed port."
+        }
+      ]
+    },
+    {
+      "id": "windsurf",
+      "name": "Windsurf / Cascade",
+      "label": "Windsurf",
+      "provider": "tools",
+      "setup": "local-json",
+      "steps": [
+        "In legacy Cascade, open the Actions (...) menu > MCPs > Open MCP config file.",
+        "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://docs.windsurf.com/windsurf/cascade/mcp"
+      ],
+      "checked": "2026-10-24",
+      "note": "The vendor now documents this as legacy Cascade in Devin Desktop. Its 100-tool budget requires selecting a subset of Polarion tools. This config does not apply to the Devin Local agent.",
+      "redirectUris": []
+    },
+    {
+      "id": "jetbrains-ai",
+      "name": "JetBrains AI Assistant",
+      "label": "JetBrains",
+      "provider": "tools",
+      "setup": "local-json",
+      "steps": [
+        "Open Settings > Tools > AI Assistant > Model Context Protocol (MCP), add a server and choose STDIO.",
+        "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+        "Click OK and Apply. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://www.jetbrains.com/help/ai-assistant/mcp.html"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "zed",
+      "name": "Zed",
+      "label": "Zed",
+      "provider": "tools",
+      "setup": "zed-json",
+      "steps": [
+        "Run zed: open settings file from the Command Palette.",
+        "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://zed.dev/docs/ai/mcp"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "cline",
+      "name": "Cline",
+      "label": "Cline",
+      "provider": "tools",
+      "setup": "local-json",
+      "steps": [
+        "Open Cline > MCP Servers > Configure > Configure MCP Servers.",
+        "Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.",
+        "Save and reconnect the server. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://docs.cline.bot/mcp/mcp-overview"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "docker",
+      "name": "Docker team server",
+      "label": "Docker",
+      "provider": "custom",
+      "setup": "docker",
+      "steps": [
+        "Install Docker and replace the Polarion REST URL in the command.",
+        "Run the container. Connect a local HTTP client to http://localhost:3000/mcp with Authorization: Bearer YOUR_POLARION_PAT.",
+        "For a team, put a TLS proxy in front, set allowed hosts to its hostname, and configure OAuth for cloud connectors."
+      ],
+      "sources": [
+        "https://github.com/phillipboesger/polarion-mcp/blob/main/Dockerfile",
+        "https://github.com/phillipboesger/polarion-mcp/blob/main/docs/deployment.md"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "generic-stdio",
+      "name": "Generic stdio client",
+      "label": "stdio",
+      "provider": "custom",
+      "setup": "stdio",
+      "steps": [
+        "Open your client\u2019s local MCP server settings.",
+        "Set command to npx, arguments to -y polarion-mcp, and pass API_BASE_URL and BEARER_TOKEN as environment variables, as shown below.",
+        "Let the client launch the process, then list its tools. Ask: \u201cList the Polarion projects I can access.\u201d"
+      ],
+      "sources": [
+        "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "generic-http",
+      "name": "Generic HTTP client",
+      "label": "HTTP",
+      "provider": "custom",
+      "setup": "connector",
+      "steps": [
+        "Obtain your team\u2019s MCP server URL, or start the Docker server for local use.",
+        "Paste your HTTPS URL below into the Streamable HTTP setting, or use http://localhost:3000/mcp for local Docker. Add Authorization: Bearer YOUR_POLARION_PAT.",
+        "Connect and list tools. For OAuth-capable clients, use your administrator\u2019s login configuration instead."
+      ],
+      "sources": [
+        "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "rest-wrapper",
+      "name": "REST wrapper / OpenAPI",
+      "label": "REST / OpenAPI",
+      "provider": "custom",
+      "setup": "rest",
+      "steps": [
+        "Install Docker. Replace the Polarion URL, deployment PAT, wrapper key and public HTTPS URL in the command.",
+        "Run the container and route HTTPS traffic to its loopback port.",
+        "Import /openapi.json into your integration, or /openapi-gpt.json into Custom GPT Actions. Send HTTP_API_KEY as a Bearer token."
+      ],
+      "sources": [
+        "https://github.com/phillipboesger/polarion-mcp/blob/main/src/http-server.ts",
+        "https://github.com/phillipboesger/polarion-mcp/blob/main/src/rest-api.ts"
+      ],
+      "checked": "2026-10-24",
+      "note": "",
+      "redirectUris": []
+    },
+    {
+      "id": "n8n",
+      "name": "n8n REST workflow",
+      "label": "n8n",
+      "provider": "custom",
+      "setup": "n8n-rest",
+      "steps": [
+        "Get a deployed REST wrapper URL and its HTTP_API_KEY from your administrator.",
+        "Add an HTTP Request node, choose Import cURL and paste the command below after replacing the server URL.",
+        "Replace the imported Authorization header with a Bearer Auth credential containing HTTP_API_KEY, then execute the node. The shell variable in the snippet is a placeholder."
+      ],
+      "sources": [
+        "https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/",
+        "https://docs.n8n.io/integrations/builtin/credentials/httprequest/"
+      ],
+      "checked": "2026-10-24",
+      "note": "Use the HTTP Request node as a workflow step or attach it as a tool to an AI Agent.",
+      "redirectUris": [],
+      "referenceNote": "This confirmed path uses REST. The MCP Client Tool documentation still describes an SSE Endpoint, so it is not used as evidence for a Streamable HTTP setup here."
+    }
+  ],
+  "readmeGroups": [
+    {
+      "name": "Claude",
+      "summary": "Desktop JSON; web connector URL; Claude Code CLI; Messages API.",
+      "client": "claude-desktop"
+    },
+    {
+      "name": "OpenAI / ChatGPT",
+      "summary": "ChatGPT connector URL; GPT Actions schema; Responses / Agents SDK; Codex CLI.",
+      "client": "chatgpt-apps"
+    },
+    {
+      "name": "Microsoft",
+      "summary": "Copilot Studio URL + PAT header; VS Code servers JSON.",
+      "client": "copilot-studio"
+    },
+    {
+      "name": "Google",
+      "summary": "Gemini CLI add command with URL and PAT environment.",
+      "client": "gemini-cli"
+    },
+    {
+      "name": "Tools / IDEs",
+      "summary": "VS Code, Cursor, Windsurf, JetBrains, Zed, Cline: one shared JSON panel with client-specific format.",
+      "client": "cursor"
+    },
+    {
+      "name": "Docker team server",
+      "summary": "Published GHCR image, per-user PATs, Streamable HTTP; TLS / OAuth for cloud clients.",
+      "client": "docker"
+    },
+    {
+      "name": "Custom / automation",
+      "summary": "Generic stdio / HTTP; REST wrapper + OpenAPI; n8n HTTP Request.",
+      "client": "generic-stdio"
+    }
   ]
 }

@@ -2,7 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderClientsBlock } from './render-clients.mjs';
+import { renderClientsBlock, renderClientReference } from './render-clients.mjs';
+import { renderSite } from './render-site.mjs';
 
 const RULES = {
   env: 'env-vars', tools: 'tool-references', prompts: 'prompt-resource-references',
@@ -49,6 +50,16 @@ function checker(root) {
 
   // 0. The landing page client matrix must match the clients manifest exactly.
   const readme = read(root, 'README.md');
+  const packageText = read(root, 'package.json');
+  if (packageText) {
+    const version = JSON.parse(packageText).version;
+    for (const file of ['README.md', 'docs/deployment.md', 'docs/clients.json']) {
+      const text = read(root, file);
+      for (const match of text.matchAll(/ghcr\.io\/phillipboesger\/polarion-mcp:(\d+\.\d+\.\d+(?:-[\w.-]+)?)/g)) {
+        if (match[1] !== version) add('clients', file, lineAt(text, match.index), `container example pins ${match[1]}; package version is ${version}`);
+      }
+    }
+  }
   const startMarker = '<!-- clients:start -->';
   const endMarker = '<!-- clients:end -->';
   const startAt = readme.indexOf(startMarker);
@@ -58,9 +69,13 @@ function checker(root) {
   } else {
     try {
       const manifest = JSON.parse(read(root, 'docs/clients.json'));
-      const expected = `${startMarker}\n${renderClientsBlock(manifest.clients)}\n${endMarker}`;
+      const expected = `${startMarker}\n${renderClientsBlock(manifest)}\n${endMarker}`;
       const actual = readme.slice(startAt, endAt + endMarker.length);
       if (actual !== expected) add('clients', 'README.md', lineAt(readme, startAt), 'client marker block differs from docs/clients.json; run npm run docs:clients');
+      if (manifest.groups) {
+        if (read(root, 'docs/clients.md') !== renderClientReference(manifest)) add('clients', 'docs/clients.md', 1, 'source reference is stale; run npm run docs:clients');
+        if (read(root, 'docs/index.html') !== renderSite(root)) add('clients', 'docs/index.html', 1, 'inline setup differs from docs/clients.json; run npm run docs:site');
+      }
     } catch (error) {
       add('clients', 'docs/clients.json', 1, `cannot render client table: ${error.message}`);
     }

@@ -3,321 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Polarion MCP | Connect your AI assistant to Polarion ALM</title>
-  <meta name="description" content="Open-source MCP server with 284 tools generated from the Polarion REST API. Set up a client, deploy for a team, or contribute." />
+  <title>Polarion MCP | Your Polarion work, one conversation away</title>
+  <meta name="description" content="Find requirements, review documents and prepare test runs through your AI assistant. 284 tools, read-only controls, MIT source. Set up your client inline or run Docker for your team." />
   <link rel="canonical" href="https://polarion-mcp.boesger.com/" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%2312385f%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2244%22 text-anchor=%22middle%22 fill=%22%2362d6ff%22%3EP%3C/text%3E%3C/svg%3E" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://polarion-mcp.boesger.com/" />
-  <meta property="og:title" content="Polarion MCP | Connect your AI assistant to Polarion ALM" />
-  <meta property="og:description" content="Open-source MCP server with 284 tools generated from the Polarion REST API. Set up a client, deploy for a team, or contribute." />
+  <meta property="og:title" content="Polarion MCP | Your Polarion work, one conversation away" />
+  <meta property="og:description" content="284 Polarion REST tools for your AI assistant. Search, review and prepare changes with read-only and dry_run controls. Open source, MIT." />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Polarion MCP | Connect your AI assistant to Polarion ALM" />
-  <meta name="twitter:description" content="Open-source MCP server with 284 tools generated from the Polarion REST API. Set up a client, deploy for a team, or contribute." />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #12385f;
-      --bg-card: #174470;
-      --accent: #62d6ff;
-      --accent-dim: rgba(98,214,255,0.14);
-      --text: #ffffff;
-      --text-sub: #c9dbea;
-      --border: rgba(255,255,255,0.16);
-      --border-acc: rgba(98,214,255,0.4);
-      --warm: #ffc266;
-      --radius: 12px;
-      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --mono: ui-monospace, 'SF Mono', Menlo, monospace;
-    }
-    html { scroll-behavior: smooth; scroll-padding-top: 90px; }
-    body {
-      background: radial-gradient(ellipse 80% 700px at 25% 0%, rgba(140,210,255,0.24), transparent 75%),
-        linear-gradient(180deg, #174470, var(--bg) 45%, #0f3050);
-      color: var(--text); font-family: var(--font); font-size: 16px; line-height: 1.6;
-    }
-    a { color: var(--accent); text-underline-offset: 4px; }
-    a:hover { color: white; }
-    a:focus-visible, summary:focus-visible { outline: 3px solid var(--warm); outline-offset: 5px; }
-    p + p { margin-top: 16px; }
-    code { font-family: var(--mono); font-size: 0.88em; }
-    pre { max-width: 100%; overflow-x: auto; padding: 18px; background: #0b2a4c; border: 1px solid var(--border); border-radius: var(--radius); text-align: left; }
-    pre code { color: var(--accent); font-size: 13px; }
-    .skip-link { position: absolute; left: 16px; top: -100px; z-index: 10; padding: 10px; background: var(--bg); }
-    .skip-link:focus { top: 12px; }
-    nav { border-bottom: 1px solid var(--border); background: var(--bg); }
-    .nav-inner { max-width: 1280px; margin: auto; min-height: 72px; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
-    .nav-brand { color: white; font-weight: 700; text-decoration: none; letter-spacing: -0.02em; white-space: nowrap; }
-    .nav-brand span { color: var(--accent); }
-    .nav-links { display: flex; gap: 26px; flex-wrap: wrap; }
-    .nav-links a { font-size: 14px; color: var(--text-sub); text-decoration: none; }
-    .nav-links a:hover { color: white; text-decoration: underline; }
-    .hero { padding: 44px 24px 38px; text-align: center; }
-    .eyebrow { font: 12px var(--mono); color: var(--warm); letter-spacing: 0.12em; text-transform: uppercase; }
-    h1 { font-size: clamp(54px, 7.5vw, 100px); font-weight: 750; letter-spacing: -0.065em; line-height: 1.12; margin: 12px 0 16px; }
-    h1 span { color: var(--accent); }
-    .hero-sub { font-size: clamp(20px, 2.5vw, 27px); font-weight: 500; line-height: 1.35; text-wrap: balance; }
-    .hero-description { max-width: 700px; margin: 12px auto 0; color: var(--text-sub); }
-    .project-badges { max-width: 900px; margin: 24px auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
-    .project-badges a { display: inline-flex; min-height: 20px; }
-    .project-badges img { height: 20px; max-width: 100%; }
-    .client-picker { max-width: 760px; margin: 0 auto; border: 1px solid var(--border-acc); border-radius: var(--radius); background: var(--bg); text-align: left; }
-    .client-picker summary { cursor: pointer; padding: 15px 24px; font-size: 18px; font-weight: 700; color: #0b2a4c; background: var(--accent); border-radius: 11px; text-align: center; }
-    .client-picker[open] summary { border-radius: 11px 11px 0 0; }
-    .picker-note { padding: 20px 24px 0; color: var(--text-sub); font-size: 14px; }
-    .client-guide-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; padding: 8px 24px 24px; gap: 0 24px; }
-    .client-row { min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--border); }
-    .client-guide { display: block; font-size: 14px; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-    .client-guide:hover { text-decoration: underline; }
-    .client-status { display: block; font: 11px var(--mono); color: var(--warm); margin-top: 4px; }
-    .github-link { display: inline-block; margin-top: 16px; font-size: 14px; color: var(--text-sub); }
-    .quickstart { max-width: 1120px; margin: 30px auto 0; }
-    .quickstart h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-    .quickstart-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; list-style: none; text-align: left; margin-top: 20px; }
-    .quickstart-steps li { border-top: 1px solid var(--border-acc); padding-top: 12px; min-width: 0; }
-    .step-title { font-size: 17px; font-weight: 650; }
-    .step-number { color: var(--warm); margin-right: 8px; font: 12px var(--mono); }
-    .quickstart-steps p { font-size: 14px; color: var(--text-sub); margin-top: 6px; }
-    .team-note { color: var(--text-sub); font-size: 13px; margin-top: 20px; }
-    .source-build { max-width: 760px; margin: 16px auto 0; text-align: left; color: var(--text-sub); font-size: 13px; }
-    .source-build summary { cursor: pointer; text-align: center; }
-    .source-build p { margin: 16px 0; }
-    .section-inner { max-width: 1184px; padding: 64px 32px; margin: auto; }
-    .section-label { font: 12px var(--mono); color: var(--warm); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
-    h2 { font-size: clamp(28px, 4vw, 42px); letter-spacing: -0.035em; line-height: 1.2; text-wrap: balance; }
-    .section-sub { color: var(--text-sub); max-width: 820px; margin-top: 20px; }
-    .demo .section-inner { padding-top: 26px; }
-    .demo-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
-    .demo-header a { font-size: 14px; }
-    .demo img { display: block; width: 100%; height: auto; border: 1px solid var(--border-acc); border-radius: 16px; box-shadow: 0 20px 60px rgba(7,28,52,0.35); }
-    figcaption { margin-top: 16px; font-size: 13px; text-align: center; color: var(--text-sub); }
-    .features-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 56px; margin-top: 32px; }
-    .feature { border-top: 1px solid var(--border); padding-top: 20px; }
-    h3 { font-size: 20px; letter-spacing: -0.02em; }
-    .feature p { color: var(--text-sub); margin-top: 10px; font-size: 15px; }
-    .feature a { display: inline-block; margin-top: 12px; font-size: 14px; }
-    .operations { background: rgba(7,28,52,0.2); border-block: 1px solid var(--border); }
-    .reference-links { display: flex; flex-wrap: wrap; gap: 12px 26px; margin-top: 24px; }
-    .trust-strip { list-style: none; display: flex; flex-wrap: wrap; gap: 12px 30px; padding-top: 28px; margin-top: 28px; border-top: 1px solid var(--border); font-size: 14px; }
-    .supply-note { font-size: 13px; color: var(--text-sub); margin-top: 20px; max-width: 860px; }
-    .docs-list { margin-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 56px; }
-    .docs-list div { padding: 18px 0; border-bottom: 1px solid var(--border); }
-    dt { font-weight: 600; margin-bottom: 6px; }
-    dd { color: var(--text-sub); font-size: 14px; }
-    .community { border-top: 1px solid var(--border); }
-    .community .section-inner { padding-block: 48px; }
-    .credits { font-size: 14px; color: var(--text-sub); margin-top: 24px; }
-    footer { max-width: 1280px; margin: auto; padding: 30px 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; font-size: 13px; color: var(--text-sub); }
-    .footer-links { display: flex; flex-wrap: wrap; gap: 20px; }
-    @media (max-width: 760px) {
-      html { scroll-padding-top: 24px; }
-      .nav-inner { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 20px; }
-      .nav-links { gap: 12px 20px; }
-      .nav-links a { font-size: 13px; }
-      .hero { padding: 32px 20px; }
-      h1 { font-size: clamp(46px, 13vw, 80px); }
-      .hero-description { font-size: 15px; }
-      .project-badges { margin-block: 20px; gap: 8px 6px; }
-      .client-picker summary { padding: 14px 18px; }
-      .client-guide-list { grid-template-columns: minmax(0, 1fr); padding-inline: 18px; }
-      .picker-note { padding-inline: 18px; }
-      .quickstart-steps { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-      .quickstart { margin-top: 28px; }
-      .team-note { font-size: 13px; }
-      .section-inner { padding: 48px 20px; }
-      .demo .section-inner { padding-top: 12px; }
-      .demo-header { display: block; }
-      .demo-header a { display: inline-block; margin-top: 12px; }
-      .demo img { border-radius: 10px; }
-      .features-grid, .docs-list { grid-template-columns: minmax(0, 1fr); gap: 24px; }
-      .docs-list { gap: 0; }
-      .trust-strip { flex-direction: column; }
-      footer { padding: 28px 20px; }
-    }
-    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-  </style>
+  <link rel="preload" href="https://boesger.com/assets/fonts/geist-var.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="site.css" />
+  <script src="viz.js" defer></script>
+  <script src="setup.js" defer></script>
 </head>
 <body>
+<canvas id="particles" aria-hidden="true"></canvas>
 <a class="skip-link" href="#main">Skip to content</a>
-<nav aria-label="Main navigation">
-  <div class="nav-inner">
-    <a href="https://polarion-mcp.boesger.com/" class="nav-brand" aria-label="Polarion MCP home">polarion<span>-mcp</span></a>
-    <div class="nav-links">
-      <a href="#clients">Get started</a>
-      <a href="#features">Features</a>
-      <a href="#links">Documentation</a>
-      <a href="https://github.com/phillipboesger/polarion-mcp">GitHub ↗</a>
-    </div>
-  </div>
-</nav>
+<header>
+  <nav class="nav-inner" aria-label="Main navigation">
+    <a href="#" class="brand" aria-label="Polarion MCP home"><span class="brand-symbol" aria-hidden="true">p</span>polarion<span class="accent">-mcp</span></a>
+    <div class="nav-links"><a href="#features">Capabilities</a><a href="#docs">Docs</a><a href="https://github.com/phillipboesger/polarion-mcp">GitHub ↗</a><a class="nav-cta" href="#clients">Get started <span aria-hidden="true">↗</span></a></div>
+  </nav>
+</header>
 <main id="main">
-  <section class="hero" id="what" aria-labelledby="project-title">
-    <p class="eyebrow">Open source · MIT · Built for Polarion</p>
-    <h1 id="project-title">polarion<span>-mcp</span></h1>
-    <p class="hero-sub">Connect your AI assistant to Polarion ALM.</p>
-    <p class="hero-description">An open-source Model Context Protocol server with <strong>284 tools</strong> generated from the Polarion REST API.</p>
-    <div class="project-badges" aria-label="Project badges">
-      <a href="https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml"><img src="https://github.com/phillipboesger/polarion-mcp/actions/workflows/ci.yml/badge.svg" alt="CI status" width="88" height="20" /></a>
-      <a href="https://www.npmjs.com/package/polarion-mcp"><img src="https://img.shields.io/npm/v/polarion-mcp" alt="npm version" width="82" height="20" /></a>
-      <a href="https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp"><img src="https://img.shields.io/badge/ghcr.io-polarion--mcp-2496ED?logo=docker&amp;logoColor=white" alt="Docker image on GHCR" width="154" height="20" /></a>
-      <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license" width="78" height="20" /></a>
-      <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/package.json"><img src="https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&amp;logoColor=white" alt="Node.js 22 or newer" width="96" height="20" /></a>
-      <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-server-6E56CF" alt="Model Context Protocol server" width="80" height="20" /></a>
-      <a href="https://github.com/phillipboesger/polarion-mcp/stargazers"><img src="https://img.shields.io/github/stars/phillipboesger/polarion-mcp?style=flat" alt="GitHub stars" width="88" height="20" /></a>
-    </div>
-    <details class="client-picker" id="clients">
-      <summary>Pick your client</summary>
-      <p class="picker-note">Choose a setup guide. “Unverified” entries need confirmation against current vendor documentation; this list does not certify every client integration.</p>
-      <ul class="client-guide-list">
-        <!-- clients:start -->
-      <li class="client-row">
-        <a class="client-guide" href="clients/claude-web-desktop.html" aria-label="Set up Claude.ai / Claude Desktop (custom connectors)">Claude.ai / Claude Desktop (custom connectors) <span aria-hidden="true">→</span></a>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/claude-code.html" aria-label="Set up Claude Code">Claude Code <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/claude-api.html" aria-label="Set up Claude API MCP connector">Claude API MCP connector <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/chatgpt-apps.html" aria-label="Set up ChatGPT connectors / Apps">ChatGPT connectors / Apps <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/custom-gpt.html" aria-label="Set up Custom GPT (Actions)">Custom GPT (Actions) <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/openai-api.html" aria-label="Set up OpenAI Responses API / Agents SDK">OpenAI Responses API / Agents SDK <span aria-hidden="true">→</span></a>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/codex-cli.html" aria-label="Set up Codex CLI">Codex CLI <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/vscode-copilot.html" aria-label="Set up VS Code Copilot">VS Code Copilot <span aria-hidden="true">→</span></a>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/copilot-studio.html" aria-label="Set up Microsoft Copilot Studio">Microsoft Copilot Studio <span aria-hidden="true">→</span></a>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/cursor.html" aria-label="Set up Cursor">Cursor <span aria-hidden="true">→</span></a>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/windsurf.html" aria-label="Set up Windsurf">Windsurf <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/jetbrains-ai.html" aria-label="Set up JetBrains AI Assistant">JetBrains AI Assistant <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/gemini-cli.html" aria-label="Set up Gemini CLI">Gemini CLI <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/zed.html" aria-label="Set up Zed">Zed <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/cline.html" aria-label="Set up Cline">Cline <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-      <li class="client-row">
-        <a class="client-guide" href="clients/n8n.html" aria-label="Set up n8n">n8n <span aria-hidden="true">→</span></a>
-        <span class="client-status">Unverified</span>
-      </li>
-    <!-- clients:end -->
+  <section class="hero" aria-labelledby="hero-title">
+    <canvas id="viz-hero" class="viz-hero" aria-hidden="true"></canvas>
+    <div class="hero-content">
+      <p class="eyebrow">Polarion ALM × your AI assistant</p>
+      <h1 id="hero-title">Your Polarion work.<br /><span>One conversation away.</span></h1>
+      <p class="hero-sub">Find the right requirements. Review a document.<br class="desktop-break" /> Prepare your next test run. Just ask your AI.</p>
+      <p class="hero-explainer">An open-source MCP server connecting Polarion to Claude, ChatGPT,<br class="desktop-break" /> Copilot, Gemini and the tools you already use.</p>
+      <div class="hero-actions"><a class="button primary" href="#clients">Connect your assistant <span aria-hidden="true">↗</span></a><a class="button secondary" href="#setup/docker">Run with Docker <span aria-hidden="true">→</span></a></div>
+      <ul class="proof" aria-label="Project features">
+        <li><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/src/tools.ts"><strong>284</strong> tools</a></li>
+        <li><a href="features.html"><strong>Read-only</strong> &amp; <code>dry_run</code></a></li>
+        <li><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE"><strong>Open source</strong> · MIT</a></li>
+        <li><a href="quality/supply-chain.html"><strong>Signed</strong> releases</a></li>
       </ul>
-    </details>
-    <a class="github-link" href="https://github.com/phillipboesger/polarion-mcp">View on GitHub ↗</a>
-    <div class="quickstart" id="quickstart">
-      <h2>Start in 3 steps</h2>
-      <ol class="quickstart-steps">
-        <li><h3 class="step-title"><span class="step-number">01</span>Choose</h3><p>Open the client picker above for your setup guide. For local setup, you need Node.js 22+, a Polarion REST API URL, and a personal access token (PAT).</p></li>
-        <li><h3 class="step-title"><span class="step-number">02</span>Connect</h3><p>Local clients launch <code>npx -y polarion-mcp</code>. Set <code>API_BASE_URL</code> to <code>https://YOUR-POLARION/polarion/rest/v1</code> and <code>BEARER_TOKEN</code> to your PAT in the client's configuration.</p></li>
-        <li><h3 class="step-title"><span class="step-number">03</span>Ask</h3><p>Confirm that the client lists Polarion tools, then ask: “List the Polarion projects I can access.”</p></li>
-      </ol>
-      <p class="team-note">Already have a team MCP URL? Use it in your client guide. Cloud clients need a deployed server. Hosting one? Read the <a href="deployment.html">deployment guide</a>.</p>
-      <details class="source-build">
-        <summary>Alternative: build from source</summary>
-        <p>With Git and Node.js 22+, build the server:</p>
-        <pre><code>git clone https://github.com/phillipboesger/polarion-mcp.git
-cd polarion-mcp
-npm ci --ignore-scripts
-npm run build</code></pre>
-        <p>In your client's local configuration, use command <code>node</code> and argument <code>/absolute/path/to/polarion-mcp/build/index.js</code> instead of <code>npx -y polarion-mcp</code>. Keep the same environment variables. See the <a href="https://github.com/phillipboesger/polarion-mcp#quickstart">configuration example</a>.</p>
-      </details>
-    </div>
-  </section>
-  <section class="demo" aria-labelledby="demo-title">
-    <div class="section-inner">
-      <div class="demo-header"><h2 id="demo-title">See it in action</h2><a href="example-task.html">Follow a worked example →</a></div>
-      <figure>
-        <img src="assets/demo.gif" alt="Illustrated workflow: an AI assistant queries Polarion work items and presents the results" width="850" height="529" />
-        <figcaption>Illustrated workflow: an AI assistant queries Polarion work items and presents the results.</figcaption>
-      </figure>
-    </div>
-  </section>
-  <section id="features" aria-labelledby="features-title">
-    <div class="section-inner">
-      <p class="section-label">What you can do</p>
-      <h2 id="features-title">Bring Polarion into the conversation</h2>
-      <div class="features-grid">
-        <article class="feature"><h3>Work with Polarion data</h3><p>284 tools generated from the REST API cover work items, documents, test management, plans, projects, and more.</p><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/src/tools.ts">Browse the tool catalog →</a></article>
-        <article class="feature"><h3>Choose the tools you expose</h3><p>Named toolsets, allowlists, and read-only mode narrow the callable surface. The enabled list depends on your configuration.</p><a href="configuration.html">Configure tools →</a></article>
-        <article class="feature"><h3>Preview changes</h3><p>Mutating REST tools support dry-run request previews. Selected Work Item changes also have validation guards for enumeration values, custom-field keys, and user references.</p><a href="features.html">Explore features →</a></article>
-        <article class="feature"><h3>Read rich text</h3><p>Supported HTML response values include a Markdown representation alongside the original content.</p><a href="usage.html">Read the usage guide →</a></article>
+      <div class="outcomes" aria-label="Example requests">
+        <div><span>01 / FIND</span><p>“Show open defects<br />for this release.”</p></div>
+        <div><span>02 / UNDERSTAND</span><p>“Summarize requirements<br />in this document.”</p></div>
+        <div><span>03 / PREPARE</span><p>“Draft test cases.<br />Preview before saving.”</p></div>
       </div>
-      <p class="section-sub">Connect locally over stdio or remotely over Streamable HTTP. A separate REST wrapper serves OpenAPI Actions. The tool count covers generated REST tools; optional helpers and filters change the enabled list.</p>
     </div>
   </section>
-  <section class="operations" id="auth" aria-labelledby="security-title">
-    <div class="section-inner">
-      <p class="section-label">For teams and administrators</p>
-      <h2 id="security-title">Security and team deployment</h2>
-      <p class="section-sub">Polarion controls each user's permissions. Remote MCP accepts a user's PAT directly or through the server's OAuth login. The REST wrapper uses the deployment's Polarion credentials and a separate API key.</p>
-      <p class="section-sub">Plan TLS and reverse proxies, redirect allowlists, token lifetimes, rate limits, and tool restrictions. Extension interfaces support custom policy, audit, authentication, and instance resolution integrations.</p>
-      <div class="reference-links"><a href="deployment.html">Deployment</a><a href="configuration.html">Configuration</a><a href="security.html">Security</a><a href="extensions.html">Extension interfaces</a></div>
-      <ul class="trust-strip">
-        <li><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE">Open source · MIT</a></li>
-        <li><a href="https://github.com/phillipboesger/polarion-mcp/actions/workflows/live-polarion.yml">Tested against Polarion 2506 and 2606</a> · <a href="polarion-versioning.html">Scope</a></li>
-        <li><a href="quality/supply-chain.html">Supply-chain verification</a></li>
-      </ul>
-      <p class="supply-note">Release workflows generate CycloneDX SBOMs and GitHub build provenance, and sign tagged container images with cosign. Check the artifacts available for each <a href="https://github.com/phillipboesger/polarion-mcp/releases">release</a>.</p>
+  <section id="clients" class="section setup-section" aria-labelledby="clients-title">
+    <div class="section-heading"><div><p class="eyebrow">Get connected</p><h2 id="clients-title">Your assistant. Your setup.</h2></div><p>Pick a client, copy one snippet, and connect.<br />Local: Node.js 22+, a REST-enabled Polarion instance and a PAT.<br />Cloud: your team’s deployed HTTPS server.</p></div>
+    <!-- clients:start -->
+    <div class="setup-layout">
+      <div class="client-groups"><section class="client-group" aria-labelledby="group-providers">
+          <h3 id="group-providers">AI providers</h3>
+          <div class="provider-grid ">
+            <article class="provider-card claude">
+              <div class="provider-heading"><span class="monogram" aria-hidden="true">C</span><div><h4>Claude</h4><p>Desktop, web and developer tools</p></div></div>
+              <div class="client-buttons"><button type="button" data-client="claude-desktop" aria-controls="setup" aria-pressed="true">Desktop</button><button type="button" data-client="claude-web-desktop" aria-controls="setup" aria-pressed="false">Web connector</button><button type="button" data-client="claude-code" aria-controls="setup" aria-pressed="false">Code</button><button type="button" data-client="claude-api" aria-controls="setup" aria-pressed="false">API</button></div>
+            </article>
+            <article class="provider-card openai">
+              <div class="provider-heading"><span class="monogram" aria-hidden="true">O</span><div><h4>OpenAI / ChatGPT</h4><p>Chat, coding and agents</p></div></div>
+              <div class="client-buttons"><button type="button" data-client="chatgpt-apps" aria-controls="setup" aria-pressed="false">ChatGPT</button><button type="button" data-client="custom-gpt" aria-controls="setup" aria-pressed="false">Custom GPT</button><button type="button" data-client="openai-api" aria-controls="setup" aria-pressed="false">API</button><button type="button" data-client="openai-agents" aria-controls="setup" aria-pressed="false">Agents SDK</button><button type="button" data-client="codex-cli" aria-controls="setup" aria-pressed="false">Codex</button></div>
+            </article>
+            <article class="provider-card microsoft">
+              <div class="provider-heading"><span class="monogram" aria-hidden="true">M</span><div><h4>Microsoft</h4><p>Team agents and your editor</p></div></div>
+              <div class="client-buttons"><button type="button" data-client="copilot-studio" aria-controls="setup" aria-pressed="false">Copilot Studio</button><button type="button" data-client="vscode-copilot" aria-controls="setup" aria-pressed="false">VS Code Copilot</button></div>
+            </article>
+            <article class="provider-card google">
+              <div class="provider-heading"><span class="monogram" aria-hidden="true">G</span><div><h4>Google</h4><p>Gemini in your terminal</p></div></div>
+              <div class="client-buttons"><button type="button" data-client="gemini-cli" aria-controls="setup" aria-pressed="false">Gemini CLI</button></div>
+            </article>
+          </div>
+        </section>
+        <section class="client-group" aria-labelledby="group-tools">
+          <h3 id="group-tools">Tools / IDEs</h3>
+          <div class="provider-grid wide">
+            <article class="provider-card editors">
+              <div class="provider-heading"><span class="monogram" aria-hidden="true">&lt;/&gt;</span><div><h4>Your development workspace</h4><p>Use the client you already work in.</p></div></div>
+              <div class="client-buttons"><button type="button" data-client="vscode-copilot" aria-controls="setup" aria-pressed="false">VS Code Copilot</button><button type="button" data-client="cursor" aria-controls="setup" aria-pressed="false">Cursor</button><button type="button" data-client="windsurf" aria-controls="setup" aria-pressed="false">Windsurf</button><button type="button" data-client="jetbrains-ai" aria-controls="setup" aria-pressed="false">JetBrains</button><button type="button" data-client="zed" aria-controls="setup" aria-pressed="false">Zed</button><button type="button" data-client="cline" aria-controls="setup" aria-pressed="false">Cline</button></div>
+            </article>
+          </div>
+        </section>
+        <section class="client-group" aria-labelledby="group-custom">
+          <h3 id="group-custom">Custom / self-hosted</h3>
+          <div class="provider-grid wide">
+            <article class="provider-card self-hosted">
+              <div class="provider-heading"><span class="monogram" aria-hidden="true">&gt;_</span><div><h4>Run it your way</h4><p>A team server, your own client, or a workflow.</p></div></div>
+              <div class="client-buttons"><button type="button" data-client="docker" aria-controls="setup" aria-pressed="false">Docker</button><button type="button" data-client="generic-stdio" aria-controls="setup" aria-pressed="false">stdio</button><button type="button" data-client="generic-http" aria-controls="setup" aria-pressed="false">HTTP</button><button type="button" data-client="rest-wrapper" aria-controls="setup" aria-pressed="false">REST / OpenAPI</button><button type="button" data-client="n8n" aria-controls="setup" aria-pressed="false">n8n</button></div>
+            </article>
+          </div>
+        </section></div>
+      <section class="setup-panel" id="setup" aria-labelledby="setup-title" tabindex="-1">
+        <p class="eyebrow" id="setup-kind">Local · JSON</p>
+        <h3 id="setup-title">Local MCP configuration</h3>
+        <label for="setup-client">Set up</label>
+        <select id="setup-client"><option value="claude-desktop">Claude Desktop</option><option value="cursor">Cursor</option><option value="windsurf">Windsurf / Cascade</option><option value="jetbrains-ai">JetBrains AI Assistant</option><option value="cline">Cline</option></select>
+        <p class="compatibility" id="setup-compatibility">Same format: Desktop · Cursor · Windsurf · JetBrains · Cline</p>
+        <ol class="setup-steps" id="setup-steps"><li>Open Claude Desktop Settings &gt; Developer &gt; Edit Config.</li><li>Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.</li><li>Save, fully quit and reopen Claude Desktop. Ask: “List the Polarion projects I can access.”</li></ol>
+        <div class="snippet-header"><span id="snippet-language">json</span><button type="button" id="copy-setup">Copy snippet</button></div>
+        <pre tabindex="0" aria-label="Setup snippet"><code id="setup-code">{
+  &quot;mcpServers&quot;: {
+    &quot;polarion&quot;: {
+      &quot;command&quot;: &quot;npx&quot;,
+      &quot;args&quot;: [&quot;-y&quot;, &quot;polarion-mcp&quot;],
+      &quot;env&quot;: {
+        &quot;API_BASE_URL&quot;: &quot;https://YOUR-POLARION/polarion/rest/v1&quot;,
+        &quot;BEARER_TOKEN&quot;: &quot;YOUR_POLARION_PAT&quot;
+      }
+    }
+  }
+}</code></pre>
+        <p class="setup-note" id="setup-note">Node.js 22+ runs the published npm package on your computer. Replace the URL and PAT locally; keep credentials out of Git.</p>
+        <div class="setup-links"><a id="setup-source" href="https://modelcontextprotocol.io/docs/develop/connect-local-servers" target="_blank" rel="noopener noreferrer">Client documentation ↗</a><a href="clients.html">Sources &amp; details</a></div>
+        <p id="setup-status" class="sr-only" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+    <script type="application/json" id="client-data">{"clients":[{"id":"claude-desktop","name":"Claude Desktop","label":"Desktop","setup":"local-json","steps":["Open Claude Desktop Settings > Developer > Edit Config.","Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.","Save, fully quit and reopen Claude Desktop. Ask: “List the Polarion projects I can access.”"],"note":"","source":"https://modelcontextprotocol.io/docs/develop/connect-local-servers"},{"id":"claude-web-desktop","name":"Claude web / Desktop connector","label":"Web connector","setup":"connector","steps":["Get your team’s HTTPS MCP URL. The administrator enables OAuth and the Claude redirect preset.","Open Customize > Connectors > Add custom connector. Paste the URL below. Choose Register automatically for this server’s DCR flow.","Connect, enter your Polarion PAT on the server login page, and enable the connector in a conversation."],"note":"On Team / Enterprise, an owner adds the connector under Organization settings > Connectors > Add > Custom > Web; members then choose Connect.","source":"https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp"},{"id":"claude-code","name":"Claude Code","label":"Code","setup":"cli","steps":["Install Claude Code and Node.js 22+.","Replace the URL and PAT, then run the command below.","Start Claude Code, open /mcp, and confirm Polarion is connected. Ask: “List the Polarion projects I can access.”"],"snippet":"claude mcp add --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT --transport stdio polarion -- npx -y polarion-mcp","note":"","source":"https://code.claude.com/docs/en/mcp"},{"id":"claude-api","name":"Claude API","label":"API","setup":"claude-api","steps":["Deploy or obtain a reachable HTTPS MCP server.","Add the snippet to your Messages request and set the beta header named below. Replace URL and PAT.","Send a request with your model, max_tokens and messages. Check the returned tool results."],"note":"","source":"https://platform.claude.com/docs/en/agents-and-tools/mcp-connector"},{"id":"chatgpt-apps","name":"ChatGPT connector","label":"ChatGPT","setup":"connector","steps":["Get your team’s HTTPS MCP URL. The administrator enables OAuth and allowlists the exact callback shown by ChatGPT.","In ChatGPT Plugins, choose + > Add custom MCP server. Paste the URL and select OAuth with dynamic client registration (DCR).","Install the resulting plugin, sign in with your Polarion PAT, and select it with @ in a conversation."],"note":"Custom MCP access depends on your ChatGPT workspace permissions. Use DCR for this server unless the administrator explicitly enabled CIMD.","source":"https://developers.openai.com/api/docs/guides/custom-mcp-server"},{"id":"custom-gpt","name":"Custom GPT Actions","label":"Custom GPT","setup":"gpt-actions","steps":["Get your team’s deployed REST wrapper URL and HTTP_API_KEY.","In the GPT editor, open Actions > Create new action > Import from URL and paste the schema URL below.","Choose API Key authentication, Bearer type, and enter HTTP_API_KEY. Test getProjects in the editor."],"note":"","source":"https://developers.openai.com/api/docs/actions/getting-started"},{"id":"openai-api","name":"OpenAI Responses API","label":"API","setup":"openai-api","steps":["Get a reachable HTTPS MCP server and your Polarion PAT.","Add the snippet to your Responses request, replacing URL and PAT.","Send a request with your model and input. Review and approve MCP tool calls."],"note":"","source":"https://developers.openai.com/api/docs/guides/tools-connectors-mcp"},{"id":"openai-agents","name":"OpenAI Agents SDK","label":"Agents SDK","setup":"agents-sdk","steps":["Install openai-agents and import Agent from agents in your async app.","Paste the snippet inside an async function. Replace URL and PAT.","Run the agent with Runner while the MCP server context is open."],"note":"","source":"https://openai.github.io/openai-agents-python/mcp/"},{"id":"codex-cli","name":"Codex","label":"Codex","setup":"cli","steps":["Install Codex and Node.js 22+.","Replace the URL and PAT, then run the command below.","Open Codex and inspect /mcp. Ask: “List the Polarion projects I can access.”"],"snippet":"codex mcp add polarion --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT -- npx -y polarion-mcp","note":"","source":"https://developers.openai.com/codex/mcp"},{"id":"copilot-studio","name":"Microsoft Copilot Studio","label":"Copilot Studio","setup":"connector","steps":["Open your agent’s Tools page, then Add a tool > New tool > Model Context Protocol.","Enter a name, description and the URL below. Choose API key > Header, named Authorization.","Create a connection with the value Bearer YOUR_POLARION_PAT. Add the tool and test the agent."],"note":"Use generative orchestration. This path uses a PAT header and does not require an OAuth callback. Select only the tools your agent needs.","source":"https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent"},{"id":"vscode-copilot","name":"VS Code / GitHub Copilot","label":"VS Code Copilot","setup":"vscode-json","steps":["Run MCP: Open User Configuration from the Command Palette.","Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.","Save, start the server and trust it when prompted. In agent chat, select Polarion tools. Ask: “List the Polarion projects I can access.”"],"note":"","source":"https://code.visualstudio.com/docs/agents/reference/mcp-configuration"},{"id":"gemini-cli","name":"Gemini CLI","label":"Gemini CLI","setup":"cli","steps":["Install Gemini CLI and Node.js 22+.","Replace the URL and PAT, then run the command below.","Start Gemini CLI and inspect /mcp. Ask: “List the Polarion projects I can access.”"],"snippet":"gemini mcp add --scope user --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT polarion npx -y polarion-mcp","note":"Run Gemini in a trusted folder. If the server shows Disconnected, use gemini trust to trust that folder.","source":"https://geminicli.com/docs/tools/mcp-server/"},{"id":"cursor","name":"Cursor","label":"Cursor","setup":"local-json","steps":["Open your personal ~/.cursor/mcp.json, or create it. Do not put a PAT in a shared project file.","Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.","Save and reconnect the server. Ask: “List the Polarion projects I can access.”"],"note":"","source":"https://cursor.com/docs/mcp"},{"id":"windsurf","name":"Windsurf / Cascade","label":"Windsurf","setup":"local-json","steps":["In legacy Cascade, open the Actions (...) menu > MCPs > Open MCP config file.","Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.","Save and reconnect the server. Ask: “List the Polarion projects I can access.”"],"note":"The vendor now documents this as legacy Cascade in Devin Desktop. Its 100-tool budget requires selecting a subset of Polarion tools. This config does not apply to the Devin Local agent.","source":"https://docs.windsurf.com/windsurf/cascade/mcp"},{"id":"jetbrains-ai","name":"JetBrains AI Assistant","label":"JetBrains","setup":"local-json","steps":["Open Settings > Tools > AI Assistant > Model Context Protocol (MCP), add a server and choose STDIO.","Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.","Click OK and Apply. Ask: “List the Polarion projects I can access.”"],"note":"","source":"https://www.jetbrains.com/help/ai-assistant/mcp.html"},{"id":"zed","name":"Zed","label":"Zed","setup":"zed-json","steps":["Run zed: open settings file from the Command Palette.","Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.","Save and reconnect the server. Ask: “List the Polarion projects I can access.”"],"note":"","source":"https://zed.dev/docs/ai/mcp"},{"id":"cline","name":"Cline","label":"Cline","setup":"local-json","steps":["Open Cline > MCP Servers > Configure > Configure MCP Servers.","Paste the snippet, merge with existing settings, and replace the Polarion URL and PAT.","Save and reconnect the server. Ask: “List the Polarion projects I can access.”"],"note":"","source":"https://docs.cline.bot/mcp/mcp-overview"},{"id":"docker","name":"Docker team server","label":"Docker","setup":"docker","steps":["Install Docker and replace the Polarion REST URL in the command.","Run the container. Connect a local HTTP client to http://localhost:3000/mcp with Authorization: Bearer YOUR_POLARION_PAT.","For a team, put a TLS proxy in front, set allowed hosts to its hostname, and configure OAuth for cloud connectors."],"note":"","source":"https://github.com/phillipboesger/polarion-mcp/blob/main/Dockerfile"},{"id":"generic-stdio","name":"Generic stdio client","label":"stdio","setup":"stdio","steps":["Open your client’s local MCP server settings.","Set command to npx, arguments to -y polarion-mcp, and pass API_BASE_URL and BEARER_TOKEN as environment variables, as shown below.","Let the client launch the process, then list its tools. Ask: “List the Polarion projects I can access.”"],"note":"","source":"https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"},{"id":"generic-http","name":"Generic HTTP client","label":"HTTP","setup":"connector","steps":["Obtain your team’s MCP server URL, or start the Docker server for local use.","Paste your HTTPS URL below into the Streamable HTTP setting, or use http://localhost:3000/mcp for local Docker. Add Authorization: Bearer YOUR_POLARION_PAT.","Connect and list tools. For OAuth-capable clients, use your administrator’s login configuration instead."],"note":"","source":"https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"},{"id":"rest-wrapper","name":"REST wrapper / OpenAPI","label":"REST / OpenAPI","setup":"rest","steps":["Install Docker. Replace the Polarion URL, deployment PAT, wrapper key and public HTTPS URL in the command.","Run the container and route HTTPS traffic to its loopback port.","Import /openapi.json into your integration, or /openapi-gpt.json into Custom GPT Actions. Send HTTP_API_KEY as a Bearer token."],"note":"","source":"https://github.com/phillipboesger/polarion-mcp/blob/main/src/http-server.ts"},{"id":"n8n","name":"n8n REST workflow","label":"n8n","setup":"n8n-rest","steps":["Get a deployed REST wrapper URL and its HTTP_API_KEY from your administrator.","Add an HTTP Request node, choose Import cURL and paste the command below after replacing the server URL.","Replace the imported Authorization header with a Bearer Auth credential containing HTTP_API_KEY, then execute the node. The shell variable in the snippet is a placeholder."],"note":"Use the HTTP Request node as a workflow step or attach it as a tool to an AI Agent.","source":"https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/"}],"setups":[{"id":"local-json","title":"Local MCP configuration","kind":"Local · JSON","language":"json","snippet":"{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}","note":"Node.js 22+ runs the published npm package on your computer. Replace the URL and PAT locally; keep credentials out of Git."},{"id":"cli","title":"Add from your terminal","kind":"Local · CLI","language":"bash","snippet":"","note":"Commands shown for macOS, Linux and WSL. Install the selected client and Node.js 22+. Replace the URL and PAT before running; the command stores them in your local client configuration."},{"id":"connector","title":"Connect to your team server","kind":"Remote · URL","language":"text","snippet":"https://YOUR-SERVER/mcp","note":"Use your own deployed HTTPS URL. There is no public Polarion relay. Your server must be reachable by the client provider; an administrator sets up TLS, OAuth and exact redirect allowlists."},{"id":"vscode-json","title":"VS Code MCP configuration","kind":"Local · JSON","language":"json","snippet":"{\n  \"servers\": {\n    \"polarion\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}","note":"Node.js 22+ is required. VS Code uses a servers object. Select the tools you need in chat; the full catalog can exceed the client tool budget."},{"id":"zed-json","title":"Zed context server","kind":"Local · JSON","language":"json","snippet":"{\n  \"context_servers\": {\n    \"polarion\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}","note":"Node.js 22+ is required. Zed uses context_servers, with command, args and env directly inside the server entry."},{"id":"claude-api","title":"Claude Messages API","kind":"Remote · API","language":"json","snippet":"{\n  \"mcp_servers\": [\n    {\n      \"type\": \"url\",\n      \"name\": \"polarion\",\n      \"url\": \"https://YOUR-SERVER/mcp\",\n      \"authorization_token\": \"YOUR_POLARION_PAT\"\n    }\n  ],\n  \"tools\": [\n    {\n      \"type\": \"mcp_toolset\",\n      \"mcp_server_name\": \"polarion\"\n    }\n  ]\n}","note":"Add these fields to your Messages request. Enable the mcp-client-2025-11-20 beta header. The Polarion PAT authenticates to this server; your Anthropic API key authenticates the API request."},{"id":"openai-api","title":"OpenAI Responses API","kind":"Remote · API","language":"json","snippet":"{\n  \"tools\": [\n    {\n      \"type\": \"mcp\",\n      \"server_label\": \"polarion\",\n      \"server_url\": \"https://YOUR-SERVER/mcp\",\n      \"authorization\": \"YOUR_POLARION_PAT\",\n      \"require_approval\": \"always\"\n    }\n  ]\n}","note":"Add this tools field to a Responses request. Use your OpenAI API key for the API request and your Polarion PAT for the MCP server."},{"id":"agents-sdk","title":"OpenAI Agents SDK","kind":"Remote · Python","language":"python","snippet":"from agents.mcp import MCPServerStreamableHttp\n\nasync with MCPServerStreamableHttp(\n    name=\"Polarion\",\n    params={\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n    },\n) as server:\n    agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])","note":"Use inside your async application with openai-agents installed and Agent imported from agents. Run the agent while the server context is open. Keep API keys and PATs in your application secret store."},{"id":"gpt-actions","title":"Custom GPT Actions","kind":"Remote · OpenAPI","language":"text","snippet":"https://YOUR-SERVER/openapi-gpt.json","note":"This uses the REST wrapper and its HTTP_API_KEY, not the MCP endpoint or the user PAT. The reduced schema contains 30 actions. A team administrator deploys the REST wrapper first."},{"id":"docker","title":"Docker team server","kind":"Self-hosted · Docker","language":"bash","snippet":"docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0","note":"The image starts Streamable HTTP. Each client sends its own Polarion PAT as Authorization: Bearer \u003cPAT>. Local endpoint: http://localhost:3000/mcp. Add TLS and OAuth before connecting cloud clients."},{"id":"stdio","title":"Any stdio MCP client","kind":"Custom · stdio","language":"bash","snippet":"API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\nBEARER_TOKEN=YOUR_POLARION_PAT \\\nnpx -y polarion-mcp","note":"Node.js 22+ is required. The client owns stdin and stdout. Configure this as its subprocess; it is not a standalone web service."},{"id":"rest","title":"REST wrapper / OpenAPI","kind":"Self-hosted · REST","language":"bash","snippet":"docker run -d --name polarion-rest \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e BEARER_TOKEN=YOUR_POLARION_PAT \\\n  -e HTTP_API_KEY=YOUR_WRAPPER_API_KEY \\\n  -e PUBLIC_URL=https://YOUR-SERVER \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.0 \\\n  node build/http-server.js","note":"All calls use the deployment PAT. Clients send Authorization: Bearer \u003cHTTP_API_KEY>. Serve this behind HTTPS; schemas are at /openapi.json and /openapi-gpt.json."},{"id":"n8n-rest","title":"n8n HTTP Request","kind":"Automation · REST","language":"bash","snippet":"curl -X POST https://YOUR-SERVER/api/tools/getProjects \\\n  -H \"Authorization: Bearer ${HTTP_API_KEY}\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{}'","note":"This setup uses the REST wrapper. Its administrator configures API_BASE_URL, BEARER_TOKEN and HTTP_API_KEY. Store the wrapper key in an n8n credential after importing."}]}</script>
+    <!-- clients:end -->
+    <noscript><p class="notice">Enable JavaScript for the inline setup switcher, or use the <a href="https://github.com/phillipboesger/polarion-mcp#quickstart">README quickstart</a> and <a href="clients.html">client reference</a>.</p></noscript>
+    <p class="under-setup">Need a token? See <a href="usage.html">Polarion access and usage</a>. Hosting for a team? See <a href="deployment.html">TLS, OAuth and deployment</a>.</p>
+  </section>
+  <section id="features" class="section capabilities" aria-labelledby="features-title">
+    <div class="section-heading"><div><p class="eyebrow">From question to action</p><h2 id="features-title">Less searching.<br />More engineering.</h2></div><p>284 generated REST tools cover the Polarion domains below. The tools your assistant sees depend on server configuration and client limits.</p></div>
+    <div class="domain-grid">
+      <article><span class="domain-number">01</span><h3>Work items</h3><p>Find requirements and defects. Read relationships, prepare updates and link related work.</p></article>
+      <article><span class="domain-number">02</span><h3>Documents</h3><p>Read LiveDocs, inspect their work items, and work with document parts and attachments.</p></article>
+      <article><span class="domain-number">03</span><h3>Test management</h3><p>Inspect test runs and records. Create runs and record results with the available REST operations.</p></article>
+      <article><span class="domain-number">04</span><h3>Plans &amp; collections</h3><p>Review release plans, scheduled work and document collections in the context of your question.</p></article>
+      <article><span class="domain-number">05</span><h3>Projects &amp; people</h3><p>Discover projects, users and enumerations. Give your assistant the context it needs to work with your data.</p></article>
+      <article class="safety"><span class="domain-number">YOU SET THE LIMITS</span><h3>Preview, then decide.</h3><p>Enable <code>MCP_READ_ONLY</code> to expose read-only tools. Use <code>dry_run</code> on mutating REST tools to preview a request before sending it.</p><a href="features.html">Features and limits →</a></article>
     </div>
   </section>
-  <section id="links" aria-labelledby="docs-title">
-    <div class="section-inner">
-      <p class="section-label">Documentation</p>
-      <h2 id="docs-title">Find what you need</h2>
-      <dl class="docs-list">
-        <div><dt>Find a guide</dt><dd><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/README.md">Documentation index</a> · <a href="troubleshooting.html">Troubleshooting</a></dd></div>
-        <div><dt>Configure the server</dt><dd><a href="configuration.html">Environment, toolsets, and settings</a></dd></div>
-        <div><dt>Host it for a team</dt><dd><a href="deployment.html">Docker, remote MCP, and reverse proxies</a></dd></div>
-        <div><dt>Review authentication and controls</dt><dd><a href="security.html">Security</a> · <a href="quality/supply-chain.html">Supply chain</a></dd></div>
-        <div><dt>Use tools and prompts</dt><dd><a href="usage.html">Usage</a> · <a href="resources-and-prompts.html">Resources and prompts</a></dd></div>
-        <div><dt>Inspect API coverage</dt><dd><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/src/tools.ts">Tool catalog</a> · <a href="quality/rest-coverage.html">REST coverage</a></dd></div>
-        <div><dt>Understand or extend it</dt><dd><a href="architecture.html">Architecture</a> · <a href="extensions.html">Extension interfaces</a></dd></div>
-        <div><dt>Check version support</dt><dd><a href="polarion-versioning.html">Polarion versions</a> · <a href="live-tests.html">Live tests</a></dd></div>
-      </dl>
-    </div>
+  <section class="section demo" aria-labelledby="demo-title">
+    <div class="section-heading"><div><p class="eyebrow">See the flow</p><h2 id="demo-title">Ask. Inspect. Continue.</h2></div><a href="example-task.html">Walk through an example →</a></div>
+    <figure><img src="assets/demo.gif" width="1440" height="900" loading="lazy" alt="Illustrated workflow: an AI assistant queries Polarion work items and presents the results" /><figcaption>An illustrated Polarion workflow. Your client controls tool approval and presentation.</figcaption></figure>
   </section>
-  <section class="community" aria-labelledby="contribute-title">
-    <div class="section-inner">
-      <p class="section-label">Made in the open</p>
-      <h2 id="contribute-title">Contribute</h2>
-      <p class="section-sub">Bug reports, documentation fixes, and focused pull requests are welcome.</p>
-      <div class="reference-links"><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/CONTRIBUTING.md">Contributing guide</a><a href="https://github.com/phillipboesger/polarion-mcp/issues">Issues</a><a href="https://github.com/phillipboesger/polarion-mcp/releases">Releases</a></div>
-      <p class="credits">Built by <a href="https://github.com/phillipboesger">Phillip Bösger</a>, building on the work of <a href="https://github.com/Jonasdero">@Jonasdero</a>.</p>
+  <section id="docs" class="section docs-section" aria-labelledby="docs-title">
+    <div class="section-heading"><div><p class="eyebrow">Built for your environment</p><h2 id="docs-title">Local today.<br />Ready for your team.</h2></div><p>Polarion enforces each caller’s permissions. Remote MCP supports per-user PATs and OAuth. The separate REST wrapper uses the deployment’s credentials.</p></div>
+    <div class="docs-grid">
+      <a href="deployment.html"><span>01 / OPERATIONS</span><h3>Deploy &amp; configure <b aria-hidden="true">↗</b></h3><p>Docker, reverse proxies, TLS and OAuth login.</p></a>
+      <a href="security.html"><span>02 / CONTROL</span><h3>Security &amp; enterprise <b aria-hidden="true">↗</b></h3><p>Tool restrictions, rate limits, redirect allowlists and token lifetimes.</p></a>
+      <a href="quality/supply-chain.html"><span>03 / PROVENANCE</span><h3>Inspect your release <b aria-hidden="true">↗</b></h3><p>CycloneDX SBOMs, build provenance and cosign image signatures.</p></a>
+      <a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/README.md"><span>04 / REFERENCE</span><h3>Explore the docs <b aria-hidden="true">↗</b></h3><p>Usage, architecture, extension hooks and contributing.</p></a>
     </div>
+    <p class="version-note">Live integration tests have passed against Polarion 2506 and 2606. See <a href="polarion-versioning.html">version support and scope</a>.</p>
   </section>
+  <section class="section community"><p class="eyebrow">Open source · MIT</p><h2>Make it work for your team.</h2><p>Report a bug, improve a guide, or build an integration.</p><div class="hero-actions"><a class="button primary" href="https://github.com/phillipboesger/polarion-mcp">Explore on GitHub ↗</a><a class="button secondary" href="https://github.com/phillipboesger/polarion-mcp/blob/main/CONTRIBUTING.md">Contribute →</a></div></section>
 </main>
-<footer>
-  <span>polarion-mcp · © Phillip Bösger</span>
-  <div class="footer-links"><a href="https://github.com/phillipboesger/polarion-mcp">GitHub</a><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/docs/README.md">Documentation</a><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE">MIT license</a></div>
-</footer>
+<footer><p>Built by <a href="https://boesger.com">Phillip Bösger</a>, building on the work of <a href="https://github.com/Jonasdero">@Jonasdero</a>.</p><div><a href="https://www.npmjs.com/package/polarion-mcp">npm</a><a href="https://github.com/phillipboesger/polarion-mcp/releases">Releases</a><a href="https://github.com/phillipboesger/polarion-mcp/blob/main/LICENSE">MIT license</a></div></footer>
 </body>
 </html>

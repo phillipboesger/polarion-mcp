@@ -1,7 +1,8 @@
 /* Visual explainer for this project site: shape and flow only, drawn on canvas.
    Each canvas runs only while visible and shows one calm frame for reduced motion. */
 (function () {
-  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var reduce = motion.matches;
   var C = { cyan: "#62d6ff", blue: "#6aa9ff", warm: "#ffc266", mint: "#7be0b0", coral: "#ff8fa3", ice: "#bdeeff" };
   var TAU = Math.PI * 2;
   function rgba(hex, a) {
@@ -29,47 +30,46 @@
     ctx.closePath();
   }
   var MONO = "600 11px 'Geist Mono', ui-monospace, Menlo, monospace";
+  // Restored from e2120c1; cap resolution and frame rate, and stop in background tabs.
   function stage(canvas, init, draw) {
     var ctx = canvas.getContext("2d");
-    var w = 0, h = 0, visible = false, raf = 0, last = 0, t0 = 0, state = null;
+    if (!ctx) return;
+    var w = 0, h = 0, visible = false, raf = 0, last = 0, t0 = 0, state;
+    function paint(now, still) {
+      if (!t0) t0 = now;
+      var dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016);
+      last = now;
+      ctx.clearRect(0, 0, w, h);
+      draw(ctx, w, h, reduce ? 40 : (now - t0) / 1000, dt, state, still);
+    }
+    function tick(now) {
+      if (reduce || !visible || document.hidden) { raf = 0; return; }
+      if (now - last >= 1000 / 30) paint(now, false);
+      raf = requestAnimationFrame(tick);
+    }
+    function sync() {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      last = 0;
+      if (reduce) paint(performance.now(), true);
+      else if (visible && !document.hidden) raf = requestAnimationFrame(tick);
+    }
     function size() {
-      var r = canvas.getBoundingClientRect();
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = Math.max(1, Math.round(r.width));
-      h = Math.max(1, Math.round(r.height));
+      var rect = canvas.getBoundingClientRect();
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      w = Math.max(1, Math.round(rect.width));
+      h = Math.max(1, Math.round(rect.height));
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       state = init(w, h, state);
-      if (reduce || !visible) frame(performance.now(), true);
+      paint(performance.now(), true);
     }
-    function frame(now, still) {
-      if (!t0) t0 = now;
-      var t = reduce ? 40 : (now - t0) / 1000;
-      var dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016);
-      last = now;
-      ctx.clearRect(0, 0, w, h);
-      draw(ctx, w, h, t, dt, state, reduce || still);
-      if (!reduce && visible && !still) raf = requestAnimationFrame(function (n) { frame(n, false); });
-    }
-    if ("ResizeObserver" in window) new ResizeObserver(size).observe(canvas);
-    else window.addEventListener("resize", size);
-    if ("IntersectionObserver" in window) {
-      new IntersectionObserver(function (es) {
-        visible = es[0].isIntersecting;
-        cancelAnimationFrame(raf);
-        last = 0;
-        if (visible && !reduce) raf = requestAnimationFrame(function (n) { frame(n, false); });
-      }).observe(canvas);
-    } else {
-      visible = true;
-      if (!reduce) raf = requestAnimationFrame(function (n) { frame(n, false); });
-    }
+    new ResizeObserver(size).observe(canvas);
+    new IntersectionObserver(function (entries) { visible = entries[0].isIntersecting; sync(); }).observe(canvas);
+    motion.addEventListener("change", function () { reduce = motion.matches; sync(); });
+    document.addEventListener("visibilitychange", sync);
     size();
-  }
-  function bez(p0, p1, p2, p3, u) {
-    var m = 1 - u;
-    return m * m * m * p0 + 3 * m * m * u * p1 + 3 * m * u * u * p2 + u * u * u * p3;
   }
   var q = function (id) { return document.getElementById(id); };
   /* Hero: five AI clients around a ring of tool points. A question flies in, a tool answers. */
@@ -132,7 +132,7 @@
         ctx.beginPath(); ctx.arc(x, y, 3.4, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
       }
       ctx.font = MONO; ctx.textAlign = "center";
-      cpos.forEach(function (c, k3) {
+      if (w >= 700) cpos.forEach(function (c, k3) {
         var tw = ctx.measureText(clients[k3][0].toUpperCase()).width + 22;
         ctx.fillStyle = "rgba(11,42,76,0.9)";
         roundRect(ctx, c[0] - tw / 2, c[1] - 13, tw, 26, 13); ctx.fill();
@@ -143,66 +143,20 @@
     });
   }
 
-  /* Block: one server between the AI and Polarion, three ways in. */
-  function flowMcp(canvas) {
-    var ins = [["stdio", C.warm], ["MCP HTTP", C.blue], ["REST for GPTs", C.mint]];
-    var outs = ["Work Items", "Documents", "Test Runs", "Plans", "Users"];
-    var packets = [], spawn = 0;
-    return stage(canvas, function () { return {}; }, function (ctx, w, h, t, dt, s, still) {
-      var narrow = w < 560;
-      var xi = w * 0.12, xc = w * (narrow ? 0.42 : 0.46), xo = w * (narrow ? 0.76 : 0.82);
-      function yIn(i) { return h * (0.22 + i * 0.28); }
-      function yOut(i) { return h * (0.12 + i * 0.19); }
-      if (!still) {
-        spawn -= dt;
-        if (spawn <= 0) { spawn = 0.6; packets.push({ i: Math.floor(Math.random() * 3), o: Math.floor(Math.random() * 5), u: 0 }); }
-      }
-      ctx.lineWidth = 1.2;
-      for (var i = 0; i < 3; i++) {
-        ctx.strokeStyle = rgba(C.ice, 0.16);
-        ctx.beginPath(); ctx.moveTo(xi, yIn(i)); ctx.bezierCurveTo(xi + (xc - xi) * 0.6, yIn(i), xc - (xc - xi) * 0.5, h * 0.5, xc, h * 0.5); ctx.stroke();
-      }
-      for (var o = 0; o < 5; o++) {
-        ctx.strokeStyle = rgba(C.ice, 0.16);
-        ctx.beginPath(); ctx.moveTo(xc, h * 0.5); ctx.bezierCurveTo(xc + (xo - xc) * 0.5, h * 0.5, xo - (xo - xc) * 0.6, yOut(o), xo, yOut(o)); ctx.stroke();
-      }
-      ctx.font = MONO; ctx.textAlign = "left";
-      for (var a = 0; a < 3; a++) {
-        ctx.fillStyle = "rgba(11,42,76,0.9)"; ctx.strokeStyle = rgba(ins[a][1], 0.9);
-        ctx.beginPath(); ctx.arc(xi, yIn(a), 7, 0, TAU); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.fillText(ins[a][0].toUpperCase(), Math.max(6, xi - 8), yIn(a) - 17);
-      }
-      var pulse = still ? 1 : 1 + Math.sin(t * 2) * 0.1;
-      ctx.fillStyle = rgba(C.cyan, 0.14); ctx.beginPath(); ctx.arc(xc, h * 0.5, 38 * pulse, 0, TAU); ctx.fill();
-      ctx.fillStyle = C.ice; ctx.beginPath(); ctx.arc(xc, h * 0.5, 10, 0, TAU); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.textAlign = "center";
-      ctx.fillText("MCP SERVER", xc, h * 0.5 + 58);
-      for (var k = packets.length - 1; k >= 0; k--) {
-        var pk = packets[k]; pk.u += dt * 0.3;
-        if (pk.u >= 2) { packets.splice(k, 1); continue; }
-        var x, y, col;
-        if (pk.u < 1) {
-          x = bez(xi, xi + (xc - xi) * 0.6, xc - (xc - xi) * 0.5, xc, pk.u);
-          y = bez(yIn(pk.i), yIn(pk.i), h * 0.5, h * 0.5, pk.u); col = ins[pk.i][1];
-        } else {
-          var u2 = pk.u - 1;
-          x = bez(xc, xc + (xo - xc) * 0.5, xo - (xo - xc) * 0.6, xo, u2);
-          y = bez(h * 0.5, h * 0.5, yOut(pk.o), yOut(pk.o), u2); col = C.cyan;
-        }
-        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10;
-        ctx.beginPath(); ctx.arc(x, y, 3.6, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
-      }
-      ctx.textAlign = "left";
-      var bw = Math.min(110, w - xo - 8);
-      for (var b = 0; b < 5; b++) {
-        ctx.fillStyle = rgba(C.cyan, 0.14); roundRect(ctx, xo - 4, yOut(b) - 14, bw, 28, 8); ctx.fill();
-        ctx.strokeStyle = rgba(C.cyan, 0.7); ctx.stroke();
-        ctx.fillStyle = "#fff"; ctx.textAlign = "center";
-        ctx.fillText(outs[b].toUpperCase(), xo - 4 + bw / 2, yOut(b) + 4);
-      }
+  // Original dotted page background, bounded to 160 stars and the viewport.
+  function particles(canvas) {
+    var random = rng(12);
+    stage(canvas, function (w, h) {
+      return Array.from({ length: Math.min(160, Math.floor(w * h / 8000)) }, function () {
+        return { x: random() * w, y: random() * h, r: random() * 1.2 + 0.2, phase: random() * TAU };
+      });
+    }, function (ctx, w, h, t, dt, stars, still) {
+      stars.forEach(function (star) {
+        ctx.fillStyle = rgba(C.cyan, still ? 0.35 : 0.35 + 0.2 * Math.sin(t + star.phase));
+        ctx.beginPath(); ctx.arc(star.x, star.y, star.r, 0, TAU); ctx.fill();
+      });
     });
   }
   if (q("viz-hero")) heroMcp(q("viz-hero"));
-  if (q("viz-flow")) flowMcp(q("viz-flow"));
+  if (q("particles")) particles(q("particles"));
 })();

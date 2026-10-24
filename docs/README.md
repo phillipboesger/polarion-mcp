@@ -4,26 +4,9 @@ Reference and setup guides for Polarion MCP.
 
 ## Client setup
 
-Choose a client guide for its connection and authentication steps:
+Complete setup in the [landing page's inline guide](https://polarion-mcp.boesger.com/#clients). It groups AI providers, tools / IDEs, and custom / self-hosted options including Docker.
 
-| Client | Guide |
-|---|---|
-| Claude.ai / Claude Desktop (custom connectors) | [Setup](clients/claude-web-desktop.md) |
-| Claude Code (unverified) | [Setup](clients/claude-code.md) |
-| Claude API MCP connector (unverified) | [Setup](clients/claude-api.md) |
-| ChatGPT connectors / Apps (unverified) | [Setup](clients/chatgpt-apps.md) |
-| Custom GPT (Actions) (unverified) | [Setup](clients/custom-gpt.md) |
-| OpenAI Responses API / Agents SDK | [Setup](clients/openai-api.md) |
-| Codex CLI (unverified) | [Setup](clients/codex-cli.md) |
-| VS Code Copilot | [Setup](clients/vscode-copilot.md) |
-| Microsoft Copilot Studio | [Setup](clients/copilot-studio.md) |
-| Cursor | [Setup](clients/cursor.md) |
-| Windsurf (unverified) | [Setup](clients/windsurf.md) |
-| JetBrains AI Assistant (unverified) | [Setup](clients/jetbrains-ai.md) |
-| Gemini CLI (unverified) | [Setup](clients/gemini-cli.md) |
-| Zed (unverified) | [Setup](clients/zed.md) |
-| Cline (unverified) | [Setup](clients/cline.md) |
-| n8n (unverified) | [Setup](clients/n8n.md) |
+The [client source reference](clients.md) records vendor documentation and setup notes. [clients.json](clients.json) drives the website, grouped README table and source reference.
 
 ## Guides
 
