@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer as createHttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { paginate, pageNumberFromLink, type JsonApiPage } from '../src/pagination.js';
+import { executeTool } from '../src/tool-execution.js';
 
 test('pagination merges pages, retains totalCount, and truncates at item and page limits', async () => {
   const fetched: number[] = [];
@@ -187,3 +188,18 @@ test('generated list tool max_items paginates through a five-page stub and omiss
     delete process.env.BEARER_TOKEN;
   }
 });
+
+test('max_items rejects a page size above the per-request limit instead of shifting the page window', async () => {
+  const definition = {
+    name: 'list_things', description: '', method: 'get', pathTemplate: '/things', executionParameters: [], securityRequirements: [],
+    inputSchema: { type: 'object', properties: { 'page[size]': { type: 'number' } } },
+    outputSchema: { type: 'object', properties: { data: { type: 'array', items: {} }, links: { type: 'object', properties: { next: {} } }, meta: { type: 'object', properties: { totalCount: {} } } } },
+  } as any
+  let upstreamCalls = 0
+  const executor = async () => { upstreamCalls++; return { content: [], isError: false } } 
+  await assert.rejects(
+    executeTool('list_things', definition, { page_size_: 500, page_number_: 3, max_items: 10 }, {}, executor as any, { apiBaseUrl: 'http://127.0.0.1' }),
+    /at most 100/,
+  )
+  assert.equal(upstreamCalls, 0)
+})

@@ -37,6 +37,7 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+import { containsUntrustedMarker, UNTRUSTED_CONTENT_NOTICE } from "./untrusted-content.js";
 import { conciseDefaultFields, isConciseResponseFormat, shapeConciseResponse } from "./shaping.js";
 import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
 
@@ -71,7 +72,9 @@ function truncateResponse(text: string, maxChars: number, definition: Pick<McpTo
   ].filter(Boolean);
   const hint = suggestions.length ? `Use ${suggestions.join(' and ')} to shrink the response.` : 'Narrow the query to shrink the response.';
   const codePoints = Array.from(text);
-  const envelopeFor = (count: number) => JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, count).join(''), hint });
+  // Keep the untrusted-content notice on the envelope when the cut text carried markers.
+  const notice = containsUntrustedMarker(text) ? { _notice: UNTRUSTED_CONTENT_NOTICE } : {};
+  const envelopeFor = (count: number) => JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, count).join(''), hint, ...notice });
   // The envelope only grows with the preview, so a binary search finds the
   // largest fitting preview without re-stringifying the whole text per code point.
   let low = 0;

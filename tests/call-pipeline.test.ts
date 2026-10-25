@@ -123,6 +123,21 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
     } finally { unregisterPing(); unregisterWrite() }
   })
 
+  await t.test('error text from a virtual tool is capped at the response limit too', async () => {
+    const unregister = registerVirtualTool({
+      name: 'test_oversized_error', title: 'Test oversized error', description: 'Test-only virtual tool that fails with a large body',
+      inputSchema: { type: 'object' }, annotations: { readOnlyHint: true }, toolset: 'composites',
+      handler: () => ({ isError: true, content: [{ type: 'text', text: 'e'.repeat(300_000) }] }),
+    })
+    try {
+      const app = await start({ allowedToolsets: ['composites'] }, 'composites', true)
+      try {
+        const text = (await app.request(7, 'tools/call', { name: 'test_oversized_error', arguments: {} })).result.content[0].text
+        assert.ok(text.length <= DEFAULT_MAX_RESPONSE_CHARS, `error result was ${text.length} characters`)
+      } finally { await app.stop() }
+    } finally { unregister() }
+  })
+
   await t.test('virtual tool text is capped at the response limit before it reaches the client', async () => {
     const unregister = registerVirtualTool({
       name: 'test_oversized', title: 'Test oversized', description: 'Test-only virtual tool with a large text result',

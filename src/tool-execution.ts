@@ -54,6 +54,10 @@ export async function executeTool(
   const pageSizeKey = definition.inputSchema?.properties?.['page[size]'] ? 'page_size_' : undefined;
   if (pageSizeKey) {
     const suppliedSize = Number(firstArgs[pageSizeKey]);
+    // Clamping a larger size would silently shift the page window the caller asked for.
+    if (suppliedSize > MAX_AUTO_PAGE_SIZE) {
+      throw new Error(`page_size_ must be at most ${MAX_AUTO_PAGE_SIZE} when max_items is set (Polarion's per-request limit).`);
+    }
     const requested = Number.isInteger(suppliedSize) && suppliedSize > 0 ? suppliedSize : maxItems as number;
     firstArgs[pageSizeKey] = Math.min(requested, maxItems as number, MAX_AUTO_PAGE_SIZE);
   }

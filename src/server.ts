@@ -270,9 +270,9 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       : item);
   }
   // Virtual handlers and the marker annotation both run after the executor's
-  // cap, so the cap is applied to the final text the client receives.
+  // cap, so the cap is applied to the final text the client receives, errors included.
   const definition = virtual ?? generated;
-  if (!result!.isError && definition) {
+  if (definition) {
     const maxChars = options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS;
     result!.content = result!.content.map(item => item.type === 'text'
       ? { ...item, text: capToolResponseText(item.text, maxChars, definition) }
