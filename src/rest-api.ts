@@ -16,10 +16,12 @@
 
 import express, { type Request, type RequestHandler, type Response } from 'express';
 import { executeApiTool } from './executor.js';
+import { executeTool as executeToolWithPagination } from './tool-execution.js';
 import { toolDefinitionMap, securitySchemes } from './tools.js';
 import { enabledTools } from './tool-filter.js';
 import { logSafe, redact, sanitizeInputSchema } from './utils.js';
 import { SERVER_VERSION } from './config.js';
+import { API_BASE_URL } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import type { JsonObject } from './types.js';
 
@@ -234,7 +236,9 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       }
 
       // Execute the tool
-      const result = await executeTool(toolName, toolDefinition, toolArgs, securitySchemes, undefined, options.maxResponseChars);
+      const result = await executeToolWithPagination(toolName, toolDefinition, toolArgs, securitySchemes, executeTool, {
+        apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars,
+      });
 
       // Extract text content from MCP response format
       const textContent = result.content

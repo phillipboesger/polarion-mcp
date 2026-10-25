@@ -115,3 +115,27 @@ test("REST wrapper returns a truncated tool result as parseable JSON text", asyn
     assert.deepEqual(JSON.parse(body.result), envelope)
   } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
 })
+
+test('REST tool route collects list pages through the shared wrapper over actual HTTP', async () => {
+  const app = createHttpApp({
+    apiKey: 'paging-key', env: {}, port: 3000,
+    executeTool: async (name, _definition, args) => {
+      const page = Number(args.page_number_ ?? 1);
+      const body = { data: [{ id: `PRJ/WI-${page}` }], links: { next: page < 5 ? `http://localhost:9999/polarion/rest/v1/projects/PRJ/workitems?page[number]=${page + 1}` : undefined }, meta: { totalCount: 5 } };
+      return { content: [{ type: 'text', text: `API Response (Status: 200):\n${JSON.stringify(body)}` }], structuredContent: body };
+    },
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  try {
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/tools/getWorkItems`;
+    const response = await fetch(url, { method: 'POST', headers: { Authorization: 'Bearer paging-key', 'content-type': 'application/json' }, body: JSON.stringify({ arguments: { projectId: 'PRJ', page_size_: 1, max_items: 5 } }) });
+    assert.equal(response.status, 200);
+    const body = await response.json() as { success: boolean; result: string };
+    assert.equal(body.success, true);
+    const payload = JSON.parse(body.result.split('\n').slice(1).join('\n'));
+    assert.deepEqual(payload.data.map((item: { id: string }) => item.id), ['PRJ/WI-1', 'PRJ/WI-2', 'PRJ/WI-3', 'PRJ/WI-4', 'PRJ/WI-5']);
+    assert.equal(payload.meta.totalCount, 5);
+    assert.equal('next' in (payload.links ?? {}), false);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+});

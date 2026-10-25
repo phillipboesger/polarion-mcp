@@ -15,6 +15,7 @@ test('pagination merges pages, retains totalCount, and truncates at item and pag
   assert.deepEqual(result.response.data, [1, 2, 3, 4, 5].map(id => ({ id })));
   assert.equal(result.response.meta?.totalCount, 5);
   assert.equal(result.truncated, false);
+  assert.equal('next' in (result.response.links ?? {}), false);
   assert.deepEqual(fetched, [2, 3, 4, 5]);
 
   const capped = await paginate(page(1), 3, async next => page(Number(new URL(next, 'https://host.test').searchParams.get('page[number]'))));
@@ -55,13 +56,30 @@ test('generated list tool max_items paginates through a five-page stub and omiss
   process.env.BEARER_TOKEN = 'pagination-test-token';
   let baseUrl = '';
   let requests = 0;
-  let nextBehavior: 'normal' | 'unparseable' | 'repeat' = 'normal';
+  const observedPages: number[] = [];
+  let nextBehavior: 'normal' | 'unparseable' | 'repeat-later' = 'normal';
+  let largeCollection = false;
   const upstream = createHttpServer((req, res) => {
     requests++;
     const url = new URL(req.url ?? '/', baseUrl);
     const number = Number(url.searchParams.get('page[number]') ?? 1);
-    const nextPage = nextBehavior === 'unparseable' ? 'oops' : nextBehavior === 'repeat' ? number : number + 1;
-    const next = number < 5 ? `${baseUrl}/projects/PRJ/workitems?page%5Bsize%5D=1&page%5Bnumber%5D=${nextPage}` : undefined;
+    observedPages.push(number);
+    const pageSize = Number(url.searchParams.get('page[size]') ?? 1);
+    if (pageSize > 100) {
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ errors: [{ detail: `Expected a number between 1 and 100, got ${pageSize}` }] }));
+      return;
+    }
+    if (largeCollection) {
+      const firstItem = (number - 1) * pageSize;
+      const endItem = Math.min(250, firstItem + pageSize);
+      const next = endItem < 250 ? `http://localhost:12345/polarion/rest/v1/projects/PRJ/workitems?page%5Bsize%5D=${pageSize}&page%5Bnumber%5D=${number + 1}` : undefined;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ data: Array.from({ length: endItem - firstItem }, (_, i) => ({ type: 'workitems', id: `PRJ/WI-${firstItem + i + 1}` })), links: { next }, meta: { totalCount: 250 } }));
+      return;
+    }
+    const nextPage = nextBehavior === 'unparseable' ? 'oops' : nextBehavior === 'repeat-later' && number > 1 ? 2 : number + 1;
+    const next = number < 5 ? `http://localhost:12345/polarion/rest/v1/projects/PRJ/workitems?page%5Bsize%5D=1&page%5Bnumber%5D=${nextPage}` : undefined;
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ data: [{ type: 'workitems', id: `PRJ/WI-${number}` }], links: { next }, meta: { totalCount: 5 } }));
   });
@@ -81,8 +99,10 @@ test('generated list tool max_items paginates through a five-page stub and omiss
     assert.ok((tool?.inputSchema as any)?.properties?.max_items);
     const collected = await client.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', page_size_: 1, max_items: 5 } });
     assert.equal(requests, 5);
-    assert.deepEqual((collected.structuredContent as any).data.map((item: any) => item.id), ['PRJ/WI-1']);
+    assert.equal((collected.structuredContent as any).data[0].id, 'PRJ/WI-1');
+    assert.ok((collected.structuredContent as any).data.length < 5, 'structured-content cap should omit items when the merged payload exceeds the cap');
     assert.equal((collected.structuredContent as any).meta.totalCount, 5);
+    assert.equal('next' in ((collected.structuredContent as any).links ?? {}), false);
     assert.equal((collected.structuredContent as any).truncated, true);
     assert.ok(JSON.stringify(collected.structuredContent).length <= 220);
     const collectedText = (collected as any).content[0].text as string;
@@ -94,17 +114,57 @@ test('generated list tool max_items paginates through a five-page stub and omiss
     requests = 0;
     const baseline = await client.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', page_size_: 1 } });
     assert.equal(requests, 1);
-    const expectedPage = { data: [{ type: 'workitems', id: 'PRJ/WI-1' }], links: { next: `${baseUrl}/projects/PRJ/workitems?page%5Bsize%5D=1&page%5Bnumber%5D=2` }, meta: { totalCount: 5 } };
+    const expectedPage = { data: [{ type: 'workitems', id: 'PRJ/WI-1' }], links: { next: `http://localhost:12345/polarion/rest/v1/projects/PRJ/workitems?page%5Bsize%5D=1&page%5Bnumber%5D=2` }, meta: { totalCount: 5 } };
     assert.equal((baseline as any).content[0].text, `API Response (Status: 200):\n${JSON.stringify(expectedPage)}`);
 
-    for (const behavior of ['unparseable', 'repeat'] as const) {
+    const { Client: McpClient } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { InMemoryTransport: PairTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+    const compositeServer = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 4000, filter: { toolsets: ['work-items', 'composites'] } });
+    const [compositeClientTransport, compositeServerTransport] = PairTransport.createLinkedPair();
+    const compositeClient = new McpClient({ name: 'pagination-composite-test', version: '1' });
+    await Promise.all([compositeServer.connect(compositeServerTransport), compositeClient.connect(compositeClientTransport)]);
+    try {
+      requests = 0;
+      const searched = await compositeClient.callTool({ name: 'search_work_items', arguments: { projectId: 'PRJ', max_items: 5 } });
+      const searchBody = JSON.parse((searched as any).content[0].text);
+      assert.deepEqual(searchBody.results.map((item: any) => item.id), ['PRJ/WI-1', 'PRJ/WI-2', 'PRJ/WI-3', 'PRJ/WI-4', 'PRJ/WI-5']);
+      assert.equal(searchBody.totalCount, 5);
+      assert.equal('next' in (searchBody.links ?? {}), false);
+      assert.equal(requests, 6, 'one metadata lookup and five real list pages');
+    } finally { await compositeClient.close(); await compositeServer.close(); }
+
+    largeCollection = true;
+    requests = 0;
+    observedPages.length = 0;
+    const wideServer = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 50_000, filter: { toolsets: ['work-items'] } });
+    const [wideClientTransport, wideServerTransport] = PairTransport.createLinkedPair();
+    const wideClient = new McpClient({ name: 'pagination-page-size-test', version: '1' });
+    await Promise.all([wideServer.connect(wideServerTransport), wideClient.connect(wideClientTransport)]);
+    try {
+      const collected250 = await wideClient.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', max_items: 250 } });
+      assert.equal(requests, 3, '250 items use three pages with the API maximum of 100 per page');
+      assert.deepEqual(observedPages, [1, 2, 3]);
+      assert.equal((collected250.structuredContent as any).data.length, 250);
+      assert.equal((collected250.structuredContent as any).data[249].id, 'PRJ/WI-250');
+    } finally { await wideClient.close(); await wideServer.close(); }
+    largeCollection = false;
+
+    for (const behavior of ['unparseable', 'repeat-later'] as const) {
       nextBehavior = behavior;
       requests = 0;
       const stopped = await client.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', page_size_: 1, max_items: 4 } });
-      assert.equal(requests, 1, `${behavior} link must not trigger another page request`);
+      assert.equal(requests, behavior === 'repeat-later' ? 2 : 1, `${behavior} must stop before fetching an invalid continuation`);
       assert.equal(stopped.isError, true);
       assert.match((stopped as any).content[0].text, /Pagination stopped/);
     }
+
+    nextBehavior = 'normal';
+    requests = 0;
+    observedPages.length = 0;
+    const startedAtThree = await client.callTool({ name: 'getWorkItems', arguments: { projectId: 'PRJ', page_size_: 1, page_number_: 3, max_items: 2 } });
+    assert.equal(requests, 2);
+    assert.deepEqual(observedPages, [3, 4]);
+    assert.equal((startedAtThree.structuredContent as any).data[0].id, 'PRJ/WI-3');
 
     nextBehavior = 'normal';
     requests = 0;

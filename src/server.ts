@@ -30,7 +30,7 @@ import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes, toolDefinitionMap } from './tools.js';
 import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
-import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS, capToolResponseText } from './executor.js';
+import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
 import { listVirtualTools, discoverVirtualTools, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
@@ -47,7 +47,7 @@ import { createVersionCheck } from './version-check.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
 import { decodePolarionIdentifier, registerCompositeTools } from './composite-search.js';
-import { MAX_AUTO_ITEMS, paginate, pageNumberFromLink, type JsonApiPage } from './pagination.js';
+import { executeTool as executeToolWithPagination } from './tool-execution.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -152,7 +152,13 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             // MCP_READ_ONLY filtering has already been applied to enabledTools.
             const definition = enabledTools.get(name);
             if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
-            return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+            return executeToolWithPagination(name, definition, callArgs, securitySchemes, executeApiTool, {
+              apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal,
+              beforeNextPage: () => {
+                const retryAfter = options.rateLimiter.check(principal.id);
+                if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
+              },
+            });
           },
           requestBearerToken: bearerToken,
           userScope,
@@ -165,50 +171,13 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
         outcome = result.isError ? 'error' : 'success';
       } else if (generated) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
-        const maxItems = callArgs.max_items;
-        const outputProperties = generated.outputSchema?.properties;
-        const supportsPagination = generated.method.toLowerCase() === 'get'
-          && Boolean(outputProperties?.data?.items && outputProperties?.links?.properties?.next && outputProperties?.meta?.properties?.totalCount);
-        if (maxItems === undefined || !supportsPagination) {
-          result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-        } else {
-          if (!Number.isInteger(maxItems) || (maxItems as number) < 1 || (maxItems as number) > MAX_AUTO_ITEMS) throw new Error(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);
-          const firstArgs = { ...callArgs };
-          delete firstArgs.max_items;
-          const pageSizeKey = generated.inputSchema?.properties?.['page[size]'] ? 'page_size_' : undefined;
-          if (pageSizeKey) {
-            const suppliedSize = Number(firstArgs[pageSizeKey]);
-            const requested = Number.isInteger(suppliedSize) && suppliedSize > 0 ? suppliedSize : maxItems as number;
-            firstArgs[pageSizeKey] = Math.min(requested, maxItems as number, MAX_AUTO_ITEMS);
-          }
-          const first = await executeApiTool(toolName, generated, firstArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-          const body = first.structuredContent;
-          if (first.isError || !body || typeof body !== 'object' || !Array.isArray((body as JsonApiPage).data)) {
-            result = first;
-          } else {
-            const { response, truncated } = await paginate(body as JsonApiPage, maxItems as number, async next => {
-              const retryAfter = options.rateLimiter.check(principal.id);
-              if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
-              const nextArgs = { ...firstArgs };
-              const currentPageNumber = Number(nextArgs.page_number_ ?? 1);
-              const nextPageNumber = pageNumberFromLink(next, resolved.apiBaseUrl);
-              if (nextPageNumber === undefined || nextPageNumber <= currentPageNumber) throw new Error(`Pagination stopped for ${toolName}: next page number is missing or did not advance.`);
-              nextArgs.page_number_ = nextPageNumber;
-              const page = await executeApiTool(toolName, generated, nextArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-              if (page.isError || !page.structuredContent || typeof page.structuredContent !== 'object') throw new Error(`Pagination failed for ${toolName}: ${page.content.find(item => item.type === 'text')?.text ?? 'invalid page response'}`);
-              return page.structuredContent as JsonApiPage;
-            }, undefined, options.signal);
-            const structuredContent = capPagedStructuredContent({ ...response, ...(truncated ? { truncated: true } : {}) }, options.maxResponseChars);
-            const firstText = first.content.find(item => item.type === 'text');
-            const prefix = firstText?.type === 'text' ? (firstText.text.split('\n', 1)[0] ?? 'API Response') : 'API Response';
-            const fullText = `${prefix}\n${JSON.stringify(structuredContent)}`;
-            result = {
-              ...first,
-              content: [{ type: 'text', text: capToolResponseText(fullText, options.maxResponseChars, generated) }],
-              structuredContent,
-            };
-          }
-        }
+        result = await executeToolWithPagination(toolName, generated, callArgs, securitySchemes, executeApiTool, {
+          apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal,
+          beforeNextPage: () => {
+            const retryAfter = options.rateLimiter.check(principal.id);
+            if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
+          },
+        });
         if (/^(1|true|yes|on)$/i.test(process.env.MCP_RESOURCE_LINKS ?? '') && !result.isError) {
         const uri = toolName === 'getWorkItem' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/workitem/${encodeURIComponent(String(args.workItemId ?? ''))}`
           : toolName === 'getDocument' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/document/${encodeURIComponent(String(args.spaceId ?? ''))}/${encodeURIComponent(String(args.documentName ?? ''))}` : undefined;
@@ -301,18 +270,6 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       : item);
   }
   return result!;
-}
-
-function capPagedStructuredContent(page: JsonApiPage, maxChars: number): JsonApiPage {
-  const bounded: JsonApiPage = { ...page, data: Array.isArray(page.data) ? [...page.data] : [] };
-  let text = JSON.stringify(bounded);
-  while (text.length > maxChars && (bounded.data as unknown[]).length > 0) {
-    (bounded.data as unknown[]).pop();
-    bounded.truncated = true;
-    text = JSON.stringify(bounded);
-  }
-  if (text.length > maxChars) return { data: [], truncated: true };
-  return bounded;
 }
 
 export interface PolarionServerOptions {

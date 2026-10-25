@@ -164,7 +164,8 @@ const searchTool: VirtualTool = {
     if (typeof args.projectId === 'string') callArgs.projectId = args.projectId;
     const result = await ctx.callPolarionTool(toolName, callArgs);
     if (result.isError) return result;
-    const data = (result.structuredContent as Record<string, unknown> | undefined)?.data;
+    const source = result.structuredContent as Record<string, unknown> | undefined;
+    const data = source?.data;
     const items = Array.isArray(data) ? data.map(item => {
       if (!item || typeof item !== 'object') return item;
       const resource = item as Record<string, unknown>;
@@ -174,7 +175,12 @@ const searchTool: VirtualTool = {
       if (resource.type !== undefined) concise.resourceType = resource.type;
       return concise;
     }) : result.content;
-    return textResult({ query, results: items });
+    return textResult({ query, results: items,
+      ...(source?.links !== undefined ? { links: source.links } : {}),
+      ...(source?.meta && typeof source.meta === 'object' && (source.meta as Record<string, unknown>).totalCount !== undefined
+        ? { totalCount: (source.meta as Record<string, unknown>).totalCount } : {}),
+      ...(source?.truncated === true ? { truncated: true } : {}),
+    });
   },
 };
 

@@ -119,6 +119,21 @@ test('omits query for empty search and requests compact summary fields with real
   assert.deepEqual(body.results[0], { id: 'PRJ/WI-1', type: 'requirement', title: 'A', status: 'open', created: 'now', updated: 'now', resourceType: 'workitems' });
 });
 
+test('search response preserves pagination status and continuation metadata', async () => {
+  clearCompositeToolsForTests();
+  const setup = searchContext({ result: { content: [], structuredContent: {
+    data: [{ id: 'PRJ/WI-1', attributes: { title: 'A' } }],
+    links: { next: 'http://localhost:9999/polarion/rest/v1/projects/PRJ/workitems?page[number]=2' },
+    meta: { totalCount: 101 }, truncated: true,
+  } } });
+  const result = await compositeTools[0].handler({ projectId: 'PRJ', max_items: 1 }, setup.ctx);
+  const body = JSON.parse((result.content[0] as { text: string }).text);
+  assert.equal(body.totalCount, 101);
+  assert.equal(body.truncated, true);
+  assert.equal(body.links.next.includes('localhost'), true);
+  clearCompositeToolsForTests();
+});
+
 test('preserves caller-provided fields selector', async () => {
   clearCompositeToolsForTests();
   const setup = searchContext();
