@@ -80,8 +80,16 @@ test('strict mode reports a duplicated known configuration variable with its loc
   const root = fixtureRoot();
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const config = path.join(root, 'docs/configuration.md');
-  fs.appendFileSync(config, '\r\n- `TEST_ENV`: Duplicate fixture entry.\r\n');
+  fs.writeFileSync(config, [
+    '# Configuration',
+    '',
+    '| Variable | Default | Read by | Secret? | Purpose |',
+    '|---|---|---|---|---|',
+    '| `TEST_ENV` | `one` | fixture | No | First entry. |',
+    '| `TEST_ENV` | `two` | fixture | No | Duplicate entry. |',
+    '',
+  ].join('\r\n'));
   const result = run(root, true);
   assert.equal(result.status, 1, result.output);
-  assert.match(result.output, /WARNING duplicate-config-entries docs\/configuration\.md:\d+: TEST_ENV is duplicated; first listed at line 3/);
+  assert.match(result.output, /WARNING duplicate-config-entries docs\/configuration\.md:6: TEST_ENV is duplicated; first listed at line 5/);
 });

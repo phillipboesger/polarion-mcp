@@ -120,12 +120,13 @@ function checker(root) {
   const configNames = new Map();
   let inEnvironmentTable = false;
   config.split('\n').forEach((line, index) => {
-    const header = line.match(/^\s*\|\s*([^|]+?)\s*\|/);
-    if (header) {
-      if (/^variable$/i.test(header[1].trim())) inEnvironmentTable = true;
-      else if (!/^[-: ]+$/.test(header[1].trim())) inEnvironmentTable = false;
-      if (inEnvironmentTable && !/^[-: ]+$/.test(header[1].trim())) {
-        const name = header[1].match(/`([A-Z][A-Z0-9_]*)`/);
+    const row = line.match(/^\s*\|\s*([^|]+?)\s*\|/);
+    if (row) {
+      const firstCell = row[1].trim();
+      if (/^variable$/i.test(firstCell)) { inEnvironmentTable = true; return; }
+      if (/^[-: ]+$/.test(firstCell)) return;
+      if (inEnvironmentTable) {
+        const name = firstCell.match(/`([A-Z][A-Z0-9_]*)`/);
         if (name) {
           const previous = configNames.get(name[1]);
           if (previous) add('configDuplicates', 'docs/configuration.md', index + 1, `${name[1]} is duplicated; first listed at line ${previous}`);
