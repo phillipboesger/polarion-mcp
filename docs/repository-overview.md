@@ -5,13 +5,14 @@ This repository provides Polarion REST operations through MCP and HTTP. The comm
 ## Repository layout
 
 - `src/`: TypeScript transports, executor, authentication, guards, resources, tool filters, toolsets, and generated `tools.ts`.
-- `tests/`: unit, HTTP integration, and end-to-end tests.
+- `tests/`: unit, HTTP integration, and end-to-end tests, with `tsconfig.json` and `stryker.config.mjs` for test compilation and mutation testing.
 - `tests/live/`: tests against a real Polarion instance.
 - `docs/`: usage, maintenance, quality, and deployment documentation.
 - `scripts/`: generation, enrichment, package, and documentation check scripts.
 - `sdk/`: optional local SDK PDFs, not bundled.
-- `.github/workflows/`: CI, release, security, live-test, and regeneration workflows.
-- Root files include `package.json`, lockfile, TypeScript configuration, `Dockerfile`, `render.yaml`, and `.env.example`.
+- `.github/`: [contribution guidelines](../.github/CONTRIBUTING.md), [security policy](../.github/SECURITY.md), secret-scan configuration, and CI/release workflows.
+- `docs/CNAME`: custom domain for GitHub Pages, which publishes from `docs/`.
+- Root files contain project metadata and conventional tool entry points: `package.json`, lockfile, `tsconfig.json`, `eslint.config.mjs`, `Dockerfile`, `render.yaml`, `server.json`, and `.env.example`.
 
 ## Entry points
 

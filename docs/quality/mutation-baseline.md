@@ -4,7 +4,7 @@
 
 The initial full-suite-per-mutant experiment took 106m28s and produced 1,504 mutant timeouts (out of 2,279 mutants) even with the test compiler and build work repeated per mutant. Those timeouts made the full-suite scores unusable, so the module projects run the already compiled tests that exercise each module. The first incomplete full-suite run's timeout count is retained here as the reason for the scoped design; it is excluded from the baseline scores below.
 
-**Q04 run:** `npm run test:compile`, followed by `MUTATION_MODULE=<module> ./node_modules/.bin/stryker run stryker.config.mjs` for each module (OAuth had a clean run plus two incremental refreshes after the final assertions; sealing had one incremental confirmation). Total compile and mutation wall time was **39m38s**. Projects used four workers, 20-second timeouts, incremental mode, and the module-specific compiled test commands in `stryker.config.mjs`.
+**Q04 run:** `npm run test:compile`, followed by `MUTATION_MODULE=<module> ./node_modules/.bin/stryker run tests/stryker.config.mjs` for each module (OAuth had a clean run plus two incremental refreshes after the final assertions; sealing had one incremental confirmation). Total compile and mutation wall time was **39m38s**. Projects used four workers, 20-second timeouts, incremental mode, and the module-specific compiled test commands in `tests/stryker.config.mjs`.
 
 ## Mutation scores
 
