@@ -140,6 +140,36 @@ test('REST tool route collects list pages through the shared wrapper over actual
   } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
 });
 
+test('REST route aborts an in-flight upstream page when the client disconnects', async () => {
+  let upstreamSignal: AbortSignal | undefined;
+  let upstreamStarted!: () => void;
+  const started = new Promise<void>(resolve => { upstreamStarted = resolve; });
+  const app = createHttpApp({
+    apiKey: 'abort-key', env: {}, port: 3000,
+    executeTool: (_name, _definition, _args, _schemes, sendOpts) => new Promise((_resolve, reject) => {
+      upstreamSignal = sendOpts?.signal;
+      upstreamSignal?.addEventListener('abort', () => reject(new Error('aborted')));
+      upstreamStarted();
+    }),
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  try {
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/tools/getWorkItems`;
+    const controller = new AbortController();
+    const request = fetch(url, {
+      method: 'POST', signal: controller.signal,
+      headers: { Authorization: 'Bearer abort-key', 'content-type': 'application/json' },
+      body: JSON.stringify({ arguments: { projectId: 'PRJ', page_size_: 1, max_items: 5 } }),
+    }).catch(() => undefined);
+    await started;
+    controller.abort();
+    await request;
+    for (let attempt = 0; attempt < 50 && !upstreamSignal?.aborted; attempt++) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(upstreamSignal?.aborted, true, 'the upstream page request must be cancelled with the client');
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+})
+
 test('REST maps invalid pagination arguments to 400 with the reason', async () => {
   const app = createHttpApp({ apiKey: 'paging-key', env: {}, port: 3000, executeTool: async () => { throw new Error('must not run'); } });
   const server = app.listen(0, '127.0.0.1');
