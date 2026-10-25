@@ -22,6 +22,7 @@ The [client source reference](clients.md) records vendor documentation and setup
 | [OpenAPI and generation](openapi-and-generation.md) | How the API specification and generated tools are maintained. |
 | [Polarion versioning](polarion-versioning.md) | Compatibility and version considerations. |
 | [Distribution quality](quality/distribution.md) | Package and container distribution checks. |
+| [End-to-end conformance](quality/e2e.md) | MCP, OAuth, REST wrapper, and container conformance checks. |
 | [Supply chain verification](quality/supply-chain.md) | Release SBOMs, provenance, image signatures, and verification commands. |
 | [Agent evals](quality/evals.md) | Offline validation and optional agent tool-selection evals. |
 | [Mutation baseline](quality/mutation-baseline.md) | Mutation testing baseline and results. |
@@ -33,7 +34,6 @@ The [client source reference](clients.md) records vendor documentation and setup
 | [Security](security.md) | Authentication, authorization, and security controls. |
 | [Troubleshooting](troubleshooting.md) | Common setup and runtime issues. |
 | [Usage](usage.md) | Calling tools and using the server. |
-| [Workflows](workflows.md) | Workflow-related tools and usage patterns. |
 | [Client manifest](clients.json) | Structured client transport, authentication, and setup metadata. |
 | [Client manifest schema](clients.schema.json) | JSON Schema for the client setup manifest. |
 | [Product page](index.html) | Project website and feature overview. |
