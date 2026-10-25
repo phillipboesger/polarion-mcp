@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { AxiosError } from "axios"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
 import type { McpToolDefinition } from "../src/types.js"
-import { executeApiTool, sendWithRetry, CUSTOM_FIELD_TOOL_SPECS, DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from "../src/executor.js"
+import { executeApiTool, sendWithRetry, capToolResponseText, CUSTOM_FIELD_TOOL_SPECS, DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from "../src/executor.js"
 import { _optionsCache, _fieldKeyCache } from "../src/guards.js"
 import { toolDefinitionMap } from "../src/tools.js"
 import { requestBearerToken } from "../src/config.js"
@@ -1645,4 +1645,37 @@ test("executeApiTool refuses a call that needs a token when none is configured, 
     if (typeof previous === "undefined") delete process.env.BEARER_TOKEN
     else process.env.BEARER_TOKEN = previous
   }
+})
+
+test("capToolResponseText keeps the exact cap for escape-heavy, emoji and control-character text", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const samples = ['"'.repeat(5_000), "\\".repeat(5_000), "\u0001\n\t".repeat(3_000), "😀é".repeat(3_000)]
+  for (const text of samples) {
+    for (const maxChars of [120, 1_000, 4_096]) {
+      const capped = capToolResponseText(text, maxChars, schema)
+      assert.ok(capped.length <= maxChars, `cap ${maxChars} exceeded: ${capped.length}`)
+      const envelope = JSON.parse(capped) as { truncated: boolean; totalChars: number; preview: string }
+      assert.equal(envelope.truncated, true)
+      assert.equal(envelope.totalChars, text.length)
+      assert.equal(/[\uD800-\uDBFF]$/.test(envelope.preview), false)
+    }
+  }
+})
+
+test("capToolResponseText leaves small text unchanged and handles the minimum cap", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  assert.equal(capToolResponseText("short", 100, schema), "short")
+  const capped = capToolResponseText("x".repeat(10_000), 1, schema)
+  assert.equal(JSON.parse(capped).preview, "")
+})
+
+test("capToolResponseText trims a 215k-character list quickly", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const items = Array.from({ length: 900 }, (_, index) => ({ id: `PROJ-${index}`, title: "Requirement " + "word ".repeat(40) + index }))
+  const text = `API Response (Status: 200):\n${JSON.stringify({ data: items })}`
+  assert.ok(text.length > 200_000)
+  const started = Date.now()
+  const capped = capToolResponseText(text, DEFAULT_MAX_RESPONSE_CHARS, schema)
+  assert.ok(Date.now() - started < 2_000, "cap took longer than the regression budget")
+  assert.ok(capped.length <= DEFAULT_MAX_RESPONSE_CHARS)
 })

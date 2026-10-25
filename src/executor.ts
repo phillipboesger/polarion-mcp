@@ -63,7 +63,7 @@ export { sendWithRetry };
 export const DEFAULT_MAX_RESPONSE_CHARS = 100_000;
 const MIN_RESPONSE_CHARS = JSON.stringify({ truncated: true, totalChars: Number.MAX_SAFE_INTEGER, preview: '', hint: 'Use fields and page_size_ to shrink the response.' }).length;
 
-function truncateResponse(text: string, maxChars: number, definition: McpToolDefinition): string {
+function truncateResponse(text: string, maxChars: number, definition: Pick<McpToolDefinition, 'inputSchema'>): string {
   const properties = definition.inputSchema?.properties ?? {};
   const suggestions = [
     properties.fields ? 'fields' : undefined,
@@ -71,17 +71,21 @@ function truncateResponse(text: string, maxChars: number, definition: McpToolDef
   ].filter(Boolean);
   const hint = suggestions.length ? `Use ${suggestions.join(' and ')} to shrink the response.` : 'Narrow the query to shrink the response.';
   const codePoints = Array.from(text);
-  let previewLength = Math.min(codePoints.length, maxChars);
-  while (previewLength >= 0) {
-    const envelope = JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, previewLength).join(''), hint });
-    if (envelope.length <= maxChars || previewLength === 0) return envelope;
-    previewLength--;
+  const envelopeFor = (count: number) => JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, count).join(''), hint });
+  // The envelope only grows with the preview, so a binary search finds the
+  // largest fitting preview without re-stringifying the whole text per code point.
+  let low = 0;
+  let high = codePoints.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (envelopeFor(mid).length <= maxChars) low = mid;
+    else high = mid - 1;
   }
-  return JSON.stringify({ truncated: true, totalChars: text.length, preview: '', hint });
+  return envelopeFor(low);
 }
 
 /** Applies the executor's text-size cap to a composed response. */
-export function capToolResponseText(text: string, maxChars: number, definition: McpToolDefinition): string {
+export function capToolResponseText(text: string, maxChars: number, definition: Pick<McpToolDefinition, 'inputSchema'>): string {
   return text.length > maxChars ? truncateResponse(text, maxChars, definition) : text;
 }
 

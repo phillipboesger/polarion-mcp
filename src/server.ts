@@ -30,7 +30,7 @@ import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes, toolDefinitionMap } from './tools.js';
 import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
-import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
+import { executeApiTool, capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
 import { listVirtualTools, discoverVirtualTools, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
@@ -267,6 +267,15 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     if (result!.structuredContent !== undefined) result!.structuredContent = annotatePolarionResult(result!.structuredContent, true) as Record<string, unknown>;
     result!.content = result!.content.map(item => item.type === 'text'
       ? { ...item, text: annotateToolText(item.text, options.markUntrusted) }
+      : item);
+  }
+  // Virtual handlers and the marker annotation both run after the executor's
+  // cap, so the cap is applied to the final text the client receives.
+  const definition = virtual ?? generated;
+  if (!result!.isError && definition) {
+    const maxChars = options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS;
+    result!.content = result!.content.map(item => item.type === 'text'
+      ? { ...item, text: capToolResponseText(item.text, maxChars, definition) }
       : item);
   }
   return result!;

@@ -10,6 +10,7 @@ import { sanitizeInputSchema } from '../src/utils.js'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createPolarionServer } from '../src/server.js'
+import { DEFAULT_MAX_RESPONSE_CHARS } from '../src/executor.js'
 import { COMPOSITE_TOOLS } from '../src/composite-tools.js'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -120,6 +121,22 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
         assert.ok((await app.request(5, 'tools/call', { name: 'getLicense', arguments: {} })).result.isError)
       } finally { await app.stop() }
     } finally { unregisterPing(); unregisterWrite() }
+  })
+
+  await t.test('virtual tool text is capped at the response limit before it reaches the client', async () => {
+    const unregister = registerVirtualTool({
+      name: 'test_oversized', title: 'Test oversized', description: 'Test-only virtual tool with a large text result',
+      inputSchema: { type: 'object' }, annotations: { readOnlyHint: true }, toolset: 'composites',
+      handler: () => ({ content: [{ type: 'text', text: 'z'.repeat(300_000) }] }),
+    })
+    try {
+      const app = await start({ allowedToolsets: ['composites'] }, 'composites', true)
+      try {
+        const text = (await app.request(6, 'tools/call', { name: 'test_oversized', arguments: {} })).result.content[0].text
+        assert.ok(text.length <= DEFAULT_MAX_RESPONSE_CHARS, `virtual result was ${text.length} characters`)
+        assert.equal(JSON.parse(text).truncated, true)
+      } finally { await app.stop() }
+    } finally { unregister() }
   })
 
   await t.test('policy denial skips the generated executor and audit stores only hashes', async () => {
