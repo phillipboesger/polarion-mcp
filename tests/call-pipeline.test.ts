@@ -304,3 +304,18 @@ test('composite previews and invalid inputs make no upstream writes; explicit jo
     if (previousRoots === undefined) delete process.env.MCP_UPLOAD_ROOTS; else process.env.MCP_UPLOAD_ROOTS = previousRoots
   }
 })
+
+test('dry_run is ignored, not rejected, by strict read-only virtual tools', async () => {
+  const server = createPolarionServer({ apiBaseUrl: 'http://127.0.0.1:9/polarion/rest/v1', filter: { toolsets: ['composites'] }, transport: 'stdio' })
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+  const client = new Client({ name: 'dry-run-readonly-test', version: '1' })
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+  try {
+    const result = await client.callTool({ name: 'lint_query', arguments: { query: 'type:task', dry_run: true } })
+    const text = JSON.stringify(result.content)
+    assert.doesNotMatch(text, /Invalid arguments|unrecognized/i)
+    const unknown = await client.callTool({ name: 'lint_query', arguments: { query: 'type:task', bogus: 1 } })
+    assert.equal(unknown.isError, true)
+    assert.match(JSON.stringify(unknown.content), /unknown argument/)
+  } finally { await client.close(); await server.close() }
+})

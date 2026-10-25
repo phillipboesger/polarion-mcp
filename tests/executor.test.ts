@@ -1691,3 +1691,14 @@ test("capToolResponseText shrinks an existing truncation envelope instead of nes
   assert.equal(parsed._notice, "n")
   assert.match(parsed.preview, /^a+$/)
 })
+
+test("capToolResponseText re-fit keeps the untrusted wrapper closed", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const preview = `<polarion-untrusted>${"b".repeat(2_000)}</polarion-untrusted>`
+  const envelope = JSON.stringify({ truncated: true, totalChars: 5_000, preview, hint: "h", _notice: "n" })
+  const capped = capToolResponseText(envelope, 1_000, schema)
+  assert.ok(capped.length <= 1_000)
+  const parsed = JSON.parse(capped) as { preview: string }
+  assert.ok(parsed.preview.startsWith("<polarion-untrusted>"))
+  assert.ok(parsed.preview.endsWith("</polarion-untrusted>"))
+})

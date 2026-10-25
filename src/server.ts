@@ -217,7 +217,8 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
         const openSchema = properties === undefined || virtual.inputSchema.additionalProperties === true;
         const unknown = openSchema ? [] : Object.keys(callArgs).filter(key => !key.startsWith('_') && key !== 'dry_run' && !Object.hasOwn(properties, key));
         if (unknown.length) throw new Error(`Invalid arguments for tool '${toolName}': unknown argument(s) ${unknown.join(', ')}`);
-        const schemaInput = Object.fromEntries(Object.entries(callArgs).filter(([key]) => !key.startsWith('_')));
+        // dry_run is a shared control: strict schemas that do not declare it must not reject it.
+        const schemaInput = Object.fromEntries(Object.entries(callArgs).filter(([key]) => !key.startsWith('_') && (key !== 'dry_run' || (properties !== undefined && Object.hasOwn(properties, key)))));
         let validated: Record<string, unknown>;
         try {
           validated = compileZodSchema(virtual.inputSchema).parse(schemaInput) as Record<string, unknown>;

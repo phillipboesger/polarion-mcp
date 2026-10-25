@@ -37,7 +37,7 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
-import { containsUntrustedMarker, UNTRUSTED_CONTENT_NOTICE } from "./untrusted-content.js";
+import { containsUntrustedMarker, OPEN, CLOSE, UNTRUSTED_CONTENT_NOTICE } from "./untrusted-content.js";
 import { conciseDefaultFields, isConciseResponseFormat, shapeConciseResponse } from "./shaping.js";
 import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
 
@@ -103,8 +103,12 @@ function refitTruncationEnvelope(text: string, maxChars: number): string | undef
   try { envelope = JSON.parse(text); } catch { return undefined; }
   if (!envelope || typeof envelope !== 'object' || envelope.truncated !== true
     || typeof envelope.preview !== 'string' || typeof envelope.totalChars !== 'number') return undefined;
-  const codePoints = Array.from(envelope.preview);
-  const fit = (count: number) => JSON.stringify({ ...envelope, preview: codePoints.slice(0, count).join('') });
+  // A marked preview is one untrusted span: cut inside it and keep the wrapper intact.
+  const wrapped = envelope.preview.startsWith(OPEN) && envelope.preview.endsWith(CLOSE);
+  const inner = wrapped ? envelope.preview.slice(OPEN.length, envelope.preview.length - CLOSE.length) : envelope.preview;
+  const codePoints = Array.from(inner);
+  const cut = (count: number) => codePoints.slice(0, count).join('');
+  const fit = (count: number) => JSON.stringify({ ...envelope, preview: wrapped ? `${OPEN}${cut(count)}${CLOSE}` : cut(count) });
   if (fit(0).length > maxChars) return undefined;
   let low = 0;
   let high = codePoints.length;
