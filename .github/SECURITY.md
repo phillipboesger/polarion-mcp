@@ -4,4 +4,4 @@ Report suspected vulnerabilities privately through [GitHub’s vulnerability rep
 
 Include the affected release or commit, server mode, relevant configuration names, reproduction steps and the observed impact. Use synthetic data and remove PATs, API keys, OAuth secrets and private Polarion content.
 
-Use [GitHub Issues](https://github.com/phillipboesger/polarion-mcp/issues) for general questions and bugs without sensitive security details. Deployment controls and authentication behavior are documented in the [security guide](docs/security.md).
+Use [GitHub Issues](https://github.com/phillipboesger/polarion-mcp/issues) for general questions and bugs without sensitive security details. Deployment controls and authentication behavior are documented in the [security guide](../docs/security.md).

@@ -174,7 +174,7 @@ More answers: [docs/clients.md](docs/clients.md#more-questions).
 
 **Feedback and questions:** [open an issue](https://github.com/phillipboesger/polarion-mcp/issues). Include what you tried, your client and server mode, and what you expected. Leave credentials out.
 
-Nothing documented for your case? Open an issue or PR on the repo and go wild. A clearer example, a small fix or a new integration can help the next team. Read [Contributing](CONTRIBUTING.md) for source builds and checks. Report vulnerabilities through the [security policy](SECURITY.md).
+Nothing documented for your case? Open an issue or PR on the repo and go wild. A clearer example, a small fix or a new integration can help the next team. Read [Contributing](.github/CONTRIBUTING.md) for source builds and checks. Report vulnerabilities through the [security policy](.github/SECURITY.md).
 
 Built by [Phillip Bösger](https://github.com/phillipboesger), building on [@Jonasdero](https://github.com/Jonasdero).
 
