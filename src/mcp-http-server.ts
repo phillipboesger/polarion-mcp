@@ -44,6 +44,8 @@ import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextproto
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets } from './config.js';
 import { createPolarionServer } from './server.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
+import { enabledTools, filterTools } from './tool-filter.js';
+import type { McpToolDefinition } from './types.js';
 import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
 import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
 import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
@@ -669,7 +671,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   if (oauth && publicUrl && gptClient) {
-    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
+    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
+      // The deployment's toolset allowlist applies to REST like it does to MCP sessions.
+      filterTools(enabledTools, { toolsets: [...allowedToolsets] }).tools);
   }
 
   // Health check (no auth) for load balancers and quick verification.
@@ -850,7 +854,8 @@ function mountCustomGpt(
   gptClient: { clientId: string; clientSecret: string },
   bearerChallenge: (error?: string) => string,
   tokenIpRateLimit: number,
-  maxResponseChars: number
+  maxResponseChars: number,
+  restTools: ReadonlyMap<string, McpToolDefinition>
 ): void {
   // Same limits the SDK applies to its own /authorize and /token.
   const authorizeLimit = rateLimit({
@@ -939,6 +944,7 @@ function mountCustomGpt(
 
   app.use(createRestToolsRouter({
     authenticate,
+    tools: restTools,
     serverUrl: () => publicUrl.href.replace(/\/$/, ''),
     securityScheme: {
       type: 'oauth2',
