@@ -1,0 +1,5 @@
+{
+  "file": "docs/configuration.md",
+  "find": "- TEST_ENV: The fixture environment value.",
+  "replace": "- TEST_ENV: The fixture environment value.\n- TEST_ENV: Duplicate fixture value."
+}

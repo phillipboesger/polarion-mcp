@@ -35,13 +35,12 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_RATE_LIMIT_TOKEN_IP` | `500` | `src/mcp-http-server.ts` | No | Failed OAuth token requests allowed per IP per 15 minutes. Successful requests do not count. Positive integer. |
 | `MCP_SESSION_IDLE_MINUTES` | `60` minutes | `src/mcp-http-server.ts` | No | Idle Streamable HTTP session lifetime. Positive integer overrides default. |
 | `MCP_MAX_SESSIONS` | `1000` | `src/mcp-http-server.ts` | No | Maximum in-memory MCP sessions; excess sessions evict the least recently used. Positive integer overrides default. |
-| `MCP_MAX_RESPONSE_CHARS` | `100000` characters | `src/index.ts`, `src/http-server.ts`, `src/mcp-http-server.ts` | No | Maximum returned text size. Positive integer overrides default. |
+| `MCP_MAX_RESPONSE_CHARS` | `100000` characters | `src/index.ts`, `src/http-server.ts`, `src/mcp-http-server.ts` | No | Maximum generated and composite response text size. Positive integer overrides default. Ordinary unpaged generated structured content remains complete; automatically collected pages may be trimmed to the cap and signal truncation. |
 | `MCP_RATE_LIMIT_TOOLS` | `0` (off) | `src/index.ts`, `src/mcp-http-server.ts` | No | Maximum tool calls per user in a rolling minute. Non-negative integer; over-limit calls return an MCP error with a retry hint. |
 | `MCP_MARK_UNTRUSTED` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Wrap likely user-authored Polarion text fields in `<polarion-untrusted>` markers after neutralizing embedded closing markers. The response then also carries a top-level `_notice` telling the model to treat Polarion content as data. With the default (`false`) results are returned unchanged. |
 | `MCP_LOG_FORMAT` | `text` | `src/index.ts`, `src/mcp-http-server.ts` | No | Tool-call log format: `text` preserves current output; `json` writes structured JSON lines to stderr. |
 | `MCP_LOG_LEVEL` | `info` | `src/index.ts`, `src/mcp-http-server.ts` | No | Minimum tool-call log level: `debug`, `info`, `warn`, or `error`. |
-| `MCP_CONFIRM_DESTRUCTIVE` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Set to `true` to require confirmation for destructive, delete, `patchAll*`, and bulk tools. Elicitation-capable clients receive a confirmation prompt; others can repeat the call with `confirm: true`; use `dry_run: true` first to preview. The server accepts confirmation on the first call and does not enforce that a preview happened. |
-| `MCP_CONFIRM_DESTRUCTIVE` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Set to `true` to require confirmation for destructive, delete, `patchAll*`, and bulk tools. Elicitation-capable clients receive a confirmation prompt; others must preview with `dry_run: true` and repeat with `confirm: true`. |
+| `MCP_CONFIRM_DESTRUCTIVE` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Set to `true` to require confirmation for destructive, delete, `patchAll*`, and bulk tools. Elicitation-capable clients receive a confirmation prompt; other clients may provide `confirm: true` on the first call. Previewing with `dry_run: true` is recommended, not enforced. |
 | `MCP_VERSION_CHECK` | `false` | `src/server.ts` | No | Set to `true` to check Polarion `/metadata` once on the first tool call and log a warning when the server version differs from the generated tool surface. The check has a three-second timeout and never blocks tool execution. |
 | `MCP_COMPLETIONS` | `false` | `src/server.ts` | No | Advertise MCP `completion/complete` and suggest cached project, Work Item type, status, and user values. Metadata is isolated by deployment and caller, expires after five minutes, and is bounded to 500 entries. |
 | `MCP_MODE` | `full` | `src/server.ts` | No | `full` exposes the normal tools. `discover` exposes search_tools, describe_tool, and call_tool over the enabled tool set. |
@@ -59,6 +58,8 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `OAUTH_SCOPES_<SCHEME>` | Unset | `src/auth.ts` | No | Optional OAuth scopes for the security scheme. |
 | `OAUTH_TOKEN_<SCHEME>` | Unset | `src/executor.ts` | Yes | Pre-supplied OAuth token for the scheme. |
 | `OPENID_TOKEN_<SCHEME>` | Unset | `src/executor.ts` | Yes | Pre-supplied OpenID token for the scheme. |
+
+Mutating generated and composite tools accept `dry_run` as a boolean or the compatibility values `"true"`, `"false"`, `1`, and `0`. These normalize to canonical booleans; malformed values are rejected before side effects. Composite inputs are validated against their declared schemas before handlers run.
 
 The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Toolsets` and `X-MCP-Readonly` headers, or a path such as `/mcp/projects,work-items`. Toolset names are listed above. These selectors can only narrow `MCP_TOOLSETS` and the tool filters.
 

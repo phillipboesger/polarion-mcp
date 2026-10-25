@@ -2,6 +2,8 @@
 
 ## Security model
 
+PAT validation accepts a plausible Polarion projects JSON response, including an empty projects array. Empty, malformed, HTML, proxy, or other unusable HTTP 200 responses are treated as unavailable, not as valid credentials. Failed Basic-auth requests are counted against per-IP and per-client limits before rejection; successful exchanges do not consume the failed-request budget.
+
 The REST HTTP wrapper (`build/http-server.js`) authenticates callers with `HTTP_API_KEY` and makes Polarion calls using the deployment's `BEARER_TOKEN`. The Streamable HTTP MCP server uses each caller's Polarion PAT directly, or a sealed OAuth token containing that PAT. Polarion remains the authorization boundary for tool operations. Server-side tool filters and toolsets reduce the callable surface. OAuth tokens and client credentials are sealed statelessly; in-memory login state, authorization codes, and MCP sessions are not shared between instances.
 
 ## Secrets and tokens
@@ -34,11 +36,11 @@ Tool calls can also be limited per authenticated user in a rolling minute with `
 
 With `MCP_MARK_UNTRUSTED=true`, JSON results carry a `_notice` that user-authored content is data, not instructions, and likely user-authored text fields are wrapped in `<polarion-untrusted>` markers. Embedded closing markers are neutralized. These markers help models distinguish data but do not replace tool authorization or output review.
 
-Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts (configurable with `MCP_RATE_LIMIT_TOKEN_IP`); successful requests do not count toward token failure ceilings. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour by default (`MCP_RATE_LIMIT_REGISTER`). Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
+Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts (configurable with `MCP_RATE_LIMIT_TOKEN_IP`); successful requests do not count toward token failure ceilings. Failed Basic-auth requests count against these per-client and per-IP ceilings before rejection; successful requests are excluded. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour by default (`MCP_RATE_LIMIT_REGISTER`). Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
 
 ## Destructive tool confirmation
 
-`MCP_CONFIRM_DESTRUCTIVE=true` enables the default policy hook for destructive and bulk operations. Clients that advertise form elicitation receive a server-side confirmation request with a concise action summary. Other clients receive an error; repeat the call with `confirm: true`; use `dry_run: true` first to preview. The server accepts `confirm: true` on the first call and does not enforce that a preview happened. The default is `false` to preserve existing deployment behavior; enterprise packages can replace the policy hook. Read-only tools do not prompt.
+`MCP_CONFIRM_DESTRUCTIVE=true` enables the default policy hook for destructive and bulk operations. Clients that advertise form elicitation receive a server-side confirmation request with a concise action summary. Other clients can supply `confirm: true` on the first call. A preceding `dry_run: true` preview is recommended, but the server does not enforce that one happened. Confirmation remains an optional deployment policy; the default is `false` to preserve existing behavior, and enterprise packages can replace the policy hook. Read-only tools do not prompt.
 
 ## Logging and telemetry
 

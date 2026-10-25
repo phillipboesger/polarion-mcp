@@ -53,7 +53,7 @@ test('strict mode catches container examples that drift from the release version
 
 const expectedRules = [
   'env-vars', 'tool-references', 'prompt-resource-references', 'markdown-links-toc',
-  'tool-call-examples', 'crlf', 'website-counts', 'client-references',
+  'tool-call-examples', 'crlf', 'website-counts', 'client-references', 'duplicate-config-entries',
 ];
 for (const rule of expectedRules) {
   test(`${rule} catches its fixture error and strict mode fails`, t => {
@@ -75,3 +75,13 @@ for (const rule of expectedRules) {
     assert.match(result.output, new RegExp(`WARNING ${rule} `));
   });
 }
+
+test('strict mode reports a duplicated known configuration variable with its location', t => {
+  const root = fixtureRoot();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const config = path.join(root, 'docs/configuration.md');
+  fs.appendFileSync(config, '\r\n- `TEST_ENV`: Duplicate fixture entry.\r\n');
+  const result = run(root, true);
+  assert.equal(result.status, 1, result.output);
+  assert.match(result.output, /WARNING duplicate-config-entries docs\/configuration\.md:\d+: TEST_ENV is duplicated; first listed at line 3/);
+});
