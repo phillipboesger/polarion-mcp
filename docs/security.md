@@ -52,7 +52,9 @@ Telemetry callbacks receive span start and end metadata through the optional ext
 
 `HTTP_API_KEY` protects the REST wrapper; `BEARER_TOKEN` is the Polarion credential it uses. Keep TLS verification enabled. Setting `NODE_TLS_REJECT_UNAUTHORIZED=0` disables certificate validation and exposes credentials to interception.
 
-`max_items` pagination makes up to 20 Polarion calls per request (`MAX_AUTO_PAGES`). The REST wrapper does not install a per-page hook, so each page runs without a budget check and the request is bounded only by the wrapper's HTTP-level limits. A large `max_items` call therefore holds one HTTP request open across up to 20 upstream calls made with the deployment's `BEARER_TOKEN`.
+The Custom GPT REST routes served by the Streamable HTTP server (`build/mcp-http-server.js`) run through the same pipeline as MCP tool calls, so `MCP_RATE_LIMIT_TOOLS`, the policy hook, `MCP_CONFIRM_DESTRUCTIVE` and the audit sink apply. With no MCP client to prompt, a destructive call needs `confirm: true` in its `arguments`. The standalone REST wrapper (`build/http-server.js`) does not run that pipeline: it applies only `HTTP_API_KEY`, its request limiter (failed authentication attempts are throttled separately) and the tool filters.
+
+`max_items` pagination makes up to 20 Polarion calls per request (`MAX_AUTO_PAGES`). The standalone REST wrapper does not install a per-page hook, so each page runs without a budget check and the request is bounded only by the wrapper's HTTP-level limits. A large `max_items` call therefore holds one HTTP request open across up to 20 upstream calls made with the deployment's `BEARER_TOKEN`.
 
 ## read_when
 

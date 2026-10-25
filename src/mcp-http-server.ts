@@ -42,7 +42,7 @@ import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelconte
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets } from './config.js';
-import { createPolarionServer } from './server.js';
+import { createPolarionServer, createToolCaller } from './server.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
 import { enabledTools, filterTools } from './tool-filter.js';
 import type { McpToolDefinition } from './types.js';
@@ -673,7 +673,9 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   if (oauth && publicUrl && gptClient) {
     mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
       // The deployment's toolset allowlist applies to REST like it does to MCP sessions.
-      filterTools(enabledTools, { toolsets: [...allowedToolsets] }).tools);
+      filterTools(enabledTools, { toolsets: [...allowedToolsets] }).tools,
+      // REST shares the deployment-wide limiter and the same policy, confirmation and audit pipeline.
+      { rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
   }
 
   // Health check (no auth) for load balancers and quick verification.
@@ -855,7 +857,8 @@ function mountCustomGpt(
   bearerChallenge: (error?: string) => string,
   tokenIpRateLimit: number,
   maxResponseChars: number,
-  restTools: ReadonlyMap<string, McpToolDefinition>
+  restTools: ReadonlyMap<string, McpToolDefinition>,
+  pipelineOptions: Omit<Parameters<typeof createToolCaller>[0], 'tools' | 'maxResponseChars'>
 ): void {
   // Same limits the SDK applies to its own /authorize and /token.
   const authorizeLimit = rateLimit({
@@ -945,6 +948,7 @@ function mountCustomGpt(
   app.use(createRestToolsRouter({
     authenticate,
     tools: restTools,
+    callTool: createToolCaller({ ...pipelineOptions, tools: restTools, maxResponseChars }),
     serverUrl: () => publicUrl.href.replace(/\/$/, ''),
     securityScheme: {
       type: 'oauth2',

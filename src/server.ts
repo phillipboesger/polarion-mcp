@@ -41,7 +41,7 @@ import { renderRichTextFieldsAsMarkdown } from './markdown.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
-import { annotatePolarionResult, annotateToolText } from './untrusted-content.js';
+import { annotatePolarionResult, annotateToolText, markUntrustedText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
 import { createVersionCheck } from './version-check.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
@@ -270,6 +270,10 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       ? { ...item, text: annotateToolText(item.text, options.markUntrusted) }
       : item);
   }
+  // Upstream error bodies can echo user-authored content (titles, query fragments).
+  if (options.markUntrusted && result!.isError && outcome === 'error' && generated) {
+    result!.content = result!.content.map(item => item.type === 'text' ? { ...item, text: markUntrustedText(item.text) } : item);
+  }
   // Virtual handlers and the marker annotation both run after the executor's
   // cap, so the cap is applied to the final text the client receives, errors included.
   const definition = virtual ?? generated;
@@ -305,6 +309,27 @@ export interface PolarionServerOptions {
   markUntrusted?: boolean;
   /** Current transport; local file uploads are restricted to stdio. Defaults to HTTP-safe. */
   transport?: 'stdio' | 'http';
+}
+
+/**
+ * Builds a caller that runs tools through the same pipeline as MCP tools/call
+ * (auth, rate limit, policy, confirmation, audit, marking) for transports with
+ * no MCP client, such as the Custom GPT REST routes. With no client to prompt,
+ * a destructive call needs `confirm: true` in its arguments.
+ */
+export function createToolCaller(options: PolarionServerOptions & { tools: ReadonlyMap<string, import('./types.js').McpToolDefinition> }):
+  (name: string, args: Record<string, unknown>, signal?: AbortSignal) => Promise<CallToolResult> {
+  const logger: PipelineLogger = options.logger ?? createLogger({ format: options.logFormat, level: options.logLevel });
+  const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
+  const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
+  const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
+  const noClient = { getClientCapabilities: () => undefined } as unknown as Server;
+  return (name, args, signal) => callToolPipeline(name, args, {
+    clientTools: options.tools, virtualTools: [], extensions,
+    maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
+    logger, signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
+    telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: 'http', server: noClient,
+  });
 }
 
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {

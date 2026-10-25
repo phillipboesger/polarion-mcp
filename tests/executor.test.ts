@@ -1702,3 +1702,17 @@ test("capToolResponseText re-fit keeps the untrusted wrapper closed", () => {
   assert.ok(parsed.preview.startsWith("<polarion-untrusted>"))
   assert.ok(parsed.preview.endsWith("</polarion-untrusted>"))
 })
+
+test("sendWithRetry stops without a request or a retry wait once its signal is aborted", async () => {
+  const controller = new AbortController()
+  controller.abort()
+  let calls = 0
+  const httpClient = async () => { calls++; return {} as any }
+  await assert.rejects(sendWithRetry({}, { httpClient, minIntervalMs: 0, signal: controller.signal }))
+  assert.equal(calls, 0)
+
+  const live = new AbortController()
+  let seen: AbortSignal | undefined
+  await sendWithRetry({}, { httpClient: async (config: any) => { seen = config.signal; return { status: 200 } as any }, minIntervalMs: 0, signal: live.signal })
+  assert.equal(seen, live.signal)
+})

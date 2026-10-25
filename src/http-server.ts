@@ -91,6 +91,9 @@ const app = express();
 if (options.trustProxy !== undefined) app.set('trust proxy', options.trustProxy);
 const origins = (options.env.HTTP_CORS_ORIGINS ?? 'https://chat.openai.com,https://chatgpt.com').split(',').map(origin => origin.trim()).filter(Boolean);
 app.use(cors({ origin: origins }));
+// Counts only rejected requests (status >= 400), so a wrong key cannot be guessed at full speed.
+const failedAuthLimiter = rateLimit({ windowMs: options.rateLimit?.windowMs ?? 15 * 60_000, limit: Math.min(options.rateLimit?.limit ?? 100, 20), skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => res.status(429).json({ success: false, error: 'Too many requests', message: 'Too many failed authentication attempts' }) });
+app.use(failedAuthLimiter);
 app.use(authenticateRequest(options.apiKey));
 const limiter = rateLimit({ windowMs: options.rateLimit?.windowMs ?? 15 * 60_000, limit: options.rateLimit?.limit ?? 100, standardHeaders: true, legacyHeaders: false, handler: (_req, res) => res.status(429).json({ success: false, error: 'Too many requests', message: 'Rate limit exceeded' }) });
 app.use('/api', limiter);

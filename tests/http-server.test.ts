@@ -155,3 +155,15 @@ test('REST maps invalid pagination arguments to 400 with the reason', async () =
     }
   } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
 });
+
+test('repeated wrong API keys are throttled before authentication', async () => {
+  const app = createHttpApp({ apiKey: 'right-key', env: {}, port: 3000, rateLimit: { limit: 2, windowMs: 60_000 } });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  try {
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/tools`;
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) statuses.push((await fetch(url, { headers: { Authorization: 'Bearer wrong' } })).status);
+    assert.deepEqual(statuses, [401, 401, 429, 429]);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+});

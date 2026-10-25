@@ -47,9 +47,11 @@ export async function executeTool(
   executor: SingleToolExecutor,
   options: ExecuteToolOptions,
 ): Promise<CallToolResult> {
+  // Cancelling the call must also cancel the upstream request, not only the page loop.
+  const sendOpts = options.signal ? { signal: options.signal } : undefined;
   const maxItems = args.max_items;
   if (maxItems === undefined || !paginatedList(definition)) {
-    return executor(name, definition, args, securitySchemes, undefined, options.maxResponseChars, options.apiBaseUrl);
+    return executor(name, definition, args, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl);
   }
   if (!Number.isInteger(maxItems) || (maxItems as number) < 1 || (maxItems as number) > MAX_AUTO_ITEMS) {
     throw new PaginationArgumentError(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);
@@ -66,7 +68,7 @@ export async function executeTool(
     const requested = Number.isInteger(suppliedSize) && suppliedSize > 0 ? suppliedSize : maxItems as number;
     firstArgs[pageSizeKey] = Math.min(requested, maxItems as number, MAX_AUTO_PAGE_SIZE);
   }
-  const first = await executor(name, definition, firstArgs, securitySchemes, undefined, options.maxResponseChars, options.apiBaseUrl);
+  const first = await executor(name, definition, firstArgs, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl);
   const body = first.structuredContent;
   if (first.isError || !body || typeof body !== 'object' || !Array.isArray((body as JsonApiPage).data)) return first;
 
@@ -79,7 +81,7 @@ export async function executeTool(
     }
     lastPageNumber = nextPageNumber;
     const nextArgs = { ...firstArgs, page_number_: nextPageNumber };
-    const page = await executor(name, definition, nextArgs, securitySchemes, undefined, options.maxResponseChars, options.apiBaseUrl);
+    const page = await executor(name, definition, nextArgs, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl);
     if (page.isError || !page.structuredContent || typeof page.structuredContent !== 'object') {
       throw new Error(`Pagination failed for ${name}: ${page.content.find(item => item.type === 'text')?.text ?? 'invalid page response'}`);
     }

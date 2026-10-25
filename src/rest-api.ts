@@ -14,6 +14,7 @@
  * - GET /openapi-gpt.json - OpenAPI 3.1 spec with the Custom GPT subset
  */
 
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import express, { type Request, type RequestHandler, type Response } from 'express';
 import { executeApiTool } from './executor.js';
 import { executeTool as executeToolWithPagination, PaginationArgumentError } from './tool-execution.js';
@@ -75,6 +76,8 @@ export interface RestToolsOptions {
   unauthorizedDescription: string;
   /** The tools to expose; defaults to the deployment-wide tool filter. */
   tools?: ReadonlyMap<string, McpToolDefinition>;
+  /** Runs a call through the shared MCP pipeline; when set, it replaces direct execution. */
+  callTool?: (name: string, args: Record<string, unknown>, signal?: AbortSignal) => Promise<CallToolResult>;
   executeTool?: typeof executeApiTool;
   /** Maximum characters returned in a tool's text content. */
   maxResponseChars?: number;
@@ -238,9 +241,14 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       }
 
       // Execute the tool
-      const result = await executeToolWithPagination(toolName, toolDefinition, toolArgs, securitySchemes, executeTool, {
-        apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars,
-      });
+      // A client that disconnects before the answer is written cancels the pagination loop.
+      const aborted = new AbortController();
+      res.once('close', () => { if (!res.writableEnded) aborted.abort(); });
+      const result = options.callTool
+        ? await options.callTool(toolName, toolArgs, aborted.signal)
+        : await executeToolWithPagination(toolName, toolDefinition, toolArgs, securitySchemes, executeTool, {
+          apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars, signal: aborted.signal,
+        });
 
       // Extract text content from MCP response format
       const textContent = result.content

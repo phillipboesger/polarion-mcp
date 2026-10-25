@@ -45,3 +45,8 @@ export function annotateToolText(text: string, markUntrusted: boolean): string {
   }
   return `${prefix}${JSON.stringify(annotatePolarionResult(parsed, markUntrusted))}`;
 }
+
+/** Wraps free text (such as an upstream error body that can echo user content) as one untrusted value. */
+export function markUntrustedText(text: string): string {
+  return markValue(text, 'text', true) as string;
+}
