@@ -456,6 +456,14 @@ export function compileZodSchema(jsonSchema: object): z.ZodTypeAny {
   return zodSchema as z.ZodTypeAny;
 }
 
+/** Normalize the supported compatibility forms for a dry-run control flag. */
+export function normalizeDryRun(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (value === true || value === 'true' || value === 1) return true;
+  if (value === false || value === 'false' || value === 0) return false;
+  throw new Error('dry_run must be true or false');
+}
+
 export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z.ZodTypeAny {
   if (typeof jsonSchema !== 'object' || jsonSchema === null) {
     // Invalid schema, return a permissive schema

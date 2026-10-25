@@ -12,12 +12,13 @@ import { traceLinks } from '../src/composite-trace.js';
 function link(source: string, target: string, role = 'relates_to') {
   return { attributes: { role }, relationships: { sourceWorkItem: { data: { id: source } }, workItem: { data: { id: target } } } };
 }
-function graphContext(edges: Array<[string, string, string?]>, capCalls: string[] = []) {
+function graphContext(edges: Array<[string, string, string?]>, capCalls: string[] = [], calls: Array<{ name: string; args: Record<string, unknown> }> = []) {
   return context(async (name, args) => {
+    calls.push({ name, args });
     const id = `${String(args.projectId)}/${String(args.workItemId)}`;
     if (name === 'getLinkedWorkItems') return response(edges.filter(([from]) => from === id).map(([from, to, role]) => link(from, to, role)));
     if (name === 'getBacklinkedWorkItems') return response(edges.filter(([, to]) => to === id).map(([from, to, role]) => link(from, to, role)));
-    if (name === 'getWorkItem') { capCalls.push(id); return response([{ id, attributes: { title: id, type: 'requirement', status: 'open' } }]); }
+    if (name === 'getWorkItem') { capCalls.push(id); return response({ id, attributes: { title: id, type: 'requirement', status: 'open' } }); }
     throw new Error(name);
   });
 }
@@ -36,4 +37,23 @@ test('trace_links handles diamonds, cycles, depth, roles, and node cap', async (
   assert.deepEqual(JSON.parse(text(roles)).nodes.map((n: { id: string }) => n.id), ['P/A']);
   const capped = await traceLinks.handler({ projectId: 'P', workItemId: 'A', direction: 'down', node_cap: 2 }, graphContext(edges));
   assert.equal(JSON.parse(text(capped)).truncated, true);
+});
+
+test('trace_links requests consumed relationship and Work Item fields', async () => {
+  const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const result = await traceLinks.handler({ projectId: 'P', workItemId: 'A', direction: 'down', depth: 1 }, graphContext([['P/A', 'P/B', 'parent']], [], calls));
+  const parsed = JSON.parse(text(result));
+  assert.equal(parsed.edges.length, 1);
+  assert.deepEqual(calls.find(call => call.name === 'getLinkedWorkItems')!.args.fields, { linkedworkitems: 'role,sourceWorkItem,workItem' });
+  assert.deepEqual(calls.find(call => call.name === 'getWorkItem')!.args.fields, { workitems: 'title,type,status' });
+});
+
+test('trace_links propagates upstream Work Item detail errors', async () => {
+  const result = await traceLinks.handler({ projectId: 'P', workItemId: 'A', direction: 'down', depth: 1 }, context(async name => {
+    if (name === 'getLinkedWorkItems') return response([link('P/A', 'P/B')]);
+    if (name === 'getWorkItem') return { isError: true, content: [{ type: 'text', text: 'upstream failed' }] };
+    throw new Error(name);
+  }));
+  assert.equal(result.isError, true);
+  assert.match(text(result), /upstream failed/);
 });

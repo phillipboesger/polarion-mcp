@@ -22,7 +22,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, sanitizeInputSchema } from "./utils.js";
+import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
@@ -591,10 +591,9 @@ export async function executeApiTool(
     // fall through to the real (possibly irreversible) write.
     const rawDryRun = argsForValidation.dry_run;
     delete argsForValidation.dry_run;
-    const dryRun = rawDryRun === true || rawDryRun === 'true' || rawDryRun === 1;
-    if (rawDryRun !== undefined && !dryRun && rawDryRun !== false && rawDryRun !== 'false' && rawDryRun !== 0) {
-      return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true };
-    }
+    let dryRun: boolean | undefined;
+    try { dryRun = normalizeDryRun(rawDryRun); }
+    catch { return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true }; }
 
     // Validation runs against the original schema, whose keys are the
     // original names; a sanitized name would otherwise be stripped by Zod.

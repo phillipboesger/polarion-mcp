@@ -395,6 +395,15 @@ test("executeApiTool with dry_run true on a mutating tool returns a preview with
       assert.match(message.text, /POST/i)
       assert.doesNotMatch(message.text, /super-secret-token/)
     }
+    for (const dry_run of ["true", 1]) {
+      const compatiblePreview = await executeApiTool("create_thing", definition, { requestBody: { title: "hello" }, dry_run }, securitySchemes, { httpClient })
+      assert.equal(compatiblePreview.isError, undefined)
+    }
+    for (const dry_run of ["yes", 2]) {
+      const invalidPreview = await executeApiTool("create_thing", definition, { requestBody: { title: "hello" }, dry_run }, securitySchemes, { httpClient })
+      assert.equal(invalidPreview.isError, true)
+      assert.match((invalidPreview.content[0] as { text: string }).text, /dry_run must be true or false/)
+    }
   } finally {
     if (typeof previous === "undefined") delete process.env.BEARER_TOKEN
     else process.env.BEARER_TOKEN = previous

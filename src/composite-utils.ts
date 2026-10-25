@@ -9,7 +9,13 @@ export const rows = (result: CallToolResult): JsonObject[] => {
   const body = object(result.structuredContent);
   return Array.isArray(body.data) ? body.data : [];
 };
-export const first = (result: CallToolResult): JsonObject => rows(result)[0] ?? {};
+/** Extract a single JSON:API resource without treating singleton data as a collection. */
+export const first = (result: CallToolResult): JsonObject => {
+  const rawData = object(result.structuredContent).data;
+  if (Array.isArray(rawData)) return rows(result)[0] ?? {};
+  const data = object(rawData);
+  return Object.keys(data).length ? data : {};
+};
 export const attrs = (row: JsonObject): JsonObject => object(row.attributes);
 export const relData = (row: JsonObject, rel: string): JsonObject => object(object(object(row.relationships)[rel]).data);
 export const richMarkdown = (value: unknown): string => {

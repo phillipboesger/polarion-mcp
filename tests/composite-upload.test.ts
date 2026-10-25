@@ -28,8 +28,9 @@ test('upload_attachment reads an allowed file and calls the expected multipart t
     const tool = createUploadAttachmentTool(() => ({ roots: dir }));
     const result = await tool.handler({ target, filePath: file, title: 'Spec' }, context('stdio', calls));
     assert.equal(calls.length, 1); assert.equal(calls[0].name, 'postWorkItemAttachments');
-    const body = calls[0].args.requestBody as { resource: { data: Array<{ type: string; attributes: Record<string, unknown> }> }; files: string[] };
+    const body = calls[0].args.requestBody as { resource: { data: Array<{ type: string; lid?: string; attributes: Record<string, unknown> }> }; files: string[] };
     assert.equal(body.resource.data[0].type, 'workitem_attachments'); assert.equal(body.resource.data[0].attributes.fileName, 'a.txt');
+    assert.equal(body.resource.data[0].lid, undefined);
     assert.equal(body.resource.data[0].attributes.title, 'Spec'); assert.equal(Buffer.from(body.files[0], 'base64').toString(), 'hello');
     assert.equal((result.content[0] as { text: string }).text, 'uploaded');
   } finally { await rm(dir, { recursive: true, force: true }); }
@@ -54,6 +55,26 @@ test('dry_run returns name, byte length, and SHA-256 without calling Polarion', 
     const calls: unknown[] = [];
     const result = await createUploadAttachmentTool(() => ({ roots: dir })).handler({ target, filePath: file, dry_run: true }, context('stdio', calls as never));
     assert.equal(calls.length, 0); assert.match((result.content[0] as { text: string }).text, /"size":5/); assert.match((result.content[0] as { text: string }).text, /2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('upload target is validated before attempting to read the source', async () => {
+  const tool = createUploadAttachmentTool(() => ({}));
+  const result = await tool.handler({ target: { type: 'document', projectId: 'P', id: 'D' }, filePath: '/missing/file' }, context('stdio'));
+  assert.equal(result.isError, true);
+  assert.match((result.content[0] as { text: string }).text, /target\.spaceId is required/);
+});
+
+test('upload_attachment preserves upstream API errors', async () => {
+  const dir = await tempDir();
+  try {
+    const file = path.join(dir, 'a.txt'); await writeFile(file, 'hello');
+    const tool = createUploadAttachmentTool(() => ({ roots: dir }));
+    const ctx = context('stdio');
+    ctx.callPolarionTool = async () => ({ isError: true, content: [{ type: 'text', text: 'upload failed' }] });
+    const result = await tool.handler({ target, filePath: file }, ctx);
+    assert.equal(result.isError, true);
+    assert.match((result.content[0] as { text: string }).text, /upload failed/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

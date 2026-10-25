@@ -11,6 +11,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createPolarionServer } from '../src/server.js'
 import { COMPOSITE_TOOLS } from '../src/composite-tools.js'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 
 const TOKEN = 'request-secret-token'
 const HEADERS = { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }
@@ -184,5 +187,88 @@ test('progress notifications reach an SDK client only when the request sends a p
   } finally {
     await client.close()
     unregister()
+  }
+})
+
+test('composite previews and invalid inputs make no upstream writes; explicit job and upload execute once', async () => {
+  const previousToken = process.env.BEARER_TOKEN
+  const previousRoots = process.env.MCP_UPLOAD_ROOTS
+  const dir = await mkdtemp(path.join(tmpdir(), 'polarion-composite-pipeline-'))
+  const file = path.join(dir, 'proof.txt')
+  await writeFile(file, 'upload-body')
+  process.env.BEARER_TOKEN = TOKEN
+  process.env.MCP_UPLOAD_ROOTS = dir
+  const writes: Record<string, number> = { job: 0, upload: 0 }
+  let uploadRequestBody = ''
+  const upstream = createHttpServer((req, res) => {
+    const chunks: Buffer[] = []
+    req.on('data', chunk => chunks.push(Buffer.from(chunk)))
+    req.on('end', () => {
+      const body = Buffer.concat(chunks).toString()
+      if (req.method === 'POST' && req.url === '/polarion/rest/v1/jobs/actions/execute') {
+        writes.job++
+        res.writeHead(202, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ data: { type: 'jobs', id: 'job-1', attributes: { state: 'RUNNING' } } }))
+      } else if (req.method === 'POST' && req.url?.endsWith('/polarion/rest/v1/projects/P/workitems/WI-1/attachments')) {
+        writes.upload++
+        uploadRequestBody = body
+        res.writeHead(201, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ data: [{ type: 'workitem_attachments', id: 'P/WI-1/proof.txt' }] }))
+      } else if (req.method === 'GET' && req.url === '/polarion/rest/v1/jobs/job-1') {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ data: { type: 'jobs', id: 'job-1', attributes: { state: 'FINISHED', status: { type: 'OK' } } } }))
+      } else if (req.method === 'GET' && req.url === '/polarion/rest/v1/jobs/job-1/log/content') {
+        res.writeHead(200, { 'content-type': 'text/plain' }); res.end('complete')
+      } else {
+        res.writeHead(404, { 'content-type': 'application/json' }); res.end(JSON.stringify({ errors: [{ detail: `${req.method} ${req.url}` }] }))
+      }
+    })
+  })
+  await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve))
+  const base = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/polarion/rest/v1`
+  const server = createPolarionServer({ apiBaseUrl: base, filter: { toolsets: ['composites'] }, transport: 'stdio' })
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+  const client = new Client({ name: 'composite-pipeline-test', version: '1' })
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+  try {
+    for (const flag of [true, 'true']) {
+      const preview = await client.callTool({ name: 'run_job_and_wait', arguments: { requestBody: { jobId: 'jobs.dummy' }, dry_run: flag } })
+      assert.equal(preview.isError, undefined)
+    }
+    const invalidFlag = await client.callTool({ name: 'run_job_and_wait', arguments: { requestBody: { jobId: 'jobs.dummy' }, dry_run: 'yes' } })
+    assert.equal(invalidFlag.isError, true)
+    const missingJobArgs = await client.callTool({ name: 'run_job_and_wait', arguments: {} })
+    assert.equal(missingJobArgs.isError, true)
+    const missingNestedJobArgs = await client.callTool({ name: 'run_job_and_wait', arguments: { requestBody: {} } })
+    assert.equal(missingNestedJobArgs.isError, true)
+    const unknownJobArgs = await client.callTool({ name: 'run_job_and_wait', arguments: { requestBodi: { jobId: 'jobs.dummy' } } })
+    assert.equal(unknownJobArgs.isError, true)
+    assert.equal(writes.job, 0)
+
+    const run = await client.callTool({ name: 'run_job_and_wait', arguments: { requestBody: { jobId: 'jobs.dummy' } } })
+    assert.equal(run.isError, undefined)
+    assert.equal(writes.job, 1)
+
+    for (const flag of [true, 'true']) {
+      const uploadPreview = await client.callTool({ name: 'upload_attachment', arguments: { target: { type: 'work_item', projectId: 'P', id: 'WI-1' }, filePath: file, dry_run: flag } })
+      assert.equal(uploadPreview.isError, undefined)
+    }
+    const invalidUpload = await client.callTool({ name: 'upload_attachment', arguments: { target: { type: 'work_item', projectId: 'P', id: 'WI-1' }, filePath: file, dry_run: 'maybe' } })
+    assert.equal(invalidUpload.isError, true)
+    const missingUploadTarget = await client.callTool({ name: 'upload_attachment', arguments: { filePath: file } })
+    assert.equal(missingUploadTarget.isError, true)
+    assert.equal(writes.upload, 0)
+
+    const uploaded = await client.callTool({ name: 'upload_attachment', arguments: { target: { type: 'work_item', projectId: 'P', id: 'WI-1' }, filePath: file } })
+    assert.equal(uploaded.isError, undefined)
+    assert.equal(writes.upload, 1)
+    assert.match(uploadRequestBody, /upload-body/)
+    assert.match(uploadRequestBody, /proof\.txt/)
+  } finally {
+    await Promise.all([client.close(), server.close()])
+    await new Promise<void>(resolve => upstream.close(() => resolve()))
+    await rm(dir, { recursive: true, force: true })
+    if (previousToken === undefined) delete process.env.BEARER_TOKEN; else process.env.BEARER_TOKEN = previousToken
+    if (previousRoots === undefined) delete process.env.MCP_UPLOAD_ROOTS; else process.env.MCP_UPLOAD_ROOTS = previousRoots
   }
 })

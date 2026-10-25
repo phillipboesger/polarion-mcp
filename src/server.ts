@@ -26,7 +26,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
-import { sanitizeInputSchema } from './utils.js';
+import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.js';
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes, toolDefinitionMap } from './tools.js';
 import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
@@ -237,19 +237,48 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     if (decision.action === 'deny') {
       outcome = 'denied';
       result = { content: [{ type: 'text', text: decision.reason }], isError: true };
-    } else if (decision.action === 'requireConfirmation' && !(args.dry_run === true && (generated?.inputSchema?.properties?.dry_run !== undefined || virtual?.dryRunSafe === true))) {
-      const confirmation = await requestDestructiveConfirmation(options.server, toolName, args, options.signal);
-      if (confirmation !== 'accepted') {
-        outcome = 'confirmation-required';
-        const text = confirmation === 'fallback'
-          ? 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.'
-          : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
-        result = { content: [{ type: 'text', text }], isError: true };
+    } else {
+      // Normalize and validate before confirmation selection, so malformed flags
+      // cannot turn a preview request into a write and virtual schemas are not
+      // merely descriptive.
+      const dryRun = normalizeDryRun(args.dry_run);
+      if (dryRun !== undefined) callArgs.dry_run = dryRun;
+      if (virtual) {
+        const properties = virtual.inputSchema?.properties as Record<string, unknown> | undefined;
+        const openSchema = properties === undefined || virtual.inputSchema.additionalProperties === true;
+        const unknown = openSchema ? [] : Object.keys(callArgs).filter(key => !key.startsWith('_') && key !== 'dry_run' && !Object.hasOwn(properties, key));
+        if (unknown.length) throw new Error(`Invalid arguments for tool '${toolName}': unknown argument(s) ${unknown.join(', ')}`);
+        const schemaInput = Object.fromEntries(Object.entries(callArgs).filter(([key]) => !key.startsWith('_')));
+        let validated: Record<string, unknown>;
+        try {
+          validated = compileZodSchema(virtual.inputSchema).parse(schemaInput) as Record<string, unknown>;
+        } catch (error) {
+          if (error instanceof Error && error.name === 'ZodError') {
+            const issues = (error as Error & { issues?: Array<{ path: PropertyKey[]; message: string }> }).issues ?? [];
+            throw new Error(`Invalid arguments for tool '${toolName}': ${issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join(', ')}`, { cause: error });
+          }
+          throw new Error(`Could not validate arguments for tool '${toolName}': ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+        }
+        // Keep protocol metadata and the shared dry_run control available to
+        // handlers, matching the generated executor's reserved-key behavior.
+        Object.assign(callArgs, openSchema ? schemaInput : validated, Object.fromEntries(Object.entries(args).filter(([key]) => key.startsWith('_'))));
+        if (dryRun !== undefined) callArgs.dry_run = dryRun;
+      }
+      const safePreview = dryRun === true && (generated?.inputSchema?.properties?.dry_run !== undefined || virtual?.dryRunSafe === true);
+      if (decision.action === 'requireConfirmation' && !safePreview) {
+        const confirmation = await requestDestructiveConfirmation(options.server, toolName, args, options.signal);
+        if (confirmation !== 'accepted') {
+          outcome = 'confirmation-required';
+          const text = confirmation === 'fallback'
+            ? 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.'
+            : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
+          result = { content: [{ type: 'text', text }], isError: true };
+        } else {
+          await execute();
+        }
       } else {
         await execute();
       }
-    } else {
-      await execute();
     }
   } catch (error) {
     result = { content: [{ type: 'text', text: error instanceof Error ? error.message : 'Tool call failed' }], isError: true };

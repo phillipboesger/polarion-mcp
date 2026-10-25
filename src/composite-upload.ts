@@ -195,7 +195,15 @@ function attachmentToolInput(target: Record<string, unknown>, fileName: string, 
   for (const [key, value] of Object.entries(pathArgs)) if (typeof value !== 'string' || !value) throw new Error(`target.${key} is required for ${String(type)}`);
   const attributes: Record<string, unknown> = { fileName };
   if (typeof title === 'string' && title.length) attributes.title = title;
-  return { tool, args: { ...pathArgs, requestBody: { resource: { data: [{ type: resourceType, lid: '1', attributes }] }, files: [bytes.toString('base64')] } } };
+  return { tool, args: { ...pathArgs, requestBody: { resource: { data: [{ type: resourceType, attributes }] }, files: [bytes.toString('base64')] } } };
+}
+
+function validateUploadTarget(value: unknown): asserts value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('target must be an object');
+  const target = value as Record<string, unknown>;
+  if (!['work_item', 'test_run', 'document', 'page'].includes(String(target.type))) throw new Error('target.type must be work_item, test_run, document, or page');
+  for (const key of ['projectId', 'id']) if (typeof target[key] !== 'string' || !target[key]) throw new Error(`target.${key} is required for ${String(target.type)}`);
+  if ((target.type === 'document' || target.type === 'page') && (typeof target.spaceId !== 'string' || !target.spaceId)) throw new Error(`target.spaceId is required for ${String(target.type)}`);
 }
 
 export function createUploadAttachmentTool(configProvider: () => UploadConfig = envConfig, fetchOptions: AttachmentFetchTestOptions = {}): VirtualTool {
@@ -216,7 +224,8 @@ export function createUploadAttachmentTool(configProvider: () => UploadConfig = 
       const hasPath = args.filePath !== undefined;
       const hasUrl = args.url !== undefined;
       if (hasPath === hasUrl) throw new Error('Provide exactly one of filePath or url');
-      if (!args.target || typeof args.target !== 'object' || Array.isArray(args.target)) throw new Error('target must be an object');
+      validateUploadTarget(args.target);
+      if (args.fileName !== undefined) safeFileName(args.fileName);
       const config = configProvider();
       const maxBytes = maxBytesFrom(config.maxBytes);
       let file: { bytes: Buffer; defaultName: string };
