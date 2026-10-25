@@ -81,7 +81,13 @@ describe("composite tools against disposable Polarion data", () => {
     assert.deepEqual(cleanupErrors, [], "failed to remove test-owned Work Items");
   });
 
-  test("run_job_and_wait previews and rejects malformed inputs without creating jobs, then executes once", async () => {
+  test("run_job_and_wait previews and rejects malformed inputs without creating jobs, then executes once", async (t) => {
+    // Polarion 2506 exposes only GET /jobs/{id} and file download, with no job list, execute or log routes.
+    const jobCollection = await call(client, "getJobs", { page_size_: 1, page_number_: 1 });
+    if (jobCollection.isError && /Not Found/.test(jobCollection.text)) {
+      t.skip("this Polarion version has no /jobs endpoints (job execution needs 2606)");
+      return;
+    }
     const labels = ["boolean-preview", "string-preview", "invalid-flag", "missing-body", "execute-once"]
       .map((part) => `${tag}-${part}`);
     for (const name of labels) assert.equal((await namedJobs(client, name)).length, 0, `job ${name} already exists`);
