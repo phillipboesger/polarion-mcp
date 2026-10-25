@@ -8,6 +8,8 @@ const staticFields = new Set([
 ]);
 const fieldCache = new Map<string, { fields: Set<string>; expires: number }>();
 const CACHE_TTL_MS = 5 * 60_000;
+const CACHE_MAX_ENTRIES = 500;
+let cacheClock: () => number = Date.now;
 const luceneSpecial = new Set('+-!(){}[]^"~*?:\\/|&');
 
 export function escapeLuceneValue(value: string): string {
@@ -29,16 +31,28 @@ function fieldNames(value: unknown): Set<string> {
   return output;
 }
 
+function cacheKey(projectId: string, ctx: VirtualToolContext): string {
+  return JSON.stringify([ctx.apiBaseUrl, ctx.userScope ?? 'anonymous', projectId]);
+}
+
 async function workItemFields(projectId: string | undefined, ctx: VirtualToolContext): Promise<Set<string>> {
   if (!projectId) return new Set(staticFields);
-  const cached = fieldCache.get(projectId);
-  if (cached && cached.expires > Date.now()) return cached.fields;
+  const key = cacheKey(projectId, ctx);
+  const cached = fieldCache.get(key);
+  if (cached && cached.expires > cacheClock()) {
+    fieldCache.delete(key);
+    fieldCache.set(key, cached);
+    return cached.fields;
+  }
+  if (cached) fieldCache.delete(key);
   // The project-level metadata operation is the REST equivalent of the
   // work-item-specific metadata operation (which requires an item ID).
   const result = await ctx.callPolarionTool('getProjectFieldsMetadata', { projectId, resourceType: 'workitems' });
-  if (!result.isError && result.structuredContent) {
-    const fields = fieldNames((result.structuredContent as Record<string, unknown>).data);
-    fieldCache.set(projectId, { fields, expires: Date.now() + CACHE_TTL_MS });
+  const metadata = (result.structuredContent as Record<string, unknown> | undefined)?.data;
+  if (!result.isError && metadata !== null && typeof metadata === 'object') {
+    const fields = fieldNames(metadata);
+    fieldCache.set(key, { fields, expires: cacheClock() + CACHE_TTL_MS });
+    while (fieldCache.size > CACHE_MAX_ENTRIES) fieldCache.delete(fieldCache.keys().next().value!);
     return fields;
   }
   return new Set(staticFields);
@@ -83,8 +97,15 @@ export function buildWorkItemQuery(args: Record<string, unknown>, knownFields: R
     if (!knownFields.has(field)) throw new Error(`Unknown work item field: ${field}`);
     clauses.push(`${field}:"${escapeLuceneValue(value)}"`);
   };
-  for (const type of stringArray(args.types, 'types')) add('type', type);
-  for (const status of stringArray(args.statuses, 'statuses')) add('status', status);
+  const addAlternatives = (field: string, values: string[]) => {
+    if (values.length === 1) add(field, values[0]);
+    else if (values.length > 1) {
+      if (!knownFields.has(field)) throw new Error(`Unknown work item field: ${field}`);
+      clauses.push(`(${values.map(value => `${field}:"${escapeLuceneValue(value)}"`).join(' OR ')})`);
+    }
+  };
+  addAlternatives('type', stringArray(args.types, 'types'));
+  addAlternatives('status', stringArray(args.statuses, 'statuses'));
   if (typeof args.assignee === 'string' && args.assignee) add('assignee.id', args.assignee);
   if (typeof args.text === 'string' && args.text) {
     const escaped = escapeLuceneValue(args.text);
@@ -104,7 +125,7 @@ export function buildWorkItemQuery(args: Record<string, unknown>, knownFields: R
       clauses.push(`${field}:["${escapeLuceneValue(args[arg] as string)}" TO *]`);
     }
   }
-  return clauses.length ? clauses.join(' AND ') : '*';
+  return clauses.join(' AND ');
 }
 
 function pageSize(args: Record<string, unknown>): number | undefined {
@@ -135,7 +156,11 @@ const searchTool: VirtualTool = {
     }
     const limit = pageSize(args);
     const toolName = typeof args.projectId === 'string' ? 'getWorkItems' : 'getAllWorkItems';
-    const callArgs: Record<string, unknown> = { query, ...(sort ? { sort } : {}), ...(limit ? { page_size_: limit } : {}), ...(args.max_items ? { max_items: args.max_items } : {}) };
+    const callArgs: Record<string, unknown> = {
+      ...(query ? { query } : {}),
+      ...(args.fields && typeof args.fields === 'object' ? { fields: args.fields } : { fields: { workitems: 'type,title,status,created,updated' } }),
+      ...(sort ? { sort } : {}), ...(limit ? { page_size_: limit } : {}), ...(args.max_items ? { max_items: args.max_items } : {}),
+    };
     if (typeof args.projectId === 'string') callArgs.projectId = args.projectId;
     const result = await ctx.callPolarionTool(toolName, callArgs);
     if (result.isError) return result;
@@ -261,6 +286,9 @@ export function registerCompositeTools(): void {
   if (unregister.length) return;
   unregister = [searchTool, lintTool, resolveTool].map(tool => registerVirtualTool(tool));
 }
-export function clearCompositeToolsForTests(): void { unregister.splice(0).forEach(remove => remove()); fieldCache.clear(); }
+export function clearCompositeToolsForTests(): void { unregister.splice(0).forEach(remove => remove()); fieldCache.clear(); cacheClock = Date.now; }
+
+/** Isolated clock seam for cache expiry tests. */
+export function setCompositeSearchClockForTests(clock: () => number): void { cacheClock = clock; }
 
 export const compositeTools = [searchTool, lintTool, resolveTool] as const;
