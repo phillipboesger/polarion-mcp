@@ -396,10 +396,24 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       legacyHeaders: false,
       handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests from this IP' }),
     });
+    const tokenClientLimit = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: 50,
+      skipSuccessfulRequests: true,
+      keyGenerator: req => {
+        const basic = basicCredentials(req.get('authorization'));
+        const clientId = basic?.clientId ?? String(req.body?.client_id ?? '');
+        return tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', clientId);
+      },
+      validate: { keyGeneratorIpFallback: false },
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests' }),
+    });
     // The SDK token endpoint only reads client credentials from the body;
     // move HTTP Basic credentials there so client_secret_basic clients work.
     // The SDK's own urlencoded parser then sees a consumed stream and keeps this body.
-    app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response, next: NextFunction) => {
+    app.post('/token', express.urlencoded({ extended: false }), tokenIpLimit, tokenClientLimit, async (req: Request, res: Response, next: NextFunction) => {
       const basic = basicCredentials(req.get('authorization'));
       if (basic) {
         if (isCimdClientIdentifier(basic.clientId)) {
@@ -418,9 +432,6 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       }
       next();
     });
-    // The preceding shim parses the body so this per-IP ceiling bounds the
-    // number of distinct client-id buckets one source can create.
-    app.post('/token', tokenIpLimit);
     // The SDK metadata omits Basic even though the token shim supports it; augment its JSON response.
     app.use('/.well-known/oauth-authorization-server', (_req: Request, res: Response, next: NextFunction) => {
       const sendJson = res.json.bind(res);
@@ -489,18 +500,10 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
             handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many client registrations' }),
           },
         },
-        tokenOptions: {
-          rateLimit: {
-            windowMs: 15 * 60 * 1000,
-            limit: 50,
-            skipSuccessfulRequests: true,
-            keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id ?? '')),
-            validate: { keyGeneratorIpFallback: false },
-            standardHeaders: true,
-            legacyHeaders: false,
-            handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests' }),
-          },
-        },
+        // The custom pre-auth limiters above include Basic credentials and
+        // skip successful exchanges; the SDK's default limiter would count
+        // successes and impose a second, conflicting budget.
+        tokenOptions: { rateLimit: false },
         scopesSupported: [POLARION_SCOPE],
       })
     );
