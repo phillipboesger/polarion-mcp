@@ -52,6 +52,8 @@ Telemetry callbacks receive span start and end metadata through the optional ext
 
 `HTTP_API_KEY` protects the REST wrapper; `BEARER_TOKEN` is the Polarion credential it uses. Keep TLS verification enabled. Setting `NODE_TLS_REJECT_UNAUTHORIZED=0` disables certificate validation and exposes credentials to interception.
 
+`max_items` pagination makes up to 20 Polarion calls per request (`MAX_AUTO_PAGES`). The REST wrapper does not install a per-page hook, so each page runs without a budget check and the request is bounded only by the wrapper's HTTP-level limits. A large `max_items` call therefore holds one HTTP request open across up to 20 upstream calls made with the deployment's `BEARER_TOKEN`.
+
 ## read_when
 
 - Use this guide when reviewing deployment security or handling credentials.
