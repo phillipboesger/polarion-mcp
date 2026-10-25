@@ -159,12 +159,5 @@
   });
   if (tabs.length) showDay(tabs[0]);
 
-  // Live numbers from the public GitHub API; the chips keep their plain labels if the request fails.
-  const repoApi = 'https://api.github.com/repos/phillipboesger/polarion-mcp';
-  fetch(repoApi).then(r => r.ok ? r.json() : Promise.reject()).then(repo => {
-    if (Number.isFinite(repo.stargazers_count)) text('gh-stars', `${repo.stargazers_count} stars`);
-  }).catch(() => {});
-  fetch(`${repoApi}/releases/latest`).then(r => r.ok ? r.json() : Promise.reject()).then(release => {
-    if (typeof release.tag_name === 'string') text('gh-release', `Release ${release.tag_name.slice(0, 20)}`);
-  }).catch(() => {});
+  // Public release and repository links provide current details without sending visitor data to an API.
 })();
