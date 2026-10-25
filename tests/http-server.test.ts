@@ -139,3 +139,19 @@ test('REST tool route collects list pages through the shared wrapper over actual
     assert.equal('next' in (payload.links ?? {}), false);
   } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
 });
+
+test('REST maps invalid pagination arguments to 400 with the reason', async () => {
+  const app = createHttpApp({ apiKey: 'paging-key', env: {}, port: 3000, executeTool: async () => { throw new Error('must not run'); } });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  try {
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/tools/getWorkItems`;
+    for (const args of [{ projectId: 'PRJ', max_items: 0 }, { projectId: 'PRJ', page_size_: 500, max_items: 5 }]) {
+      const response = await fetch(url, { method: 'POST', headers: { Authorization: 'Bearer paging-key', 'content-type': 'application/json' }, body: JSON.stringify({ arguments: args }) });
+      assert.equal(response.status, 400);
+      const body = await response.json() as { success: boolean; message: string };
+      assert.equal(body.success, false);
+      assert.match(body.message, /max_items|page_size_/);
+    }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+});

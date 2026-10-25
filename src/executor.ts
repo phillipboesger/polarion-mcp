@@ -89,7 +89,31 @@ function truncateResponse(text: string, maxChars: number, definition: Pick<McpTo
 
 /** Applies the executor's text-size cap to a composed response. */
 export function capToolResponseText(text: string, maxChars: number, definition: Pick<McpToolDefinition, 'inputSchema'>): string {
-  return text.length > maxChars ? truncateResponse(text, maxChars, definition) : text;
+  if (text.length <= maxChars) return text;
+  return refitTruncationEnvelope(text, maxChars) ?? truncateResponse(text, maxChars, definition);
+}
+
+/**
+ * Shrinks the preview of an existing truncation envelope instead of wrapping it
+ * again: untrusted-content annotation runs after the executor's cap and can push
+ * the envelope back over it. Keeps the original `totalChars`.
+ */
+function refitTruncationEnvelope(text: string, maxChars: number): string | undefined {
+  let envelope: { truncated?: unknown; preview?: unknown; totalChars?: unknown };
+  try { envelope = JSON.parse(text); } catch { return undefined; }
+  if (!envelope || typeof envelope !== 'object' || envelope.truncated !== true
+    || typeof envelope.preview !== 'string' || typeof envelope.totalChars !== 'number') return undefined;
+  const codePoints = Array.from(envelope.preview);
+  const fit = (count: number) => JSON.stringify({ ...envelope, preview: codePoints.slice(0, count).join('') });
+  if (fit(0).length > maxChars) return undefined;
+  let low = 0;
+  let high = codePoints.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (fit(mid).length <= maxChars) low = mid;
+    else high = mid - 1;
+  }
+  return fit(low);
 }
 
 /** Parses the response text cap from the entry-point environment. */

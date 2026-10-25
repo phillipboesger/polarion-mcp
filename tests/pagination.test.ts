@@ -203,3 +203,29 @@ test('max_items rejects a page size above the per-request limit instead of shift
   )
   assert.equal(upstreamCalls, 0)
 })
+
+test('a cut inside a page drops links.next so a client cannot skip the dropped items', async () => {
+  const page = (n: number) => ({ data: [{ id: n * 2 - 1 }, { id: n * 2 }], links: { next: `?page%5Bnumber%5D=${n + 1}` }, meta: { totalCount: 10 } });
+  const result = await paginate(page(1), 3, async next => page(Number(new URL(next, 'https://host.test').searchParams.get('page[number]'))));
+  assert.deepEqual(result.response.data, [{ id: 1 }, { id: 2 }, { id: 3 }]);
+  assert.equal(result.truncated, true);
+  assert.equal('next' in (result.response.links ?? {}), false);
+
+  const firstPageCut = await paginate(page(1), 1, async () => { throw new Error('must not fetch'); });
+  assert.equal('next' in (firstPageCut.response.links ?? {}), false);
+});
+
+test('executeTool drops links.next when the response cap pops items', async () => {
+  const definition = {
+    name: 'list_things', description: '', method: 'get', pathTemplate: '/things', executionParameters: [], securityRequirements: [],
+    inputSchema: { type: 'object', properties: {} },
+    outputSchema: { type: 'object', properties: { data: { type: 'array', items: {} }, links: { type: 'object', properties: { next: {} } }, meta: { type: 'object', properties: { totalCount: {} } } } },
+  } as any;
+  const body = { data: Array.from({ length: 20 }, (_, i) => ({ id: `item-${i}`, pad: 'x'.repeat(50) })), links: { next: '?page%5Bnumber%5D=2' }, meta: { totalCount: 99 } };
+  const executor = async () => ({ content: [{ type: 'text', text: `API Response (Status: 200):\n${JSON.stringify(body)}` }], structuredContent: body });
+  const result = await executeTool('list_things', definition, { max_items: 20 }, {}, executor as any, { apiBaseUrl: 'http://127.0.0.1', maxResponseChars: 600 });
+  const structured = result.structuredContent as JsonApiPage;
+  assert.equal(structured.truncated, true);
+  assert.ok((structured.data as unknown[]).length < 20);
+  assert.equal('next' in (structured.links ?? {}), false);
+});

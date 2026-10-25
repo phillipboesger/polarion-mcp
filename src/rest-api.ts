@@ -16,7 +16,7 @@
 
 import express, { type Request, type RequestHandler, type Response } from 'express';
 import { executeApiTool } from './executor.js';
-import { executeTool as executeToolWithPagination } from './tool-execution.js';
+import { executeTool as executeToolWithPagination, PaginationArgumentError } from './tool-execution.js';
 import { toolDefinitionMap, securitySchemes } from './tools.js';
 import { enabledTools } from './tool-filter.js';
 import { logSafe, redact, sanitizeInputSchema } from './utils.js';
@@ -263,6 +263,17 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
     } catch (error: unknown) {
       const detail = redact(String(error instanceof Error ? error.message : error));
       console.error("[ERROR] Error executing tool '%s': %s", logSafe(toolName), logSafe(detail));
+
+      if (error instanceof PaginationArgumentError) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid pagination arguments',
+          message: error.message,
+          tool: toolName,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
 
       res.status(500).json({
         success: false,

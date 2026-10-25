@@ -4,6 +4,9 @@ import type { SendWithRetryOpts } from './httpClient.js';
 import { MAX_AUTO_ITEMS, MAX_AUTO_PAGE_SIZE, paginate, pageNumberFromLink, type JsonApiPage } from './pagination.js';
 import type { McpToolDefinition } from './types.js';
 
+/** Caller-supplied pagination arguments that are invalid (a client error, not a tool failure). */
+export class PaginationArgumentError extends Error {}
+
 export type SingleToolExecutor = (
   name: string, definition: McpToolDefinition, args: Record<string, unknown>, securitySchemes: Record<string, any>,
   sendOpts?: SendWithRetryOpts, maxResponseChars?: number, apiBaseUrl?: string,
@@ -22,6 +25,11 @@ function capPagedStructuredContent(page: JsonApiPage, maxChars: number): JsonApi
   while (text.length > maxChars && (bounded.data as unknown[]).length > 0) {
     (bounded.data as unknown[]).pop();
     bounded.truncated = true;
+    // The dropped items belong to pages before `next`, so following it would skip them.
+    if (bounded.links) {
+      const { next: _dropped, ...links } = bounded.links;
+      bounded.links = links;
+    }
     text = JSON.stringify(bounded);
   }
   return text.length > maxChars ? { data: [], truncated: true } : bounded;
@@ -47,7 +55,7 @@ export async function executeTool(
     return executor(name, definition, args, securitySchemes, undefined, options.maxResponseChars, options.apiBaseUrl);
   }
   if (!Number.isInteger(maxItems) || (maxItems as number) < 1 || (maxItems as number) > MAX_AUTO_ITEMS) {
-    throw new Error(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);
+    throw new PaginationArgumentError(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);
   }
   const firstArgs = { ...args };
   delete firstArgs.max_items;
@@ -56,7 +64,7 @@ export async function executeTool(
     const suppliedSize = Number(firstArgs[pageSizeKey]);
     // Clamping a larger size would silently shift the page window the caller asked for.
     if (suppliedSize > MAX_AUTO_PAGE_SIZE) {
-      throw new Error(`page_size_ must be at most ${MAX_AUTO_PAGE_SIZE} when max_items is set (Polarion's per-request limit).`);
+      throw new PaginationArgumentError(`page_size_ must be at most ${MAX_AUTO_PAGE_SIZE} when max_items is set (Polarion's per-request limit).`);
     }
     const requested = Number.isInteger(suppliedSize) && suppliedSize > 0 ? suppliedSize : maxItems as number;
     firstArgs[pageSizeKey] = Math.min(requested, maxItems as number, MAX_AUTO_PAGE_SIZE);

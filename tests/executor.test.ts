@@ -1679,3 +1679,15 @@ test("capToolResponseText trims a 215k-character list quickly", () => {
   assert.ok(Date.now() - started < 2_000, "cap took longer than the regression budget")
   assert.ok(capped.length <= DEFAULT_MAX_RESPONSE_CHARS)
 })
+
+test("capToolResponseText shrinks an existing truncation envelope instead of nesting it", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const envelope = JSON.stringify({ truncated: true, totalChars: 99_999, preview: "a".repeat(2_000), hint: "h", _notice: "n" })
+  const capped = capToolResponseText(envelope, 1_000, schema)
+  assert.ok(capped.length <= 1_000)
+  const parsed = JSON.parse(capped) as { truncated: boolean; totalChars: number; preview: string; _notice: string }
+  assert.equal(parsed.truncated, true)
+  assert.equal(parsed.totalChars, 99_999)
+  assert.equal(parsed._notice, "n")
+  assert.match(parsed.preview, /^a+$/)
+})
