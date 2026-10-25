@@ -141,20 +141,20 @@ The unchanged baseline has 496 passing tests and passed the previous coverage, E
 
 ## Acceptance criteria
 
-- [ ] Invalid or preview composite inputs produce no Polarion writes; explicit valid execution happens once.
-- [ ] Real singleton job and Work Item responses are read correctly.
-- [ ] A real LiveDoc renders body and headings; a known link and its details appear in the trace.
-- [ ] A one-file upload returns success and preserves the bytes and filename.
-- [ ] Empty structured search works; type/status alternatives produce OR semantics and usable summaries.
-- [ ] Field metadata is isolated by instance/caller/project and remains bounded.
-- [ ] Generated MCP, composite search, and REST honor `max_items` across real pages.
-- [ ] Finished collections have no stale next link; malformed or repeating pagination stops safely.
-- [ ] A graph with more than one link page is complete within its bounds or explicitly truncated.
-- [ ] Generated and composite text respects the configured cap without excessive synchronous work.
-- [ ] HTML/proxy responses do not establish a valid PAT; valid JSON projects still do.
-- [ ] Failed Basic token requests reach the documented limiter and successes do not consume its failure budget.
-- [ ] Negative regressions fail against the pre-fix behavior; the full suite and 2506/2606 live checks pass after fixes.
-- [ ] Documentation matches the implemented contracts and protected CRLF files retain their line endings.
+- [x] Invalid or preview composite inputs produce no Polarion writes; explicit valid execution happens once.
+- [x] Real singleton job and Work Item responses are read correctly.
+- [x] A real LiveDoc renders body and headings; a known link and its details appear in the trace.
+- [x] A one-file upload returns success and preserves the bytes and filename.
+- [x] Empty structured search works; type/status alternatives produce OR semantics and usable summaries.
+- [x] Field metadata is isolated by instance/caller/project and remains bounded.
+- [x] Generated MCP, composite search, and REST honor `max_items` across real pages.
+- [x] Finished collections have no stale next link; malformed or repeating pagination stops safely.
+- [x] A graph with more than one link page is complete within its bounds or explicitly truncated.
+- [x] Generated and composite text respects the configured cap without excessive synchronous work.
+- [x] HTML/proxy responses do not establish a valid PAT; valid JSON projects still do.
+- [x] Failed Basic token requests reach the documented limiter and successes do not consume its failure budget.
+- [x] Negative regressions fail against the pre-fix behavior; the full suite and 2506/2606 live checks pass after fixes.
+- [x] Documentation matches the implemented contracts and protected CRLF files retain their line endings.
 
 ## Risks and rollback
 
