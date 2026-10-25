@@ -26,10 +26,7 @@ function capPagedStructuredContent(page: JsonApiPage, maxChars: number): JsonApi
     (bounded.data as unknown[]).pop();
     bounded.truncated = true;
     // The dropped items belong to pages before `next`, so following it would skip them.
-    if (bounded.links) {
-      const { next: _dropped, ...links } = bounded.links;
-      bounded.links = links;
-    }
+    if (bounded.links) bounded.links = Object.fromEntries(Object.entries(bounded.links).filter(([key]) => key !== 'next'));
     text = JSON.stringify(bounded);
   }
   return text.length > maxChars ? { data: [], truncated: true } : bounded;
