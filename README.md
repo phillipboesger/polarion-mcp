@@ -114,7 +114,7 @@ docker run -d --name polarion-mcp \
   -p 127.0.0.1:3000:3000 \
   -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \
   -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.0
+  ghcr.io/phillipboesger/polarion-mcp:1.4.1
 ```
 
 For a local HTTP client, use `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. For a team, proxy HTTPS to that port and add the public hostname to `MCP_ALLOWED_HOSTS`. Cloud connectors also need `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, exact redirect allowlists and a `TRUST_PROXY` setting matching the real proxy chain. The picker includes that server configuration for claude.ai and ChatGPT. See [deployment](docs/deployment.md#docker) for operations details.
