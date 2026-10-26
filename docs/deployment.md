@@ -34,7 +34,7 @@ docker run -d --name polarion-mcp \
   -p 127.0.0.1:3000:3000 \
   -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \
   -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.0
+  ghcr.io/phillipboesger/polarion-mcp:1.4.1
 ```
 
 Connect to `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. The image holds no shared Polarion credentials in this mode. Each caller supplies their own PAT.
