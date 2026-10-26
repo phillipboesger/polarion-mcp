@@ -22,3 +22,7 @@ LIVE_PAT=your-token npm run test:live
 `LIVE_PROJECT` selects the project used for write scenarios; the suite's default is defined in `tests/live/`. `LIVE_BUILD_DIR` can point the runner at a different build. See [configuration.md](./configuration.md) for server settings; these live-test variables are consumed by the test runner.
 
 The suite creates and removes test data on the configured instance. Use a disposable project with appropriate permissions.
+
+For the project-permission regression test, set `LIVE_PROJECT_PAT` to a separate user with REST GET permission in `LIVE_PROJECT` and no global REST GET permission. On Polarion 2512+, the test requires `/metadata` to return 200 and `/projects` to return 403 for that PAT, then verifies MCP initialization and project reads succeed. Without this variable, only that test is skipped.
+
+The Streamable HTTP/OAuth live suite requires Polarion 2512+ because its PAT preflight uses `/metadata`. The suite skips HTTP/OAuth on older instances when that endpoint returns 404; stdio tests still run.
