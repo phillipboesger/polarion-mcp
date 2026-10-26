@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.4.1
+
+### Upgrade notes
+
+- Composite tools now reject unknown top-level arguments and malformed `dry_run` values. Previously they were ignored, and `dry_run: "true"` ran a real job.
+- `max_items` together with `page_size_` above 100 is rejected (Polarion's page limit).
+- The PAT check refuses a 200 response that is not JSON (for example an SSO or proxy login page).
+- With `MCP_CONFIRM_DESTRUCTIVE=true`, destructive Custom GPT REST calls need `confirm: true` in `arguments`. Defaults are unchanged.
+
+### Fixes
+
+- `run_job_and_wait`, `get_document_markdown` and `trace_links` handled Polarion's single-object responses wrongly (no job ID, empty document, no links). They now read the real shapes and request the fields they render. `trace_links` pages through all link pages.
+- `search_work_items`: several types or statuses are OR-ed within a group and AND-ed across groups; an empty search no longer sends an invalid query; field metadata is cached per instance, caller and project.
+- `upload_attachment` no longer sends a `lid` that Polarion rejects for single files.
+- `max_items` is honoured across pages for MCP, composite and REST calls; a finished list no longer advertises a stale `next` link; repeated or backward next links stop paging.
+- Response caps apply to composite, error and marked output; truncation uses a binary search instead of a quadratic loop.
+- Failed Basic token requests are rate limited before credential rejection.
+
+### Security
+
+- Custom GPT REST routes of the Streamable HTTP server run through the MCP pipeline (rate limit, policy, audit, confirmation) and honour `MCP_TOOLSETS`.
+- Forged `<polarion-untrusted>` wrappers are neutralised when `MCP_MARK_UNTRUSTED=true`; upstream error text is marked as untrusted.
+- Standalone REST wrapper: failed API-key attempts (401/403 only) are throttled before authentication.
+- A disconnecting client cancels in-flight pagination and retries.
+
+### Docs
+
+- Documentation matches the implemented contracts; the docs check flags duplicate configuration entries.
+- Polarion 2506 exposes only `GET /jobs/{id}`; the live job scenario skips there and runs on 2606.
+
 ## 1.4.0
 
 ### Upgrade notes
