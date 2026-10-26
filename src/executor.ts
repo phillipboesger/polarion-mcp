@@ -22,7 +22,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, sanitizeInputSchema } from "./utils.js";
+import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema } from "./utils.js";
 import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
@@ -37,6 +37,7 @@ import {
   type EnumGuardResult,
 } from "./guards.js";
 import { renderRichTextFieldsAsMarkdown } from "./markdown.js";
+import { containsUntrustedMarker, OPEN, CLOSE, UNTRUSTED_CONTENT_NOTICE } from "./untrusted-content.js";
 import { conciseDefaultFields, isConciseResponseFormat, shapeConciseResponse } from "./shaping.js";
 import { isDownloadTool, downloadResult, MAX_DOWNLOAD_BYTES } from "./binary.js";
 
@@ -63,7 +64,7 @@ export { sendWithRetry };
 export const DEFAULT_MAX_RESPONSE_CHARS = 100_000;
 const MIN_RESPONSE_CHARS = JSON.stringify({ truncated: true, totalChars: Number.MAX_SAFE_INTEGER, preview: '', hint: 'Use fields and page_size_ to shrink the response.' }).length;
 
-function truncateResponse(text: string, maxChars: number, definition: McpToolDefinition): string {
+function truncateResponse(text: string, maxChars: number, definition: Pick<McpToolDefinition, 'inputSchema'>): string {
   const properties = definition.inputSchema?.properties ?? {};
   const suggestions = [
     properties.fields ? 'fields' : undefined,
@@ -71,18 +72,52 @@ function truncateResponse(text: string, maxChars: number, definition: McpToolDef
   ].filter(Boolean);
   const hint = suggestions.length ? `Use ${suggestions.join(' and ')} to shrink the response.` : 'Narrow the query to shrink the response.';
   const codePoints = Array.from(text);
-  let previewLength = Math.min(codePoints.length, maxChars);
-  while (previewLength >= 0) {
-    const envelope = JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, previewLength).join(''), hint });
-    if (envelope.length <= maxChars || previewLength === 0) return envelope;
-    previewLength--;
+  // Keep the untrusted-content notice on the envelope when the cut text carried markers.
+  const notice = containsUntrustedMarker(text) ? { _notice: UNTRUSTED_CONTENT_NOTICE } : {};
+  const envelopeFor = (count: number) => JSON.stringify({ truncated: true, totalChars: text.length, preview: codePoints.slice(0, count).join(''), hint, ...notice });
+  // The envelope only grows with the preview, so a binary search finds the
+  // largest fitting preview without re-stringifying the whole text per code point.
+  let low = 0;
+  let high = codePoints.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (envelopeFor(mid).length <= maxChars) low = mid;
+    else high = mid - 1;
   }
-  return JSON.stringify({ truncated: true, totalChars: text.length, preview: '', hint });
+  return envelopeFor(low);
 }
 
 /** Applies the executor's text-size cap to a composed response. */
-export function capToolResponseText(text: string, maxChars: number, definition: McpToolDefinition): string {
-  return text.length > maxChars ? truncateResponse(text, maxChars, definition) : text;
+export function capToolResponseText(text: string, maxChars: number, definition: Pick<McpToolDefinition, 'inputSchema'>): string {
+  if (text.length <= maxChars) return text;
+  return refitTruncationEnvelope(text, maxChars) ?? truncateResponse(text, maxChars, definition);
+}
+
+/**
+ * Shrinks the preview of an existing truncation envelope instead of wrapping it
+ * again: untrusted-content annotation runs after the executor's cap and can push
+ * the envelope back over it. Keeps the original `totalChars`.
+ */
+function refitTruncationEnvelope(text: string, maxChars: number): string | undefined {
+  let envelope: { truncated?: unknown; preview?: unknown; totalChars?: unknown };
+  try { envelope = JSON.parse(text); } catch { return undefined; }
+  if (!envelope || typeof envelope !== 'object' || envelope.truncated !== true
+    || typeof envelope.preview !== 'string' || typeof envelope.totalChars !== 'number') return undefined;
+  // A marked preview is one untrusted span: cut inside it and keep the wrapper intact.
+  const wrapped = envelope.preview.startsWith(OPEN) && envelope.preview.endsWith(CLOSE);
+  const inner = wrapped ? envelope.preview.slice(OPEN.length, envelope.preview.length - CLOSE.length) : envelope.preview;
+  const codePoints = Array.from(inner);
+  const cut = (count: number) => codePoints.slice(0, count).join('');
+  const fit = (count: number) => JSON.stringify({ ...envelope, preview: wrapped ? `${OPEN}${cut(count)}${CLOSE}` : cut(count) });
+  if (fit(0).length > maxChars) return undefined;
+  let low = 0;
+  let high = codePoints.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (fit(mid).length <= maxChars) low = mid;
+    else high = mid - 1;
+  }
+  return fit(low);
 }
 
 /** Parses the response text cap from the entry-point environment. */
@@ -591,10 +626,9 @@ export async function executeApiTool(
     // fall through to the real (possibly irreversible) write.
     const rawDryRun = argsForValidation.dry_run;
     delete argsForValidation.dry_run;
-    const dryRun = rawDryRun === true || rawDryRun === 'true' || rawDryRun === 1;
-    if (rawDryRun !== undefined && !dryRun && rawDryRun !== false && rawDryRun !== 'false' && rawDryRun !== 0) {
-      return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true };
-    }
+    let dryRun: boolean | undefined;
+    try { dryRun = normalizeDryRun(rawDryRun); }
+    catch { return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true }; }
 
     // Validation runs against the original schema, whose keys are the
     // original names; a sanitized name would otherwise be stripped by Zod.

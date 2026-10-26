@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { AxiosError } from "axios"
-import { compileZodSchema, extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, paramToSafeInputKey, bearerCredential, logSafe, readArg, redact, sanitizeInputSchema } from "../src/utils.js"
+import { compileZodSchema, extractJsonApiErrorDetail, formatApiError, getZodSchemaFromJsonSchema, normalizeDryRun, paramToSafeInputKey, bearerCredential, logSafe, readArg, redact, sanitizeInputSchema } from "../src/utils.js"
 import { toolDefinitionMap } from "../src/tools.js"
 
 test("redact removes authorization credentials and query API keys", () => {
@@ -9,6 +9,13 @@ test("redact removes authorization credentials and query API keys", () => {
   assert.doesNotMatch(value, /abc123|dXNlcjpwYXNz|key-1|tok-2/)
   assert.match(value, /Bearer \[REDACTED\]/)
   assert.match(value, /Basic \[REDACTED\]/)
+})
+
+test("normalizeDryRun accepts only explicit boolean compatibility forms", () => {
+  for (const value of [true, "true", 1]) assert.equal(normalizeDryRun(value), true)
+  for (const value of [false, "false", 0]) assert.equal(normalizeDryRun(value), false)
+  assert.equal(normalizeDryRun(undefined), undefined)
+  for (const value of ["yes", 2, null, "TRUE", " false "]) assert.throws(() => normalizeDryRun(value), /dry_run must be true or false/)
 })
 
 test("sanitizeInputSchema rewrites invalid property names and records the mapping", () => {

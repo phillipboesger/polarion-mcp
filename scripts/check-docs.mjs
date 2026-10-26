@@ -8,7 +8,7 @@ import { renderSite } from './render-site.mjs';
 const RULES = {
   env: 'env-vars', tools: 'tool-references', prompts: 'prompt-resource-references',
   links: 'markdown-links-toc', examples: 'tool-call-examples', endings: 'crlf',
-  website: 'website-counts', clients: 'client-references',
+  website: 'website-counts', clients: 'client-references', configDuplicates: 'duplicate-config-entries',
 };
 // Names supplied by hosting runtimes or read through a parameterized env map.
 // They are checked through their documented family/flow rather than as literals.
@@ -115,6 +115,34 @@ function checker(root) {
     }
   }
   const config = read(root, 'docs/configuration.md');
+  // Configuration names are structured entries: the first cell of the
+  // Environment variables table, or an env-style bullet. Avoid prose scanning.
+  const configNames = new Map();
+  let inEnvironmentTable = false;
+  config.split('\n').forEach((line, index) => {
+    const row = line.match(/^\s*\|\s*([^|]+?)\s*\|/);
+    if (row) {
+      const firstCell = row[1].trim();
+      if (/^variable$/i.test(firstCell)) { inEnvironmentTable = true; return; }
+      if (/^[-: ]+$/.test(firstCell)) return;
+      if (inEnvironmentTable) {
+        const name = firstCell.match(/`([A-Z][A-Z0-9_]*)`/);
+        if (name) {
+          const previous = configNames.get(name[1]);
+          if (previous) add('configDuplicates', 'docs/configuration.md', index + 1, `${name[1]} is duplicated; first listed at line ${previous}`);
+          else configNames.set(name[1], index + 1);
+        }
+      }
+      return;
+    }
+    inEnvironmentTable = false;
+    const bullet = line.match(/^\s*[-*]\s+`?([A-Z][A-Z0-9_]*)`?\s*:/);
+    if (bullet) {
+      const previous = configNames.get(bullet[1]);
+      if (previous) add('configDuplicates', 'docs/configuration.md', index + 1, `${bullet[1]} is duplicated; first listed at line ${previous}`);
+      else configNames.set(bullet[1], index + 1);
+    }
+  });
   const documented = new Map();
   for (const match of config.matchAll(/^\s*-\s+`?([A-Z][A-Z0-9_]*)(?:\s*\/\s*[A-Z][A-Z0-9_]*)?`?\s*:/gm)) documented.set(match[1], lineAt(config, match.index));
   for (const match of config.matchAll(/\b((?:API_KEY|BEARER_TOKEN|BASIC_USERNAME|BASIC_PASSWORD|OAUTH_CLIENT_ID|OAUTH_CLIENT_SECRET|OAUTH_SCOPES|OAUTH_TOKEN|OPENID_TOKEN)_<SCHEME>)/g)) documented.set(match[1], lineAt(config, match.index));

@@ -26,11 +26,11 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
-import { sanitizeInputSchema } from './utils.js';
+import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.js';
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes, toolDefinitionMap } from './tools.js';
 import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
-import { executeApiTool, DEFAULT_MAX_RESPONSE_CHARS, capToolResponseText } from './executor.js';
+import { executeApiTool, capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
 import { listVirtualTools, discoverVirtualTools, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
@@ -41,13 +41,13 @@ import { renderRichTextFieldsAsMarkdown } from './markdown.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
-import { annotatePolarionResult, annotateToolText } from './untrusted-content.js';
+import { annotatePolarionResult, annotateToolText, markUntrustedText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
 import { createVersionCheck } from './version-check.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
 import { decodePolarionIdentifier, registerCompositeTools } from './composite-search.js';
-import { MAX_AUTO_ITEMS, paginate, pageNumberFromLink, type JsonApiPage } from './pagination.js';
+import { executeTool as executeToolWithPagination } from './tool-execution.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -152,7 +152,13 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             // MCP_READ_ONLY filtering has already been applied to enabledTools.
             const definition = enabledTools.get(name);
             if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
-            return executeApiTool(name, definition, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
+            return executeToolWithPagination(name, definition, callArgs, securitySchemes, executeApiTool, {
+              apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal,
+              beforeNextPage: () => {
+                const retryAfter = options.rateLimiter.check(principal.id);
+                if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
+              },
+            });
           },
           requestBearerToken: bearerToken,
           userScope,
@@ -165,50 +171,13 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
         outcome = result.isError ? 'error' : 'success';
       } else if (generated) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
-        const maxItems = callArgs.max_items;
-        const outputProperties = generated.outputSchema?.properties;
-        const supportsPagination = generated.method.toLowerCase() === 'get'
-          && Boolean(outputProperties?.data?.items && outputProperties?.links?.properties?.next && outputProperties?.meta?.properties?.totalCount);
-        if (maxItems === undefined || !supportsPagination) {
-          result = await executeApiTool(toolName, generated, callArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-        } else {
-          if (!Number.isInteger(maxItems) || (maxItems as number) < 1 || (maxItems as number) > MAX_AUTO_ITEMS) throw new Error(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);
-          const firstArgs = { ...callArgs };
-          delete firstArgs.max_items;
-          const pageSizeKey = generated.inputSchema?.properties?.['page[size]'] ? 'page_size_' : undefined;
-          if (pageSizeKey) {
-            const suppliedSize = Number(firstArgs[pageSizeKey]);
-            const requested = Number.isInteger(suppliedSize) && suppliedSize > 0 ? suppliedSize : maxItems as number;
-            firstArgs[pageSizeKey] = Math.min(requested, maxItems as number, MAX_AUTO_ITEMS);
-          }
-          const first = await executeApiTool(toolName, generated, firstArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-          const body = first.structuredContent;
-          if (first.isError || !body || typeof body !== 'object' || !Array.isArray((body as JsonApiPage).data)) {
-            result = first;
-          } else {
-            const { response, truncated } = await paginate(body as JsonApiPage, maxItems as number, async next => {
-              const retryAfter = options.rateLimiter.check(principal.id);
-              if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
-              const nextArgs = { ...firstArgs };
-              const currentPageNumber = Number(nextArgs.page_number_ ?? 1);
-              const nextPageNumber = pageNumberFromLink(next, resolved.apiBaseUrl);
-              if (nextPageNumber === undefined || nextPageNumber <= currentPageNumber) throw new Error(`Pagination stopped for ${toolName}: next page number is missing or did not advance.`);
-              nextArgs.page_number_ = nextPageNumber;
-              const page = await executeApiTool(toolName, generated, nextArgs, securitySchemes, undefined, options.maxResponseChars, resolved.apiBaseUrl);
-              if (page.isError || !page.structuredContent || typeof page.structuredContent !== 'object') throw new Error(`Pagination failed for ${toolName}: ${page.content.find(item => item.type === 'text')?.text ?? 'invalid page response'}`);
-              return page.structuredContent as JsonApiPage;
-            }, undefined, options.signal);
-            const structuredContent = capPagedStructuredContent({ ...response, ...(truncated ? { truncated: true } : {}) }, options.maxResponseChars);
-            const firstText = first.content.find(item => item.type === 'text');
-            const prefix = firstText?.type === 'text' ? (firstText.text.split('\n', 1)[0] ?? 'API Response') : 'API Response';
-            const fullText = `${prefix}\n${JSON.stringify(structuredContent)}`;
-            result = {
-              ...first,
-              content: [{ type: 'text', text: capToolResponseText(fullText, options.maxResponseChars, generated) }],
-              structuredContent,
-            };
-          }
-        }
+        result = await executeToolWithPagination(toolName, generated, callArgs, securitySchemes, executeApiTool, {
+          apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal,
+          beforeNextPage: () => {
+            const retryAfter = options.rateLimiter.check(principal.id);
+            if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
+          },
+        });
         if (/^(1|true|yes|on)$/i.test(process.env.MCP_RESOURCE_LINKS ?? '') && !result.isError) {
         const uri = toolName === 'getWorkItem' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/workitem/${encodeURIComponent(String(args.workItemId ?? ''))}`
           : toolName === 'getDocument' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/document/${encodeURIComponent(String(args.spaceId ?? ''))}/${encodeURIComponent(String(args.documentName ?? ''))}` : undefined;
@@ -237,19 +206,49 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
     if (decision.action === 'deny') {
       outcome = 'denied';
       result = { content: [{ type: 'text', text: decision.reason }], isError: true };
-    } else if (decision.action === 'requireConfirmation' && !(args.dry_run === true && (generated?.inputSchema?.properties?.dry_run !== undefined || virtual?.dryRunSafe === true))) {
-      const confirmation = await requestDestructiveConfirmation(options.server, toolName, args, options.signal);
-      if (confirmation !== 'accepted') {
-        outcome = 'confirmation-required';
-        const text = confirmation === 'fallback'
-          ? 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.'
-          : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
-        result = { content: [{ type: 'text', text }], isError: true };
+    } else {
+      // Normalize and validate before confirmation selection, so malformed flags
+      // cannot turn a preview request into a write and virtual schemas are not
+      // merely descriptive.
+      const dryRun = normalizeDryRun(args.dry_run);
+      if (dryRun !== undefined) callArgs.dry_run = dryRun;
+      if (virtual) {
+        const properties = virtual.inputSchema?.properties as Record<string, unknown> | undefined;
+        const openSchema = properties === undefined || virtual.inputSchema.additionalProperties === true;
+        const unknown = openSchema ? [] : Object.keys(callArgs).filter(key => !key.startsWith('_') && key !== 'dry_run' && !Object.hasOwn(properties, key));
+        if (unknown.length) throw new Error(`Invalid arguments for tool '${toolName}': unknown argument(s) ${unknown.join(', ')}`);
+        // dry_run is a shared control: strict schemas that do not declare it must not reject it.
+        const schemaInput = Object.fromEntries(Object.entries(callArgs).filter(([key]) => !key.startsWith('_') && (key !== 'dry_run' || (properties !== undefined && Object.hasOwn(properties, key)))));
+        let validated: Record<string, unknown>;
+        try {
+          validated = compileZodSchema(virtual.inputSchema).parse(schemaInput) as Record<string, unknown>;
+        } catch (error) {
+          if (error instanceof Error && error.name === 'ZodError') {
+            const issues = (error as Error & { issues?: Array<{ path: PropertyKey[]; message: string }> }).issues ?? [];
+            throw new Error(`Invalid arguments for tool '${toolName}': ${issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join(', ')}`, { cause: error });
+          }
+          throw new Error(`Could not validate arguments for tool '${toolName}': ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+        }
+        // Keep protocol metadata and the shared dry_run control available to
+        // handlers, matching the generated executor's reserved-key behavior.
+        Object.assign(callArgs, openSchema ? schemaInput : validated, Object.fromEntries(Object.entries(args).filter(([key]) => key.startsWith('_'))));
+        if (dryRun !== undefined) callArgs.dry_run = dryRun;
+      }
+      const safePreview = dryRun === true && (generated?.inputSchema?.properties?.dry_run !== undefined || virtual?.dryRunSafe === true);
+      if (decision.action === 'requireConfirmation' && !safePreview) {
+        const confirmation = await requestDestructiveConfirmation(options.server, toolName, args, options.signal);
+        if (confirmation !== 'accepted') {
+          outcome = 'confirmation-required';
+          const text = confirmation === 'fallback'
+            ? 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.'
+            : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
+          result = { content: [{ type: 'text', text }], isError: true };
+        } else {
+          await execute();
+        }
       } else {
         await execute();
       }
-    } else {
-      await execute();
     }
   } catch (error) {
     result = { content: [{ type: 'text', text: error instanceof Error ? error.message : 'Tool call failed' }], isError: true };
@@ -271,19 +270,20 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       ? { ...item, text: annotateToolText(item.text, options.markUntrusted) }
       : item);
   }
-  return result!;
-}
-
-function capPagedStructuredContent(page: JsonApiPage, maxChars: number): JsonApiPage {
-  const bounded: JsonApiPage = { ...page, data: Array.isArray(page.data) ? [...page.data] : [] };
-  let text = JSON.stringify(bounded);
-  while (text.length > maxChars && (bounded.data as unknown[]).length > 0) {
-    (bounded.data as unknown[]).pop();
-    bounded.truncated = true;
-    text = JSON.stringify(bounded);
+  // Upstream error bodies can echo user-authored content (titles, query fragments).
+  if (options.markUntrusted && result!.isError && outcome === 'error' && generated) {
+    result!.content = result!.content.map(item => item.type === 'text' ? { ...item, text: markUntrustedText(item.text) } : item);
   }
-  if (text.length > maxChars) return { data: [], truncated: true };
-  return bounded;
+  // Virtual handlers and the marker annotation both run after the executor's
+  // cap, so the cap is applied to the final text the client receives, errors included.
+  const definition = virtual ?? generated;
+  if (definition) {
+    const maxChars = options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS;
+    result!.content = result!.content.map(item => item.type === 'text'
+      ? { ...item, text: capToolResponseText(item.text, maxChars, definition) }
+      : item);
+  }
+  return result!;
 }
 
 export interface PolarionServerOptions {
@@ -309,6 +309,27 @@ export interface PolarionServerOptions {
   markUntrusted?: boolean;
   /** Current transport; local file uploads are restricted to stdio. Defaults to HTTP-safe. */
   transport?: 'stdio' | 'http';
+}
+
+/**
+ * Builds a caller that runs tools through the same pipeline as MCP tools/call
+ * (auth, rate limit, policy, confirmation, audit, marking) for transports with
+ * no MCP client, such as the Custom GPT REST routes. With no client to prompt,
+ * a destructive call needs `confirm: true` in its arguments.
+ */
+export function createToolCaller(options: PolarionServerOptions & { tools: ReadonlyMap<string, import('./types.js').McpToolDefinition> }):
+  (name: string, args: Record<string, unknown>, signal?: AbortSignal) => Promise<CallToolResult> {
+  const logger: PipelineLogger = options.logger ?? createLogger({ format: options.logFormat, level: options.logLevel });
+  const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
+  const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
+  const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
+  const noClient = { getClientCapabilities: () => undefined } as unknown as Server;
+  return (name, args, signal) => callToolPipeline(name, args, {
+    clientTools: options.tools, virtualTools: [], extensions,
+    maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
+    logger, signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
+    telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: 'http', server: noClient,
+  });
 }
 
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {

@@ -42,8 +42,10 @@ import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelconte
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets } from './config.js';
-import { createPolarionServer } from './server.js';
+import { createPolarionServer, createToolCaller } from './server.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
+import { enabledTools, filterTools } from './tool-filter.js';
+import type { McpToolDefinition } from './types.js';
 import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
 import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
 import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
@@ -396,10 +398,24 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       legacyHeaders: false,
       handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests from this IP' }),
     });
+    const tokenClientLimit = rateLimit({
+      windowMs: 15 * 60 * 1000,
+      limit: 50,
+      skipSuccessfulRequests: true,
+      keyGenerator: req => {
+        const basic = basicCredentials(req.get('authorization'));
+        const clientId = basic?.clientId ?? String(req.body?.client_id ?? '');
+        return tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', clientId);
+      },
+      validate: { keyGeneratorIpFallback: false },
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests' }),
+    });
     // The SDK token endpoint only reads client credentials from the body;
     // move HTTP Basic credentials there so client_secret_basic clients work.
     // The SDK's own urlencoded parser then sees a consumed stream and keeps this body.
-    app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response, next: NextFunction) => {
+    app.post('/token', express.urlencoded({ extended: false }), tokenIpLimit, tokenClientLimit, async (req: Request, res: Response, next: NextFunction) => {
       const basic = basicCredentials(req.get('authorization'));
       if (basic) {
         if (isCimdClientIdentifier(basic.clientId)) {
@@ -418,9 +434,6 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       }
       next();
     });
-    // The preceding shim parses the body so this per-IP ceiling bounds the
-    // number of distinct client-id buckets one source can create.
-    app.post('/token', tokenIpLimit);
     // The SDK metadata omits Basic even though the token shim supports it; augment its JSON response.
     app.use('/.well-known/oauth-authorization-server', (_req: Request, res: Response, next: NextFunction) => {
       const sendJson = res.json.bind(res);
@@ -489,18 +502,10 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
             handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many client registrations' }),
           },
         },
-        tokenOptions: {
-          rateLimit: {
-            windowMs: 15 * 60 * 1000,
-            limit: 50,
-            skipSuccessfulRequests: true,
-            keyGenerator: req => tokenRateLimitKey(req.ip ?? req.socket.remoteAddress ?? '', String(req.body?.client_id ?? '')),
-            validate: { keyGeneratorIpFallback: false },
-            standardHeaders: true,
-            legacyHeaders: false,
-            handler: (_req, res) => res.status(429).json({ error: 'too_many_requests', error_description: 'Too many token requests' }),
-          },
-        },
+        // The custom pre-auth limiters above include Basic credentials and
+        // skip successful exchanges; the SDK's default limiter would count
+        // successes and impose a second, conflicting budget.
+        tokenOptions: { rateLimit: false },
         scopesSupported: [POLARION_SCOPE],
       })
     );
@@ -666,7 +671,11 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   if (oauth && publicUrl && gptClient) {
-    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS);
+    mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
+      // The deployment's toolset allowlist applies to REST like it does to MCP sessions.
+      filterTools(enabledTools, { toolsets: [...allowedToolsets] }).tools,
+      // REST shares the deployment-wide limiter and the same policy, confirmation and audit pipeline.
+      { rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
   }
 
   // Health check (no auth) for load balancers and quick verification.
@@ -847,7 +856,9 @@ function mountCustomGpt(
   gptClient: { clientId: string; clientSecret: string },
   bearerChallenge: (error?: string) => string,
   tokenIpRateLimit: number,
-  maxResponseChars: number
+  maxResponseChars: number,
+  restTools: ReadonlyMap<string, McpToolDefinition>,
+  pipelineOptions: Omit<Parameters<typeof createToolCaller>[0], 'tools' | 'maxResponseChars'>
 ): void {
   // Same limits the SDK applies to its own /authorize and /token.
   const authorizeLimit = rateLimit({
@@ -936,6 +947,8 @@ function mountCustomGpt(
 
   app.use(createRestToolsRouter({
     authenticate,
+    tools: restTools,
+    callTool: createToolCaller({ ...pipelineOptions, tools: restTools, maxResponseChars }),
     serverUrl: () => publicUrl.href.replace(/\/$/, ''),
     securityScheme: {
       type: 'oauth2',

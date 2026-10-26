@@ -14,14 +14,16 @@
  * - GET /openapi-gpt.json - OpenAPI 3.1 spec with the Custom GPT subset
  */
 
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import express, { type Request, type RequestHandler, type Response } from 'express';
 import { executeApiTool } from './executor.js';
+import { executeTool as executeToolWithPagination, PaginationArgumentError } from './tool-execution.js';
 import { toolDefinitionMap, securitySchemes } from './tools.js';
 import { enabledTools } from './tool-filter.js';
 import { logSafe, redact, sanitizeInputSchema } from './utils.js';
-import { SERVER_VERSION } from './config.js';
+import { API_BASE_URL, SERVER_VERSION } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
-import type { JsonObject } from './types.js';
+import type { JsonObject, McpToolDefinition } from './types.js';
 
 /**
  * Builds the `servers` URL for the REST wrapper's OpenAPI specs.
@@ -72,6 +74,10 @@ export interface RestToolsOptions {
   securityScheme: Record<string, unknown>;
   /** What a 401 means, as documented in the specs. */
   unauthorizedDescription: string;
+  /** The tools to expose; defaults to the deployment-wide tool filter. */
+  tools?: ReadonlyMap<string, McpToolDefinition>;
+  /** Runs a call through the shared MCP pipeline; when set, it replaces direct execution. */
+  callTool?: (name: string, args: Record<string, unknown>, signal?: AbortSignal) => Promise<CallToolResult>;
   executeTool?: typeof executeApiTool;
   /** Maximum characters returned in a tool's text content. */
   maxResponseChars?: number;
@@ -186,13 +192,14 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
   const { authenticate, serverUrl, securityScheme, unauthorizedDescription } = options;
   const router = express.Router();
   const executeTool = options.executeTool ?? executeApiTool;
+  const exposedTools = options.tools ?? enabledTools;
 
   /**
    * List all available tools
    * Returns tool names, descriptions, and input schemas
    */
   router.get('/api/tools', authenticate, (req: Request, res: Response) => {
-    const tools = Array.from(enabledTools.values()).map(def => {
+    const tools = Array.from(exposedTools.values()).map(def => {
       const nameMap = {};
       const sanitizedSchema = sanitizeInputSchema(def.inputSchema, nameMap);
 
@@ -223,7 +230,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
 
     try {
       // Look up the tool definition
-      const toolDefinition = enabledTools.get(toolName);
+      const toolDefinition = exposedTools.get(toolName);
 
       if (!toolDefinition) {
         return res.status(404).json({
@@ -234,7 +241,14 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       }
 
       // Execute the tool
-      const result = await executeTool(toolName, toolDefinition, toolArgs, securitySchemes, undefined, options.maxResponseChars);
+      // A client that disconnects before the answer is written cancels the pagination loop.
+      const aborted = new AbortController();
+      res.once('close', () => { if (!res.writableEnded) aborted.abort(); });
+      const result = options.callTool
+        ? await options.callTool(toolName, toolArgs, aborted.signal)
+        : await executeToolWithPagination(toolName, toolDefinition, toolArgs, securitySchemes, executeTool, {
+          apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars, signal: aborted.signal,
+        });
 
       // Extract text content from MCP response format
       const textContent = result.content
@@ -260,6 +274,17 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
     } catch (error: unknown) {
       const detail = redact(String(error instanceof Error ? error.message : error));
       console.error("[ERROR] Error executing tool '%s': %s", logSafe(toolName), logSafe(detail));
+
+      if (error instanceof PaginationArgumentError) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid pagination arguments',
+          message: error.message,
+          tool: toolName,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
 
       res.status(500).json({
         success: false,
@@ -316,7 +341,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
     };
 
     // Add each tool as a separate endpoint
-    for (const name of enabledTools.keys()) {
+    for (const name of exposedTools.keys()) {
       paths[`/api/tools/${name}`] = toolOperation(name, unauthorizedDescription);
     }
 
@@ -325,7 +350,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       info: {
         title: 'Polarion REST API via MCP',
         version: SERVER_VERSION,
-        description: `HTTP REST API wrapper for Polarion MCP Server. Provides access to ${enabledTools.size} Polarion API operations.`
+        description: `HTTP REST API wrapper for Polarion MCP Server. Provides access to ${exposedTools.size} Polarion API operations.`
       },
       servers: [{ url: serverUrl(req), description: 'Polarion MCP HTTP Server' }],
       paths,
@@ -345,7 +370,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
     // Add only essential tools (max 30 for Custom GPT)
     let toolCount = 0;
     for (const toolName of ESSENTIAL_GPT_TOOLS) {
-      if (!enabledTools.has(toolName)) {
+      if (!exposedTools.has(toolName)) {
         // A tool switched off by the tool filter is left out on purpose.
         if (!toolDefinitionMap.has(toolName)) console.error(`[WARNING] Essential tool '${toolName}' not found in toolDefinitionMap`);
         continue;

@@ -39,10 +39,10 @@ export async function connectStdio(env = {}) {
  * client itself refused the result, for example an outputSchema violation, which
  * is the failure class mocks cannot show.
  */
-export async function call(client, name, args = {}) {
+export async function call(client, name, args = {}, options = {}) {
   try {
-    const r = await client.callTool({ name, arguments: args });
-    return { isError: !!r.isError, text: r.content?.[0]?.text ?? "", structured: r.structuredContent };
+    const r = await client.callTool({ name, arguments: args }, undefined, options);
+    return { isError: !!r.isError, text: r.content?.[0]?.text ?? "", structured: r.structuredContent, content: r.content ?? [] };
   } catch (e) {
     return { thrown: String(e?.message ?? e).slice(0, 600), isError: true, text: "" };
   }

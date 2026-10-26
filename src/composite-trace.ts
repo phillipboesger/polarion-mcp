@@ -1,4 +1,5 @@
 import type { VirtualTool } from './virtual-tools.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { attrs, boundedNumber, first, parseWorkItemId, relData, rows, textResult, type JsonObject } from './composite-utils.js';
 
 interface TraceNode { id: string; title: string; type: string; status: string }
@@ -34,43 +35,55 @@ export const traceLinks: VirtualTool = {
     const edgeMap = new Map<string, TraceEdge>();
     const queue = [rootId];
     const seen = new Set<string>();
+    const discovered = new Set<string>([rootId]);
     const distances = new Map([[rootId, 0]]);
     let truncated = false;
-    while (queue.length && seen.size <= cap) {
-      const batch = queue.splice(0, 4).filter(id => (distances.get(id) ?? 0) < depth);
-      if (batch.length === 0) { truncated ||= queue.length > 0; break; }
-      const queries = batch.flatMap(id => {
+    while (queue.length) {
+      const batch = queue.splice(0, 4);
+      const expandable = batch.filter(id => (distances.get(id) ?? 0) < depth);
+      const queries = expandable.flatMap(id => {
         const parsed = parseWorkItemId(id)!;
         return [
           ...(direction !== 'up' ? [{ id, dir: 'down' as const, name: 'getLinkedWorkItems', parsed }] : []),
           ...(direction !== 'down' ? [{ id, dir: 'up' as const, name: 'getBacklinkedWorkItems', parsed }] : []),
         ];
       });
-      const fetched = await mapLimit(queries, 4, query => ctx.callPolarionTool(query.name, query.parsed));
+      const fetched = await mapLimit(queries, 4, query => ctx.callPolarionTool(query.name, {
+        ...query.parsed,
+        fields: { linkedworkitems: 'role,sourceWorkItem,workItem' },
+        max_items: 1000,
+      }));
       const failed = fetched.find(result => result.isError === true);
       if (failed) return failed;
-      const expansions = batch.map(id => ({ id, edges: queries.flatMap((query, index) => query.id === id ? relationEdges(rows(fetched[index]!), id, query.dir) : []) }));
+      if (fetched.some(result => (result.structuredContent as Record<string, unknown> | undefined)?.truncated === true)) truncated = true;
+      const expansions = expandable.map(id => ({ id, edges: queries.flatMap((query, index) => query.id === id ? relationEdges(rows(fetched[index]!), id, query.dir) : []) }));
       for (const expansion of expansions) {
         for (const edge of expansion.edges.filter(candidate => !roleFilter || roleFilter.has(candidate.role))) {
           edgeMap.set(`${edge.from}\0${edge.to}\0${edge.role}`, edge);
           const other = edge.from === expansion.id ? edge.to : edge.from;
-          if (other !== expansion.id && !seen.has(other) && !queue.includes(other)) {
-            if (seen.size + queue.length >= cap) { truncated = true; continue; }
+          if (other !== expansion.id && !discovered.has(other)) {
+            if (discovered.size >= cap) { truncated = true; continue; }
+            discovered.add(other);
             distances.set(other, (distances.get(expansion.id) ?? 0) + 1);
             queue.push(other);
           }
         }
       }
       for (const id of batch) seen.add(id);
-      const nodeIds = [...new Set([rootId, ...[...edgeMap.values()].flatMap(e => [e.from, e.to])])].filter(id => !nodeMap.has(id)).slice(0, cap - nodeMap.size);
-      const details = await mapLimit(nodeIds, 4, async id => {
+      const candidates = [...new Set([rootId, ...[...edgeMap.values()].flatMap(e => [e.from, e.to])])].filter(id => !nodeMap.has(id));
+      const nodeIds = candidates.slice(0, Math.max(0, cap - nodeMap.size));
+      if (nodeIds.length < candidates.length) truncated = true;
+      const details = await mapLimit< string, TraceNode | CallToolResult >(nodeIds, 4, async id => {
         const parsed = parseWorkItemId(id);
         if (!parsed) return { id } as TraceNode;
-        const response = await ctx.callPolarionTool('getWorkItem', parsed);
+        const response = await ctx.callPolarionTool('getWorkItem', { ...parsed, fields: { workitems: 'title,type,status' } });
+        if (response.isError) return response;
         const item = first(response); const a = attrs(item);
         return { id, title: String(a.title ?? ''), type: String(a.type ?? ''), status: String(a.status ?? '') };
       });
-      for (const node of details) nodeMap.set(node.id, node);
+      const detailError = details.find((node): node is CallToolResult => 'isError' in node && node.isError === true);
+      if (detailError) return detailError;
+      for (const node of details as TraceNode[]) nodeMap.set(node.id, node);
       if (seen.size >= cap && queue.length) { truncated = true; break; }
     }
     const returned = new Set(nodeMap.keys());

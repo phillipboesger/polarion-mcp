@@ -8,13 +8,23 @@ const response = (data: unknown, extra: Record<string, unknown> = {}): CallToolR
 function context(call: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>, signal = new AbortController().signal, progress: unknown[] = []): VirtualToolContext {
   return { callPolarionTool: call, signal, apiBaseUrl: 'https://polarion.test/polarion/rest/v1', logger: console, reportProgress: async item => { progress.push(item); } };
 }
-const job = (state: string, status?: string) => response([{ id: 'job-1', attributes: { state, status: status ? { type: status, message: 'done' } : undefined } }]);
+const job = (state: string, status?: string) => response({ id: 'job-1', attributes: { state, status: status ? { type: status, message: 'done' } : undefined } });
 import { runJobAndWait } from '../src/composite-jobs.js';
+import { first, rows } from '../src/composite-utils.js';
+test('resource extraction handles singleton data while collection extraction stays array-only', () => {
+  const singleton = response({ id: 'job-singleton' });
+  assert.equal(first(singleton).id, 'job-singleton');
+  assert.deepEqual(rows(singleton), []);
+  const collection = response([{ id: 'job-first' }, { id: 'job-second' }]);
+  assert.equal(first(collection).id, 'job-first');
+  assert.equal(Array.isArray(first(collection)), false);
+  assert.equal(rows(collection).length, 2);
+});
 test('run_job_and_wait reports successful and failed terminal states with capped log tails', async () => {
   const calls: string[] = [];
   const ctx = context(async name => {
     calls.push(name);
-    if (name === 'executeJob') return response([{ id: 'job-1', attributes: { state: 'running' } }]);
+    if (name === 'executeJob') return response({ id: 'job-1', attributes: { state: 'running' } });
     if (name === 'getJob') return job('finished', 'OK');
     if (name === 'getJobLogContent') return { content: [{ type: 'text', text: '0123456789' }] };
     throw new Error(name);
@@ -25,14 +35,14 @@ test('run_job_and_wait reports successful and failed terminal states with capped
   assert.match(text(result), /"status":"OK"/);
   assert.match(text(result), /"logTail":"6789"/);
 
-  const failure = await runJobAndWait.handler({ requestBody: { jobId: 'x' } }, context(async name => name === 'executeJob' ? response([{ id: 'j' }]) : name === 'getJob' ? job('failed', 'FAILED') : { content: [{ type: 'text', text: 'failure log' }] }));
+  const failure = await runJobAndWait.handler({ requestBody: { jobId: 'x' } }, context(async name => name === 'executeJob' ? response({ id: 'j' }) : name === 'getJob' ? job('failed', 'FAILED') : { content: [{ type: 'text', text: 'failure log' }] }));
   assert.match(text(failure), /"status":"FAILED"/);
 });
 
 test('run_job_and_wait times out and cancellation stops polling without cancelling the job', async () => {
   const calls: string[] = [];
   const timeout = await runJobAndWait.handler({ requestBody: { jobId: 'x' }, max_wait_seconds: 0 }, context(async name => {
-    calls.push(name); return name === 'executeJob' ? response([{ id: 'j', attributes: { state: 'running' } }]) : job('running');
+    calls.push(name); return name === 'executeJob' ? response({ id: 'j', attributes: { state: 'running' } }) : job('running');
   }));
   assert.match(text(timeout), /"status":"timeout"/);
   assert.deepEqual(calls, ['executeJob']);
@@ -40,7 +50,7 @@ test('run_job_and_wait times out and cancellation stops polling without cancelli
   const controller = new AbortController();
   let pollCalls = 0;
   const cancelContext = context(async name => {
-    if (name === 'executeJob') return response([{ id: 'j', attributes: { state: 'running' } }]);
+    if (name === 'executeJob') return response({ id: 'j', attributes: { state: 'running' } });
     pollCalls++;
     return job('running');
   }, controller.signal);
@@ -53,7 +63,7 @@ test('run_job_and_wait times out and cancellation stops polling without cancelli
 
 test('run_job_and_wait emits virtual progress and is conservatively destructive', async () => {
   const progress: unknown[] = [];
-  const ctx = context(async name => name === 'executeJob' ? response([{ id: 'j', attributes: { state: 'finished', status: { type: 'OK' } } }]) : { content: [{ type: 'text', text: 'log' }] }, undefined, progress);
+  const ctx = context(async name => name === 'executeJob' ? response({ id: 'j', attributes: { state: 'finished', status: { type: 'OK' } } }) : { content: [{ type: 'text', text: 'log' }] }, undefined, progress);
   await runJobAndWait.handler({ requestBody: { jobId: 'x' } }, ctx);
   assert.equal(progress.length, 2);
   assert.equal(runJobAndWait.annotations?.destructiveHint, true);
@@ -69,4 +79,17 @@ test('run_job_and_wait dry_run previews without executing the job', async () => 
   assert.deepEqual(calls, []);
   assert.match(text(result), /"dryRun":true/);
   assert.match(text(result), /"jobId":"jobs\.cleanup"/);
+});
+
+test('run_job_and_wait propagates execute and poll failures', async () => {
+  const executeError = await runJobAndWait.handler({ requestBody: { jobId: 'x' } }, context(async () => ({ isError: true, content: [{ type: 'text', text: 'execute failed' }] })));
+  assert.equal(executeError.isError, true);
+  assert.match(text(executeError), /execute failed/);
+
+  const pollError = await runJobAndWait.handler({ requestBody: { jobId: 'x' }, max_wait_seconds: 2 }, context(async name => {
+    if (name === 'executeJob') return response({ id: 'job-1', attributes: { state: 'RUNNING' } });
+    return { isError: true, content: [{ type: 'text', text: 'poll failed' }] };
+  }));
+  assert.equal(pollError.isError, true);
+  assert.match(text(pollError), /poll failed/);
 });

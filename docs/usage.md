@@ -33,9 +33,9 @@ Start with `npm run start:http`. Set `HTTP_API_KEY`; requests use that key to ac
 
 The generated map in `src/tools.ts` contains 284 tools. Use `GET /api/tools` or MCP `tools/list` to discover the enabled set. For field metadata, use `getProjectFieldsMetadata` or a resource-specific `getFieldsMetadataFor…` tool. For enumeration options, use the corresponding `getAvailableEnumOptionsFor…` tool, such as `getAvailableEnumOptionsForWorkItemType`.
 
-Mutating tools accept `dry_run: true`. This validates and prepares the request, then returns a preview without sending it to Polarion. The preview is normal text and, when the tool declares an output schema, structured content. Read-only tools do not preview; `dry_run` is ignored for them. Unknown arguments are rejected, except names beginning with `_`, which are reserved client metadata.
+Mutating generated and composite tools accept `dry_run` as a boolean or the compatibility values `"true"`, `"false"`, `1`, and `0`. Values normalize to canonical booleans; malformed values are rejected before side effects. A safe dry run validates and prepares the request, then returns a preview without sending it to Polarion. Read-only tools do not preview; `dry_run` is ignored for them. Composite arguments are validated against their input schemas before handlers run. Unknown arguments are rejected, except names beginning with `_`, which are reserved client metadata.
 
-`MCP_MAX_RESPONSE_CHARS` sets the maximum text content length for tool responses; the default is 100,000 characters. The text representation may be truncated, while `structuredContent` remains complete. See [configuration.md](./configuration.md) for the setting.
+`MCP_MAX_RESPONSE_CHARS` caps generated and composite response text; the default is 100,000 characters. Ordinary, unpaged generated calls retain complete `structuredContent`. Automatically collected paginated results are also bounded by the response cap and may have items removed, with `truncated: true` when content is omitted. See [configuration.md](./configuration.md) for the setting.
 
 Read tools accept `response_format: "concise" | "detailed"`. It defaults to `detailed`, which preserves the complete response. `concise` drops rich-text HTML when a `value_markdown` sibling exists, removes JSON:API links and metadata except `links.next` and `meta.totalCount`, and applies a small default sparse fieldset to large list tools when `fields` is omitted. Any caller-supplied `fields` value is preserved. Successful responses add `value_markdown` for HTML rich-text fields. Write guards fail closed when supported enum, custom-field key, or Work Item user-reference validation cannot confirm a value. See [Features](./features.md) for coverage details.
 
@@ -55,7 +55,7 @@ The `composites` toolset includes `search_work_items` for structured Work Item f
 
 `resolve_polarion_url` recognizes same-host Polarion work item, LiveDoc, wiki page, test run, and plan URLs. It returns the parsed entity identifiers; pass `fetch: true` to retrieve the matching resource through its REST tool. URLs on another host or with an unsupported shape are rejected.
 
-Generated list tools that expose pagination accept optional `max_items` (1 to 1000). For example, call `getWorkItems` with `projectId` and `max_items: 250` to collect across pages. Automatic collection follows at most 20 pages and reports `truncated: true` when either limit stops it. Without `max_items`, the tool still returns only its requested page.
+Generated MCP list tools, composite search, and REST tool entry points that expose pagination support shared automatic collection with optional `max_items` (1 to 1000). For example, call `getWorkItems` with `projectId` and `max_items: 250` to collect across pages. Automatic collection follows at most 20 pages. Every incomplete collection signals `truncated: true`, including when its item or page bound, or the response text cap, omits results. Without `max_items`, the tool still returns only its requested page.
 
 ## Quality checks
 

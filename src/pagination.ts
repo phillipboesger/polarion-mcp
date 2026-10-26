@@ -1,5 +1,6 @@
 export const MAX_AUTO_PAGES = 20;
 export const MAX_AUTO_ITEMS = 1000;
+export const MAX_AUTO_PAGE_SIZE = 100;
 
 export interface JsonApiPage {
   data?: unknown[];
@@ -30,9 +31,12 @@ export async function paginate<T extends JsonApiPage>(
   let next = initial.links?.next ?? undefined;
   let pagesFetched = 1;
   let truncated = false;
+  // A cut inside a page leaves its `links.next` pointing past the dropped items.
+  let cutMidPage = false;
   if ((merged.data as unknown[]).length > limit) {
     merged.data = (merged.data as unknown[]).slice(0, limit);
     truncated = true;
+    cutMidPage = true;
   }
   while (next && !truncated) {
     if (signal?.aborted) { truncated = true; break; }
@@ -54,9 +58,14 @@ export async function paginate<T extends JsonApiPage>(
     }
     next = page.links?.next ?? undefined;
     merged.links = { ...merged.links, ...page.links };
-    if (items.length > remaining) truncated = true;
+    if (items.length > remaining) { truncated = true; cutMidPage = true; }
   }
   if (next && ((merged.data as unknown[]).length >= limit || pagesFetched >= pageLimit)) truncated = true;
+  if (next === undefined || cutMidPage) {
+    if (merged.links) delete merged.links.next;
+  } else if (merged.links) {
+    merged.links.next = next;
+  }
   if (truncated) merged.truncated = true;
   return { response: merged as T, pagesFetched, truncated };
 }

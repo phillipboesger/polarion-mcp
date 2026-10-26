@@ -11,12 +11,14 @@ const GPT_CLIENT = { clientId: "polarion-gpt", clientSecret: "gpt-client-secret-
 const CALLBACK = "https://chatgpt.com/aip/g-abc123DEF/oauth/callback"
 
 /** Starts the app with the OAuth login and, unless disabled, the Custom GPT client. */
-async function startApp(withGpt = true) {
+async function startApp(withGpt = true, allowedToolsets?: Parameters<typeof createMcpHttpApp>[0] extends infer O ? (O extends { allowedToolsets?: infer T } ? T : never) : never, extra: Partial<Parameters<typeof createMcpHttpApp>[0]> = {}) {
   const { app, closeAllSessions } = createMcpHttpApp({
     publicUrl: new URL(PUBLIC_URL),
     validateToken: async (token) => token === VALID_PAT,
     tokenSecret: "gpt-test-token-secret-long-enough-0123456789",
     ...(withGpt ? { gptClient: GPT_CLIENT } : {}),
+    ...(allowedToolsets ? { allowedToolsets } : {}),
+    ...extra,
   })
   const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", () => resolve()))
@@ -244,4 +246,67 @@ test("Custom GPT Basic credentials work even when the secret contains a raw %", 
     await closeAllSessions()
     server.close()
   }
+})
+
+test("the deployment toolset allowlist also limits the Custom GPT REST routes", async () => {
+  const unrestricted = await startApp()
+  const unrestrictedNames = await (async () => {
+    try {
+      const code = await gptCode(unrestricted.base)
+      const tokens = (await (await gptToken(unrestricted.base, { grant_type: "authorization_code", code, redirect_uri: CALLBACK })).json()) as Tokens
+      const list = (await (await fetch(`${unrestricted.base}/api/tools`, { headers: { authorization: `Bearer ${tokens.access_token}` } })).json()) as { tools: { name: string }[] }
+      return list.tools.map(tool => tool.name)
+    } finally { await unrestricted.stop() }
+  })()
+  assert.ok(unrestrictedNames.includes("deleteWorkItems"))
+
+  const { base, stop } = await startApp(true, ["composites"])
+  try {
+    const code = await gptCode(base)
+    const tokens = (await (await gptToken(base, { grant_type: "authorization_code", code, redirect_uri: CALLBACK })).json()) as Tokens
+    const auth = { authorization: `Bearer ${tokens.access_token}`, "content-type": "application/json" }
+    const list = (await (await fetch(`${base}/api/tools`, { headers: auth })).json()) as { tools: { name: string }[] }
+    assert.equal(list.tools.some(tool => tool.name === "deleteWorkItems"), false)
+    assert.equal((await fetch(`${base}/api/tools/deleteWorkItems`, { method: "POST", headers: auth, body: "{}" })).status, 404)
+    const spec = JSON.stringify(await (await fetch(`${base}/openapi.json`)).json())
+    assert.equal(spec.includes("/api/tools/deleteWorkItems"), false)
+  } finally { await stop() }
+})
+
+async function restCall(base: string, access: string, tool: string, args: Record<string, unknown>) {
+  const res = await fetch(`${base}/api/tools/${tool}`, {
+    method: "POST", headers: { authorization: `Bearer ${access}`, "content-type": "application/json" }, body: JSON.stringify({ arguments: args }),
+  })
+  return (await res.json()) as { success: boolean; result: string }
+}
+
+async function gptAccess(base: string) {
+  const code = await gptCode(base)
+  return ((await (await gptToken(base, { grant_type: "authorization_code", code, redirect_uri: CALLBACK })).json()) as Tokens).access_token
+}
+
+test("Custom GPT REST calls require confirm for destructive tools when MCP_CONFIRM_DESTRUCTIVE is on", async () => {
+  const { base, stop } = await startApp(true, undefined, { confirmDestructive: true })
+  try {
+    const access = await gptAccess(base)
+    const blocked = await restCall(base, access, "deleteWorkItems", { projectId: "PRJ", requestBody: { data: [{ type: "workitems", id: "PRJ/WI-1" }] } })
+    assert.equal(blocked.success, false)
+    assert.match(blocked.result, /requires confirmation/i)
+  } finally { await stop() }
+})
+
+test("Custom GPT REST calls share the deployment tool-call rate limit and the audit sink", async () => {
+  const audited: string[] = []
+  const { base, stop } = await startApp(true, undefined, {
+    rateLimitTools: 1, apiBaseUrl: "http://127.0.0.1:9/polarion/rest/v1",
+    extensions: { auditSink: { record: async (event: { tool: string; outcome: string }) => { audited.push(`${event.tool}:${event.outcome}`) } } } as any,
+  })
+  try {
+    const access = await gptAccess(base)
+    await restCall(base, access, "getProjects", {})
+    const limited = await restCall(base, access, "getProjects", {})
+    assert.equal(limited.success, false)
+    assert.match(limited.result, /rate limit exceeded/i)
+    assert.ok(audited.includes("getProjects:denied"))
+  } finally { await stop() }
 })

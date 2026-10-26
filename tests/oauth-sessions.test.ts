@@ -27,10 +27,12 @@ async function startApp(
   publicUrl = PUBLIC_URL,
   previousTokenSecrets: string[] = [],
   trustProxy?: string | number,
+  tokenIpRateLimit?: number,
 ) {
   const options = {
     publicUrl: new URL(publicUrl), validateToken, tokenSecret, previousTokenSecrets,
     ...(trustProxy === undefined ? {} : { trustProxy }),
+    ...(tokenIpRateLimit === undefined ? {} : { tokenIpRateLimit }),
     ...(refreshTokenTtlSeconds === undefined ? {} : { refreshTokenTtlSeconds }),
   } as Parameters<typeof createMcpHttpApp>[0]
   const { app, closeAllSessions } = createMcpHttpApp(options)
@@ -534,6 +536,59 @@ test("invalid Basic client credentials return 401 and a Basic challenge from /to
     assert.equal(res.status, 401)
     assert.equal(((await res.json()) as { error: string }).error, "invalid_client")
     assert.match(res.headers.get("www-authenticate") ?? "", /^Basic\b/)
+  } finally {
+    await stop()
+  }
+})
+
+test("invalid and unknown Basic credentials count against the failed-token IP ceiling", async () => {
+  const { base, stop } = await startApp(SECRET, undefined, PUBLIC_URL, [], undefined, 1)
+  try {
+    const client = await register(base, { token_endpoint_auth_method: "client_secret_basic" })
+    const post = (clientId: string, secret: string) => fetch(`${base}/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: `Basic ${Buffer.from(`${clientId}:${secret}`).toString("base64")}`,
+      },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: "malformed" }),
+    })
+    assert.equal((await post(client.client_id, "wrong")).status, 401)
+    assert.equal((await post("unknown-client", "wrong")).status, 429)
+    assert.equal((await post(client.client_id, "wrong-again")).status, 429)
+  } finally {
+    await stop()
+  }
+})
+
+test("Basic client failures have separate client budgets and successful exchanges do not consume them", async () => {
+  const { base, stop } = await startApp()
+  try {
+    const first = await register(base, { token_endpoint_auth_method: "client_secret_basic" })
+    const second = await register(base, { token_endpoint_auth_method: "client_secret_basic" })
+    const { code, verifier } = await loginForCode(base, freshPat(), first)
+    const success = await fetch(`${base}/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: `Basic ${Buffer.from(`${first.client_id}:${first.client_secret}`).toString("base64")}`,
+      },
+      body: new URLSearchParams({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    })
+    assert.equal(success.status, 200)
+
+    const bad = (clientId: string) => fetch(`${base}/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: `Basic ${Buffer.from(`${clientId}:wrong`).toString("base64")}`,
+      },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: "malformed" }),
+    })
+    for (let i = 0; i < 50; i++) assert.equal((await bad(first.client_id)).status, 401, `first client failure ${i + 1}`)
+    for (let i = 0; i < 50; i++) assert.equal((await bad(second.client_id)).status, 401, `second client failure ${i + 1}`)
+    assert.equal((await bad(first.client_id)).status, 429)
+    assert.equal((await bad(second.client_id)).status, 429)
   } finally {
     await stop()
   }

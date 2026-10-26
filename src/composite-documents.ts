@@ -8,7 +8,14 @@ async function readParts(args: Record<string, unknown>, ctx: VirtualToolContext)
   const all: JsonObject[] = [];
   const includedItems = new Map<string, JsonObject>();
   for (let page = 1; page <= 100; page++) {
-    const response = await ctx.callPolarionTool('getDocumentParts', { ...base, 'page[size]': 100, 'page[number]': page, include: 'workItem', ...(typeof args.revision === 'string' ? { revision: args.revision } : {}) });
+    const response = await ctx.callPolarionTool('getDocumentParts', {
+      ...base, 'page[size]': 100, 'page[number]': page, include: 'workItem',
+      fields: {
+        document_parts: 'type,content,headingText,level,workItem',
+        workitems: 'title,type,description',
+      },
+      ...(typeof args.revision === 'string' ? { revision: args.revision } : {}),
+    });
     if (resultFailed(response)) return response;
     const pageRows = rows(response); all.push(...pageRows);
     const included = object(response.structuredContent).included;
@@ -19,7 +26,9 @@ async function readParts(args: Record<string, unknown>, ctx: VirtualToolContext)
   const parts: DocPart[] = [];
   for (const part of all) {
     const a = attrs(part); const type = String(a.type ?? '');
-    let markdown = richMarkdown(a.content);
+    let markdown = typeof a.content === 'string'
+      ? richMarkdown({ type: 'text/html', value: a.content })
+      : richMarkdown(a.content);
     if (type === 'heading') markdown = `${'#'.repeat(Math.max(1, Math.min(6, Number(a.level ?? 0) + 1)))} ${String(a.headingText ?? '')}`;
     if (type === 'workitem') {
       const workItemId = relData(part, 'workItem').id;
@@ -27,7 +36,13 @@ async function readParts(args: Record<string, unknown>, ctx: VirtualToolContext)
       if (!Object.keys(workItem).length && typeof workItemId === 'string') {
         const parsed = parseWorkItemId(workItemId);
         if (parsed) {
-          const response = await ctx.callPolarionTool('getWorkItem', parsed);
+          const relationshipRevision = relData(part, 'workItem').revision;
+          const revision = typeof relationshipRevision === 'string' ? relationshipRevision : args.revision;
+          const response = await ctx.callPolarionTool('getWorkItem', {
+            ...parsed,
+            fields: { workitems: 'title,type,description' },
+            ...(typeof revision === 'string' ? { revision } : {}),
+          });
           if (resultFailed(response)) return response;
           workItem = first(response);
         }

@@ -21,7 +21,9 @@ The Custom GPT OpenAPI document is derived from `src/gpt-tools.ts`, a curated su
 1. The client initializes the MCP connection and discovers enabled tools, resources, and prompts.
 2. Input schemas are sanitized to MCP-compatible property names; a name map restores original Polarion parameter names for requests.
 3. `src/executor.ts` validates arguments, performs applicable pre-write checks, applies the OpenAPI security scheme, and sends the request.
-4. Results include text content and, for tools with an output schema, structured content. Text is capped by `MCP_MAX_RESPONSE_CHARS` (default 100,000 characters); structured content is not truncated.
+4. Results include text content and, for tools with an output schema, structured content. Generated and composite text is capped by `MCP_MAX_RESPONSE_CHARS` (default 100,000 characters). Ordinary unpaged generated structured content remains complete; automatic page collection is capped too, may omit items, and marks incomplete results with `truncated: true`.
+
+Automatic pagination is shared by generated MCP calls, composite search, and REST tool routes. It collects up to 1000 items across at most 20 pages. Any incomplete collection reports truncation.
 
 ## Resources and validation
 

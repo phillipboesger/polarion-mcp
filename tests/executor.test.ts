@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { AxiosError } from "axios"
 import type { AxiosRequestConfig, AxiosResponse } from "axios"
 import type { McpToolDefinition } from "../src/types.js"
-import { executeApiTool, sendWithRetry, CUSTOM_FIELD_TOOL_SPECS, DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from "../src/executor.js"
+import { executeApiTool, sendWithRetry, capToolResponseText, CUSTOM_FIELD_TOOL_SPECS, DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from "../src/executor.js"
 import { _optionsCache, _fieldKeyCache } from "../src/guards.js"
 import { toolDefinitionMap } from "../src/tools.js"
 import { requestBearerToken } from "../src/config.js"
@@ -394,6 +394,15 @@ test("executeApiTool with dry_run true on a mutating tool returns a preview with
       assert.match(message.text, /\/things/)
       assert.match(message.text, /POST/i)
       assert.doesNotMatch(message.text, /super-secret-token/)
+    }
+    for (const dry_run of ["true", 1]) {
+      const compatiblePreview = await executeApiTool("create_thing", definition, { requestBody: { title: "hello" }, dry_run }, securitySchemes, { httpClient })
+      assert.equal(compatiblePreview.isError, undefined)
+    }
+    for (const dry_run of ["yes", 2]) {
+      const invalidPreview = await executeApiTool("create_thing", definition, { requestBody: { title: "hello" }, dry_run }, securitySchemes, { httpClient })
+      assert.equal(invalidPreview.isError, true)
+      assert.match((invalidPreview.content[0] as { text: string }).text, /dry_run must be true or false/)
     }
   } finally {
     if (typeof previous === "undefined") delete process.env.BEARER_TOKEN
@@ -1636,4 +1645,74 @@ test("executeApiTool refuses a call that needs a token when none is configured, 
     if (typeof previous === "undefined") delete process.env.BEARER_TOKEN
     else process.env.BEARER_TOKEN = previous
   }
+})
+
+test("capToolResponseText keeps the exact cap for escape-heavy, emoji and control-character text", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const samples = ['"'.repeat(5_000), "\\".repeat(5_000), "\u0001\n\t".repeat(3_000), "😀é".repeat(3_000)]
+  for (const text of samples) {
+    for (const maxChars of [120, 1_000, 4_096]) {
+      const capped = capToolResponseText(text, maxChars, schema)
+      assert.ok(capped.length <= maxChars, `cap ${maxChars} exceeded: ${capped.length}`)
+      const envelope = JSON.parse(capped) as { truncated: boolean; totalChars: number; preview: string }
+      assert.equal(envelope.truncated, true)
+      assert.equal(envelope.totalChars, text.length)
+      assert.equal(/[\uD800-\uDBFF]$/.test(envelope.preview), false)
+    }
+  }
+})
+
+test("capToolResponseText leaves small text unchanged and handles the minimum cap", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  assert.equal(capToolResponseText("short", 100, schema), "short")
+  const capped = capToolResponseText("x".repeat(10_000), 1, schema)
+  assert.equal(JSON.parse(capped).preview, "")
+})
+
+test("capToolResponseText trims a 215k-character list quickly", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const items = Array.from({ length: 900 }, (_, index) => ({ id: `PROJ-${index}`, title: "Requirement " + "word ".repeat(40) + index }))
+  const text = `API Response (Status: 200):\n${JSON.stringify({ data: items })}`
+  assert.ok(text.length > 200_000)
+  const started = Date.now()
+  const capped = capToolResponseText(text, DEFAULT_MAX_RESPONSE_CHARS, schema)
+  assert.ok(Date.now() - started < 2_000, "cap took longer than the regression budget")
+  assert.ok(capped.length <= DEFAULT_MAX_RESPONSE_CHARS)
+})
+
+test("capToolResponseText shrinks an existing truncation envelope instead of nesting it", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const envelope = JSON.stringify({ truncated: true, totalChars: 99_999, preview: "a".repeat(2_000), hint: "h", _notice: "n" })
+  const capped = capToolResponseText(envelope, 1_000, schema)
+  assert.ok(capped.length <= 1_000)
+  const parsed = JSON.parse(capped) as { truncated: boolean; totalChars: number; preview: string; _notice: string }
+  assert.equal(parsed.truncated, true)
+  assert.equal(parsed.totalChars, 99_999)
+  assert.equal(parsed._notice, "n")
+  assert.match(parsed.preview, /^a+$/)
+})
+
+test("capToolResponseText re-fit keeps the untrusted wrapper closed", () => {
+  const schema = { inputSchema: { type: "object", properties: {} } }
+  const preview = `<polarion-untrusted>${"b".repeat(2_000)}</polarion-untrusted>`
+  const envelope = JSON.stringify({ truncated: true, totalChars: 5_000, preview, hint: "h", _notice: "n" })
+  const capped = capToolResponseText(envelope, 1_000, schema)
+  assert.ok(capped.length <= 1_000)
+  const parsed = JSON.parse(capped) as { preview: string }
+  assert.ok(parsed.preview.startsWith("<polarion-untrusted>"))
+  assert.ok(parsed.preview.endsWith("</polarion-untrusted>"))
+})
+
+test("sendWithRetry stops without a request or a retry wait once its signal is aborted", async () => {
+  const controller = new AbortController()
+  controller.abort()
+  let calls = 0
+  const httpClient = async () => { calls++; return {} as any }
+  await assert.rejects(sendWithRetry({}, { httpClient, minIntervalMs: 0, signal: controller.signal }))
+  assert.equal(calls, 0)
+
+  const live = new AbortController()
+  let seen: AbortSignal | undefined
+  await sendWithRetry({}, { httpClient: async (config: any) => { seen = config.signal; return { status: 200 } as any }, minIntervalMs: 0, signal: live.signal })
+  assert.equal(seen, live.signal)
 })

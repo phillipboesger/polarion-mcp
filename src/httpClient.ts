@@ -81,6 +81,8 @@ export interface SendWithRetryOpts {
   initialBackoffMs?: number;
   minIntervalMs?: number;
   postMutationDelayMs?: number;
+  /** Cancels the in-flight request and any retry wait, e.g. when the caller disconnected. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -104,11 +106,13 @@ export async function sendWithRetry(
     initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
     minIntervalMs = DEFAULT_MIN_REQUEST_INTERVAL_MS,
     postMutationDelayMs = DEFAULT_POST_MUTATION_DELAY_MS,
+    signal,
   } = opts;
+  signal?.throwIfAborted();
   await paceRequest(minIntervalMs);
   const method = String(config.method ?? 'get').toLowerCase();
   try {
-    const response = await httpClient({ timeout: DEFAULT_TIMEOUT_MS, ...config });
+    const response = await httpClient({ timeout: DEFAULT_TIMEOUT_MS, ...(signal ? { signal } : {}), ...config });
     if (MUTATING_METHODS.has(method) && postMutationDelayMs > 0) {
       await new Promise((r) => setTimeout(r, postMutationDelayMs));
     }
@@ -123,7 +127,8 @@ export async function sendWithRetry(
       axios.isAxiosError(error) &&
       error.response &&
       isRetryable(method, error.response.status) &&
-      attempt <= maxRetries
+      attempt <= maxRetries &&
+      !signal?.aborted
     ) {
       // Honour Retry-After (seconds) on 429; else back off exponentially.
       const retryAfter = Number(error.response.headers?.['retry-after']);

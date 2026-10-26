@@ -4,7 +4,9 @@ The MCP server supports synthetic tools and per-call extension hooks through `cr
 
 ## Virtual tools
 
-Register a `VirtualTool` with `registerVirtualTool()` from `src/virtual-tools.ts`. It has a name, title, description, JSON input schema, MCP annotations, one toolset, and a handler. The handler receives `VirtualToolContext`, including `callPolarionTool()` for generated operations. That helper runs the normal executor, write guards, and request token handling. The registry is empty by default.
+Register a `VirtualTool` with `registerVirtualTool()` from `src/virtual-tools.ts`. It has a name, title, description, JSON input schema, MCP annotations, one toolset, and a handler. The handler receives `VirtualToolContext`, including `callPolarionTool()` for generated operations. That helper runs the normal executor, write guards, and request token handling. The normal server registers the built-in composite tools; the registry is therefore not empty by default.
+
+Virtual tool arguments are validated against their schemas before handlers run. Schemas that intentionally allow custom properties retain their `additionalProperties` semantics. Mutating virtual tools use the same dry-run normalization and response text cap as generated tools.
 
 Virtual tools use the generated-tool filters: `MCP_TOOLS`, `MCP_READ_ONLY`, `MCP_TOOLSETS`, and request toolset/read-only narrowing. A request can only narrow deployment settings. The `composites` toolset is reserved for synthetic tools that combine multiple Polarion operations.
 

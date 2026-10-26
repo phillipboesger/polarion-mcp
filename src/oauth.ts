@@ -150,7 +150,21 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
       timeout: 15_000,
       validateStatus: () => true,
     });
-    if (response.status >= 200 && response.status < 300) return true;
+    if (response.status >= 200 && response.status < 300) {
+      const contentType = response.headers['content-type'];
+      const mediaType = typeof contentType === 'string' ? contentType.split(';', 1)[0].trim().toLowerCase() : '';
+      const isJson = mediaType === 'application/json' || /^[^/]+\/[^/]+\+json$/.test(mediaType);
+      const body = response.data;
+      const projectList = body !== null && typeof body === 'object' && !Array.isArray(body) && !('errors' in body)
+        ? (body as { data?: unknown }).data
+        : undefined;
+      const hasProjects = Array.isArray(projectList) && projectList.every(project => project !== null && typeof project === 'object'
+        && !Array.isArray(project) && typeof (project as { type?: unknown }).type === 'string'
+        && typeof (project as { id?: unknown }).id === 'string');
+      if (isJson && hasProjects) return true;
+      console.error(`[WARN] Polarion token check failed: HTTP ${response.status} - unusable projects response`);
+      return 'unavailable';
+    }
     // Why Polarion refused (status and its own error detail), never the token:
     // without it a 403 on the login page is indistinguishable from a typo.
     const detail = String(response.data?.errors?.[0]?.detail ?? response.data?.errors?.[0]?.title ?? '')
