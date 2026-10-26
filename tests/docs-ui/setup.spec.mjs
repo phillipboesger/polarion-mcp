@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const manifest = JSON.parse(fs.readFileSync('docs/clients.json', 'utf8'));
 const scenarios = JSON.parse(fs.readFileSync('docs/daily-use.json', 'utf8'));
 const screenshotDir = process.env.DOCS_SCREENSHOT_DIR || '/tmp/sol-docs3';
@@ -115,7 +116,7 @@ test('hero CTAs reach setup and Docker links work with an already selected hash'
   await page.getByRole('link', { name: 'Run with Docker' }).click();
   await expect(page.locator('#setup-title')).toHaveText('Docker team server');
   await expect(page.locator('#setup-title')).toBeInViewport();
-  await expect(page.locator('#server-code')).toContainText('ghcr.io/phillipboesger/polarion-mcp:1.4.1');
+  await expect(page.locator('#server-code')).toContainText(`ghcr.io/phillipboesger/polarion-mcp:${version}`);
   await page.evaluate(() => globalThis.scrollTo({ top: 0, behavior: 'instant' }));
   await page.getByRole('link', { name: 'Run with Docker' }).click();
   await expect(page.locator('#setup-title')).toBeInViewport();
