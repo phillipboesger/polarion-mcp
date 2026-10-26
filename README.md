@@ -114,7 +114,7 @@ docker run -d --name polarion-mcp \
   -p 127.0.0.1:3000:3000 \
   -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \
   -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.1
+  ghcr.io/phillipboesger/polarion-mcp:1.4.2
 ```
 
 For a local HTTP client, use `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. For a team, proxy HTTPS to that port and add the public hostname to `MCP_ALLOWED_HOSTS`. Cloud connectors also need `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, exact redirect allowlists and a `TRUST_PROXY` setting matching the real proxy chain. The picker includes that server configuration for claude.ai and ChatGPT. See [deployment](docs/deployment.md#docker) for operations details.
@@ -153,7 +153,7 @@ The token was cut off, has expired, or belongs to another Polarion. Run the toke
 </details>
 <details><summary>It says 403 "Polarion denied access".</summary>
 
-The token is known but refused. Check: REST enabled (`com.siemens.polarion.rest.enabled=true`), your user has a license and project access, and no proxy blocks `/polarion/rest` or the Authorization header.
+Polarion denied access. Check the user's license and REST or item permissions for the affected tool. The metadata authentication probe requires Polarion 2512+ and does not require global REST GET permission. A 403 during login is rejected.
 
 </details>
 <details><summary>My AI client says "Disconnected" or "Failed to connect".</summary>
@@ -164,6 +164,11 @@ npm: run `npx -y polarion-mcp` in a terminal with the same values to see the rea
 <details><summary>The connector login in claude.ai or ChatGPT fails or loops.</summary>
 
 Check `MCP_PUBLIC_URL` (exact https address, no path), the padlock, that the redirect preset or callback is allowed (`MCP_ALLOWED_REDIRECT_PRESETS=claude`; the log says `redirect_uri rejected`), and that `MCP_TOKEN_SECRET` did not change.
+
+</details>
+<details><summary>Does HTTP/OAuth work with Polarion 2506 or older?</summary>
+
+HTTP MCP initialization and OAuth login/refresh require Polarion 2512 or newer. They validate the PAT through GET /metadata, which is available from 2512 without global REST GET permission. Polarion 2506 and older return 404 on this endpoint, so HTTP/OAuth connections fail the preflight. Use stdio mode with API_BASE_URL and your own BEARER_TOKEN, or upgrade Polarion to 2512+. The server does not fall back to project/user listing or accept 403 as successful validation. Tool access still depends on your Polarion permissions.
 
 </details>
 

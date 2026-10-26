@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { PAT, PROJECT, call, connectStdio, json, startHttpServer } from "./helpers.mjs";
+import { API_BASE_URL, PAT, PROJECT, call, connectStdio, json, startHttpServer } from "./helpers.mjs";
 
 const created = [];
 
@@ -157,10 +157,15 @@ describe("stdio server against Polarion", () => {
   });
 });
 
-describe("Streamable HTTP server with OAuth against Polarion", () => {
+const metadataProbe = await fetch(`${API_BASE_URL}/metadata`, { headers: { authorization: `Bearer ${PAT}` }, redirect: "manual" });
+await metadataProbe.text();
+describe("Streamable HTTP server with OAuth against Polarion", {
+  skip: metadataProbe.status === 404 && "HTTP/OAuth PAT validation requires Polarion 2512+ (/metadata)",
+}, () => {
   let server;
 
   before(async () => {
+    assert.equal(metadataProbe.status, 200, "metadata authentication must succeed before HTTP/OAuth tests");
     server = await startHttpServer();
   });
 

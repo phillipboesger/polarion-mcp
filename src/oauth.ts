@@ -75,7 +75,7 @@ function normalizeResource(value: string): string {
 
 /**
  * Result of asking Polarion about a PAT: accepted, rejected (401), known but
- * without access (403, e.g. no license or REST permission), or no answer
+ * without access (403), or no answer
  * (network error, Polarion down) — the last must not end a login.
  */
 export type TokenCheck = boolean | 'forbidden' | 'unavailable';
@@ -133,36 +133,34 @@ interface AccessPayload extends RefreshPayload {
 type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secret' | 'client_secret_expires_at'>;
 
 /**
- * Checks a Polarion Personal Access Token by making the cheapest authenticated
- * call the REST API offers: asking for a single project.
+ * Checks a PAT using REST metadata, available since Polarion 2512 without
+ * global REST endpoint permissions. There is no fallback for older versions.
+ * Each tool must still obtain its own authorization from Polarion.
  *
  * @param token - The token to check.
  * @returns True if Polarion accepted it, false if it rejected it, 'forbidden'
- *   if it knows the token but denies access, or 'unavailable' if Polarion gave
+ *   if it recognizes the token but denies this probe, or 'unavailable' if Polarion gave
  *   no usable answer.
  */
 export async function validatePolarionToken(token: string): Promise<TokenCheck> {
   try {
-    const response = await axios.get(`${API_BASE_URL}/projects`, {
+    const response = await axios.get(`${API_BASE_URL}/metadata`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      params: { 'page[size]': 1 },
       httpsAgent: new https.Agent({ rejectUnauthorized: shouldRejectUnauthorized() }),
       timeout: 15_000,
+      maxRedirects: 0,
       validateStatus: () => true,
     });
+    const contentType = response.headers['content-type'];
+    const mediaType = typeof contentType === 'string' ? contentType.split(';', 1)[0].trim().toLowerCase() : '';
+    const isJson = mediaType === 'application/json' || mediaType === 'application/vnd.api+json';
+    const body = response.data;
+    const isObject = body !== null && typeof body === 'object' && !Array.isArray(body);
     if (response.status >= 200 && response.status < 300) {
-      const contentType = response.headers['content-type'];
-      const mediaType = typeof contentType === 'string' ? contentType.split(';', 1)[0].trim().toLowerCase() : '';
-      const isJson = mediaType === 'application/json' || /^[^/]+\/[^/]+\+json$/.test(mediaType);
-      const body = response.data;
-      const projectList = body !== null && typeof body === 'object' && !Array.isArray(body) && !('errors' in body)
-        ? (body as { data?: unknown }).data
-        : undefined;
-      const hasProjects = Array.isArray(projectList) && projectList.every(project => project !== null && typeof project === 'object'
-        && !Array.isArray(project) && typeof (project as { type?: unknown }).type === 'string'
-        && typeof (project as { id?: unknown }).id === 'string');
-      if (isJson && hasProjects) return true;
-      console.error(`[WARN] Polarion token check failed: HTTP ${response.status} - unusable projects response`);
+      const metadata = isObject && !('errors' in body) ? body.data : undefined;
+      if (isJson && metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
+        && metadata.type === 'metadata' && metadata.id === 'metadata') return true;
+      console.error(`[WARN] Polarion token check failed: HTTP ${response.status} - unusable metadata response`);
       return 'unavailable';
     }
     // Why Polarion refused (status and its own error detail), never the token:
