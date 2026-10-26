@@ -197,3 +197,18 @@ test('repeated wrong API keys are throttled before authentication', async () => 
     assert.deepEqual(statuses, [401, 401, 429, 429]);
   } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
 });
+
+test('tool errors do not count against the failed-key throttle', async () => {
+  const app = createHttpApp({ apiKey: 'right-key', env: {}, port: 3000, rateLimit: { limit: 100, windowMs: 60_000 }, executeTool: async () => { throw new Error('boom'); } });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  try {
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const tool = enabledTools.keys().next().value as string;
+    for (let i = 0; i < 25; i++) {
+      assert.equal((await fetch(`${base}/api/tools/${tool}`, { method: 'POST', headers: { Authorization: 'Bearer right-key', 'content-type': 'application/json' }, body: JSON.stringify({ arguments: {} }) })).status, 500);
+      assert.equal((await fetch(`${base}/api/tools/doesNotExist`, { method: 'POST', headers: { Authorization: 'Bearer right-key', 'content-type': 'application/json' }, body: '{}' })).status, 404);
+    }
+    assert.equal((await fetch(`${base}/api/tools`, { headers: { Authorization: 'Bearer right-key' } })).status, 200);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+});
