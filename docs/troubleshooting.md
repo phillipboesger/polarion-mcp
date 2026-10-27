@@ -9,6 +9,21 @@
 - Stdio and REST HTTP mode need `BEARER_TOKEN`. The Streamable HTTP MCP server needs `Authorization: Bearer <PAT>` on each MCP request.
 - If `API_BASE_URL` is unset, calls use the placeholder `https://polarion.example.com/polarion/rest/v1`.
 
+## Permissions: Three Separate Controls
+
+Polarion checks three things. A failure in one does not mean the others are wrong.
+
+1. **REST service enabled.** The instance must have its REST API active. If it is off, every call fails, including the login check.
+2. **REST method permission.** The account needs the method (GET, or a write method) for the endpoint, granted globally or in a project. A GET grant in one project does not allow global endpoints such as `/user` or `/projects`. Global grants can reach project roles, but they never bypass item access.
+3. **Item and resource permissions.** Access to a specific work item, document or test run is checked per item.
+
+What this means in practice:
+
+- `getCurrentUser` calls `GET /user`, a global endpoint. A project-only account can get a 403 there and still read its projects with `getProject(projectId)`. That 403 limits the endpoint; it is not a failed login.
+- Connecting does not need global GET. The login check uses `GET /metadata` on Polarion 2512+.
+- Do not grant global write permissions to make onboarding pass.
+- Upgrading from 1.4.1 to 1.4.2 changes the login check to `/metadata`. Update the image or package and recreate the container; a restart keeps the old image.
+
 ## Connection and Login Errors (Q&A)
 
 Direct PAT initialization, OAuth login, and refresh check authentication against Polarion (`GET <API_BASE_URL>/metadata`), and Polarion's answer decides. The server log shows it as `Polarion token check failed: HTTP <status> - <Polarion's message>`. A host-side curl can test the URL from that host, but it does not prove the Docker container can reach the same address. Use the container-side probe below for deployment diagnostics. Do not put a real PAT in a command argument, shell history, or logs.
@@ -22,7 +37,7 @@ HTTP MCP initialization and OAuth login/refresh require Polarion 2512 or newer. 
 Polarion does not know the token. Check that it was copied completely (no line break), has not expired or been revoked, and that API_BASE_URL points to the right Polarion instance.
 
 **I get 403, "Polarion denied access".**
-Polarion denied access. Check the user's license and REST endpoint or item permissions for the affected operation. On Polarion 2512+, `/metadata` does not require global REST GET permission; a 403 during login is rejected rather than accepted as successful authentication.
+Polarion denied access. Check the user's license and REST endpoint or item permissions for the affected operation. See [Permissions: Three Separate Controls](#permissions-three-separate-controls). On Polarion 2512+, `/metadata` does not require global REST GET permission; a 403 during login is rejected rather than accepted as successful authentication.
 
 **I get 503, "Polarion could not be reached".**
 The server could not get a usable answer (the log shows why, e.g. `HTTP 404` or a connection error): wrong host, port or path in API_BASE_URL (it must end in `/polarion/rest/v1`), network or firewall between the MCP server and Polarion, Polarion down, or a TLS error (see below). The authentication probe does not follow redirects: configure API_BASE_URL with the final HTTPS host and REST path directly, rather than a redirecting alias. Test from inside the MCP container; a request from your laptop does not test the container network path.

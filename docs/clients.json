@@ -178,7 +178,7 @@
       "title": "n8n HTTP Request",
       "kind": "Automation · REST",
       "language": "bash",
-      "snippet": "curl -X POST https://YOUR-SERVER/api/tools/getProjects \\\n  -H \"Authorization: Bearer ${HTTP_API_KEY}\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{}'",
+      "snippet": "curl -X POST https://YOUR-SERVER/api/tools/getCurrentUser \\\n  -H \"Authorization: Bearer ${HTTP_API_KEY}\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{}'",
       "note": "This setup uses the REST wrapper. Its administrator configures API_BASE_URL, BEARER_TOKEN and HTTP_API_KEY. Store the wrapper key in an n8n credential after importing."
     },
     {
@@ -268,7 +268,7 @@
             "Node.js 22+ (npx works in a terminal)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude calls a Polarion tool and lists your project names."
           },
           "fails": [
@@ -299,7 +299,7 @@
             "Public HTTPS server address with OAuth"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude calls a Polarion tool and lists your project names."
           },
           "fails": [
@@ -332,7 +332,7 @@
             "Public HTTPS server address with OAuth"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude calls a Polarion tool and lists your project names."
           },
           "fails": [
@@ -399,7 +399,7 @@
             "Public HTTPS server address with OAuth"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude calls a Polarion tool and lists your project names."
           },
           "fails": [
@@ -432,7 +432,7 @@
             "Public HTTPS server address with OAuth"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude calls a Polarion tool and lists your project names."
           },
           "fails": [
@@ -487,7 +487,7 @@
             "Node.js 22+"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude lists your projects. /mcp shows polarion as connected."
           },
           "fails": [
@@ -515,7 +515,7 @@
             "Server address from your administrator"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude lists your projects. /mcp shows polarion as connected."
           },
           "fails": [
@@ -546,7 +546,7 @@
             "Running Docker server (http://localhost:3000/mcp)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Claude lists your projects. /mcp shows polarion as connected."
           },
           "fails": [
@@ -599,14 +599,14 @@
             "Look for mcp_tool_use and mcp_tool_result blocks in the response."
           ],
           "note": "",
-          "snippet": "curl https://api.anthropic.com/v1/messages \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: $ANTHROPIC_API_KEY\" \\\n  -H \"anthropic-version: 2023-06-01\" \\\n  -H \"anthropic-beta: mcp-client-2025-11-20\" \\\n  -d '{\n    \"model\": \"YOUR_CLAUDE_MODEL\",\n    \"max_tokens\": 1000,\n    \"messages\": [{\"role\": \"user\", \"content\": \"List the Polarion projects I can access.\"}],\n    \"mcp_servers\": [\n      {\n        \"type\": \"url\",\n        \"name\": \"polarion\",\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"authorization_token\": \"YOUR_POLARION_PAT\"\n      }\n    ],\n    \"tools\": [\n      {\"type\": \"mcp_toolset\", \"mcp_server_name\": \"polarion\"}\n    ]\n  }'",
+          "snippet": "curl https://api.anthropic.com/v1/messages \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: $ANTHROPIC_API_KEY\" \\\n  -H \"anthropic-version: 2023-06-01\" \\\n  -H \"anthropic-beta: mcp-client-2025-11-20\" \\\n  -d '{\n    \"model\": \"YOUR_CLAUDE_MODEL\",\n    \"max_tokens\": 1000,\n    \"messages\": [{\"role\": \"user\", \"content\": \"Which Polarion user am I? Use getCurrentUser.\"}],\n    \"mcp_servers\": [\n      {\n        \"type\": \"url\",\n        \"name\": \"polarion\",\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"authorization_token\": \"YOUR_POLARION_PAT\"\n      }\n    ],\n    \"tools\": [\n      {\"type\": \"mcp_toolset\", \"mcp_server_name\": \"polarion\"}\n    ]\n  }'",
           "language": "bash",
           "needs": [
             "Anthropic API key",
             "Public HTTPS MCP server address"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Response has mcp_tool_use and mcp_tool_result blocks, then a project list."
           },
           "fails": [
@@ -632,14 +632,14 @@
           ],
           "note": "The cloud API cannot reach localhost. Keep API keys and PATs in your application secret store.",
           "serverSetup": "docker-public",
-          "snippet": "curl https://api.anthropic.com/v1/messages \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: $ANTHROPIC_API_KEY\" \\\n  -H \"anthropic-version: 2023-06-01\" \\\n  -H \"anthropic-beta: mcp-client-2025-11-20\" \\\n  -d '{\n    \"model\": \"YOUR_CLAUDE_MODEL\",\n    \"max_tokens\": 1000,\n    \"messages\": [{\"role\": \"user\", \"content\": \"List the Polarion projects I can access.\"}],\n    \"mcp_servers\": [\n      {\n        \"type\": \"url\",\n        \"name\": \"polarion\",\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"authorization_token\": \"YOUR_POLARION_PAT\"\n      }\n    ],\n    \"tools\": [\n      {\"type\": \"mcp_toolset\", \"mcp_server_name\": \"polarion\"}\n    ]\n  }'",
+          "snippet": "curl https://api.anthropic.com/v1/messages \\\n  -H \"Content-Type: application/json\" \\\n  -H \"X-API-Key: $ANTHROPIC_API_KEY\" \\\n  -H \"anthropic-version: 2023-06-01\" \\\n  -H \"anthropic-beta: mcp-client-2025-11-20\" \\\n  -d '{\n    \"model\": \"YOUR_CLAUDE_MODEL\",\n    \"max_tokens\": 1000,\n    \"messages\": [{\"role\": \"user\", \"content\": \"Which Polarion user am I? Use getCurrentUser.\"}],\n    \"mcp_servers\": [\n      {\n        \"type\": \"url\",\n        \"name\": \"polarion\",\n        \"url\": \"https://YOUR-SERVER/mcp\",\n        \"authorization_token\": \"YOUR_POLARION_PAT\"\n      }\n    ],\n    \"tools\": [\n      {\"type\": \"mcp_toolset\", \"mcp_server_name\": \"polarion\"}\n    ]\n  }'",
           "language": "bash",
           "needs": [
             "Anthropic API key",
             "Docker server with a public HTTPS address"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Response has mcp_tool_use and mcp_tool_result blocks, then a project list."
           },
           "fails": [
@@ -700,7 +700,7 @@
             "OAuth set up on the server by your admin"
           ],
           "verify": {
-            "prompt": "@Polarion List the Polarion projects I can access. Use the Polarion tool getProjects.",
+            "prompt": "@Polarion Which Polarion user am I? Use the Polarion tool getCurrentUser.",
             "expect": "ChatGPT calls a Polarion tool and lists project names and IDs."
           },
           "fails": [
@@ -732,7 +732,7 @@
             "Public HTTPS URL for your Docker server"
           ],
           "verify": {
-            "prompt": "@Polarion List the Polarion projects I can access. Use the Polarion tool getProjects.",
+            "prompt": "@Polarion Which Polarion user am I? Use the Polarion tool getCurrentUser.",
             "expect": "ChatGPT calls a Polarion tool and lists project names and IDs."
           },
           "fails": [
@@ -765,7 +765,7 @@
         "Get the REST wrapper URL and HTTP_API_KEY from your team.",
         "In the GPT editor, open Actions > Create new action > Import from URL.",
         "Choose API Key authentication, Bearer type, and enter HTTP_API_KEY.",
-        "Test getProjects in the editor."
+        "Test getProject with your projectId in the editor."
       ],
       "sources": [
         "https://developers.openai.com/api/docs/actions/getting-started",
@@ -785,7 +785,7 @@
             "Open your GPT editor, go to Actions and add a new action.",
             "Import the schema from https://YOUR-SERVER/openapi-gpt.json.",
             "Set authentication to API Key with Bearer style and paste HTTP_API_KEY.",
-            "Click Test and run getProjects.",
+            "Click Test and run getProject with your projectId.",
             "Save or update the GPT."
           ],
           "note": "Calls run as one fixed Polarion user (the deployment PAT), not your own.",
@@ -795,8 +795,8 @@
             "REST wrapper URL and HTTP_API_KEY"
           ],
           "verify": {
-            "prompt": "List the Polarion projects.",
-            "expect": "The GPT asks to allow the action, then lists project names and IDs."
+            "prompt": "Show project YOUR_PROJECT_ID. Use getProject.",
+            "expect": "The GPT asks to allow the action, then shows the project with that ID."
           },
           "fails": [
             {
@@ -816,7 +816,7 @@
             "Open your GPT editor, go to Actions and add a new action.",
             "Import the schema from https://YOUR-SERVER/openapi-gpt.json.",
             "Set authentication to API Key with Bearer style and paste HTTP_API_KEY.",
-            "Click Test and run getProjects.",
+            "Click Test and run getProject with your projectId.",
             "Save or update the GPT."
           ],
           "note": "Calls run as one fixed Polarion user (the deployment PAT), not your own.",
@@ -827,8 +827,8 @@
             "Public HTTPS URL for the REST wrapper"
           ],
           "verify": {
-            "prompt": "List the Polarion projects.",
-            "expect": "The GPT asks to allow the action, then lists project names and IDs."
+            "prompt": "Show project YOUR_PROJECT_ID. Use getProject.",
+            "expect": "The GPT asks to allow the action, then shows the project with that ID."
           },
           "fails": [
             {
@@ -883,14 +883,14 @@
             "Repeat the approval for each further tool call."
           ],
           "note": "",
-          "snippet": "from openai import OpenAI\n\nclient = OpenAI()  # reads OPENAI_API_KEY\n\ntools = [{\n    \"type\": \"mcp\",\n    \"server_label\": \"polarion\",\n    \"server_url\": \"https://YOUR-SERVER/mcp\",\n    \"authorization\": \"YOUR_POLARION_PAT\",\n    \"require_approval\": \"always\",\n}]\n\nresp = client.responses.create(\n    model=\"YOUR-MODEL\",\n    tools=tools,\n    input=\"List the Polarion projects I can access.\",\n)\nprint([i.type for i in resp.output])",
+          "snippet": "from openai import OpenAI\n\nclient = OpenAI()  # reads OPENAI_API_KEY\n\ntools = [{\n    \"type\": \"mcp\",\n    \"server_label\": \"polarion\",\n    \"server_url\": \"https://YOUR-SERVER/mcp\",\n    \"authorization\": \"YOUR_POLARION_PAT\",\n    \"require_approval\": \"always\",\n}]\n\nresp = client.responses.create(\n    model=\"YOUR-MODEL\",\n    tools=tools,\n    input=\"Which Polarion user am I? Use getCurrentUser.\",\n)\nprint([i.type for i in resp.output])",
           "language": "python",
           "needs": [
             "OpenAI API key",
             "Public HTTPS Polarion MCP server"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "mcp_list_tools, mcp_approval_request; after approval, mcp_call and projects."
           },
           "fails": [
@@ -916,14 +916,14 @@
           ],
           "note": "The cloud API cannot reach localhost. Keep API keys and PATs in your application secret store.",
           "serverSetup": "docker-public",
-          "snippet": "from openai import OpenAI\n\nclient = OpenAI()  # reads OPENAI_API_KEY\n\ntools = [{\n    \"type\": \"mcp\",\n    \"server_label\": \"polarion\",\n    \"server_url\": \"https://YOUR-SERVER/mcp\",\n    \"authorization\": \"YOUR_POLARION_PAT\",\n    \"require_approval\": \"always\",\n}]\n\nresp = client.responses.create(\n    model=\"YOUR-MODEL\",\n    tools=tools,\n    input=\"List the Polarion projects I can access.\",\n)\nprint([i.type for i in resp.output])",
+          "snippet": "from openai import OpenAI\n\nclient = OpenAI()  # reads OPENAI_API_KEY\n\ntools = [{\n    \"type\": \"mcp\",\n    \"server_label\": \"polarion\",\n    \"server_url\": \"https://YOUR-SERVER/mcp\",\n    \"authorization\": \"YOUR_POLARION_PAT\",\n    \"require_approval\": \"always\",\n}]\n\nresp = client.responses.create(\n    model=\"YOUR-MODEL\",\n    tools=tools,\n    input=\"Which Polarion user am I? Use getCurrentUser.\",\n)\nprint([i.type for i in resp.output])",
           "language": "python",
           "needs": [
             "OpenAI API key",
             "Public HTTPS Docker server"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "mcp_list_tools, mcp_approval_request; after approval, mcp_call and projects."
           },
           "fails": [
@@ -967,7 +967,7 @@
       "connections": {
         "npm": {
           "setup": "agents-stdio",
-          "snippet": "import asyncio\nfrom agents import Agent, Runner\nfrom agents.mcp import MCPServerStdio\n\nasync def main():\n    async with MCPServerStdio(\n        name=\"Polarion\",\n        params={\n            \"command\": \"npx\",\n            \"args\": [\"-y\", \"polarion-mcp\"],\n            \"env\": {\n                \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n                \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\",\n            },\n        },\n        client_session_timeout_seconds=60,\n    ) as server:\n        agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n        result = await Runner.run(agent, \"List the Polarion projects I can access.\")\n        print(result.final_output)\n\nasyncio.run(main())",
+          "snippet": "import asyncio\nfrom agents import Agent, Runner\nfrom agents.mcp import MCPServerStdio\n\nasync def main():\n    async with MCPServerStdio(\n        name=\"Polarion\",\n        params={\n            \"command\": \"npx\",\n            \"args\": [\"-y\", \"polarion-mcp\"],\n            \"env\": {\n                \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n                \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\",\n            },\n        },\n        client_session_timeout_seconds=60,\n    ) as server:\n        agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n        result = await Runner.run(agent, \"Which Polarion user am I? Use getCurrentUser.\")\n        print(result.final_output)\n\nasyncio.run(main())",
           "steps": [
             "Run: pip install openai-agents, and set OPENAI_API_KEY",
             "Save the snippet as polarion_agent.py",
@@ -980,7 +980,7 @@
             "Node.js 22+"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The printed final_output names projects from your Polarion."
           },
           "fails": [
@@ -1003,13 +1003,13 @@
             "Run: python polarion_agent.py"
           ],
           "note": "",
-          "snippet": "import asyncio\nfrom agents import Agent, Runner\nfrom agents.mcp import MCPServerStreamableHttp\n\nasync def main():\n    async with MCPServerStreamableHttp(\n        name=\"Polarion\",\n        params={\n            \"url\": \"https://YOUR-SERVER/mcp\",\n            \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n        },\n        cache_tools_list=True,\n    ) as server:\n        agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n        result = await Runner.run(agent, \"List the Polarion projects I can access.\")\n        print(result.final_output)\n\nasyncio.run(main())",
+          "snippet": "import asyncio\nfrom agents import Agent, Runner\nfrom agents.mcp import MCPServerStreamableHttp\n\nasync def main():\n    async with MCPServerStreamableHttp(\n        name=\"Polarion\",\n        params={\n            \"url\": \"https://YOUR-SERVER/mcp\",\n            \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n        },\n        cache_tools_list=True,\n    ) as server:\n        agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n        result = await Runner.run(agent, \"Which Polarion user am I? Use getCurrentUser.\")\n        print(result.final_output)\n\nasyncio.run(main())",
           "needs": [
             "An OpenAI API key",
             "Python 3.10+"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The printed final_output names projects from your Polarion."
           },
           "fails": [
@@ -1034,13 +1034,13 @@
           ],
           "note": "Keep API keys and PATs in your application secret store. For local Docker use http://localhost:3000/mcp.",
           "serverSetup": "docker",
-          "snippet": "import asyncio\nfrom agents import Agent, Runner\nfrom agents.mcp import MCPServerStreamableHttp\n\nasync def main():\n    async with MCPServerStreamableHttp(\n        name=\"Polarion\",\n        params={\n            \"url\": \"https://YOUR-SERVER/mcp\",\n            \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n        },\n        cache_tools_list=True,\n    ) as server:\n        agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n        result = await Runner.run(agent, \"List the Polarion projects I can access.\")\n        print(result.final_output)\n\nasyncio.run(main())",
+          "snippet": "import asyncio\nfrom agents import Agent, Runner\nfrom agents.mcp import MCPServerStreamableHttp\n\nasync def main():\n    async with MCPServerStreamableHttp(\n        name=\"Polarion\",\n        params={\n            \"url\": \"https://YOUR-SERVER/mcp\",\n            \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n        },\n        cache_tools_list=True,\n    ) as server:\n        agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n        result = await Runner.run(agent, \"Which Polarion user am I? Use getCurrentUser.\")\n        print(result.final_output)\n\nasyncio.run(main())",
           "needs": [
             "An OpenAI API key",
             "Docker server running (public HTTPS URL)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The printed final_output names projects from your Polarion."
           },
           "fails": [
@@ -1072,7 +1072,7 @@
       "steps": [
         "Replace the URL and PAT, then run the command below",
         "Run codex mcp list to check, then start Codex",
-        "Type /mcp and ask: “List the Polarion projects I can access.”"
+        "Type /mcp and ask: “Which Polarion user am I? Use getCurrentUser.”"
       ],
       "sources": [
         "https://learn.chatgpt.com/docs/extend/mcp?surface=cli",
@@ -1099,7 +1099,7 @@
             "Node.js 22+"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Codex asks to call a Polarion tool; approve it. /mcp shows polarion enabled."
           },
           "fails": [
@@ -1127,7 +1127,7 @@
             "Codex (CLI or IDE extension)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Codex asks to call a Polarion tool; approve it. /mcp shows polarion enabled."
           },
           "fails": [
@@ -1158,7 +1158,7 @@
             "Docker server running (public HTTPS URL)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Codex asks to call a Polarion tool; approve it. /mcp shows polarion enabled."
           },
           "fails": [
@@ -1218,8 +1218,8 @@
             "Server on a public HTTPS /mcp URL"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
-            "expect": "The assistant calls a Polarion tool (e.g. getProjects) and lists projects."
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
+            "expect": "The assistant calls getCurrentUser and shows your Polarion user. A 403 means this account lacks global REST read access; see Troubleshooting."
           },
           "fails": [
             {
@@ -1250,8 +1250,8 @@
             "Docker server on public HTTPS"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
-            "expect": "The assistant calls a Polarion tool (e.g. getProjects) and lists projects."
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
+            "expect": "The assistant calls getCurrentUser and shows your Polarion user. A 403 means this account lacks global REST read access; see Troubleshooting."
           },
           "fails": [
             {
@@ -1310,7 +1310,7 @@
             "Node.js 22+"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1339,7 +1339,7 @@
             "VS Code 1.99+ with GitHub Copilot"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1371,7 +1371,7 @@
             "Docker server running (public HTTPS URL)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1403,7 +1403,7 @@
       "steps": [
         "Replace the URL and PAT, then run the command below",
         "Run gemini mcp list, then start gemini",
-        "Type /mcp and ask: “List the Polarion projects I can access.”"
+        "Type /mcp and ask: “Which Polarion user am I? Use getCurrentUser.”"
       ],
       "sources": [
         "https://geminicli.com/docs/tools/mcp-server/"
@@ -1429,7 +1429,7 @@
             "Node.js 22+, and a folder you trust"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1458,7 +1458,7 @@
             "A folder you trust to run it in"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1489,7 +1489,7 @@
             "Docker server running (public HTTPS URL)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1549,7 +1549,7 @@
             "Server on public HTTPS with OAuth login enabled"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Gemini Enterprise calls a Polarion action and lists project names."
           },
           "fails": [
@@ -1581,7 +1581,7 @@
             "Docker server on public HTTPS with OAuth enabled"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "Gemini Enterprise calls a Polarion action and lists project names."
           },
           "fails": [
@@ -1649,7 +1649,7 @@
             "Node.js 22+"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1678,7 +1678,7 @@
             "Cursor"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1710,7 +1710,7 @@
             "Docker server running (public HTTPS URL)"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -1769,8 +1769,8 @@
             "Node.js 22 or newer"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
-            "expect": "A Polarion tool (for example getProjects) is called and projects are listed."
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
+            "expect": "The assistant calls getCurrentUser and shows your Polarion user. A 403 means this account lacks global REST read access; see Troubleshooting."
           },
           "fails": [
             {
@@ -1799,8 +1799,8 @@
             "The https://.../mcp address from your admin"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
-            "expect": "A Polarion tool (for example getProjects) is called and projects are listed."
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
+            "expect": "The assistant calls getCurrentUser and shows your Polarion user. A 403 means this account lacks global REST read access; see Troubleshooting."
           },
           "fails": [
             {
@@ -1830,8 +1830,8 @@
             "Docker server running at its https://YOUR-SERVER/mcp"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
-            "expect": "A Polarion tool (for example getProjects) is called and projects are listed."
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
+            "expect": "The assistant calls getCurrentUser and shows your Polarion user. A 403 means this account lacks global REST read access; see Troubleshooting."
           },
           "fails": [
             {
@@ -1889,8 +1889,8 @@
             "Node.js 22 or newer"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
-            "expect": "A Polarion tool (for example getProjects) is called and projects are listed."
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
+            "expect": "The assistant calls getCurrentUser and shows your Polarion user. A 403 means this account lacks global REST read access; see Troubleshooting."
           },
           "fails": [
             {
@@ -1923,8 +1923,8 @@
             "Docker installed and running"
           ],
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
-            "expect": "A Polarion tool (for example getProjects) is called and projects are listed."
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
+            "expect": "The assistant calls getCurrentUser and shows your Polarion user. A 403 means this account lacks global REST read access; see Troubleshooting."
           },
           "fails": [
             {
@@ -1982,7 +1982,7 @@
           "snippet": "https://YOUR-SERVER/mcp\nAuthorization: Bearer YOUR_POLARION_PAT",
           "note": "No new container is needed when your team already hosts the server.",
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The client lists project names, or at least the tool list."
           },
           "fails": [
@@ -2012,7 +2012,7 @@
           "serverSetup": "docker",
           "snippet": "http://localhost:3000/mcp\nAuthorization: Bearer YOUR_POLARION_PAT",
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The client lists project names, or curl in Before you start returns 200."
           },
           "fails": [
@@ -2063,7 +2063,7 @@
           ],
           "note": "Any MCP-capable client works. For OpenAPI-only integrations, choose REST / OpenAPI.",
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -2091,7 +2091,7 @@
           ],
           "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL.",
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -2120,7 +2120,7 @@
           "note": "Local Docker: use http://localhost:3000/mcp. Use HTTPS for team access.",
           "serverSetup": "docker",
           "verify": {
-            "prompt": "List the Polarion projects I can access.",
+            "prompt": "Which Polarion user am I? Use getCurrentUser.",
             "expect": "The assistant calls a Polarion tool and lists project names."
           },
           "fails": [
@@ -2256,11 +2256,11 @@
             "Ask your administrator for the wrapper address and HTTP_API_KEY.",
             "Import https://YOUR-SERVER/openapi.json (all) or /openapi-gpt.json (30 actions).",
             "Set authentication to Bearer token and paste the HTTP_API_KEY.",
-            "Call getProjects to check access."
+            "Call getCurrentUser to check access. The 30-action GPT schema has no getCurrentUser; use getProject with a projectId there."
           ],
           "note": "REST uses the deployment PAT, shared by all calls through this wrapper.",
           "verify": {
-            "prompt": "curl -X POST https://YOUR-SERVER/api/tools/getProjects -H \"Authorization: Bearer YOUR_WRAPPER_API_KEY\" -H \"Content-Type: application/json\" -d '{}'",
+            "prompt": "curl -X POST https://YOUR-SERVER/api/tools/getCurrentUser -H \"Authorization: Bearer YOUR_WRAPPER_API_KEY\" -H \"Content-Type: application/json\" -d '{}'",
             "expect": "JSON with the Polarion projects. Without the key, /api/tools answers 401."
           },
           "fails": [
@@ -2290,8 +2290,8 @@
           "note": "REST uses the deployment PAT, shared by all calls through this wrapper. Use a dedicated user.",
           "serverSetup": "rest",
           "verify": {
-            "prompt": "curl -X POST https://YOUR-SERVER/api/tools/getProjects -H \"Authorization: Bearer YOUR_WRAPPER_API_KEY\" -H \"Content-Type: application/json\" -d '{}'",
-            "expect": "JSON with the Polarion projects. Without the key, /api/tools answers 401."
+            "prompt": "curl -X POST https://YOUR-SERVER/api/tools/getProject -H \"Authorization: Bearer YOUR_WRAPPER_API_KEY\" -H \"Content-Type: application/json\" -d '{\"projectId\":\"YOUR_PROJECT_ID\"}'",
+            "expect": "JSON with the project. The 30-action GPT schema has no getCurrentUser. Without the key, /api/tools answers 401."
           },
           "fails": [
             {

@@ -239,6 +239,33 @@ test("extractJsonApiErrorDetail names the failing part of the request", () => {
   )
 })
 
+test("formatApiError explains a 403 on /user as an endpoint scope limit, not a failed login", () => {
+  const error = { response: { status: 403, statusText: "Forbidden", data: {} }, config: { url: "/polarion/rest/v1/user" }, message: "x" } as any
+  const message = formatApiError(error)
+  assert.match(message, /Status 403/)
+  assert.match(message, /denied GET \/user/)
+  assert.match(message, /getProject with a known projectId/)
+  assert.doesNotMatch(message, /rejected the token/)
+})
+
+test("formatApiError separates a project 403 and 404 from a wrong PAT 401", () => {
+  const project403 = formatApiError({ response: { status: 403, statusText: "Forbidden", data: {} }, config: { url: "/projects/drivepilot" }, message: "x" } as any)
+  assert.match(project403, /token was accepted but Polarion denied this request/)
+  assert.doesNotMatch(project403, /getProject with a known projectId/)
+  const project404 = formatApiError({ response: { status: 404, statusText: "Not Found", data: {} }, config: { url: "/projects/Drive" }, message: "x" } as any)
+  assert.match(project404, /Project IDs are case-sensitive/)
+  const wrongPat = formatApiError({ response: { status: 401, statusText: "Unauthorized", data: {} }, config: { url: "/user" }, message: "x" } as any)
+  assert.match(wrongPat, /rejected the token \(invalid, expired or revoked\)/)
+  assert.doesNotMatch(wrongPat, /denied GET/)
+})
+
+test("formatApiError adds no permission hint to unrelated statuses or endpoints", () => {
+  const plain = formatApiError({ response: { status: 404, statusText: "Not Found", data: {} }, config: { url: "/users/someone" }, message: "x" } as any)
+  assert.doesNotMatch(plain, /Hint:/)
+  const server = formatApiError({ response: { status: 500, statusText: "Error", data: {} }, config: { url: "/user" }, message: "x" } as any)
+  assert.doesNotMatch(server, /Hint:/)
+})
+
 test("formatApiError decodes an error body that arrived as bytes (file downloads)", () => {
   const body = Buffer.from(JSON.stringify({ errors: [{ status: "404", detail: "Attachment not found" }] }))
   const error = new AxiosError("fail", "ERR_BAD_REQUEST", undefined, undefined, {
