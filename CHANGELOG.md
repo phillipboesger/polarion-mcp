@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.3
+
+### Fixes
+
+- Failed PAT probes log Polarion's own message again (sanitized, 200 characters, PAT redacted) next to the category and status, for example `request_rejected HTTP 400 - ...`. The error shown to users stays generic.
+- Setup connectivity: the PAT check reports one of 13 categories (invalid PAT, permission denied, rejected request, missing endpoint, redirect, TLS, DNS, timeout and more) with an action. Tool errors add a hint that separates a rejected token from a missing permission.
+- Docs: troubleshooting names the log line the server writes and explains `request_rejected HTTP 400`, including the Polarion Docker image's `ALLOWED_HOSTS` for non-default hostnames; container-side probe; firewall note for Anthropic's outbound range.
+
+### Upgrade notes
+
+- Update the image or package and recreate the container; a restart keeps the old image.
+
+## 1.4.2
+
+### Fixes
+
+- The PAT check calls `GET /metadata`, which needs no global REST permission, so project-only users can connect (they previously got 403 at login). HTTP and OAuth connections require Polarion 2512 or newer; on older releases use stdio with your own PAT. 403 and unusable responses are never accepted as a valid login.
+
 ## 1.4.1
 
 ### Upgrade notes
