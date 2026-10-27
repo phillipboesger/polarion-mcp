@@ -8,6 +8,7 @@ MCP server for the Polarion ALM REST API (TypeScript, ESM, Node >= 22).
 - `npm run build:http`: same, but copies the REST wrapper over `build/index.js` (Render only)
 - `npm test`: compiles with `tests/tsconfig.json` and runs `node --test build-tests/tests/*.test.js`
 - `npm run typecheck`: `tsc --noEmit` (no linter is configured)
+- `npm run verify:setup`: typecheck, lint, strict docs, package check and full tests, zero skips allowed; `--docker` adds live tests (needs LIVE_API_BASE_URL, LIVE_PAT, LIVE_PROJECT_PAT)
 - `npm run test:live`: runs `tests/live/` against a real Polarion (needs `LIVE_API_BASE_URL`, `LIVE_PAT`, a build; see `docs/live-tests.md`). CI: `.github/workflows/live-polarion.yml`
 - `npm run regenerate`: re-download the OpenAPI spec and regenerate `src/tools.ts`
 

@@ -24,9 +24,10 @@ if (args.has('--ui')) {
 }
 
 if (args.has('--docker')) {
-  const missing = ['LIVE_API_BASE_URL', 'LIVE_PAT'].filter(name => !process.env[name]);
+  // LIVE_PROJECT_PAT is required too: its regression test would otherwise skip, and skips fail the gate.
+  const missing = ['LIVE_API_BASE_URL', 'LIVE_PAT', 'LIVE_PROJECT_PAT'].filter(name => !process.env[name]);
   if (missing.length) {
-    console.error(`verify-setup: --docker needs ${missing.join(' and ')}. Start your Polarion container, provision users (scripts/live/provision-users.mjs), then export them.`);
+    console.error(`verify-setup: --docker needs ${missing.join(', ')}. Start your Polarion container, provision users (scripts/live/provision-users.mjs), then export them.`);
     process.exit(2);
   }
   steps.push({ name: 'live tests (your Polarion)', cmd: ['npm', ['run', 'test:live']], noSkips: true });

@@ -28,4 +28,4 @@ This repository provides Polarion REST operations through MCP and HTTP. The comm
 
 ## Build and verification
 
-The package scripts include `npm run build`, `npm run typecheck`, `npm test`, `npm run lint`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package`. The release and CI workflows are defined under `.github/workflows/`.
+The package scripts include `npm run build`, `npm run typecheck`, `npm test`, `npm run lint`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, `npm run check:package`, and `npm run verify:setup` (the local setup gate, see [live-tests.md](live-tests.md)). The release and CI workflows are defined under `.github/workflows/`.
