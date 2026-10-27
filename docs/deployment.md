@@ -62,7 +62,7 @@ For team access, proxy HTTPS to the loopback port and include the public hostnam
 
 For stdio, run the same image with `docker run -i --rm`, pass `API_BASE_URL` and `BEARER_TOKEN`, and override the command with `node build/index.js`. Do not detach a stdio container.
 
-For REST/OpenAPI, override the command with `node build/http-server.js`, configure `API_BASE_URL`, `BEARER_TOKEN`, `HTTP_API_KEY` and `PUBLIC_URL`, and keep the loopback port mapping. REST callers authenticate with `HTTP_API_KEY`; calls run under the deployment PAT. The [inline REST setup](https://polarion-mcp.boesger.com/#setup/rest-wrapper) contains the complete command.
+For REST/OpenAPI, override the command with `node build/http-server.js`, configure `API_BASE_URL`, `BEARER_TOKEN`, `HTTP_API_KEY` and `PUBLIC_URL`, and keep the loopback port mapping. REST callers authenticate with `HTTP_API_KEY`; calls run under the deployment PAT. The [REST wrapper guide](guides/clients/rest-wrapper.md) contains the complete command.
 
 ## Other Platforms
 

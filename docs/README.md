@@ -4,9 +4,9 @@ Reference and setup guides for Polarion MCP.
 
 ## Client setup
 
-Complete setup in the [landing page's inline guide](https://polarion-mcp.boesger.com/#clients). It groups AI providers, tools / IDEs, and custom / self-hosted options including Docker.
+The [landing page](https://polarion-mcp.boesger.com/#clients) lists every client and both setups (Local and Server). All install guides live in this repository: start at the [client index](clients.md).
 
-The [client source reference](clients.md) records vendor documentation and setup notes. [clients.json](clients.json) drives the website, grouped README table and source reference.
+[clients.json](clients.json) drives the website, the README table and the generated guides in [guides/](guides/).
 
 ## Guides
 

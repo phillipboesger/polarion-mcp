@@ -7,7 +7,7 @@ import { once } from 'node:events';
 
 test('cloud instructions distinguish real Polarion URLs from local development networking', () => {
   const manifest = JSON.parse(readFileSync('docs/clients.json', 'utf8'));
-  const prerequisites = manifest.serverModes.find(mode => mode.id === 'docker').before;
+  const prerequisites = manifest.serverModes.find(mode => mode.id === 'server').before;
   const local = prerequisites.filter(entry => entry.how.includes('host.docker.internal'));
   assert.equal(local.length, 1);
   assert.match(local[0].title, /local development/i);

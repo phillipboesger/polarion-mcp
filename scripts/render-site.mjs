@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { guideUrl, requirement } from './render-clients.mjs';
 
+const repoBlob = 'https://github.com/phillipboesger/polarion-mcp/blob/main';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const escapeHtml = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 const httpsUrl = value => {
@@ -13,53 +15,42 @@ const httpsUrl = value => {
 };
 
 export function renderSiteClientsBlock(manifest) {
-  const clientButton = id => {
-    const client = manifest.clients.find(client => client.id === id);
-    if (!client) throw new Error(`Unknown client ${id}`);
-    return `<button type="button" data-client="${escapeHtml(id)}" aria-controls="setup" aria-pressed="${id === 'claude-desktop'}">${escapeHtml(client.label)}</button>`;
+  const rendered = new Set();
+  const card = client => {
+    const supported = connection => !connection.reason;
+    return `<article class="provider-card client-card" data-client="${escapeHtml(client.id)}" data-local="${supported(client.local)}" data-server="${supported(client.server)}">
+              <h4>${escapeHtml(client.name)}</h4>
+              <p>${escapeHtml(client.summary)}</p>
+              <dl><div><dt>Local</dt><dd>${escapeHtml(requirement(client.local))}</dd></div><div><dt>Server</dt><dd>${escapeHtml(requirement(client.server))}</dd></div></dl>
+              <a class="guide-link" href="${httpsUrl(guideUrl(client.id))}" target="_blank" rel="noopener noreferrer">Open guide ↗</a>
+            </article>`;
   };
-  const groups = manifest.groups.map(group => `<section class="client-group" aria-labelledby="group-${group.id}">
-          <h3 id="group-${group.id}">${escapeHtml(group.title)}</h3>
-          <div class="provider-grid ${group.id === 'providers' ? '' : 'wide'}">${group.cards.map(card => `
-            <article class="provider-card ${card.id}">
-              <div class="provider-heading"><span class="monogram" aria-hidden="true">${escapeHtml(card.mark)}</span><div><h4>${escapeHtml(card.name)}</h4><p>${escapeHtml(card.description)}</p></div></div>
-              <div class="client-buttons">${card.clients.map(clientButton).join('')}</div>
-            </article>`).join('')}
-          </div>
-        </section>`).join('\n        ');
-  const first = manifest.clients[0];
-  const connection = first.connections[first.defaultMode];
-  const setup = manifest.setups.find(setup => setup.id === connection.setup);
-  const clients = manifest.clients.map(({ id, name, label, defaultMode, connections, sources }) => ({ id, name, label, defaultMode, connections, source: sources[0] }));
-  const data = JSON.stringify({ clients, setups: manifest.setups, serverModes: manifest.serverModes }).replaceAll('<', '\\u003c');
-  return `<div class="setup-layout">
-      <div class="client-groups">${groups}</div>
-      <section class="setup-panel" id="setup" aria-labelledby="setup-title" tabindex="-1">
-        <p class="eyebrow" id="setup-kind">${escapeHtml(manifest.serverModes.find(mode => mode.id === first.defaultMode).label)}</p>
-        <h3 id="setup-title">${escapeHtml(first.name)}</h3>
-        <fieldset class="server-picker"><legend>1. How do you run the server?</legend>
-          <div class="server-options">${manifest.serverModes.map(mode => `<label class="server-option"><input type="radio" name="server-mode" value="${mode.id}"${mode.id === first.defaultMode ? ' checked' : ''} /><span><strong>${escapeHtml(mode.label)}</strong><small id="description-${mode.id}">${escapeHtml(first.connections[mode.id].description || mode.description)}</small><small id="reason-${mode.id}" class="mode-reason"></small></span></label>`).join('')}</div>
-        </fieldset>
-        <label for="setup-client">2. Connect your client</label>
-        <select id="setup-client">${manifest.clients.map(client => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join('')}</select>
-        <p class="compatibility" id="setup-compatibility">${escapeHtml(first.name)} · ${escapeHtml(setup.title)}</p>
-        <div id="setup-before" class="setup-before" hidden><h4 id="before-title">Before you start</h4><div id="before-items"></div></div>
-        <p class="setup-needs" id="setup-needs" hidden></p>
-        <ol class="setup-steps" id="setup-steps">${connection.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ol>
-        <div id="server-command" hidden>
-          <div class="snippet-header"><span>Start your server · bash</span><button type="button" class="copy-snippet" data-copy="server-code">Copy server command</button></div>
-          <pre tabindex="0" aria-label="Server command"><code id="server-code"></code></pre><p class="setup-note" id="server-note"></p>
-        </div>
-        <div class="snippet-header"><span id="snippet-language">${escapeHtml(setup.language)} · client configuration</span><button type="button" id="copy-setup" class="copy-snippet" data-copy="setup-code">Copy snippet</button></div>
-        <pre tabindex="0" aria-label="Client setup snippet"><code id="setup-code">${escapeHtml(connection.snippet ?? setup.snippet)}</code></pre>
-        <div id="setup-verify" class="setup-verify" hidden><h4>Check that it works</h4><p id="verify-prompt"></p><p id="verify-expect"></p></div>
-        <details id="setup-fails" class="setup-fails" hidden><summary>If it does not work</summary><dl id="fails-list"></dl></details>
-        <p class="setup-note" id="setup-note">${escapeHtml(connection.note || setup.note)}</p>
-        <div class="setup-links"><a id="setup-source" href="${httpsUrl(first.sources[0])}" target="_blank" rel="noopener noreferrer">Client documentation ↗</a><a href="#faq">Questions ↓</a></div>
-        <p id="setup-status" class="sr-only" role="status" aria-live="polite"></p>
-      </section>
+  const groups = manifest.groups.flatMap(group => group.cards).map(group => {
+    const clients = group.clients.filter(id => !rendered.has(id)).map(id => {
+      const client = manifest.clients.find(client => client.id === id);
+      if (!client) throw new Error(`Unknown client ${id}`);
+      rendered.add(id);
+      return client;
+    });
+    return clients.length ? `<section class="client-group" aria-labelledby="group-${group.id}">
+          <h3 id="group-${group.id}">${escapeHtml(group.name)}</h3>
+          <div class="path-grid">${clients.map(card).join('\n            ')}</div>
+        </section>` : '';
+  }).filter(Boolean).join('\n        ');
+  const mode = id => manifest.serverModes.find(mode => mode.id === id);
+  return `<div class="path-entries">
+      <p><strong>${escapeHtml(mode('local').label)}</strong>${escapeHtml(mode('local').description)} <a href="${httpsUrl(`${repoBlob}/docs/guides/local-npm.md`)}" target="_blank" rel="noopener noreferrer">Open the local guide ↗</a></p>
+      <p><strong>${escapeHtml(mode('server').label)}</strong>${escapeHtml(mode('server').description)} <a href="${httpsUrl(`${repoBlob}/docs/guides/server-docker.md`)}" target="_blank" rel="noopener noreferrer">Open the server guide ↗</a></p>
     </div>
-    <script type="application/json" id="client-data">${data}</script>`;
+    <fieldset class="path-question"><legend>Does your client run on your computer (Local) or in the cloud or for a team (Server)?</legend>
+      <div class="path-options">
+        <label class="path-option"><input type="radio" name="path" value="all" checked /> Show all clients</label>
+        <label class="path-option"><input type="radio" name="path" value="local" /> On my computer (Local)</label>
+        <label class="path-option"><input type="radio" name="path" value="server" /> Cloud or team (Server)</label>
+      </div>
+    </fieldset>
+    <div class="client-groups">${groups}</div>
+    <p id="path-status" class="sr-only" role="status" aria-live="polite"></p>`;
 }
 
 // Disjoint, ordered path rules: nested work items are counted with work items,
@@ -111,7 +102,7 @@ export const renderFaq = manifest => manifest.faq.map(item => `<details><summary
 function replaceBlock(html, name, body) {
   const start = `<!-- ${name}:start -->`, end = `<!-- ${name}:end -->`;
   if (html.split(start).length !== 2 || html.split(end).length !== 2 || html.indexOf(start) > html.indexOf(end)) throw new Error(`docs/index.html must contain exactly one ordered ${name} marker block`);
-  return html.replace(new RegExp(`${start}[\\s\\S]*?${end}`), `${start}\n${body}\n${end}`);
+  return html.replace(new RegExp(`${start}[\\s\\S]*?${end}`), () => `${start}\n${body}\n${end}`);
 }
 
 export function renderSite(rootDir = root) {
@@ -126,7 +117,7 @@ export function renderSite(rootDir = root) {
   if (html.includes('<!-- daily:start -->')) html = replaceBlock(html, 'daily', renderDailyUse(JSON.parse(fs.readFileSync(path.join(rootDir, 'docs/daily-use.json'), 'utf8'))));
   html = html.replaceAll('{{TOOL_COUNT}}', countDomains(toolsSource).total);
   // Pages caches assets for hours: tie each asset URL to its content so a new HTML never meets old CSS/JS.
-  return html.replace(/(href|src)="(site\.css|viz\.js|setup\.js|carousel\.js)(\?v=[0-9a-f]+)?"/g, (_, attr, file) => {
+  return html.replace(/(href|src)="(site\.css|viz\.js|paths\.js|carousel\.js)(\?v=[0-9a-f]+)?"/g, (_, attr, file) => {
     const hash = createHash('sha1').update(fs.readFileSync(path.join(rootDir, 'docs', file))).digest('hex').slice(0, 8);
     return `${attr}="${file}?v=${hash}"`;
   });
@@ -139,6 +130,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const current = fs.readFileSync(htmlPath, 'utf8');
     if (process.argv.includes('--check') && current !== expected) throw new Error('website blocks are stale; run npm run docs:site');
     if (!process.argv.includes('--check') && current !== expected) fs.writeFileSync(htmlPath, expected);
-    console.log('Website setup, domains and daily examples are up to date');
+    console.log('Website paths, domains and daily examples are up to date');
   } catch (error) { console.error(`render-site: ${error.message}`); process.exitCode = 1; }
 }

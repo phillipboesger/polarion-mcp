@@ -69,66 +69,49 @@ These are illustrative conversations using real tools, not recorded outputs. Pro
 
 ## Get connected
 
-![Pick your AI provider, choose npm, Docker or Remote URL, and copy the matching configuration](docs/assets/site-setup.png)
+Two setups, pick by where your client runs. You need a REST-enabled Polarion instance and a PAT. Every guide starts from nothing and ends with a check.
 
-**First: how do you run the server?** You need a REST-enabled Polarion instance and a PAT.
-
-| Server choice | Use it when | What runs |
+| Setup | Use it when | Guide |
 |---|---|---|
-| **npm / npx** | Your desktop or coding client supports local MCP. | The client launches a stdio process with Node.js 22+ and your PAT. |
-| **Docker** | You are setting up your own or a team server. | Streamable HTTP, with each caller’s PAT. Add HTTPS and OAuth for cloud connectors. |
-| **Remote URL** | Your team already hosts it. | Nothing to install locally; get the endpoint from your administrator. |
+| **Local (npm / npx)** | Your desktop or coding client runs on your computer and starts MCP servers. | [Local setup](docs/guides/local-npm.md) |
+| **Server (Docker)** | Your client runs in the cloud (claude.ai, ChatGPT) or your team shares one server. | [Server setup](docs/guides/server-docker.md) |
 
-Choose your client in the [inline setup picker](https://polarion-mcp.boesger.com/#clients). It recommends a server choice, explains unsupported options, and shows the server command, client snippet and short steps together. Claude Desktop, Claude Code, Cursor and VS Code accept local or remote setups. **claude.ai and ChatGPT’s hosted connector path use a reachable HTTPS server**, rather than directly launching npx. OpenAI also offers [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) for private servers; that requires separate setup and permissions.
+Then open the guide for your client:
 
 <!-- clients:start -->
-| Group | Setup |
-|---|---|
-| [Claude](https://polarion-mcp.boesger.com/#setup/claude-desktop) | Claude Desktop and Claude Code: local or remote; claude.ai and API: HTTPS server. |
-| [ChatGPT / Codex](https://polarion-mcp.boesger.com/#setup/chatgpt-apps) | ChatGPT connector: HTTPS; Custom GPT Actions: REST/OpenAPI; Codex: local or remote. |
-| [Gemini, editors, other providers](https://polarion-mcp.boesger.com/#setup/cursor) | Gemini Enterprise and CLI, VS Code, Cursor and more; OpenAI API, Agents SDK or any MCP client. |
-| [Custom / team server](https://polarion-mcp.boesger.com/#setup/generic-stdio) | Other AI provider / any MCP client: stdio or HTTP; Docker, REST/OpenAPI and n8n. |
+| Client | Local | Server | Guide |
+|---|---|---|---|
+| Claude Desktop | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-desktop.md) |
+| claude.ai | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-web-desktop.md) |
+| Claude Code | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-code.md) |
+| Claude API | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-api.md) |
+| ChatGPT connector | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/chatgpt-apps.md) |
+| Custom GPT Actions | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/custom-gpt.md) |
+| OpenAI Responses API | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openai-api.md) |
+| OpenAI Agents SDK | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openai-agents.md) |
+| Codex | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/codex-cli.md) |
+| Microsoft Copilot Studio | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/copilot-studio.md) |
+| VS Code / GitHub Copilot | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/vscode-copilot.md) |
+| Gemini CLI | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/gemini-cli.md) |
+| Gemini Enterprise | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/gemini-enterprise.md) |
+| Cursor | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/cursor.md) |
+| Windsurf / Cascade | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/windsurf.md) |
+| JetBrains AI Assistant | Yes | No | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/jetbrains-ai.md) |
+| Docker team server | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/docker.md) |
+| Other AI provider / any MCP client | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-stdio.md) |
+| Generic HTTP client | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-http.md) |
+| REST wrapper / OpenAPI | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/rest-wrapper.md) |
+| n8n REST workflow | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/n8n.md) |
 <!-- clients:end -->
 
-**Local example:** paste this into Claude Desktop’s Developer config or a compatible client’s private MCP settings. Replace the URL and PAT, merge with existing settings, then reconnect. Fully quit and restart Claude Desktop.
-
-```json
-{
-  "mcpServers": {
-    "polarion": {
-      "command": "npx",
-      "args": ["-y", "polarion-mcp"],
-      "env": {
-        "API_BASE_URL": "https://YOUR-POLARION/polarion/rest/v1",
-        "BEARER_TOKEN": "YOUR_POLARION_PAT"
-      }
-    }
-  }
-}
-```
-
-**Docker example:** the published image starts an HTTP server on a loopback port.
-
-```bash
-docker run -d --name polarion-mcp \
-  -p 127.0.0.1:3000:3000 \
-  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \
-  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.3
-```
-
-For a local HTTP client, use `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. For a team, proxy HTTPS to that port and add the public hostname to `MCP_ALLOWED_HOSTS`. Cloud connectors also need `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, exact redirect allowlists and a `TRUST_PROXY` setting matching the real proxy chain. The picker includes that server configuration for claude.ai and ChatGPT. See [deployment](docs/deployment.md#docker) for operations details.
-
-**Other AI provider / any MCP client:** choose [Any MCP client](https://polarion-mcp.boesger.com/#setup/generic-stdio) for stdio or HTTP connection shapes. For OpenAPI clients, Custom GPT Actions and n8n, run the **separate REST wrapper** with a deployment PAT and `HTTP_API_KEY`; the [REST setup](https://polarion-mcp.boesger.com/#setup/rest-wrapper) includes its command and schema URLs.
-
-Keep credentials out of Git. There is no public Polarion relay. Finish with a read-only check: “List the Polarion projects I can access.” [Vendor sources and compatibility notes](docs/clients.md) explain the documented paths.
+For OpenAPI clients, Custom GPT Actions and n8n, run the separate REST wrapper (see the client guides). Keep credentials out of Git. There is no public Polarion relay. See also the [client index](docs/clients.md) and [deployment](docs/deployment.md).
 
 ## FAQ
 
 <!-- faq:start -->
 <details><summary>Which setup do I need?</summary>
 
-Desktop or coding client: npm / npx (your client starts the server). Shared team server: Docker. claude.ai or ChatGPT connector: a public HTTPS server with OAuth, so Docker, or Remote URL if your team runs one. Custom GPT Actions use the REST wrapper.
+Local: your client starts the server on your computer with `npx`. Server: you host the server with Docker and the client connects by URL; claude.ai and ChatGPT need it. Custom GPT Actions and n8n use the REST wrapper on a server.
 
 </details>
 <details><summary>How do I create a Polarion personal access token (PAT)?</summary>
@@ -138,7 +121,7 @@ Polarion user page > Personal Access Token > name and expiry > Create Token. Cop
 </details>
 <details><summary>Is my data safe? Which permissions apply?</summary>
 
-Polarion enforces the permissions of the token owner. Remote mode uses each caller's own token and the server stores none. Tool results go to your AI provider, so your organization's data policies apply.
+Polarion enforces the permissions of the token owner. Server mode uses each caller's own token and the server stores none. Tool results go to your AI provider, so your organization's data policies apply.
 
 </details>
 <details><summary>Can I limit the server to read-only?</summary>
@@ -146,29 +129,9 @@ Polarion enforces the permissions of the token owner. Remote mode uses each call
 Yes: set `MCP_READ_ONLY=1` and restart. Only read tools are exposed. In write-enabled sessions every write tool can preview with `dry_run: true`.
 
 </details>
-<details><summary>It says 401 "Polarion did not accept this token".</summary>
-
-The token was cut off, has expired, or belongs to another Polarion. Test the token with the `/metadata` request in the setup guide ("Before you start" on the website, or docs/troubleshooting.md) and create a new token.
-
-</details>
-<details><summary>It says 403 "Polarion denied access".</summary>
-
-Polarion denied access. Check the user's license and REST or item permissions for the affected tool. The metadata authentication probe requires Polarion 2512+ and does not require global REST GET permission. A 403 during login is rejected.
-
-</details>
 <details><summary>My AI client says "Disconnected" or "Failed to connect".</summary>
 
-npm: run `npx -y polarion-mcp` in a terminal with the same values to see the real error (Node older than 22 and JSON typos are common). Docker or remote: open `https://YOUR-SERVER/health`, then read `docker logs polarion-mcp`.
-
-</details>
-<details><summary>The connector login in claude.ai or ChatGPT fails or loops.</summary>
-
-Check `MCP_PUBLIC_URL` (exact https address, no path), the padlock, that the redirect preset or callback is allowed (`MCP_ALLOWED_REDIRECT_PRESETS=claude`; the log says `redirect_uri rejected`), and that `MCP_TOKEN_SECRET` did not change.
-
-</details>
-<details><summary>Does HTTP/OAuth work with Polarion 2506 or older?</summary>
-
-HTTP MCP initialization and OAuth login/refresh require Polarion 2512 or newer. They validate the PAT through GET /metadata, which is available from 2512 without global REST GET permission. Polarion 2506 and older return 404 on this endpoint, so HTTP/OAuth connections fail the preflight. Use stdio mode with API_BASE_URL and your own BEARER_TOKEN, or upgrade Polarion to 2512+. The server does not fall back to project/user listing or accept 403 as successful validation. Tool access still depends on your Polarion permissions.
+Local: run `npx -y polarion-mcp` in a terminal with the same values to see the real error (Node older than 22 and JSON typos are common). Server: open `https://YOUR-SERVER/health`, then read `docker logs polarion-mcp`.
 
 </details>
 
