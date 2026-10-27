@@ -31,6 +31,8 @@ import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handle
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
 import { fetchClientMetadata, parseClientIdentifierUrl, type CimdClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, safeEqual } from './sealed.js';
+import { tokenDiagnostic, tokenNetworkDiagnostic, type TokenProbeResult } from './token-diagnostics.js';
+export type { TokenDiagnostic, TokenDiagnosticCategory, TokenProbeResult } from './token-diagnostics.js';
 
 /** Scope advertised by this server; the PAT itself carries the real permissions. */
 export const POLARION_SCOPE = 'polarion';
@@ -142,7 +144,7 @@ type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secre
  *   if it recognizes the token but denies this probe, or 'unavailable' if Polarion gave
  *   no usable answer.
  */
-export async function validatePolarionToken(token: string): Promise<TokenCheck> {
+export async function probePolarionToken(token: string): Promise<TokenProbeResult> {
   try {
     const response = await axios.get(`${API_BASE_URL}/metadata`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -159,22 +161,30 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
     if (response.status >= 200 && response.status < 300) {
       const metadata = isObject && !('errors' in body) ? body.data : undefined;
       if (isJson && metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
-        && metadata.type === 'metadata' && metadata.id === 'metadata') return true;
-      console.error(`[WARN] Polarion token check failed: HTTP ${response.status} - unusable metadata response`);
-      return 'unavailable';
+        && metadata.type === 'metadata' && metadata.id === 'metadata') return { valid: true };
+      return { valid: false, diagnostic: tokenDiagnostic('unusable_response', response.status) };
     }
-    // Why Polarion refused (status and its own error detail), never the token:
-    // without it a 403 on the login page is indistinguishable from a typo.
-    const detail = String(response.data?.errors?.[0]?.detail ?? response.data?.errors?.[0]?.title ?? '')
-      .replace(/\s+/g, ' ').slice(0, 200);
-    console.error(`[WARN] Polarion token check failed: HTTP ${response.status}${detail ? ` - ${detail}` : ''}`);
-    if (response.status === 401) return false;
-    if (response.status === 403) return 'forbidden';
-    return 'unavailable';
+    const category = response.status === 401 ? 'invalid_pat'
+      : response.status === 403 ? 'permission_denied'
+        : response.status === 400 ? 'request_rejected'
+          : response.status === 404 ? 'endpoint_missing'
+            : response.status >= 300 && response.status < 400 ? 'redirect'
+              : response.status >= 500 ? 'server_error' : 'unexpected_status';
+    return { valid: false, diagnostic: tokenDiagnostic(category, response.status) };
   } catch (error) {
-    console.error(`[WARN] Polarion token check failed: ${error instanceof Error ? error.message : String(error)}`);
-    return 'unavailable';
+    return { valid: false, diagnostic: tokenNetworkDiagnostic(error) };
   }
+}
+
+/** Backward-compatible result mapping for existing OAuth callers. */
+export async function validatePolarionToken(token: string): Promise<TokenCheck> {
+  const result = await probePolarionToken(token);
+  if (result.valid) return true;
+  const { diagnostic } = result;
+  console.error(`[WARN] Polarion token probe GET /metadata failed: ${diagnostic.category}${diagnostic.upstreamStatus === undefined ? '' : ` HTTP ${diagnostic.upstreamStatus}`}`);
+  if (diagnostic.category === 'invalid_pat') return false;
+  if (diagnostic.category === 'permission_denied') return 'forbidden';
+  return 'unavailable';
 }
 
 /** Hosts whose redirect URIs may use any port (RFC 8252 section 7.3). */

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import assert from "node:assert/strict"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
+import axios from "axios"
 
 // Each test file runs in its own process, so API_BASE_URL can point at a stub
 // Polarion before oauth.js reads it at import time.
@@ -62,7 +63,7 @@ const polarion = createServer((req, res) => {
 polarion.listen(0, "127.0.0.1")
 await new Promise<void>((resolve) => polarion.once("listening", () => resolve()))
 process.env.API_BASE_URL = `http://127.0.0.1:${(polarion.address() as AddressInfo).port}/polarion/rest/v1`
-const { validatePolarionToken } = await import("../src/oauth.js")
+const { probePolarionToken, validatePolarionToken } = await import("../src/oauth.js")
 
 test.after(() => polarion.close())
 
@@ -96,10 +97,10 @@ test("successful HTTP responses require a usable metadata JSON body", async () =
   assert.equal((await check(`${SECRET_PAT}mixedcase`)).result, true, "JSON media type matching is case-insensitive and permits parameters")
 })
 
-test("unusable successful responses produce a warning without exposing the PAT", async () => {
+test("unusable successful responses produce a safe probe warning without exposing upstream content", async () => {
   const { result, log } = await check(`${SECRET_PAT}textjson`)
   assert.equal(result, "unavailable")
-  assert.match(log, /HTTP 200 - unusable metadata response/)
+  assert.match(log, /Polarion token probe GET \/metadata failed: unusable_response HTTP 200/)
   assert.doesNotMatch(log, new RegExp(SECRET_PAT))
 })
 
@@ -113,11 +114,61 @@ test("the token check sends a bearer to metadata without querying projects", asy
   assert.equal(new URL(request.url, "http://polarion").search, "")
 })
 
-test("a failed check logs status and Polarion's detail, never the token", async () => {
+test("a failed check logs safe status and category, never upstream detail or secrets", async () => {
   const { log } = await check(`${SECRET_PAT}broken`)
-  assert.match(log, /HTTP 400 - No access for user \(400\)/)
+  assert.match(log, /Polarion token probe GET \/metadata failed: request_rejected HTTP 400/)
+  assert.doesNotMatch(log, /No access/)
   assert.doesNotMatch(log, new RegExp(SECRET_PAT))
   assert.equal((await check(`${SECRET_PAT}ok`)).log, "", "a successful check logs nothing")
+})
+
+test("the detailed probe classifies metadata HTTP outcomes deterministically", async () => {
+  const cases = [
+    ["revoked", "invalid_pat", 401, false], ["forbidden", "permission_denied", 403, false],
+    ["broken", "request_rejected", 400, false], ["unsupported", "endpoint_missing", 404, false],
+    ["redirect", "redirect", 302, false], ["empty", "server_error", 500, true],
+    ["html", "unusable_response", 200, false],
+  ] as const
+  for (const [token, category, status, retryable] of cases) {
+    const result = await probePolarionToken(`${SECRET_PAT}${token}`)
+    assert.equal(result.valid, false, token)
+    if (!result.valid) {
+      assert.equal(result.diagnostic.category, category)
+      assert.equal(result.diagnostic.upstreamStatus, status)
+      assert.equal(result.diagnostic.retryable, retryable)
+      assert.match(result.diagnostic.message, /^Polarion token probe GET \/metadata:/)
+      assert.ok(result.diagnostic.action.length > 0)
+      assert.deepEqual((await probePolarionToken(`${SECRET_PAT}${token}`)), result, "diagnostics are deterministic")
+      assert.doesNotMatch(JSON.stringify(result.diagnostic), new RegExp(SECRET_PAT))
+    }
+  }
+  assert.deepEqual(await probePolarionToken(`${SECRET_PAT}ok`), { valid: true })
+})
+
+test("network and TLS errors are safely classified without leaking Axios text", async () => {
+  const originalGet = axios.get
+  try {
+    const cases = [
+      ["ENOTFOUND", "dns", true], ["ETIMEDOUT", "timeout", true],
+      ["ECONNREFUSED", "connection_refused", true], ["CERT_AUTHORITY_INVALID", "tls_trust", false],
+    ] as const
+    for (const [code, category, retryable] of cases) {
+      axios.get = (async () => { throw Object.assign(new Error(`secret ${SECRET_PAT} https://user:pass@host/path?token=${SECRET_PAT}`), { code }) }) as typeof axios.get
+      const { result, log } = await check(`${SECRET_PAT}ignored`)
+      assert.equal(result, "unavailable")
+      assert.match(log, new RegExp(`Polarion token probe GET \\/metadata failed: ${category}`))
+      assert.doesNotMatch(log, /secret|user:pass|token=/)
+      const detailed = await probePolarionToken(`${SECRET_PAT}ignored`)
+      assert.equal(detailed.valid, false)
+      if (!detailed.valid) {
+        assert.equal(detailed.diagnostic.category, category)
+        assert.equal(detailed.diagnostic.retryable, retryable)
+        assert.doesNotMatch(JSON.stringify(detailed), /secret|user:pass|token=/)
+      }
+    }
+  } finally {
+    axios.get = originalGet
+  }
 })
 
 test("redirects and unsupported endpoints cannot authenticate a PAT or trigger a fallback", async () => {
