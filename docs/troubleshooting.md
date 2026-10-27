@@ -119,7 +119,3 @@ The PAT is not printed or placed in command arguments. An authenticated metadata
 ## Missing Build Output
 
 - Run `npm run build` to generate `build/`.
-
-## read_when
-
-- Use this guide when diagnosing setup, authentication, or build issues.

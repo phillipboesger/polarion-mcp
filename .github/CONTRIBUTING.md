@@ -28,9 +28,22 @@ npm run check:docs
 
 `npm run verify:setup` runs typecheck, lint, the strict docs check, the package check and the full test suite in one command. It fails on any skipped test. Add `--ui` for the docs browser tests. `npm run verify:setup:docker` adds the live tests against a Polarion you run yourself; see [docs/live-tests.md](../docs/live-tests.md).
 
-Additional gates are `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, and `npm run check:package`. See [docs/quality/e2e.md](../docs/quality/e2e.md), [docs/quality/mutation-baseline.md](../docs/quality/mutation-baseline.md), [docs/quality/static-analysis.md](../docs/quality/static-analysis.md), and [docs/quality/distribution.md](../docs/quality/distribution.md).
+Additional gates are `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, and `npm run check:package`. See [docs/quality/e2e.md](../docs/quality/e2e.md), [docs/quality/static-analysis.md](../docs/quality/static-analysis.md), and [docs/quality/distribution.md](../docs/quality/distribution.md).
 
 For a real Polarion integration run, see [docs/live-tests.md](../docs/live-tests.md). Do not run it against production data.
+
+## Mutation testing
+
+Run `npm run test:mutation` to compile the tests and run the OAuth, sealing, guards, tool-filter and executor mutation projects. Configuration and module-specific test commands are in [`tests/stryker.config.mjs`](../tests/stryker.config.mjs).
+
+For one module:
+
+```bash
+npm run test:compile
+MUTATION_MODULE=oauth npx --no-install stryker run tests/stryker.config.mjs
+```
+
+Reports and incremental results are written to the gitignored `reports/mutation/` directory. Review the generated reports locally; keep run histories and detailed findings outside the repository.
 
 ## Pull requests
 

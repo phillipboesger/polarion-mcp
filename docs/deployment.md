@@ -225,7 +225,3 @@ curl -s --max-time 5 http://polarion.example.com:3000/health || echo "refused, a
 ```
 
 Connector URL for the MCP client: `https://polarion.example.com/mcp`.
-
-## read_when
-
-- Use this guide when deploying to Render, onto a Polarion server behind its own Apache, or another hosting platform.
