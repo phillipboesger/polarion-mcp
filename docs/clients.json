@@ -162,7 +162,7 @@
       "title": "Docker team server",
       "kind": "Self-hosted · Docker",
       "language": "bash",
-      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.2",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.3",
       "note": "The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends their own Polarion PAT. For team access, proxy HTTPS to the loopback port, forward the public Host, and add your public hostname to MCP_ALLOWED_HOSTS. Cloud connectors also need OAuth; their Docker choice includes that configuration."
     },
     {
@@ -170,7 +170,7 @@
       "title": "REST wrapper / OpenAPI",
       "kind": "Self-hosted · REST",
       "language": "bash",
-      "snippet": "docker run -d --name polarion-rest \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e BEARER_TOKEN=YOUR_POLARION_PAT \\\n  -e HTTP_API_KEY=YOUR_WRAPPER_API_KEY \\\n  -e PUBLIC_URL=https://YOUR-SERVER \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.2 \\\n  node build/http-server.js",
+      "snippet": "docker run -d --name polarion-rest \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \\\n  -e BEARER_TOKEN=YOUR_POLARION_PAT \\\n  -e HTTP_API_KEY=YOUR_WRAPPER_API_KEY \\\n  -e PUBLIC_URL=https://YOUR-SERVER \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.3 \\\n  node build/http-server.js",
       "note": "All calls use the deployment PAT. Clients send Authorization: Bearer <HTTP_API_KEY>. Serve this behind HTTPS; schemas are at /openapi.json and /openapi-gpt.json. Forward the public Host through your TLS proxy. HTTP_API_KEY is a random secret you invent (for example from openssl rand -hex 32); callers send it as the Bearer token. TRUST_PROXY=1 lets the 100-requests-per-15-minutes limit count each caller separately behind your proxy."
     },
     {
@@ -186,7 +186,7 @@
       "title": "HTTPS team server with OAuth",
       "kind": "Self-hosted · Docker",
       "language": "bash",
-      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PRESETS=claude \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.2",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PRESETS=claude \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.3",
       "note": "Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and forward the public Host. TRUST_PROXY=1 assumes exactly one trusted proxy hop; adjust it to your network. Generate a stable secret of at least 32 characters. The claude redirect preset allows the claude.ai callback used by Claude web and Desktop connectors."
     },
     {
@@ -218,7 +218,7 @@
       "title": "HTTPS team server for ChatGPT",
       "kind": "Self-hosted · Docker",
       "language": "bash",
-      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PREFIXES=https://YOUR-CLIENT/EXACT-CALLBACK \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.2",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PREFIXES=https://YOUR-CLIENT/EXACT-CALLBACK \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.3",
       "note": "Before connecting, replace MCP_ALLOWED_REDIRECT_PREFIXES with the exact callback shown by ChatGPT. Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and forward the public Host. TRUST_PROXY=1 assumes exactly one trusted hop; adjust it to your network. Generate a stable secret of at least 32 characters. Use dynamic client registration (DCR)."
     },
     {
@@ -226,7 +226,7 @@
       "title": "Public HTTPS server for cloud APIs",
       "kind": "Self-hosted · Docker",
       "language": "bash",
-      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.2",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.3",
       "note": "Required for cloud API calls: a publicly reachable HTTPS endpoint at https://YOUR-SERVER/mcp. Configure a TLS reverse proxy to 127.0.0.1:3000, forward the public Host and use a real public hostname in MCP_ALLOWED_HOSTS. TRUST_PROXY=1 assumes exactly one trusted hop. Each API request sends your Polarion PAT; OAuth is not required for this PAT-header path."
     }
   ],
@@ -1916,7 +1916,7 @@
             "Check the Status column for polarion, then ask the test prompt in the chat."
           ],
           "note": "Launches a local stdio container. It is not a shared HTTP team server.",
-          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"command\": \"docker\",\n      \"args\": [\n        \"run\",\n        \"-i\",\n        \"--rm\",\n        \"-e\",\n        \"API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1\",\n        \"-e\",\n        \"BEARER_TOKEN=YOUR_POLARION_PAT\",\n        \"ghcr.io/phillipboesger/polarion-mcp:1.4.2\",\n        \"node\",\n        \"build/index.js\"\n      ]\n    }\n  }\n}",
+          "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"command\": \"docker\",\n      \"args\": [\n        \"run\",\n        \"-i\",\n        \"--rm\",\n        \"-e\",\n        \"API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1\",\n        \"-e\",\n        \"BEARER_TOKEN=YOUR_POLARION_PAT\",\n        \"ghcr.io/phillipboesger/polarion-mcp:1.4.3\",\n        \"node\",\n        \"build/index.js\"\n      ]\n    }\n  }\n}",
           "description": "Local container, launched by the IDE",
           "needs": [
             "A JetBrains IDE with AI Assistant",
