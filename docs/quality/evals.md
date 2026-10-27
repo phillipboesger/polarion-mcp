@@ -11,4 +11,4 @@ npm run evals
 
 Without `EVALS_ANTHROPIC_API_KEY`, the runner validates cases and prints `agent run skipped`. For an agent run, set `EVALS_ANTHROPIC_API_KEY`, `API_BASE_URL`, and `BEARER_TOKEN` in the shell environment; these values are never stored in the repository. Optionally set `EVALS_MODEL` to choose another compatible Anthropic model. The runner submits tool definitions and asks the model to select tools without executing them against Polarion; scores reflect tool choice.
 
-For an agent run, point `API_BASE_URL` at your test instance's `/polarion/rest/v1` endpoint and set `BEARER_TOKEN` to a dedicated test account's PAT. See [configuration](../configuration.md) for connection settings and [live tests](../live-tests.md) for integration checks against a real instance. The eval runner does not create fixtures or execute the selected tools against Polarion.
+Use a dedicated test account with the [connection settings](../configuration.md); see [live tests](../live-tests.md) for integration checks against a real instance.

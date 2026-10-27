@@ -8,7 +8,7 @@
 - `docs/`: public guides and the GitHub Pages site, including its client manifest and assets.
 - `plugin/`: Claude Code plugin and shipped workflow skills.
 - `sdk/`: optional local SDK PDFs, not bundled. See [SDK setup](../sdk/README.md).
-- `.github/`: contribution and security policies, CI and release workflows.
+- `.github/`: [contribution guidelines](../.github/CONTRIBUTING.md), [security policy](../.github/SECURITY.md), secret-scan configuration, CI and release workflows.
 
 ## Development
 

@@ -8,7 +8,7 @@ Three entry points share the Polarion execution core:
 - `src/mcp-http-server.ts`: Streamable HTTP MCP with caller authentication and optional OAuth.
 - `src/http-server.ts`: REST wrapper protected by `HTTP_API_KEY`.
 
-`src/server.ts` creates MCP servers; `src/rest-api.ts` defines REST tool routes. Generated MCP calls, composite dependencies and REST routes use `src/tool-execution.ts` for execution and automatic pagination. `src/executor.ts` validates and maps arguments, runs write guards, calls Polarion and formats responses.
+`src/server.ts` creates MCP servers; `src/rest-api.ts` defines REST tool routes. Generated MCP calls, composite dependencies and REST routes use `src/tool-execution.ts` for execution and automatic pagination. `src/executor.ts` validates and maps arguments, applies request pacing and retries, runs write guards from `src/guards.ts`, calls Polarion and formats responses.
 
 ## Tool surface
 
