@@ -26,7 +26,7 @@ What this means in practice:
 
 ## Connection and Login Errors (Q&A)
 
-Direct PAT initialization, OAuth login, and refresh check authentication against Polarion (`GET <API_BASE_URL>/metadata`), and Polarion's answer decides. The server log shows it as `Polarion token check failed: HTTP <status> - <Polarion's message>`. A host-side curl can test the URL from that host, but it does not prove the Docker container can reach the same address. Use the container-side probe below for deployment diagnostics. Do not put a real PAT in a command argument, shell history, or logs.
+Direct PAT initialization, OAuth login, and refresh check authentication against Polarion (`GET <API_BASE_URL>/metadata`), and Polarion's answer decides. The server log shows it as `Polarion token probe GET /metadata failed: <category> HTTP <status> - <Polarion's message>`, for example `request_rejected HTTP 400`. The same category and status appear in the error shown to the user; Polarion's own message appears only in the log. A host-side curl can test the URL from that host, but it does not prove the Docker container can reach the same address. Use the container-side probe below for deployment diagnostics. Do not put a real PAT in a command argument, shell history, or logs.
 
 HTTP 200 with a usable metadata response allows connection. HTTP 401 rejects the PAT; HTTP 403 denies access. The probe requires Polarion 2512+ and does not require global REST GET permission.
 
@@ -38,6 +38,9 @@ Polarion does not know the token. Check that it was copied completely (no line b
 
 **I get 403, "Polarion denied access".**
 Polarion denied access. Check the user's license and REST endpoint or item permissions for the affected operation. See [Permissions: Three Separate Controls](#permissions-three-separate-controls). On Polarion 2512+, `/metadata` does not require global REST GET permission; a 403 during login is rejected rather than accepted as successful authentication.
+
+**The error says `request_rejected HTTP 400`.**
+Polarion or a proxy in front of it refused the request itself, usually because it does not accept the hostname in `API_BASE_URL`. Use the address your users open in the browser (the hostname Polarion and its proxy are configured for), not an IP address or an internal alias. The log line shows Polarion's own message. If you run Polarion from the Polarion Docker image and reach it under a name that the image does not know (for example `host.docker.internal` in a local development setup), set `ALLOWED_HOSTS` on the **Polarion** container to include that name, for example `ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,host.docker.internal`, and recreate the Polarion container (its entrypoint rewrites the setting at start, so editing the properties file and restarting does not work). This is separate from `MCP_ALLOWED_HOSTS`, which only filters requests arriving at the MCP server.
 
 **I get 503, "Polarion could not be reached".**
 The server could not get a usable answer (the log shows why, e.g. `HTTP 404` or a connection error): wrong host, port or path in API_BASE_URL (it must end in `/polarion/rest/v1`), network or firewall between the MCP server and Polarion, Polarion down, or a TLS error (see below). The authentication probe does not follow redirects: configure API_BASE_URL with the final HTTPS host and REST path directly, rather than a redirecting alias. Test from inside the MCP container; a request from your laptop does not test the container network path.

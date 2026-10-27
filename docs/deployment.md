@@ -26,7 +26,7 @@ Cloud clients such as claude.ai and ChatGPT make two separate network connection
 1. The provider connects to the MCP endpoint at a **publicly reachable HTTPS** URL such as `https://mcp.company.example/mcp`. HTTPS is required even when the MCP server runs on a laptop. A cloud provider cannot use the laptop's `localhost` address.
 2. The MCP container connects outbound to Polarion using `API_BASE_URL`, for example `https://polarion.company.example/polarion/rest/v1`. This Polarion URL may be private and reachable only from the server's network or VPN. The Polarion server does not need to be public if the MCP container can reach it.
 
-`MCP_ALLOWED_HOSTS` validates the public Host header arriving at the MCP server (for example `mcp.company.example`). It does not allow or block outbound connections to Polarion. `ALLOWED_HOSTS` is an input used by the Polarion Docker image; it is unrelated to this MCP server's Host-header allowlist.
+`MCP_ALLOWED_HOSTS` validates the public Host header arriving at the MCP server (for example `mcp.company.example`). It does not allow or block outbound connections to Polarion. `ALLOWED_HOSTS` is an input used by the Polarion Docker image; it is unrelated to this MCP server's Host-header allowlist and only matters when Polarion itself answers `request_rejected HTTP 400` (see [troubleshooting](troubleshooting.md)). If a firewall protects the MCP host, allow Anthropic's outbound range `160.79.104.0/21` for claude.ai.
 
 ### Ordered setup
 

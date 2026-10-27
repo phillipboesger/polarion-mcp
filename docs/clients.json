@@ -305,7 +305,7 @@
           "fails": [
             {
               "symptom": "Connecting fails or sign-in does not open",
-              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail."
+              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail; behind a firewall, allow Anthropic's outbound range 160.79.104.0/21."
             },
             {
               "symptom": "Sign-in ends with a redirect_uri error",
@@ -338,7 +338,7 @@
           "fails": [
             {
               "symptom": "Connecting fails or sign-in does not open",
-              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail."
+              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail; behind a firewall, allow Anthropic's outbound range 160.79.104.0/21."
             },
             {
               "symptom": "Sign-in ends with a redirect_uri error",
@@ -405,7 +405,7 @@
           "fails": [
             {
               "symptom": "Connecting fails or sign-in does not open",
-              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail."
+              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail; behind a firewall, allow Anthropic's outbound range 160.79.104.0/21."
             },
             {
               "symptom": "Sign-in ends with a redirect_uri error",
@@ -438,7 +438,7 @@
           "fails": [
             {
               "symptom": "Connecting fails or sign-in does not open",
-              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail."
+              "fix": "The server must be reachable from the public internet. VPN or firewalled servers fail; behind a firewall, allow Anthropic's outbound range 160.79.104.0/21."
             },
             {
               "symptom": "Sign-in ends with a redirect_uri error",
@@ -2434,7 +2434,7 @@
         },
         {
           "title": "Optional: start the server once",
-          "how": "macOS and Linux:\n```\nAPI_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 BEARER_TOKEN=YOUR_PAT npx -y polarion-mcp\n```\nPowerShell: `$env:API_BASE_URL='...'; $env:BEARER_TOKEN='...'; npx -y polarion-mcp`. No output is normal (it waits for a client); stop with Ctrl+C. Use `polarion-mcp@latest` in the client config to get updates, or `polarion-mcp@1.4.0` to pin."
+          "how": "macOS and Linux:\n```\nAPI_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 BEARER_TOKEN=YOUR_PAT npx -y polarion-mcp\n```\nPowerShell: `$env:API_BASE_URL='...'; $env:BEARER_TOKEN='...'; npx -y polarion-mcp`. No output is normal (it waits for a client); stop with Ctrl+C. Use `polarion-mcp@latest` in the client config to get updates, or `polarion-mcp@1.4.3` to pin."
         }
       ]
     },
@@ -2453,7 +2453,7 @@
         },
         {
           "title": "Local development only: Polarion on the Docker host",
-          "how": "Use this only when Polarion runs on the same machine as this development container and the container cannot reach it by its normal company hostname. Inside a container, `localhost` means that container. On Docker Desktop use `https://host.docker.internal/...`; on Linux add `--add-host=host.docker.internal:host-gateway` and use that hostname. The Docker host must have VPN access. Set `API_BASE_URL` to the resulting full REST URL. For cloud/team use, prefer the real Polarion hostname reachable from the server container. `MCP_ALLOWED_HOSTS` is the allowlist for requests arriving at the MCP server public hostname; it does not control outbound access to Polarion. `ALLOWED_HOSTS` is a separate input used by the Polarion Docker image and does not configure this MCP server."
+          "how": "Use this only when Polarion runs on the same machine as this development container and the container cannot reach it by its normal company hostname. Inside a container, `localhost` means that container. On Docker Desktop use `https://host.docker.internal/...`; on Linux add `--add-host=host.docker.internal:host-gateway` and use that hostname. The Docker host must have VPN access. Set `API_BASE_URL` to the resulting full REST URL. For cloud/team use, prefer the real Polarion hostname reachable from the server container. `MCP_ALLOWED_HOSTS` is the allowlist for requests arriving at the MCP server public hostname; it does not control outbound access to Polarion. If Polarion answers `request_rejected HTTP 400` for that hostname, add it to `ALLOWED_HOSTS` on the Polarion container and recreate that container (a restart is not enough); see docs/troubleshooting.md."
         },
         {
           "title": "Team or cloud: hostname and HTTPS",
@@ -2504,7 +2504,7 @@
     },
     {
       "q": "It says 401 \"Polarion did not accept this token\".",
-      "a": "The token was cut off, has expired, or belongs to another Polarion. Run the token test from Before you start and create a new token."
+      "a": "The token was cut off, has expired, or belongs to another Polarion. Test the token with the `/metadata` request in the setup guide (\"Before you start\" on the website, or docs/troubleshooting.md) and create a new token."
     },
     {
       "q": "It says 403 \"Polarion denied access\".",
@@ -2534,7 +2534,7 @@
     },
     {
       "q": "Which Polarion versions work?",
-      "a": "Live integration tests have passed on Polarion 2506 and 2606. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance."
+      "a": "Live integration tests run against Polarion 2506 (stdio) and 2606. HTTP/OAuth connectors such as claude.ai and ChatGPT need Polarion 2512 or newer. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance."
     },
     {
       "q": "Which AI clients can I use?",
@@ -2542,7 +2542,7 @@
     },
     {
       "q": "It says 503 \"Polarion could not be reached\".",
-      "a": "The server got no usable answer from Polarion. Read `Polarion token check failed` in `docker logs polarion-mcp`. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and that the MCP container can reach it; a private Polarion host may be reachable from the server network or VPN even when the AI provider cannot reach Polarion directly. Do not use `localhost` from inside Docker. Use the container-side Node probe in docs/troubleshooting.md. `/health` only confirms MCP liveness."
+      "a": "The server got no usable answer from Polarion. Read the `Polarion token probe GET /metadata failed` line in `docker logs polarion-mcp`; it shows the category, the HTTP status and Polarion's own message. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and that the MCP container can reach it; a private Polarion host may be reachable from the server network or VPN even when the AI provider cannot reach Polarion directly. Do not use `localhost` from inside Docker. Use the container-side Node probe in docs/troubleshooting.md. `/health` only confirms MCP liveness."
     },
     {
       "q": "Can claude.ai or ChatGPT connect to a server on my own laptop?",
@@ -2562,7 +2562,7 @@
     },
     {
       "q": "Should I use polarion-mcp@latest or a pinned version?",
-      "a": "The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.0` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client."
+      "a": "The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.3` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client."
     },
     {
       "q": "How do I update the Docker server?",

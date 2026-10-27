@@ -66,6 +66,7 @@ polarion.listen(0, "127.0.0.1")
 await new Promise<void>((resolve) => polarion.once("listening", () => resolve()))
 process.env.API_BASE_URL = `http://127.0.0.1:${(polarion.address() as AddressInfo).port}/polarion/rest/v1`
 const { probePolarionToken, validatePolarionToken } = await import("../src/oauth.js")
+const { upstreamDetail } = await import("../src/token-diagnostics.js")
 
 test.after(() => polarion.close())
 
@@ -229,10 +230,9 @@ test("the token check sends a bearer to metadata without querying projects", asy
   assert.equal(new URL(request.url, "http://polarion").search, "")
 })
 
-test("a failed check logs safe status and category, never upstream detail or secrets", async () => {
+test("a failed check logs status, category and Polarion's message, never secrets", async () => {
   const { log } = await check(`${SECRET_PAT}broken`)
-  assert.match(log, /Polarion token probe GET \/metadata failed: request_rejected HTTP 400/)
-  assert.doesNotMatch(log, /No access/)
+  assert.match(log, /Polarion token probe GET \/metadata failed: request_rejected HTTP 400 - No access for user \(400\)/)
   assert.doesNotMatch(log, new RegExp(SECRET_PAT))
   assert.equal((await check(`${SECRET_PAT}ok`)).log, "", "a successful check logs nothing")
 })
@@ -337,4 +337,33 @@ test("the real preflight permits a project user while tool permissions remain en
 test("an unreachable Polarion cannot authenticate a PAT", async () => {
   await new Promise<void>(resolve => polarion.close(() => resolve()))
   assert.equal((await check(`${SECRET_PAT}ok`)).result, "unavailable")
+})
+
+test("upstream detail is plain text for the log: tags, control characters, tokens and length are removed", () => {
+  assert.equal(upstreamDetail({ errors: [{ title: "Bad title", detail: "Invalid host" }] }, SECRET_PAT), "Invalid host")
+  assert.equal(upstreamDetail({ errors: [{ title: "Only title" }] }, SECRET_PAT), "Only title")
+  assert.equal(upstreamDetail("<html><style>p{}</style><h1>Bad Request</h1><script>x()</script>\n<p>Invalid  Host</p></html>", SECRET_PAT), "Bad Request Invalid Host")
+  assert.equal(upstreamDetail({ errors: [{ detail: `echo ${SECRET_PAT}\u001b[31m forged\nline` }] }, SECRET_PAT), "echo [token] [31m forged line")
+  assert.equal(upstreamDetail("x".repeat(500), SECRET_PAT).length, 200)
+  for (const empty of [null, undefined, 42, [], {}, { errors: [] }, { errors: [null] }, { errors: [{ detail: 7 }] }]) assert.equal(upstreamDetail(empty, SECRET_PAT), "")
+})
+
+test("a Host-style HTML rejection reaches the log as text but not the user-facing diagnostic", async () => {
+  const original = axios.get.bind(axios)
+  try {
+    axios.get = (async () => ({ status: 400, headers: { "content-type": "text/html" }, data: "<html><body><h1>Bad Request</h1>Invalid host header</body></html>" })) as unknown as typeof axios.get
+    const logged: string[] = []
+    const originalError = console.error
+    console.error = (...args: unknown[]) => { logged.push(args.join(" ")) }
+    let result
+    try { result = await probePolarionToken(`${SECRET_PAT}ignored`) } finally { console.error = originalError }
+    assert.match(logged.join("\n"), /request_rejected HTTP 400 - Bad Request Invalid host header/)
+    assert.equal(result.valid, false)
+    if (!result.valid) {
+      assert.match(result.diagnostic.action, /ALLOWED_HOSTS/)
+      assert.doesNotMatch(JSON.stringify(result.diagnostic), /Invalid host header/)
+    }
+  } finally {
+    axios.get = original
+  }
 })

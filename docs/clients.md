@@ -430,7 +430,7 @@ In your personal client settings or an environment variable, never in a file ins
 
 ### Which Polarion versions work?
 
-Live integration tests have passed on Polarion 2506 and 2606. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
+Live integration tests run against Polarion 2506 (stdio) and 2606. HTTP/OAuth connectors such as claude.ai and ChatGPT need Polarion 2512 or newer. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
 
 ### Which AI clients can I use?
 
@@ -438,7 +438,7 @@ Any client that supports MCP over stdio or Streamable HTTP. The setup guide abov
 
 ### It says 503 "Polarion could not be reached".
 
-The server got no usable answer from Polarion. Read `Polarion token check failed` in `docker logs polarion-mcp`. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and that the MCP container can reach it; a private Polarion host may be reachable from the server network or VPN even when the AI provider cannot reach Polarion directly. Do not use `localhost` from inside Docker. Use the container-side Node probe in docs/troubleshooting.md. `/health` only confirms MCP liveness.
+The server got no usable answer from Polarion. Read the `Polarion token probe GET /metadata failed` line in `docker logs polarion-mcp`; it shows the category, the HTTP status and Polarion's own message. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and that the MCP container can reach it; a private Polarion host may be reachable from the server network or VPN even when the AI provider cannot reach Polarion directly. Do not use `localhost` from inside Docker. Use the container-side Node probe in docs/troubleshooting.md. `/health` only confirms MCP liveness.
 
 ### Can claude.ai or ChatGPT connect to a server on my own laptop?
 
@@ -458,7 +458,7 @@ Keep TLS verification enabled. Mount the company CA PEM into the MCP container a
 
 ### Should I use polarion-mcp@latest or a pinned version?
 
-The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.0` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client.
+The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.3` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client.
 
 ### How do I update the Docker server?
 

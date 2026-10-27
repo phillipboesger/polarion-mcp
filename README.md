@@ -148,7 +148,7 @@ Yes: set `MCP_READ_ONLY=1` and restart. Only read tools are exposed. In write-en
 </details>
 <details><summary>It says 401 "Polarion did not accept this token".</summary>
 
-The token was cut off, has expired, or belongs to another Polarion. Run the token test from Before you start and create a new token.
+The token was cut off, has expired, or belongs to another Polarion. Test the token with the `/metadata` request in the setup guide ("Before you start" on the website, or docs/troubleshooting.md) and create a new token.
 
 </details>
 <details><summary>It says 403 "Polarion denied access".</summary>
