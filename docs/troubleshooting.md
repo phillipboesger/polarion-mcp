@@ -74,7 +74,3 @@ Both only prove that the MCP server runs. Polarion is only contacted when a toke
 ## Missing Build Output
 
 - Run `npm run build` to generate `build/`.
-
-## read_when
-
-- Use this guide when diagnosing setup, authentication, or build issues.

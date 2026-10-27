@@ -15,7 +15,6 @@ The [client source reference](clients.md) records vendor documentation and setup
 | [Architecture](architecture.md) | Server components, transports, and request flow. |
 | [Configuration](configuration.md) | Environment variables and configuration behavior. |
 | [Deployment](deployment.md) | Deployment targets, reverse proxy setup, and operations. |
-| [Example task](example-task.md) | An example workflow using Polarion MCP. |
 | [Extension seams](extensions.md) | Synthetic tools, policy, audit, authentication, and instance resolver interfaces. |
 | [Features](features.md) | Supported server features and behavior. |
 | [Live tests](live-tests.md) | Running integration tests against a live Polarion instance. |
@@ -25,7 +24,6 @@ The [client source reference](clients.md) records vendor documentation and setup
 | [End-to-end conformance](quality/e2e.md) | MCP, OAuth, REST wrapper, and container conformance checks. |
 | [Supply chain verification](quality/supply-chain.md) | Release SBOMs, provenance, image signatures, and verification commands. |
 | [Agent evals](quality/evals.md) | Offline validation and optional agent tool-selection evals. |
-| [Mutation baseline](quality/mutation-baseline.md) | Mutation testing baseline and results. |
 | [REST API coverage](quality/rest-coverage.md) | Generated operation coverage and Polarion version differences. |
 | [Static analysis](quality/static-analysis.md) | CodeQL, ESLint, Gitleaks and audit: what runs in CI and how to read it. |
 | [Repository overview](repository-overview.md) | Repository layout and development entry points. |

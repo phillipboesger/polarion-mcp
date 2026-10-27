@@ -32,6 +32,8 @@ Client ID Metadata Documents are disabled by default. Set `MCP_CIMD_ENABLED=true
 
 ## Rate limits and reverse proxies
 
+Tool-call rate limits and metadata caches are shared across MCP sessions in one HTTP app and keyed by caller token. Requests without a token use the single shared `no-token` bucket/cache scope.
+
 Tool calls can also be limited per authenticated user in a rolling minute with `MCP_RATE_LIMIT_TOOLS`; the default is off. The limit is process-local, keys are derived from a hash of caller identity, and an over-limit call returns an MCP tool error with a retry hint.
 
 With `MCP_MARK_UNTRUSTED=true`, JSON results carry a `_notice` that user-authored content is data, not instructions, and likely user-authored text fields are wrapped in `<polarion-untrusted>` markers. Embedded closing markers are neutralized. These markers help models distinguish data but do not replace tool authorization or output review.
@@ -55,8 +57,3 @@ Telemetry callbacks receive span start and end metadata through the optional ext
 The Custom GPT REST routes served by the Streamable HTTP server (`build/mcp-http-server.js`) run through the same pipeline as MCP tool calls, so `MCP_RATE_LIMIT_TOOLS`, the policy hook, `MCP_CONFIRM_DESTRUCTIVE` and the audit sink apply. With no MCP client to prompt, a destructive call needs `confirm: true` in its `arguments`. The standalone REST wrapper (`build/http-server.js`) does not run that pipeline: it applies only `HTTP_API_KEY`, its request limiter (failed authentication attempts are throttled separately) and the tool filters.
 
 `max_items` pagination makes up to 20 Polarion calls per request (`MAX_AUTO_PAGES`). The standalone REST wrapper does not install a per-page hook, so each page runs without a budget check and the request is bounded only by the wrapper's HTTP-level limits. A large `max_items` call therefore holds one HTTP request open across up to 20 upstream calls made with the deployment's `BEARER_TOKEN`.
-
-## read_when
-
-- Use this guide when reviewing deployment security or handling credentials.
-Tool-call rate limits and metadata caches are shared across MCP sessions in one HTTP app and keyed by caller token. Requests without a token use the single shared `no-token` bucket/cache scope.

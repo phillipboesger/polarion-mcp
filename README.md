@@ -65,7 +65,7 @@ These are illustrative conversations using real tools, not recorded outputs. Pro
 | “Summarize this release plan and its latest test runs.” | `getPlan`, `getWorkItems`, `getTestRuns`: a draft status update with source IDs and missing data. | You decide release readiness. |
 | “Find requirements without a verifies link to a test case.” | `getWorkItems`, `getLinkedWorkItems`: a scoped gap list and existing candidate tests. | Confirm link roles and scope before creating anything. |
 
-[Explore the chat-style walkthroughs](https://polarion-mcp.boesger.com/#daily-use). For larger work, follow the [worked task](docs/example-task.md): read items one by one, check existing coverage, propose changes, then verify the result.
+[Explore the chat-style walkthroughs](https://polarion-mcp.boesger.com/#daily-use).
 
 ## Get connected
 

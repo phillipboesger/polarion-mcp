@@ -88,7 +88,3 @@ Keep `.env` out of version control and use least-privilege Polarion PATs. `NODE_
 | `POLARION_PASS` | `admin` | `scripts/live/create-pat.mjs` | Yes | Password for live PAT setup. |
 | `PAT_NAME` | `live-suite` | `scripts/live/create-pat.mjs` | No | Name assigned to the generated live-test PAT. |
 | `CHECK_DOCS_STRICT` | `0` | `scripts/check-docs.mjs` | No | Set to `1` to make all documentation checker findings fail the command. |
-
-## read_when
-
-- Use this guide when setting environment variables or troubleshooting authentication.
