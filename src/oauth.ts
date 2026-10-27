@@ -31,7 +31,7 @@ import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handle
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
 import { fetchClientMetadata, parseClientIdentifierUrl, type CimdClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, safeEqual } from './sealed.js';
-import { tokenDiagnostic, tokenNetworkDiagnostic, type TokenDiagnostic, type TokenProbeResult } from './token-diagnostics.js';
+import { tokenDiagnostic, tokenNetworkDiagnostic, upstreamDetail, type TokenDiagnostic, type TokenProbeResult } from './token-diagnostics.js';
 export type { TokenDiagnostic, TokenDiagnosticCategory, TokenProbeResult } from './token-diagnostics.js';
 
 /** Scope advertised by this server; the PAT itself carries the real permissions. */
@@ -161,9 +161,10 @@ type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secre
  * @returns A strict metadata success or a safe diagnostic for the failed probe.
  */
 export async function probePolarionToken(token: string): Promise<TokenProbeResult> {
-  const failed = (diagnostic: TokenDiagnostic): TokenProbeResult => {
+  const failed = (diagnostic: TokenDiagnostic, detail = ''): TokenProbeResult => {
     const status = diagnostic.upstreamStatus === undefined ? '' : ` HTTP ${diagnostic.upstreamStatus}`;
-    console.error(`[WARN] Polarion token probe GET /metadata failed: ${diagnostic.category}${status}`);
+    // Polarion's own wording (log only) is what tells a Host rejection from a permission problem.
+    console.error(`[WARN] Polarion token probe GET /metadata failed: ${diagnostic.category}${status}${detail ? ` - ${detail}` : ''}`);
     return { valid: false, diagnostic };
   };
   try {
@@ -183,7 +184,7 @@ export async function probePolarionToken(token: string): Promise<TokenProbeResul
       const metadata = isObject && !('errors' in body) ? body.data : undefined;
       if (isJson && metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
         && metadata.type === 'metadata' && metadata.id === 'metadata') return { valid: true };
-      return failed(tokenDiagnostic('unusable_response', response.status));
+      return failed(tokenDiagnostic('unusable_response', response.status), upstreamDetail(response.data, token));
     }
     const category = response.status === 401 ? 'invalid_pat'
       : response.status === 403 ? 'permission_denied'
@@ -191,7 +192,7 @@ export async function probePolarionToken(token: string): Promise<TokenProbeResul
           : response.status === 404 ? 'endpoint_missing'
             : response.status >= 300 && response.status < 400 ? 'redirect'
               : response.status >= 500 ? 'server_error' : 'unexpected_status';
-    return failed(tokenDiagnostic(category, response.status));
+    return failed(tokenDiagnostic(category, response.status), upstreamDetail(response.data, token));
   } catch (error) {
     return failed(tokenNetworkDiagnostic(error));
   }

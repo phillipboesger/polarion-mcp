@@ -27,7 +27,7 @@ export type TokenProbeResult = { valid: true } | { valid: false; diagnostic: Tok
 const guidance: Record<TokenDiagnosticCategory, { message: string; action: string; retryable: boolean }> = {
   invalid_pat: { message: 'Polarion token probe GET /metadata: Polarion rejected the token.', action: 'Check whether the PAT is valid and has not been revoked.', retryable: false },
   permission_denied: { message: 'Polarion token probe GET /metadata: Polarion denied access for this token.', action: 'Check that the PAT can access Polarion REST metadata.', retryable: false },
-  request_rejected: { message: 'Polarion token probe GET /metadata: Polarion rejected the request.', action: 'Check API_BASE_URL and the hostname accepted by Polarion or its proxy; an upstream Host allowlist is one possible cause.', retryable: false },
+  request_rejected: { message: 'Polarion token probe GET /metadata: Polarion rejected the request.', action: 'Check that API_BASE_URL uses the hostname Polarion and its proxy accept (the address users open in the browser). The server log shows Polarion\'s own message. For the Polarion Docker image, a missing ALLOWED_HOSTS entry is one possible cause.', retryable: false },
   endpoint_missing: { message: 'Polarion token probe GET /metadata: the endpoint was not found.', action: 'Check API_BASE_URL ends in /polarion/rest/v1 and uses the final server address. HTTP/OAuth requires Polarion 2512 or newer.', retryable: false },
   redirect: { message: 'Polarion token probe GET /metadata: the request was redirected.', action: 'Check the configured REST base URL and proxy or login routing.', retryable: false },
   server_error: { message: 'Polarion token probe GET /metadata: Polarion returned a server error.', action: 'Retry later and check Polarion availability.', retryable: true },
@@ -53,4 +53,24 @@ export function tokenNetworkDiagnostic(error: unknown): TokenDiagnostic {
   if (code === 'ECONNABORTED' || code === 'ETIMEDOUT' || code === 'ERR_SOCKET_TIMEOUT') return tokenDiagnostic('timeout');
   if (code === 'ECONNREFUSED') return tokenDiagnostic('connection_refused');
   return tokenDiagnostic('network_error');
+}
+
+/**
+ * Polarion's own explanation for a refused probe, for the server log only (never
+ * returned to callers). Reads the JSON:API error, or the text of a plain/HTML
+ * body such as a proxy's Host rejection, and removes the token and control characters.
+ */
+export function upstreamDetail(data: unknown, token: string): string {
+  let raw = '';
+  if (typeof data === 'string') raw = (token ? data.split(token).join('[token]') : data).slice(0, 4000).replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ');
+  else if (data !== null && typeof data === 'object' && 'errors' in data && Array.isArray(data.errors)) {
+    const first: unknown = data.errors[0];
+    if (first !== null && typeof first === 'object') {
+      const { detail, title } = first as { detail?: unknown; title?: unknown };
+      raw = typeof detail === 'string' ? detail : typeof title === 'string' ? title : '';
+    }
+  }
+  // eslint-disable-next-line no-control-regex
+  const text = (token ? raw.split(token).join('[token]') : raw).replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.slice(0, 200);
 }
