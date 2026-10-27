@@ -11,11 +11,7 @@
 
 ## Connection and Login Errors (Q&A)
 
-Direct PAT initialization, OAuth login, and refresh check authentication against Polarion (`GET <API_BASE_URL>/metadata`), and Polarion's answer decides. The server log shows it as `Polarion token check failed: HTTP <status> - <Polarion's message>`. Quick test outside this server, it separates a Polarion problem from a server problem:
-
-```
-curl -i -H "Authorization: Bearer <PAT>" "<API_BASE_URL>/metadata"
-```
+Direct PAT initialization, OAuth login, and refresh check authentication against Polarion (`GET <API_BASE_URL>/metadata`), and Polarion's answer decides. The server log shows it as `Polarion token check failed: HTTP <status> - <Polarion's message>`. A host-side curl can test the URL from that host, but it does not prove the Docker container can reach the same address. Use the container-side probe below for deployment diagnostics. Do not put a real PAT in a command argument, shell history, or logs.
 
 HTTP 200 with a usable metadata response allows connection. HTTP 401 rejects the PAT; HTTP 403 denies access. The probe requires Polarion 2512+ and does not require global REST GET permission.
 
@@ -29,10 +25,34 @@ Polarion does not know the token. Check that it was copied completely (no line b
 Polarion denied access. Check the user's license and REST endpoint or item permissions for the affected operation. On Polarion 2512+, `/metadata` does not require global REST GET permission; a 403 during login is rejected rather than accepted as successful authentication.
 
 **I get 503, "Polarion could not be reached".**
-The server could not get a usable answer (the log shows why, e.g. `HTTP 404` or a connection error): wrong host, port or path in API_BASE_URL (it must end in `/polarion/rest/v1`), network or firewall between the MCP server and Polarion, Polarion down, or a TLS error (see below). The authentication probe does not follow redirects: configure API_BASE_URL with the final HTTPS host and REST path directly, rather than a redirecting alias. Run the curl from the machine that hosts the MCP server, not from your laptop.
+The server could not get a usable answer (the log shows why, e.g. `HTTP 404` or a connection error): wrong host, port or path in API_BASE_URL (it must end in `/polarion/rest/v1`), network or firewall between the MCP server and Polarion, Polarion down, or a TLS error (see below). The authentication probe does not follow redirects: configure API_BASE_URL with the final HTTPS host and REST path directly, rather than a redirecting alias. Test from inside the MCP container; a request from your laptop does not test the container network path.
 
 **The server answers on /health and /mcp, but tools fail.**
 Both only prove that the MCP server runs. Polarion is only contacted when a token is checked or a tool is called, so look at the log line above.
+
+## Probe Polarion from the MCP container
+
+The MCP image includes Node.js but not curl. This Bash probe prompts for the PAT without echoing it, sends it through stdin to `docker exec` (not as a command argument or environment variable), prints only the HTTP status, and clears the shell variable afterward. Replace the URL with the exact `API_BASE_URL` configured on the container.
+
+```bash
+read -rsp 'Polarion PAT: ' POLARION_PAT; printf '\n'
+printf '%s' "$POLARION_PAT" | docker exec -i polarion-mcp node -e '
+let input = "";
+for await (const chunk of process.stdin) input += chunk;
+const pat = input;
+const url = "https://polarion.company.example/polarion/rest/v1/metadata";
+try {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${pat}` }, signal: AbortSignal.timeout(10000) });
+  console.log(`Polarion metadata HTTP ${response.status}`);
+} catch (error) {
+  console.error(`Polarion request failed: ${error.cause?.code || error.name}`);
+  process.exitCode = 1;
+}
+'
+unset POLARION_PAT
+```
+
+The PAT travels only through the pipe and Authorization header; it is not printed by the probe. A 200 confirms authentication (Polarion 2512+); 401 indicates a bad or expired PAT; 403 indicates Polarion permission denial. DNS, timeout, or TLS errors indicate a network, URL, or trust problem. For a company CA, mount its PEM into the container and set `NODE_EXTRA_CA_CERTS=/certs/company-ca.pem`; do not disable TLS verification. `/health` checks MCP liveness only, not Polarion readiness.
 
 ## 403 Origin Rejected
 
@@ -57,7 +77,7 @@ Both only prove that the MCP server runs. Polarion is only contacted when a toke
 
 ## TLS or Certificate Errors
 
-- Keep certificate verification enabled. For a trusted internal server with a self-signed certificate only, `NODE_TLS_REJECT_UNAUTHORIZED=0` disables verification.
+- Keep certificate verification enabled. For a company CA, set `NODE_EXTRA_CA_CERTS` to the mounted PEM path. Do not disable TLS verification.
 
 ## Tool Not Found
 

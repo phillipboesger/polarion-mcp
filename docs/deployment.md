@@ -19,6 +19,25 @@ Optional environment variables:
 - MCP_PUBLIC_URL, MCP_TOKEN_SECRET, MCP_ALLOWED_REDIRECT_PREFIXES (or MCP_ALLOWED_REDIRECT_PRESETS), and TRUST_PROXY when deploying the Streamable HTTP MCP server with OAuth. Render must start `node build/mcp-http-server.js` for that mode; the provided blueprint currently builds the REST wrapper.
 - NODE_TLS_REJECT_UNAUTHORIZED only for trusted internal deployments with self-signed certificates.
 
+## Cloud and team connectivity
+
+Cloud clients such as claude.ai and ChatGPT make two separate network connections:
+
+1. The provider connects to the MCP endpoint at a **publicly reachable HTTPS** URL such as `https://mcp.company.example/mcp`. HTTPS is required even when the MCP server runs on a laptop. A cloud provider cannot use the laptop's `localhost` address.
+2. The MCP container connects outbound to Polarion using `API_BASE_URL`, for example `https://polarion.company.example/polarion/rest/v1`. This Polarion URL may be private and reachable only from the server's network or VPN. The Polarion server does not need to be public if the MCP container can reach it.
+
+`MCP_ALLOWED_HOSTS` validates the public Host header arriving at the MCP server (for example `mcp.company.example`). It does not allow or block outbound connections to Polarion. `POLARION_ALLOWED_HOSTS` is an input used by the Polarion Docker image; it is unrelated to this MCP server's Host-header allowlist.
+
+### Ordered setup
+
+1. Choose the Polarion REST URL from the MCP container's network and verify it ends in `/polarion/rest/v1`; use the final HTTPS URL, not a redirecting alias. Keep the PAT in a secret manager.
+2. Deploy the Streamable HTTP server on port 3000 and set `API_BASE_URL` to that Polarion URL. The caller supplies their PAT, or configure OAuth as below.
+3. Publish the MCP endpoint behind a TLS reverse proxy at a stable hostname. Forward the public Host and client IP, bind the app privately where practical, and set `MCP_ALLOWED_HOSTS` to the MCP hostname. Never expose the plaintext port to the internet.
+4. For OAuth, set `MCP_PUBLIC_URL` to the HTTPS origin only (no path), set a stable `MCP_TOKEN_SECRET` of at least 32 characters, allow the exact client callback URI through `MCP_ALLOWED_REDIRECT_PREFIXES` (or use a verified preset such as `claude`), and keep dynamic client registration (DCR) enabled unless CIMD is explicitly required. Set `TRUST_PROXY` to the actual trusted proxy hop count or address.
+5. Check `https://mcp.company.example/health` for liveness, then use the container-side Polarion probe in [troubleshooting](troubleshooting.md#probe-polarion-from-the-mcp-container). A healthy `/health` response does not prove Polarion connectivity.
+
+If Polarion uses a company CA, mount its PEM certificate into the MCP container and set `NODE_EXTRA_CA_CERTS` to that path. TLS certificate verification remains enabled.
+
 ## Docker and reverse proxies
 
 The Dockerfile runs the Streamable HTTP MCP server on port 3000. Set `API_BASE_URL`; each caller supplies their own Polarion PAT. For OAuth login also set a stable `MCP_TOKEN_SECRET`, `MCP_PUBLIC_URL`, and redirect allowlist. When a TLS proxy sits in front, forward the public Host and client IP, set `TRUST_PROXY` to the trusted hop count or proxy address, and consider binding the container service privately. Do not use `TRUST_PROXY=true` on a public listener.

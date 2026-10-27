@@ -438,11 +438,11 @@ Any client that supports MCP over stdio or Streamable HTTP. The setup guide abov
 
 ### It says 503 "Polarion could not be reached".
 
-The server got no usable answer from Polarion. Read the log line `Polarion token check failed` (`docker logs polarion-mcp`). Usual causes: the address does not end in `/polarion/rest/v1`, a firewall between server and Polarion, Polarion is down, `localhost` was used inside Docker, or a certificate error. Run the curl test on the machine that hosts the server, not on your laptop.
+The server got no usable answer from Polarion. Read `Polarion token check failed` in `docker logs polarion-mcp`. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and that the MCP container can reach it; a private Polarion host may be reachable from the server network or VPN even when the AI provider cannot reach Polarion directly. Do not use `localhost` from inside Docker. Use the container-side Node probe in docs/troubleshooting.md. `/health` only confirms MCP liveness.
 
 ### Can claude.ai or ChatGPT connect to a server on my own laptop?
 
-No. These connectors connect from the provider's cloud, so the address must be reachable on the public internet with HTTPS. On your own computer use the npm mode in Claude Desktop, Claude Code or Codex instead. Desktop and command-line tools such as VS Code, Cursor, Windsurf and Gemini CLI can use `http://localhost:3000/mcp`.
+The provider must reach the MCP endpoint over public HTTPS, even if the MCP container runs on your laptop; `http://localhost` is not reachable from provider cloud. The container can separately reach a private Polarion instance over its network or VPN, so Polarion itself need not be public. Use a local stdio setup when you do not want to publish an MCP endpoint. Desktop and command-line clients may use `http://localhost:3000/mcp` locally.
 
 ### What is the difference between the ChatGPT connector and a Custom GPT?
 
@@ -450,11 +450,11 @@ The ChatGPT connector speaks MCP and everyone signs in with their own Polarion t
 
 ### Certificate errors: the public HTTPS address does not work.
 
-DNS must point to the server, ports 80 and 443 must be reachable from the internet and no other program may use them. Caddy's log (`journalctl -u caddy`, or the terminal) says why the certificate failed. Never switch certificate checking off for the public side.
+For cloud connectors, ensure the MCP hostname resolves publicly, ports 80 and 443 reach the TLS proxy, and the certificate is valid for that hostname. Keep certificate verification enabled. A private Polarion hostname may still be used for the separate connection from the MCP container.
 
 ### My Polarion uses a company or self-signed certificate.
 
-Give Node your company root certificate as a PEM file with `NODE_EXTRA_CA_CERTS=/path/ca.pem`. npm mode: add `"NODE_EXTRA_CA_CERTS": "/path/ca.pem"` to the `env` block of the client config. Docker: `-v /path/ca.pem:/certs/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/ca.pem`. As a last resort on a trusted internal network, `NODE_TLS_REJECT_UNAUTHORIZED=0` works but turns off all certificate checks.
+Keep TLS verification enabled. Mount the company CA PEM into the MCP container and set `NODE_EXTRA_CA_CERTS=/certs/ca.pem` (for example `-v /path/ca.pem:/certs/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/ca.pem`). For npm mode, set `NODE_EXTRA_CA_CERTS` in the client environment. This adds trusted roots without disabling certificate checks.
 
 ### Should I use polarion-mcp@latest or a pinned version?
 
