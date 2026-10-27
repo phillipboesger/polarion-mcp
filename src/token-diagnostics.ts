@@ -62,7 +62,7 @@ export function tokenNetworkDiagnostic(error: unknown): TokenDiagnostic {
  */
 export function upstreamDetail(data: unknown, token: string): string {
   let raw = '';
-  if (typeof data === 'string') raw = data.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ');
+  if (typeof data === 'string') raw = (token ? data.split(token).join('[token]') : data).slice(0, 4000).replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]*>/g, ' ');
   else if (data !== null && typeof data === 'object' && 'errors' in data && Array.isArray(data.errors)) {
     const first: unknown = data.errors[0];
     if (first !== null && typeof first === 'object') {
@@ -71,6 +71,6 @@ export function upstreamDetail(data: unknown, token: string): string {
     }
   }
   // eslint-disable-next-line no-control-regex
-  const text = raw.split(token).join('[token]').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const text = (token ? raw.split(token).join('[token]') : raw).replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/\s+/g, ' ').trim();
   return text.slice(0, 200);
 }

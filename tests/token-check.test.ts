@@ -345,6 +345,9 @@ test("upstream detail is plain text for the log: tags, control characters, token
   assert.equal(upstreamDetail("<html><style>p{}</style><h1>Bad Request</h1><script>x()</script>\n<p>Invalid  Host</p></html>", SECRET_PAT), "Bad Request Invalid Host")
   assert.equal(upstreamDetail({ errors: [{ detail: `echo ${SECRET_PAT}\u001b[31m forged\nline` }] }, SECRET_PAT), "echo [token] [31m forged line")
   assert.equal(upstreamDetail("x".repeat(500), SECRET_PAT).length, 200)
+  assert.equal(upstreamDetail("a\u0085b\u009bc", SECRET_PAT), "a b c", "C1 control characters are removed")
+  assert.equal(upstreamDetail("abc", ""), "abc", "an empty token must not be spliced between characters")
+  assert.ok(upstreamDetail("<script".repeat(50_000), SECRET_PAT).length <= 200, "huge unclosed markup stays bounded")
   for (const empty of [null, undefined, 42, [], {}, { errors: [] }, { errors: [null] }, { errors: [{ detail: 7 }] }]) assert.equal(upstreamDetail(empty, SECRET_PAT), "")
 })
 
