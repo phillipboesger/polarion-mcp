@@ -32,27 +32,37 @@ Both only prove that the MCP server runs. Polarion is only contacted when a toke
 
 ## Probe Polarion from the MCP container
 
-The MCP image includes Node.js but not curl. This Bash probe prompts for the PAT without echoing it, sends it through stdin to `docker exec` (not as a command argument or environment variable), prints only the HTTP status, and clears the shell variable afterward. Replace the URL with the exact `API_BASE_URL` configured on the container.
+The MCP image includes Node.js but not curl. Run this probe in Bash. It reads the PAT without echoing it, passes it through stdin, and uses the container's configured `API_BASE_URL` and certificate trust. It does not follow redirects and requires an actual metadata resource, so an SSO login page cannot pass the check.
 
 ```bash
 read -rsp 'Polarion PAT: ' POLARION_PAT; printf '\n'
-printf '%s' "$POLARION_PAT" | docker exec -i polarion-mcp node -e '
+printf '%s' "$POLARION_PAT" | docker exec -i polarion-mcp node --input-type=module -e '
 let input = "";
 for await (const chunk of process.stdin) input += chunk;
-const pat = input;
-const url = "https://polarion.company.example/polarion/rest/v1/metadata";
 try {
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${pat}` }, signal: AbortSignal.timeout(10000) });
-  console.log(`Polarion metadata HTTP ${response.status}`);
+  const base = process.env.API_BASE_URL?.trim().replace(/\/+$/, "");
+  if (!base) throw new Error("API_BASE_URL is not set");
+  const response = await fetch(`${base}/metadata`, {
+    headers: { Authorization: `Bearer ${input.trim()}`, Accept: "application/json" },
+    redirect: "manual", signal: AbortSignal.timeout(10000)
+  });
+  const type = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+  const body = await response.json().catch(() => null);
+  const valid = response.ok && ["application/json", "application/vnd.api+json"].includes(type)
+    && body && typeof body === "object" && !Array.isArray(body) && !("errors" in body) && body.data?.type === "metadata" && body.data?.id === "metadata";
+  console.log(`Polarion metadata HTTP ${response.status}: ${valid ? "authenticated" : "probe failed"}`);
+  if (!valid) process.exitCode = 1;
 } catch (error) {
   console.error(`Polarion request failed: ${error.cause?.code || error.name}`);
   process.exitCode = 1;
 }
 '
+probe_status=$?
 unset POLARION_PAT
+(exit "$probe_status")
 ```
 
-The PAT travels only through the pipe and Authorization header; it is not printed by the probe. A 200 confirms authentication (Polarion 2512+); 401 indicates a bad or expired PAT; 403 indicates Polarion permission denial. DNS, timeout, or TLS errors indicate a network, URL, or trust problem. For a company CA, mount its PEM into the container and set `NODE_EXTRA_CA_CERTS=/certs/company-ca.pem`; do not disable TLS verification. `/health` checks MCP liveness only, not Polarion readiness.
+The PAT is not printed or placed in command arguments. An authenticated metadata response confirms the PAT on Polarion 2512+. HTTP 401 indicates a bad or expired PAT; 403 indicates denial; 400 may indicate an unacceptable hostname or request; 404 requires checking the REST URL and supported Polarion version. Redirects or HTML require checking SSO/proxy routing. For DNS, timeout, or TLS errors, check container network access and certificate trust. For a company CA, mount its PEM and set `NODE_EXTRA_CA_CERTS=/certs/company-ca.pem`; keep certificate verification enabled. `/health` checks MCP liveness only, not Polarion readiness.
 
 ## 403 Origin Rejected
 

@@ -17,7 +17,7 @@ Optional environment variables:
 
 - HTTP_PORT when the platform does not provide PORT-like routing automatically.
 - MCP_PUBLIC_URL, MCP_TOKEN_SECRET, MCP_ALLOWED_REDIRECT_PREFIXES (or MCP_ALLOWED_REDIRECT_PRESETS), and TRUST_PROXY when deploying the Streamable HTTP MCP server with OAuth. Render must start `node build/mcp-http-server.js` for that mode; the provided blueprint currently builds the REST wrapper.
-- NODE_TLS_REJECT_UNAUTHORIZED only for trusted internal deployments with self-signed certificates.
+- NODE_EXTRA_CA_CERTS for an additional company CA PEM; keep certificate verification enabled.
 
 ## Cloud and team connectivity
 
@@ -26,7 +26,7 @@ Cloud clients such as claude.ai and ChatGPT make two separate network connection
 1. The provider connects to the MCP endpoint at a **publicly reachable HTTPS** URL such as `https://mcp.company.example/mcp`. HTTPS is required even when the MCP server runs on a laptop. A cloud provider cannot use the laptop's `localhost` address.
 2. The MCP container connects outbound to Polarion using `API_BASE_URL`, for example `https://polarion.company.example/polarion/rest/v1`. This Polarion URL may be private and reachable only from the server's network or VPN. The Polarion server does not need to be public if the MCP container can reach it.
 
-`MCP_ALLOWED_HOSTS` validates the public Host header arriving at the MCP server (for example `mcp.company.example`). It does not allow or block outbound connections to Polarion. `POLARION_ALLOWED_HOSTS` is an input used by the Polarion Docker image; it is unrelated to this MCP server's Host-header allowlist.
+`MCP_ALLOWED_HOSTS` validates the public Host header arriving at the MCP server (for example `mcp.company.example`). It does not allow or block outbound connections to Polarion. `ALLOWED_HOSTS` is an input used by the Polarion Docker image; it is unrelated to this MCP server's Host-header allowlist.
 
 ### Ordered setup
 

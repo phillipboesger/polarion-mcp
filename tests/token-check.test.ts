@@ -146,11 +146,13 @@ test("the detailed probe classifies metadata HTTP outcomes deterministically", a
 })
 
 test("network and TLS errors are safely classified without leaking Axios text", async () => {
-  const originalGet = axios.get
+  const originalGet = axios.get.bind(axios)
   try {
     const cases = [
       ["ENOTFOUND", "dns", true], ["ETIMEDOUT", "timeout", true],
       ["ECONNREFUSED", "connection_refused", true], ["CERT_AUTHORITY_INVALID", "tls_trust", false],
+      ["CERT_HAS_EXPIRED", "tls_trust", false], ["CERT_NOT_YET_VALID", "tls_trust", false],
+      ["UNABLE_TO_GET_ISSUER_CERT_LOCALLY", "tls_trust", false],
     ] as const
     for (const [code, category, retryable] of cases) {
       axios.get = (async () => { throw Object.assign(new Error(`secret ${SECRET_PAT} https://user:pass@host/path?token=${SECRET_PAT}`), { code }) }) as typeof axios.get

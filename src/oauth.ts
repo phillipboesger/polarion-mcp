@@ -140,9 +140,7 @@ type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secre
  * Each tool must still obtain its own authorization from Polarion.
  *
  * @param token - The token to check.
- * @returns True if Polarion accepted it, false if it rejected it, 'forbidden'
- *   if it recognizes the token but denies this probe, or 'unavailable' if Polarion gave
- *   no usable answer.
+ * @returns A strict metadata success or a safe diagnostic for the failed probe.
  */
 export async function probePolarionToken(token: string): Promise<TokenProbeResult> {
   try {
