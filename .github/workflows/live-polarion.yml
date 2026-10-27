@@ -25,7 +25,8 @@ on:
       - "Dockerfile"
       - "Dockerfile.*"
       - "setup/**"
-      - "docs/setup/**"
+      - "docs/**"
+      - "README.md"
       - "packages/**"
       - "package.json"
       - "package-lock.json"
@@ -100,12 +101,12 @@ jobs:
         run: |
           fail() { echo "::error::$1"; exit 1; }
           for _ in $(seq 1 120); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/")
+            code=$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/" || true)
             [ "$code" = "200" ] && break
             [ "$(docker inspect -f '{{.State.Running}}' polarion 2>/dev/null || true)" = "true" ] || fail "container stopped before Polarion became ready (HTTP $code)"
             sleep 10
           done
-          code=$(curl -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/")
+          code=$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/" || true)
           [ "$code" = "200" ] || fail "Polarion did not become ready within 20 minutes (HTTP $code)"
 
           activation=$(curl -fsS -X POST "$POLARION_URL/polarion/activate/entry" \
@@ -115,7 +116,7 @@ jobs:
 
           # REST answers 401 without a token once the activated repository is ready.
           for _ in $(seq 1 60); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/rest/v1/projects")
+            code=$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' "$POLARION_URL/polarion/rest/v1/projects" || true)
             [ "$code" = "401" ] && exit 0
             [ "$(docker inspect -f '{{.State.Running}}' polarion 2>/dev/null || true)" = "true" ] || fail "container stopped while REST was starting (HTTP $code)"
             sleep 10
@@ -175,7 +176,7 @@ jobs:
           echo "Permission matrix provisioned for Polarion ${{ matrix.polarion }}"
 
       - name: Upload redacted permission matrix evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: polarion-${{ matrix.polarion }}-permission-matrix
           path: ${{ runner.temp }}/permission-matrix-evidence.json

@@ -50,8 +50,9 @@ export function validateContainerTarget(stdout, url) {
   if (owned !== "true") throw new Error("Container is not marked io.polarion-mcp.live-test=true; refusing mutation");
   if (!version || running !== "true") throw new Error("Container must be a running explicitly named Polarion 2512 or 2606 container");
   const target = new URL(url);
-  if (!/^(localhost|127\.0\.0\.1|::1)$/.test(target.hostname)) throw new Error("URL must use localhost for the explicitly owned hosted-runner container");
-  const published = [...(ports || "").matchAll(/\"HostPort\":\"(\d+)\"/g)].map(m => m[1]);
+  if (target.protocol !== "http:" || target.pathname !== "/") throw new Error("Owned-container URL must be an HTTP origin without a path");
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(target.hostname)) throw new Error("URL must use localhost for the explicitly owned hosted-runner container");
+  const published = (JSON.parse(ports || "{}")["80/tcp"] || []).map(binding => binding.HostPort);
   if (!published.includes(target.port || (target.protocol === "https:" ? "443" : "80"))) throw new Error("URL port is not published by the owned container");
   return version;
 }
@@ -61,7 +62,7 @@ export const validPat = token => /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(token);
 const waitReady = async (url) => {
   const end = Date.now() + 15 * 60_000;
   while (Date.now() < end) {
-    try { const r = await fetch(`${url}/polarion/rest/v1/metadata`, { signal: AbortSignal.timeout(4000), redirect: "manual" }); if (r.status === 401) return; } catch { /* Retry until the readiness deadline. */ }
+    try { const r = await fetch(`${url}/polarion/rest/v1/metadata`, { signal: AbortSignal.timeout(4000), redirect: "manual" }); await r.body?.cancel(); if (r.status === 401) return; } catch { /* Retry until the readiness deadline. */ }
     await new Promise(r => setTimeout(r, 1500));
   }
   throw new Error("Polarion REST API did not return 401 within 15 minutes");
@@ -135,7 +136,7 @@ USER_ID="$1"; PROJECT="$2"; REPO=/opt/polarion/data/svn/repo; WC=$(mktemp -d); t
 svn --username polarion --non-interactive -q co "file://$REPO/.polarion" "$WC/global" --depth files
 ACCESS="$WC/global/access"
 test -f "$ACCESS" || { echo 'Polarion access file missing' >&2; exit 36; }
-grep -q '^\[groups\]$' "$ACCESS" || { echo 'Polarion access file lacks [groups]' >&2; exit 37; }
+grep -Fxq '[groups]' "$ACCESS" || { echo 'Polarion access file lacks [groups]' >&2; exit 37; }
 grep -q '^user = ' "$ACCESS" || { echo 'Polarion access file lacks user group' >&2; exit 38; }
 grep -q '^everyone = ' "$ACCESS" || { echo 'Polarion access file lacks everyone group' >&2; exit 39; }
 sed -i "/^user = /s/$/, $USER_ID/; /^everyone = /s/$/, $USER_ID/" "$ACCESS"
@@ -183,19 +184,19 @@ chown -R www-data:www-data /opt/polarion/data/svn/repo
     const matrix = {};
     let mismatch;
     for (const [key, token, endpoint, expected] of probes) {
-      let status = 0, shape = "unavailable", identity = null, projectId = null;
+      let status = 0, shape = "unavailable", identity = null, projectId = null, resourceType = null;
       try {
         const res = await fetch(`${opts.url}/polarion/rest/v1${endpoint}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000), redirect: "manual" });
         status = res.status;
         const body = await res.text();
-        try { const json = JSON.parse(body); shape = json && typeof json === "object" ? (Array.isArray(json.data) ? "json:data-array" : json.data ? "json:data-object" : "json:object") : "json"; identity = json.data?.id || json.data?.attributes?.id || null; projectId = json.data?.id || null; }
+        try { const json = JSON.parse(body); shape = json && typeof json === "object" ? (Array.isArray(json.data) ? "json:data-array" : json.data ? "json:data-object" : "json:object") : "json"; resourceType = json.data?.type || null; identity = json.data?.id || json.data?.attributes?.id || null; projectId = json.data?.id || null; }
         catch { shape = body.length ? "non-json" : "empty"; }
-        matrix[key] = { status, bodyShape: shape, identity: identity && String(identity).slice(0, 128), projectId: projectId && String(projectId).slice(0, 128), expected };
+        matrix[key] = { status, bodyShape: shape, resourceType, identity: identity && String(identity).slice(0, 128), projectId: projectId && String(projectId).slice(0, 128), expected };
       } catch { matrix[key] = { status, bodyShape: shape, expected }; }
       const row = matrix[key];
       if (row.status !== expected && !mismatch) mismatch = `${key} expected ${expected}, observed ${row.status}`;
       if (key === "adminMetadata" || key === "projectMetadata") {
-        if (row.bodyShape !== "json:data-object" && !mismatch) mismatch = `${key} did not return metadata JSON data object`;
+        if ((row.bodyShape !== "json:data-object" || row.resourceType !== "metadata") && !mismatch) mismatch = `${key} did not return metadata JSON data object`;
       }
       if ((key === "adminProject" || key === "projectProject") && row.projectId !== opts.project && !mismatch) mismatch = `${key} returned the wrong project identity`;
       if (key === "adminUser" && row.identity !== "admin" && !mismatch) mismatch = "adminUser returned the wrong identity";
