@@ -2,7 +2,7 @@
 // Provision a project-only live-test user in an explicitly named disposable Polarion container.
 // Requires Docker, svn, htpasswd, curl and the optional Playwright/Chromium dependency used by create-pat.mjs.
 import { spawn } from "node:child_process";
-import { mkdtemp, writeFile, rm, access } from "node:fs/promises";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -109,8 +109,11 @@ async function main() {
   const password = randomBytes(24).toString("base64url");
   const adminName = `live-admin-${Date.now()}`, projectName = `live-project-${Date.now()}`;
   const output = path.resolve(opts.output);
+  let reserved = false;
   try {
-    try { await access(output); throw new Error("Output path already exists; choose a new private output path"); } catch (e) { if (e.message.includes("already exists")) throw e; }
+    // Atomic reservation: fails if the path exists, and later writes keep this private mode.
+    await writeFile(output, "", { mode: 0o600, flag: "wx" }).catch(e => { throw e.code === "EEXIST" ? new Error("Output path already exists; choose a new private output path") : e; });
+    reserved = true;
     const inspect = await run("docker", ["inspect", "--format", "{{.Config.Image}}|{{.State.Running}}|{{index .Config.Labels \"io.polarion-mcp.live-test\"}}|{{json .NetworkSettings.Ports}}", opts.container]);
     const version = validateContainerTarget(inspect.stdout, opts.url);
     await waitReady(opts.url);
@@ -168,7 +171,8 @@ chown -R www-data:www-data /opt/polarion/data/svn/repo
     try { projectsJson = JSON.parse(adminProjectsBody); }
     catch {
       const matrix = { adminProjects: { status: adminProjectsResponse.status, bodyShape: adminProjectsBody.length ? "non-json" : "empty", expected: 200 } };
-      await writeFile(output, `${JSON.stringify({ projectId: opts.project, version, matrix }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+      await writeFile(output, `${JSON.stringify({ projectId: opts.project, version, matrix }, null, 2)}\n`, { mode: 0o600 });
+      reserved = false;
       throw new Error(`PAT endpoint matrix mismatch: adminProjects was not JSON; redacted evidence saved to ${output}`);
     }
     const projectRows = projectsJson.data || [];
@@ -183,17 +187,18 @@ chown -R www-data:www-data /opt/polarion/data/svn/repo
     const matrix = {};
     let mismatch;
     for (const [key, token, endpoint, expected] of probes) {
-      let status = 0, shape = "unavailable", identity = null, projectId = null, isMetadata = false;
+      let observed = 0, status = 0, shape = "unavailable", identity = null, projectId = null, isMetadata = false;
       try {
         const res = await fetch(`${opts.url}/polarion/rest/v1${endpoint}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000), redirect: "manual" });
-        status = res.status;
+        observed = res.status;
+        status = [200, 401, 403, 404].find(code => code === res.status) ?? 0;
         const body = await res.text();
         try { const json = JSON.parse(body); shape = json && typeof json === "object" ? (Array.isArray(json.data) ? "json:data-array" : json.data ? "json:data-object" : "json:object") : "json"; isMetadata = json.data?.type === "metadata"; identity = json.data?.id || json.data?.attributes?.id || null; projectId = json.data?.id || null; }
         catch { shape = body.length ? "non-json" : "empty"; }
         matrix[key] = { status, bodyShape: shape, isMetadata, projectMatches: projectId === opts.project, identityMatches: identity === (key === "adminUser" ? "admin" : user), expected };
       } catch { matrix[key] = { status, bodyShape: shape, expected }; }
       const row = matrix[key];
-      if (row.status !== expected && !mismatch) mismatch = `${key} expected ${expected}, observed ${row.status}`;
+      if (row.status !== expected && !mismatch) mismatch = `${key} expected ${expected}, observed ${observed || "no response"}`;
       if (key === "adminMetadata" || key === "projectMetadata") {
         if ((row.bodyShape !== "json:data-object" || !row.isMetadata) && !mismatch) mismatch = `${key} did not return metadata JSON data object`;
       }
@@ -202,12 +207,17 @@ chown -R www-data:www-data /opt/polarion/data/svn/repo
       if (key === "projectUser" && row.status === 200 && !row.identityMatches && !mismatch) mismatch = "projectUser returned the wrong identity";
     }
     if (mismatch) {
-      await writeFile(output, `${JSON.stringify({ projectId: opts.project, version, matrix }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+      await writeFile(output, `${JSON.stringify({ projectId: opts.project, version, matrix }, null, 2)}\n`, { mode: 0o600 });
+      reserved = false;
       throw new Error(`PAT endpoint matrix mismatch: ${mismatch}; redacted evidence saved to ${output}`);
     }
-    await writeFile(output, `${JSON.stringify({ adminPat, projectPat, projectId: opts.project, version, matrix }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+    await writeFile(output, `${JSON.stringify({ adminPat, projectPat, projectId: opts.project, version, matrix }, null, 2)}\n`, { mode: 0o600 });
+    reserved = false;
     process.stdout.write(`Provisioned ${user} for ${opts.project}; credentials saved to ${output} (mode 0600).\n`);
-  } finally { await rm(scratch, { recursive: true, force: true }); }
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+    if (reserved) await rm(output, { force: true });
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
