@@ -22,7 +22,7 @@ The [client source reference](clients.md) records vendor documentation and setup
 | [Polarion versioning](polarion-versioning.md) | Compatibility and version considerations. |
 | [Distribution quality](quality/distribution.md) | Package and container distribution checks. |
 | [End-to-end conformance](quality/e2e.md) | MCP, OAuth, REST wrapper, and container conformance checks. |
-| [Supply chain verification](quality/supply-chain.md) | Release SBOMs, provenance, image signatures, and verification commands. |
+| [Supply chain verification](quality/supply-chain.md) | Provenance, image signatures, and verification commands. |
 | [Agent evals](quality/evals.md) | Offline validation and optional agent tool-selection evals. |
 | [REST API coverage](quality/rest-coverage.md) | Generated operation coverage and Polarion version differences. |
 | [Static analysis](quality/static-analysis.md) | CodeQL, ESLint, Gitleaks and audit: what runs in CI and how to read it. |

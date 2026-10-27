@@ -37,7 +37,7 @@ On this page:
 - **Find answers:** search requirements and defects, read LiveDocs and inspect traceability links.
 - **Prepare work:** draft test cases, prepare runs and record the test outcomes your team supplies.
 - **Change data, safely:** the assistant can create and update Polarion data, and every write can be previewed first (`dry_run: true` shows the exact request without sending it). Prefer read access only? `MCP_READ_ONLY=1` blocks all writes. Set approval rules in your AI client; previews do not create an approval lock.
-- **Inspect what you run:** MIT source, release SBOMs, build provenance and signed container images. See [supply-chain verification](docs/quality/supply-chain.md).
+- **Inspect what you run:** MIT source, build provenance and signed container images. See [supply-chain verification](docs/quality/supply-chain.md).
 
 ![Topic cards: work items, test management, plans, documents and more, covering every Polarion REST operation](docs/assets/site-coverage.png)
 
