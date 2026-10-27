@@ -9,7 +9,7 @@ import { toolsetsForDefinition } from '../build-tests/src/toolsets.js';
 const data = JSON.parse(fs.readFileSync('docs/clients.json', 'utf8'));
 const schema = JSON.parse(fs.readFileSync('docs/clients.schema.json', 'utf8'));
 
-test('client manifest validates every supported server choice and disabled reason', () => {
+test('client manifest validates every client for local and server with a reason when unsupported', () => {
   const validate = new Ajv2020({ allErrors: true }).compile(schema);
   assert.ok(validate(data), JSON.stringify(validate.errors));
   const ids = new Set(data.clients.map(client => client.id));
@@ -17,12 +17,14 @@ test('client manifest validates every supported server choice and disabled reaso
   const setupIds = new Set(data.setups.map(setup => setup.id));
   assert.equal(setupIds.size, data.setups.length);
   assert.deepEqual(new Set(data.groups.flatMap(group => group.cards.flatMap(card => card.clients))), ids);
-  assert.deepEqual(data.serverModes.map(mode => mode.id), ['npm', 'docker', 'remote']);
-  for (const row of data.readmeGroups) assert.ok(ids.has(row.client));
-  const used = new Set(data.clients.map(client => client.setup));
+  assert.deepEqual(data.serverModes.map(mode => mode.id), ['local', 'server']);
+  const used = new Set();
   for (const client of data.clients) {
-    assert.ok(client.connections[client.defaultMode].setup, `${client.id} default must be supported`);
-    for (const connection of Object.values(client.connections)) {
+    const modes = [client.local, client.server];
+    assert.ok(modes.some(mode => !mode.reason), `${client.id} supports neither local nor server`);
+    assert.ok(client[client.defaultMode].setup, `${client.id} default must be supported`);
+    if (!client.local.reason) assert.equal(client.defaultMode, 'local', `${client.id} defaults to local when both work`);
+    for (const connection of modes) {
       if (connection.reason) { assert.ok(connection.reason.trim()); continue; }
       assert.ok(setupIds.has(connection.setup), `${client.id} missing setup`);
       used.add(connection.setup);
@@ -36,29 +38,53 @@ test('client manifest validates every supported server choice and disabled reaso
   assert.deepEqual(used, setupIds, 'no abandoned setup definitions');
 });
 
-test('hosted connectors require a network server and generic provider covers all three paths', () => {
+test('hosted connectors are server-only and generic clients cover both setups', () => {
   for (const id of ['claude-web-desktop', 'chatgpt-apps', 'claude-api', 'openai-api', 'copilot-studio']) {
     const client = data.clients.find(client => client.id === id);
-    assert.equal(client.defaultMode, 'remote');
-    assert.ok(client.connections.npm.reason);
-    assert.ok(client.connections.docker.serverSetup);
-    assert.ok(client.connections.remote.setup);
+    assert.equal(client.defaultMode, 'server');
+    assert.ok(client.local.reason);
+    assert.ok(client.server.serverSetup);
   }
   assert.equal(data.clients.find(client => client.id === 'claude-web-desktop').label, 'claude.ai');
   const other = data.clients.find(client => client.id === 'generic-stdio');
-  for (const mode of ['npm', 'docker', 'remote']) assert.ok(other.connections[mode].setup);
+  for (const mode of ['local', 'server']) assert.ok(other[mode].setup);
   for (const id of ['claude-api', 'openai-api']) {
     const client = data.clients.find(client => client.id === id);
-    const server = data.setups.find(setup => setup.id === client.connections.docker.serverSetup);
+    const server = data.setups.find(setup => setup.id === client.server.serverSetup);
     assert.match(server.snippet, /MCP_ALLOWED_HOSTS=YOUR-SERVER/);
-    assert.match(client.connections.docker.steps.join(' '), /https/i);
+    assert.match(client.server.needs.join(' '), /HTTPS/);
   }
   const chatgpt = data.clients.find(client => client.id === 'chatgpt-apps');
-  const server = data.setups.find(setup => setup.id === chatgpt.connections.docker.serverSetup);
+  const server = data.setups.find(setup => setup.id === chatgpt.server.serverSetup);
   assert.match(server.snippet, /MCP_ALLOWED_REDIRECT_PREFIXES=/);
   assert.doesNotMatch(server.snippet, /MCP_ALLOWED_REDIRECT_PRESETS=claude/);
   const jetbrains = data.clients.find(client => client.id === 'jetbrains-ai');
-  assert.match(jetbrains.connections.docker.description, /Local container/);
+  assert.ok(jetbrains.server.reason);
+  assert.equal(jetbrains.defaultMode, 'local');
+});
+
+test('schema rejects the removed three-way connection model', () => {
+  const validate = new Ajv2020({ allErrors: true }).compile(schema);
+  const legacy = structuredClone(data);
+  legacy.clients[0].connections = { npm: legacy.clients[0].local };
+  assert.equal(validate(legacy), false);
+  const noDefault = structuredClone(data);
+  noDefault.clients[0].defaultMode = 'remote';
+  assert.equal(validate(noDefault), false);
+  const noReason = structuredClone(data);
+  noReason.clients.find(client => client.local.reason).local = {};
+  assert.equal(validate(noReason), false);
+});
+
+test('every client has a guide with the required sections and the site links to it once', () => {
+  const html = renderSite();
+  for (const client of data.clients) {
+    const guide = fs.readFileSync(`docs/guides/clients/${client.id}.md`, 'utf8');
+    for (const section of ['Prerequisites', 'Steps', 'Check', 'If it fails']) assert.match(guide, new RegExp(`^## ${section}$`, 'm'), `${client.id} lacks ${section}`);
+    assert.equal(html.split(`docs/guides/clients/${client.id}.md`).length - 1, 1, `${client.id} must be linked exactly once`);
+  }
+  const block = /<!-- clients:start -->([\s\S]*?)<!-- clients:end -->/.exec(html)[1];
+  assert.doesNotMatch(block, /<ol|<pre|setup-steps/);
 });
 
 test('domain counts cover every generated tool once and match runtime toolset classification', () => {
@@ -94,11 +120,12 @@ test('daily scenarios cite actual tools and preview only mutating operations', (
   assert.equal(fs.readFileSync('docs/index.html', 'utf8'), renderSite());
 });
 
-test('renderer rejects unsafe source URLs and escapes manifest content', () => {
+test('schema rejects unsafe source URLs and the site escapes manifest content', () => {
+  const validate = new Ajv2020({ allErrors: true }).compile(schema);
   for (const source of ['javascript:alert(1)', 'http://example.com', 'data:text/html,test', 'not a URL']) {
     const manifest = structuredClone(data);
     manifest.clients[0].sources[0] = source;
-    assert.throws(() => renderSiteClientsBlock(manifest));
+    assert.equal(validate(manifest), false, source);
   }
   const manifest = structuredClone(data);
   manifest.clients[0].name = '<img src=x onerror=alert(1)>';

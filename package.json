@@ -57,6 +57,7 @@
     "check:docs:strict": "node scripts/check-docs.mjs --strict",
     "check:rest-coverage": "node scripts/rest-coverage.mjs --offline --check",
     "docs:clients": "node scripts/render-clients.mjs",
+    "docs:site": "node scripts/render-site.mjs",
     "prepare": "node -e \"const fs=require('fs'); if (fs.existsSync('tsconfig.json') && fs.existsSync('src') && fs.existsSync('node_modules/.bin/tsc')) require('child_process').execSync('npm run build', { stdio: 'inherit' })\"",
     "download-spec": "curl -fsSL ${BEARER_TOKEN:+-H \"Authorization: Bearer ${BEARER_TOKEN}\"} \"${SPEC_URL:-https://testdrive.polarion.com/polarion/sdk/doc/rest/polarionrest.json}\" -o openapi.json",
     "fix-sparse-fields": "node scripts/fix-sparse-fields.cjs",

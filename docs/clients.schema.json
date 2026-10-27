@@ -8,7 +8,6 @@
     "groups",
     "setups",
     "clients",
-    "readmeGroups",
     "serverModes"
   ],
   "additionalProperties": false,
@@ -75,37 +74,10 @@
       },
       "minItems": 1
     },
-    "readmeGroups": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "name",
-          "summary",
-          "client"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "summary": {
-            "type": "string",
-            "minLength": 1
-          },
-          "client": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      },
-      "minItems": 1
-    },
     "serverModes": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "minItems": 2,
+      "maxItems": 2,
       "items": {
         "type": "object",
         "required": [
@@ -116,8 +88,10 @@
         "additionalProperties": false,
         "properties": {
           "id": {
-            "type": "string",
-            "minLength": 1
+            "enum": [
+              "local",
+              "server"
+            ]
           },
           "label": {
             "type": "string",
@@ -303,14 +277,14 @@
         "name",
         "label",
         "provider",
-        "setup",
-        "steps",
         "sources",
         "checked",
         "note",
         "redirectUris",
-        "connections",
-        "defaultMode"
+        "defaultMode",
+        "summary",
+        "local",
+        "server"
       ],
       "additionalProperties": false,
       "properties": {
@@ -329,19 +303,6 @@
         "provider": {
           "type": "string",
           "minLength": 1
-        },
-        "setup": {
-          "type": "string",
-          "minLength": 1
-        },
-        "steps": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "minItems": 2,
-          "maxItems": 6
         },
         "sources": {
           "type": "array",
@@ -382,39 +343,14 @@
             }
           }
         },
-        "snippet": {
-          "type": "string",
-          "minLength": 1
-        },
         "referenceNote": {
           "type": "string"
         },
         "defaultMode": {
           "enum": [
-            "npm",
-            "docker",
-            "remote"
+            "local",
+            "server"
           ]
-        },
-        "connections": {
-          "type": "object",
-          "required": [
-            "npm",
-            "docker",
-            "remote"
-          ],
-          "additionalProperties": false,
-          "properties": {
-            "npm": {
-              "$ref": "#/$defs/connection"
-            },
-            "docker": {
-              "$ref": "#/$defs/connection"
-            },
-            "remote": {
-              "$ref": "#/$defs/connection"
-            }
-          }
         },
         "unverified": {
           "type": "array",
@@ -422,6 +358,16 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "local": {
+          "$ref": "#/$defs/connection"
+        },
+        "server": {
+          "$ref": "#/$defs/connection"
         }
       }
     },
@@ -469,10 +415,6 @@
               "type": "string"
             },
             "serverSetup": {
-              "type": "string",
-              "minLength": 1
-            },
-            "description": {
               "type": "string",
               "minLength": 1
             },
@@ -529,6 +471,48 @@
             },
             "teamNote": {
               "type": "string"
+            },
+            "alternative": {
+              "type": "object",
+              "required": [
+                "title",
+                "steps",
+                "snippet"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string"
+                },
+                "needs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "steps": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "snippet": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "language": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                }
+              }
             }
           }
         }

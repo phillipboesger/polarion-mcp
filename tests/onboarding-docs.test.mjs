@@ -19,9 +19,10 @@ test("the Custom GPT path never points at getCurrentUser, which its 30-action sc
   assert.match(JSON.stringify(gpt), /getProject/)
 })
 
-test("the generated site carries the identity demo and not the old global listing", () => {
-  assert.doesNotMatch(site, /List the Polarion projects|getProjects/)
-  assert.match(site, /getCurrentUser/)
+test("the generated guides carry the identity demo and the site no longer lists a global project check", async () => {
+  const guide = await readFile(path.join(root, "docs/guides/clients/claude-desktop.md"), "utf8")
+  assert.doesNotMatch(site + guide, /List the Polarion projects|getProjects/)
+  assert.match(guide, /getCurrentUser/)
 })
 
 test("troubleshooting names the log line the server writes and the Polarion ALLOWED_HOSTS fix", async () => {

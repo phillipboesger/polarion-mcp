@@ -27,7 +27,7 @@ test('website client block matches the rendered client manifest', () => {
   const renderer = path.join(repo, 'scripts/render-site.mjs');
   const result = spawnSync(process.execPath, [renderer, '--check'], { encoding: 'utf8' });
   assert.equal(result.status, 0, `${result.stdout ?? ''}${result.stderr ?? ''}`);
-  assert.match(result.stdout ?? '', /setup, domains and daily examples are up to date/);
+  assert.match(result.stdout ?? '', /paths, domains and daily examples are up to date/);
 });
 
 test('clean documentation fixture passes every rule', t => {
@@ -93,3 +93,46 @@ test('strict mode reports a duplicated known configuration variable with its loc
   assert.equal(result.status, 1, result.output);
   assert.match(result.output, /WARNING duplicate-config-entries docs\/configuration\.md:6: TEST_ENV is duplicated; first listed at line 5/);
 });
+
+// The guide rules need the real manifest, guides and site, so these cases copy them into a temporary root.
+function repoCopy(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'check-docs-repo-'));
+  const skip = /(^|[\\/])(node_modules|\.git|build|build-tests|test-results|coverage|assets|fonts|evals)([\\/]|$)/;
+  fs.cpSync(repo, root, { recursive: true, filter: source => !skip.test(path.relative(repo, source)) });
+  return root;
+}
+
+const guideCases: Array<[string, (root: string) => void, RegExp]> = [
+  ['a missing guide', root => fs.rmSync(path.join(root, 'docs/guides/clients/cursor.md')), /cursor\.md:1: generated guide is missing or stale/],
+  ['a guide without the required sections', root => {
+    const file = path.join(root, 'docs/guides/clients/cursor.md');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('## If it fails', '## Troubleshooting'));
+  }, /cursor\.md:1: guide is missing the "If it fails" section/],
+  ['a dangling link in a guide', root => fs.appendFileSync(path.join(root, 'docs/guides/clients/cursor.md'), '\n[gone](../missing.md)\n'), /WARNING markdown-links-toc docs\/guides\/clients\/cursor\.md/],
+  ['install steps on the website', root => {
+    const file = path.join(root, 'docs/index.html');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('<!-- clients:end -->', '<ol><li>Install it</li></ol>\n<!-- clients:end -->'));
+  }, /website clients section contains numbered steps/],
+  ['a website link to a missing guide', root => {
+    const file = path.join(root, 'docs/index.html');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('docs/guides/clients/cursor.md', 'docs/guides/clients/nope.md'));
+  }, /link target docs\/guides\/clients\/nope\.md does not exist/],
+];
+
+test('guide rules pass on the real repository content', t => {
+  const root = repoCopy();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const result = run(root, true);
+  assert.equal(result.status, 0, result.output);
+});
+
+for (const [name, mutate, expected] of guideCases) {
+  test(`strict mode reports ${name}`, t => {
+    const root = repoCopy();
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    mutate(root);
+    const result = run(root, true);
+    assert.equal(result.status, 1, result.output);
+    assert.match(result.output, expected);
+  });
+}

@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderClientsBlock, renderClientReference, renderReadmeFaq } from './render-clients.mjs';
+import { renderClientsBlock, renderGuides, renderReadmeFaq } from './render-clients.mjs';
 import { renderSite } from './render-site.mjs';
 
 const RULES = {
@@ -42,6 +42,17 @@ const filesUnder = (root, dir) => {
     return entry.isDirectory() ? filesUnder(root, rel) : [rel];
   });
 };
+const REQUIRED_GUIDE_SECTIONS = ['Prerequisites', 'Steps', 'Check', 'If it fails'];
+const missingGuideSections = guide => REQUIRED_GUIDE_SECTIONS.filter(section => !new RegExp(`^## ${section}\\s*$`, 'm').test(guide));
+// The website lists options and links to the guides; it must not carry install procedures.
+function siteInstallProblems(html) {
+  const section = /<!-- clients:start -->([\s\S]*?)<!-- clients:end -->/.exec(html)?.[1] ?? '';
+  const problems = [];
+  if (/<ol[\s>]/.test(section)) problems.push('website clients section contains numbered steps; move them into the guides');
+  if (/<pre[\s>]/.test(section)) problems.push('website clients section contains a code block; move it into the guides');
+  if (/id="setup"/.test(html)) problems.push('website still contains the inline setup panel');
+  return problems;
+}
 function checker(root) {
   const findings = [];
   const add = (rule, file, line, message) => findings.push({ rule: RULES[rule], file, line, message });
@@ -73,14 +84,17 @@ function checker(root) {
       const actual = readme.slice(startAt, endAt + endMarker.length);
       if (actual !== expected) add('clients', 'README.md', lineAt(readme, startAt), 'client marker block differs from docs/clients.json; run npm run docs:clients');
       if (manifest.groups) {
-        if (read(root, 'docs/clients.md') !== renderClientReference(manifest)) add('clients', 'docs/clients.md', 1, 'source reference is stale; run npm run docs:clients');
+        for (const [file, content] of renderGuides(manifest)) if (read(root, file) !== content) add('clients', file, 1, 'generated guide is missing or stale; run npm run docs:clients');
         if (!readme.includes(`<!-- faq:start -->\n${renderReadmeFaq(manifest)}\n<!-- faq:end -->`)) add('clients', 'README.md', 1, 'FAQ block differs from docs/clients.json; run npm run docs:clients');
         // Idiot-proof rule: every supported client x mode needs prerequisites, steps, a verification and a failure fix.
-        for (const mode of manifest.serverModes) if (!mode.before?.length) add('clients', 'docs/clients.json', 1, `server mode ${mode.id} has no "Before you start" items`);
+        for (const mode of manifest.serverModes) if (!mode.before?.length) add('clients', 'docs/clients.json', 1, `setup ${mode.id} has no prerequisite items`);
         for (const client of manifest.clients) {
           if (!/^\d{4}-\d{2}-\d{2}$/.test(client.checked || '')) add('clients', 'docs/clients.json', 1, `${client.id} has no checked date`);
           for (const source of client.sources || []) if (!/^https:\/\/\S+$/.test(source)) add('clients', 'docs/clients.json', 1, `${client.id} has a source that is not a plain https URL: ${source}`);
-          for (const [mode, connection] of Object.entries(client.connections)) {
+          const supported = ['local', 'server'].filter(mode => !client[mode].reason);
+          if (!client[client.defaultMode] || client[client.defaultMode].reason || !supported.length) add('clients', 'docs/clients.json', 1, `${client.id} needs a supported default mode`);
+          for (const mode of ['local', 'server']) {
+            const connection = client[mode];
             if (connection.reason) continue;
             const missing = [];
             if ((connection.steps || []).length < 3) missing.push('at least 3 steps');
@@ -89,8 +103,19 @@ function checker(root) {
             if (!Array.isArray(connection.needs)) missing.push('a needs list');
             if (missing.length) add('clients', 'docs/clients.json', 1, `${client.id} / ${mode} is missing ${missing.join(', ')}`);
           }
+          const guideFile = `docs/guides/clients/${client.id}.md`;
+          const guide = read(root, guideFile);
+          if (!guide) add('clients', guideFile, 1, `${client.id} has no guide`);
+          else for (const section of missingGuideSections(guide)) add('clients', guideFile, 1, `guide is missing the "${section}" section`);
         }
-        if (read(root, 'docs/index.html') !== renderSite(root)) add('clients', 'docs/index.html', 1, 'inline setup differs from docs/clients.json; run npm run docs:site');
+        const html = read(root, 'docs/index.html');
+        if (html !== renderSite(root)) add('clients', 'docs/index.html', 1, 'client paths differ from docs/clients.json; run npm run docs:site');
+        for (const problem of siteInstallProblems(html)) add('clients', 'docs/index.html', 1, problem);
+        for (const text of [html, readme]) {
+          for (const match of text.matchAll(/https:\/\/github\.com\/phillipboesger\/polarion-mcp\/blob\/main\/([^\s"')#]+)/g)) {
+            if (!fs.existsSync(path.join(root, match[1]))) add('clients', text === html ? 'docs/index.html' : 'README.md', lineAt(text, match.index), `link target ${match[1]} does not exist`);
+          }
+        }
       }
     } catch (error) {
       add('clients', 'docs/clients.json', 1, `cannot render client table: ${error.message}`);
