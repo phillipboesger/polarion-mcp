@@ -11,14 +11,37 @@
   let selectedClient = data.clients[0].id;
   select.replaceChildren(...data.clients.map(client => new Option(client.name, client.id)));
 
-  // "how" texts may contain ```fenced``` blocks; everything is written with textContent only.
+  // "how" texts may contain ```fenced``` blocks, "- " bullets, "1) " steps and `inline code`;
+  // everything is written with textContent only.
+  function inline(parent, value) {
+    value.split('`').forEach((part, i) => {
+      if (!part) return;
+      if (i % 2) { const codeEl = document.createElement('code'); codeEl.textContent = part; parent.append(codeEl); }
+      else parent.append(part);
+    });
+  }
   function richText(container, value) {
-    container.replaceChildren(...value.split(/```(?:\w+)?\n?/).map((part, i) => {
-      const node = document.createElement(i % 2 ? 'pre' : 'p');
-      if (i % 2) { const codeEl = document.createElement('code'); codeEl.textContent = part.trim(); node.append(codeEl); node.tabIndex = 0; }
-      else node.textContent = part.trim();
-      return node;
-    }).filter(node => node.textContent));
+    const nodes = [];
+    value.split(/```(?:\w+)?\n?/).forEach((part, i) => {
+      if (i % 2) {
+        const pre = document.createElement('pre'); const codeEl = document.createElement('code');
+        codeEl.textContent = part.trim(); pre.append(codeEl); pre.tabIndex = 0; nodes.push(pre);
+        return;
+      }
+      let list;
+      for (const line of part.split('\n').map(line => line.trim()).filter(Boolean)) {
+        const match = /^(?:(-)|\d+\))\s+(.*)$/.exec(line);
+        if (match) {
+          const tag = match[1] ? 'ul' : 'ol';
+          if (list?.localName !== tag) { list = document.createElement(tag); nodes.push(list); }
+          const item = document.createElement('li'); inline(item, match[2]); list.append(item);
+        } else {
+          list = undefined;
+          const paragraph = document.createElement('p'); inline(paragraph, line); nodes.push(paragraph);
+        }
+      }
+    });
+    container.replaceChildren(...nodes);
   }
   function show(id, navigate = false, requestedMode) {
     const client = data.clients.find(client => client.id === id);
