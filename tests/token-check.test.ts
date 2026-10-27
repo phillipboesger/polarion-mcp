@@ -76,16 +76,25 @@ test("the default direct-PAT MCP validator exposes safe metadata diagnostics", a
   await new Promise<void>((resolve) => server.once("listening", resolve))
   const { port } = server.address() as AddressInfo
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${SECRET_PAT}broken` },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } }),
-    })
-    assert.equal(response.status, 503)
-    const body = await response.json() as { error: { message: string } }
-    assert.match(body.error.message, /request_rejected|request was rejected/)
-    assert.match(body.error.message, /API_BASE_URL/)
-    assert.doesNotMatch(body.error.message, /secret-pat-value|No access for/)
+    const cases = [
+      ["broken", 503, "request_rejected"], ["unsupported", 503, "endpoint_missing"],
+      ["forbidden", 403, "permission_denied"], ["revoked", 401, "invalid_pat"],
+      ["redirect", 503, "redirect"], ["html", 503, "unusable_response"], ["empty", 503, "server_error"],
+    ] as const
+    for (const [token, status, category] of cases) {
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${SECRET_PAT}${token}` },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } }),
+      })
+      assert.equal(response.status, status, category)
+      assert.equal(response.headers.get("mcp-session-id"), null, "a failed probe must not open a session")
+      const body = await response.json() as { error: { message: string } }
+      assert.match(body.error.message, new RegExp(`^\\[${category}`))
+      assert.match(body.error.message, /GET \/metadata/)
+      if (token === "broken" || token === "unsupported") assert.match(body.error.message, /API_BASE_URL/)
+      assert.doesNotMatch(body.error.message, /secret-pat-value|No access for/)
+    }
   } finally {
     await closeAllSessions()
     await new Promise<void>((resolve) => server.close(() => resolve()))

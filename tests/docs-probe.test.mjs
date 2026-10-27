@@ -11,7 +11,8 @@ test('cloud instructions distinguish real Polarion URLs from local development n
   const local = prerequisites.filter(entry => entry.how.includes('host.docker.internal'));
   assert.equal(local.length, 1);
   assert.match(local[0].title, /local development/i);
-  assert.ok(prerequisites.some(entry => entry.how.includes('https://polarion.company.example/polarion/rest/v1')));
+  const urls = prerequisites.flatMap(entry => [...entry.how.matchAll(/https:\/\/[^\s`"<>]+/g)].map(match => new URL(match[0])));
+  assert.ok(urls.some(url => url.hostname === 'polarion.company.example' && url.pathname === '/polarion/rest/v1'));
   assert.doesNotMatch(JSON.stringify(prerequisites), /Skip this on your own laptop/);
   for (const file of ['docs/clients.json', 'docs/configuration.md', 'docs/deployment.md']) {
     assert.doesNotMatch(readFileSync(file, 'utf8'), /POLARION_ALLOWED_HOSTS/);

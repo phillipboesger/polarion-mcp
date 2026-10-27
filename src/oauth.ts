@@ -686,21 +686,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
       return { ok: false, reason: 'Enter your Polarion Personal Access Token.', pending: retry };
     }
     const check = await normalizeTokenProbeResult(this.validateToken, polarionToken);
-    if (!check.valid && check.diagnostic.category !== 'invalid_pat' && check.diagnostic.category !== 'permission_denied') {
-      return { ok: false, reason: formatTokenDiagnostic(check.diagnostic), pending: retry };
-    }
-    if (!check.valid && check.diagnostic.category === 'permission_denied') {
-      return {
-        ok: false, reason: formatTokenDiagnostic(check.diagnostic),
-        pending: retry,
-      };
-    }
     if (!check.valid) {
-      return {
-        ok: false,
-        reason: formatTokenDiagnostic(check.diagnostic),
-        pending: retry,
-      };
+      return { ok: false, reason: formatTokenDiagnostic(check.diagnostic), pending: retry };
     }
 
     this.pendingLogins.delete(loginId);
