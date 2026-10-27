@@ -48,7 +48,7 @@ import { enabledTools, filterTools } from './tool-filter.js';
 import type { McpToolDefinition } from './types.js';
 import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
 import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
-import { PolarionOAuthProvider, validatePolarionToken, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenValidator } from './oauth.js';
+import { PolarionOAuthProvider, probePolarionToken, normalizeTokenProbeResult, formatTokenDiagnostic, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenCheckFunction, type TokenValidator } from './oauth.js';
 import { fetchClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
@@ -293,7 +293,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   // Parsed per route, after authentication, so anonymous callers cannot make
   // the server parse 10 MB bodies.
   const jsonBody = express.json({ limit: '10mb' });
-  const checkToken: TokenValidator = validateToken ?? validatePolarionToken;
+  const checkToken: TokenCheckFunction = validateToken ?? probePolarionToken;
   const sessionIdleMs = options.sessionIdleMs ?? DEFAULT_SESSION_IDLE_MS;
   const maxSessions = options.maxSessions ?? DEFAULT_MAX_SESSIONS;
   // These instances are app-wide so opening additional MCP sessions cannot
@@ -659,15 +659,16 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     const key = tokenScope(pat);
     const now = Date.now();
     if ((acceptedPats.get(key) ?? 0) > now) return undefined;
-    const check = await checkToken(pat);
-    if (check === true) {
+    const check = await normalizeTokenProbeResult(checkToken, pat);
+    if (check.valid) {
       if (acceptedPats.size >= 1000) acceptedPats.clear();
       acceptedPats.set(key, now + PAT_CACHE_MS);
       return undefined;
     }
-    if (check === 'unavailable') return { status: 503, message: 'Polarion could not be reached to check the token. Try again in a moment.' };
-    if (check === 'forbidden') return { status: 403, message: 'Polarion recognized the token but denied access. Ask your Polarion administrator.' };
-    return { status: 401, message: 'Unauthorized: Polarion did not accept this token' };
+    const diagnostic = check.diagnostic;
+    if (diagnostic.category === 'invalid_pat') return { status: 401, message: formatTokenDiagnostic(diagnostic) };
+    if (diagnostic.category === 'permission_denied') return { status: 403, message: formatTokenDiagnostic(diagnostic) };
+    return { status: 503, message: formatTokenDiagnostic(diagnostic) };
   };
 
   if (oauth && publicUrl && gptClient) {

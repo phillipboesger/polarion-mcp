@@ -1,6 +1,7 @@
 import test from "node:test"
 import { readFileSync } from "node:fs"
 import assert from "node:assert/strict"
+import { createHash, randomBytes } from "node:crypto"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import axios from "axios"
@@ -10,6 +11,7 @@ import axios from "axios"
 // Captured from GET /users on Polarion 2506; reused for permission-denied tool responses.
 const permissionDenied = JSON.parse(readFileSync("tests/fixtures/polarion-permission-denied.json", "utf8"))
 const SECRET_PAT = "secret-pat-value"
+let rejectRecoveryToken = true
 const STATUS: Record<string, number> = { ok: 200, created: 201, revoked: 401, projectOnly: 200, forbidden: 403, unsupported: 404, html403: 403, empty403: 403, mismatch403: 403, redirect: 302, broken: 400, empty: 500, html: 200, textjson: 200, noType: 200, mixedcase: 200, malformed: 200, blank: 200, errorjson: 200, errorsWithData: 200, noData: 200, invalidData: 200, noTypeField: 200, noIdField: 200, numberType: 200, numberId: 200, nullMetadata: 200, primitiveMetadata: 200, arrayMetadata: 200, wrongTopLevel: 200 }
 const observed: Array<{ url: string; authorization: string | undefined }> = []
 const polarion = createServer((req, res) => {
@@ -20,7 +22,7 @@ const polarion = createServer((req, res) => {
     res.end(JSON.stringify({ data: { type: "projects", id: "drivepilot" } }))
     return
   }
-  const status = token === "projectOnly" && req.url !== "/polarion/rest/v1/metadata" ? 403 : STATUS[token] ?? 500
+  const status = token === "recover" ? (rejectRecoveryToken ? 400 : 200) : token === "projectOnly" && req.url !== "/polarion/rest/v1/metadata" ? 403 : STATUS[token] ?? 500
   if (token === "redirect") {
     res.writeHead(302, { location: "/login" })
     res.end()
@@ -40,7 +42,7 @@ const polarion = createServer((req, res) => {
     res.end()
   } else {
     res.writeHead(status, { "content-type": token === "created" ? "application/vnd.api+json; charset=utf-8" : "application/json; charset=utf-8" })
-    res.end(JSON.stringify(token === "ok" || (token === "projectOnly" && status === 200) ? { data: { type: "metadata", id: "metadata" } }
+    res.end(JSON.stringify(token === "ok" || (token === "projectOnly" && status === 200) || (token === "recover" && status === 200) ? { data: { type: "metadata", id: "metadata" } }
       : token === "created" ? { data: { type: "metadata", id: "metadata", links: {} } }
       : status === 403 ? permissionDenied
       : token === "empty403" ? { errors: [] }
@@ -66,6 +68,110 @@ process.env.API_BASE_URL = `http://127.0.0.1:${(polarion.address() as AddressInf
 const { probePolarionToken, validatePolarionToken } = await import("../src/oauth.js")
 
 test.after(() => polarion.close())
+
+test("the default direct-PAT MCP validator exposes safe metadata diagnostics", async () => {
+  const { createMcpHttpApp } = await import("../src/mcp-http-server.js")
+  const { app, closeAllSessions } = createMcpHttpApp()
+  const server = app.listen(0, "127.0.0.1")
+  await new Promise<void>((resolve) => server.once("listening", resolve))
+  const { port } = server.address() as AddressInfo
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${SECRET_PAT}broken` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } }),
+    })
+    assert.equal(response.status, 503)
+    const body = await response.json() as { error: { message: string } }
+    assert.match(body.error.message, /request_rejected|request was rejected/)
+    assert.match(body.error.message, /API_BASE_URL/)
+    assert.doesNotMatch(body.error.message, /secret-pat-value|No access for/)
+  } finally {
+    await closeAllSessions()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test("the default OAuth login keeps request/configuration failures retryable", async () => {
+  rejectRecoveryToken = true
+  const { createMcpHttpApp } = await import("../src/mcp-http-server.js")
+  const { app, closeAllSessions } = createMcpHttpApp({ publicUrl: new URL("http://127.0.0.1"), tokenSecret: "test-token-secret-long-enough-for-oauth" })
+  const server = app.listen(0, "127.0.0.1")
+  await new Promise<void>((resolve) => server.once("listening", resolve))
+  const { port } = server.address() as AddressInfo
+  const base = `http://127.0.0.1:${port}`
+  try {
+    const registration = await fetch(`${base}/register`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_name: "Test", redirect_uris: ["https://client.example/callback"], token_endpoint_auth_method: "none" }) })
+    const { client_id } = await registration.json() as { client_id: string }
+    const verifier = randomBytes(32).toString("base64url")
+    const challenge = createHash("sha256").update(verifier).digest("base64url")
+    const authorize = new URL(`${base}/authorize`)
+    for (const [key, value] of Object.entries({ response_type: "code", client_id, redirect_uri: "https://client.example/callback", code_challenge: challenge, code_challenge_method: "S256", state: "state" })) authorize.searchParams.set(key, value)
+    const page = await fetch(authorize)
+    const loginId = /name="login_id" value="([^"]+)"/.exec(await page.text())?.[1] as string
+    const submit = () => fetch(`${base}/polarion-login`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ login_id: loginId, token: `${SECRET_PAT}recover` }), redirect: "manual" })
+    const failed = await submit()
+    assert.equal(failed.status, 400)
+    const failedHtml = await failed.text()
+    assert.match(failedHtml, /request_rejected/)
+    assert.match(failedHtml, /API_BASE_URL/)
+    assert.match(failedHtml, /name="login_id"/)
+    assert.doesNotMatch(failedHtml, /secret-pat-value|No access for/)
+    rejectRecoveryToken = false
+    const succeeded = await submit()
+    assert.equal(succeeded.status, 302)
+    const code = new URL(succeeded.headers.get("location") as string).searchParams.get("code") as string
+    const tokensResponse = await fetch(`${base}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", code, client_id, redirect_uri: "https://client.example/callback", code_verifier: verifier }) })
+    assert.equal(tokensResponse.status, 200)
+    const tokens = await tokensResponse.json() as { refresh_token: string }
+    rejectRecoveryToken = true
+    const refreshed = await fetch(`${base}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tokens.refresh_token, client_id }) })
+    assert.equal(refreshed.status, 500)
+    const refreshBody = await refreshed.json() as { error: string; error_description: string }
+    assert.notEqual(refreshBody.error, "invalid_grant")
+    assert.match(refreshBody.error_description, /request_rejected.*API_BASE_URL/)
+    assert.doesNotMatch(refreshBody.error_description, /secret-pat-value|No access for/)
+  } finally {
+    rejectRecoveryToken = true
+    await closeAllSessions()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test("the default Custom GPT refresh preserves configuration failures", async () => {
+  rejectRecoveryToken = false
+  const { createMcpHttpApp } = await import("../src/mcp-http-server.js")
+  const { app, closeAllSessions } = createMcpHttpApp({ publicUrl: new URL("http://127.0.0.1"), tokenSecret: "test-token-secret-long-enough-for-oauth", gptClient: { clientId: "test-gpt", clientSecret: "test-gpt-secret-long-enough" } })
+  const server = app.listen(0, "127.0.0.1")
+  await new Promise<void>((resolve) => server.once("listening", resolve))
+  const { port } = server.address() as AddressInfo
+  const base = `http://127.0.0.1:${port}`
+  try {
+    const authorize = new URL(`${base}/gpt/authorize`)
+    for (const [key, value] of Object.entries({ response_type: "code", client_id: "test-gpt", redirect_uri: "https://chatgpt.com/aip/test/oauth/callback", state: "state" })) authorize.searchParams.set(key, value)
+    const page = await fetch(authorize)
+    const loginId = /name="login_id" value="([^"]+)"/.exec(await page.text())?.[1] as string
+    const submitted = await fetch(`${base}/polarion-login`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ login_id: loginId, token: `${SECRET_PAT}recover` }), redirect: "manual" })
+    assert.equal(submitted.status, 302)
+    const code = new URL(submitted.headers.get("location") as string).searchParams.get("code") as string
+    const credentials = Buffer.from("test-gpt:test-gpt-secret-long-enough").toString("base64")
+    const form = (values: Record<string, string>) => new URLSearchParams({ client_id: "test-gpt", client_secret: "test-gpt-secret-long-enough", ...values })
+    const exchange = await fetch(`${base}/gpt/token`, { method: "POST", headers: { authorization: `Basic ${credentials}`, "content-type": "application/x-www-form-urlencoded" }, body: form({ grant_type: "authorization_code", code, redirect_uri: "https://chatgpt.com/aip/test/oauth/callback" }) })
+    assert.equal(exchange.status, 200)
+    const tokens = await exchange.json() as { refresh_token: string }
+    rejectRecoveryToken = true
+    const refreshed = await fetch(`${base}/gpt/token`, { method: "POST", headers: { authorization: `Basic ${credentials}`, "content-type": "application/x-www-form-urlencoded" }, body: form({ grant_type: "refresh_token", refresh_token: tokens.refresh_token }) })
+    assert.equal(refreshed.status, 500)
+    const refreshBody = await refreshed.json() as { error: string; error_description: string }
+    assert.notEqual(refreshBody.error, "invalid_grant")
+    assert.match(refreshBody.error_description, /request_rejected.*API_BASE_URL/)
+    assert.doesNotMatch(refreshBody.error_description, /secret-pat-value|No access for/)
+  } finally {
+    rejectRecoveryToken = true
+    await closeAllSessions()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
 
 /** Runs a token check and returns its result plus what it logged. */
 async function check(token: string) {
