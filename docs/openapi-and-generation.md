@@ -40,7 +40,3 @@ architecture (server factory, the three transports, executor, etc.) is preserved
 - Generated/intermediate artifacts (`openapi.json`, `.gen/`) are gitignored; only `src/tools.ts` is committed.
 - Invalid MCP property names (e.g. bracketed `page[size]`) are normalized generically at runtime by `sanitizeInputSchema`/`nameMap` in `src/utils.ts`, so no post-generation patching is required.
 - `src/tools.ts` carries a generated header and a tool count; do not edit it by hand — rerun the pipeline instead.
-
-## read_when
-
-- Use this guide when updating the Polarion REST API version or regenerating tools.
