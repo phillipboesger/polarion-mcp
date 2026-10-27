@@ -22,17 +22,6 @@ export function renderClientsBlock(manifest) {
   ].join('\n');
 }
 
-const listify = text => text.replace(/^(\s*)\d+\)\s/gm, '$11. ');
-const renderBefore = items => items.map(item => `### ${item.title}\n\n${listify(item.how)}`).join('\n\n');
-
-export function renderModeGuide(manifest, mode) {
-  const info = manifest.serverModes.find(item => item.id === mode);
-  const intro = mode === 'local'
-    ? 'The client starts `npx -y polarion-mcp` on your computer and talks to it over stdio (standard input and output). Nothing is hosted and no port is opened.'
-    : 'The server runs in Docker and your client connects to its URL. Cloud clients such as claude.ai and ChatGPT also need public HTTPS and OAuth (a browser sign-in handled by the server).';
-  return `# ${info.label}\n\n${intro}\n\n${info.description}\n\n## Prerequisites\n\n${renderBefore(info.before)}\n\nNext: [choose your client](../clients.md).\n`;
-}
-
 function renderConnection(manifest, client, mode, part) {
   const connection = client[mode];
   const setup = manifest.setups.find(item => item.id === connection.setup);
@@ -74,8 +63,6 @@ export const renderReadmeFaq = manifest => `${manifest.faq.map(item => `<details
 export function renderGuides(manifest) {
   return [
     ['docs/clients.md', renderClientIndex(manifest)],
-    ['docs/guides/local-npm.md', renderModeGuide(manifest, 'local')],
-    ['docs/guides/server-docker.md', renderModeGuide(manifest, 'server')],
     ...manifest.clients.map(client => [`docs/guides/clients/${client.id}.md`, renderClientGuide(manifest, client)]),
   ];
 }

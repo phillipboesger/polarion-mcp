@@ -6,15 +6,15 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 
 test('cloud instructions distinguish real Polarion URLs from local development networking', () => {
-  const manifest = JSON.parse(readFileSync('docs/clients.json', 'utf8'));
-  const prerequisites = manifest.serverModes.find(mode => mode.id === 'server').before;
-  const local = prerequisites.filter(entry => entry.how.includes('host.docker.internal'));
-  assert.equal(local.length, 1);
-  assert.match(local[0].title, /local development/i);
-  const urls = prerequisites.flatMap(entry => [...entry.how.matchAll(/https:\/\/[^\s`"<>]+/g)].map(match => new URL(match[0])));
-  assert.ok(urls.some(url => url.hostname === 'polarion.company.example' && url.pathname === '/polarion/rest/v1'));
-  assert.doesNotMatch(JSON.stringify(prerequisites), /Skip this on your own laptop/);
-  for (const file of ['docs/clients.json', 'docs/configuration.md', 'docs/deployment.md']) {
+  const guide = readFileSync('docs/guides/server-docker.md', 'utf8');
+  const sections = guide.split(/^### /m).filter(section => section.includes('host.docker.internal'));
+  assert.equal(sections.length, 1);
+  assert.match(sections[0], /^[^\n]*development only/i);
+  assert.match(sections[0], /ALLOWED_HOSTS/);
+  const urls = [...guide.matchAll(/https:\/\/[^\s`"<>]+/g)].map(match => new URL(match[0]));
+  assert.ok(urls.some(url => url.hostname === 'polarion.mycompany.com' && url.pathname === '/polarion/rest/v1'));
+  assert.doesNotMatch(guide, /Skip this on your own laptop/);
+  for (const file of ['docs/clients.json', 'docs/configuration.md', 'docs/deployment.md', 'docs/guides/server-docker.md']) {
     assert.doesNotMatch(readFileSync(file, 'utf8'), /POLARION_ALLOWED_HOSTS/);
   }
 });

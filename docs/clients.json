@@ -1612,60 +1612,12 @@
     {
       "id": "local",
       "label": "Local (npm / npx)",
-      "description": "Your client starts the server on your computer (stdio). Needs Node.js 22+ and a Polarion token.",
-      "before": [
-        {
-          "title": "Node.js 22 or newer",
-          "how": "Install the LTS from https://nodejs.org, open a new terminal and check that it prints v22 or higher:\n```\nnode -v\n```"
-        },
-        {
-          "title": "Polarion REST URL and token (PAT)",
-          "how": "- URL: your Polarion address plus `/polarion/rest/v1`, e.g. `https://polarion.mycompany.com/polarion/rest/v1` (keep the port if there is one).\n- Token: Polarion user page > Personal Access Token (`https://YOUR-POLARION/polarion/#/user_tokens?id=YOUR_USERNAME`) > Create Token. Copy it at once, it is shown only once.\n- \"X-Rest-Token generation is not allowed\"? Ask your Polarion administrator to set this in polarion.properties and restart Polarion:\n```\ncom.siemens.polarion.rest.enabled=true\ncom.siemens.polarion.rest.security.restApiToken.enabled=true\n```\nTest it (Windows PowerShell: `curl.exe`):\n```\ncurl -i -H \"Authorization: Bearer YOUR_PAT\" \"https://YOUR-POLARION/polarion/rest/v1/metadata\"\n```\n- 200 with metadata: works (Polarion 2512+)\n- 401: token wrong or expired\n- 403: access denied\n- 404 on Polarion 2506 or older: use stdio mode or upgrade to 2512+\n- 404 or timeout otherwise: wrong URL or network"
-        },
-        {
-          "title": "Optional: start the server once",
-          "how": "macOS and Linux:\n```\nAPI_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 BEARER_TOKEN=YOUR_PAT npx -y polarion-mcp\n```\nPowerShell: `$env:API_BASE_URL='...'; $env:BEARER_TOKEN='...'; npx -y polarion-mcp`\n- No output is normal, it waits for a client. Stop with Ctrl+C.\n- Use `polarion-mcp@latest` in the client config for updates, or `polarion-mcp@1.4.3` to pin."
-        }
-      ]
+      "description": "Your client starts the server on your computer (stdio). Needs Node.js 22+ and a Polarion token."
     },
     {
       "id": "server",
       "label": "Server (Docker)",
-      "description": "A server your client connects to by URL. Needs Docker to host it; cloud clients also need public HTTPS and OAuth.",
-      "before": [
-        {
-          "title": "Docker",
-          "how": "Install Docker Desktop or Engine (https://docs.docker.com/get-started/get-docker/), start it, then check:\n```\ndocker run --rm hello-world\n```"
-        },
-        {
-          "title": "Polarion REST URL and token (PAT)",
-          "how": "- URL: set `API_BASE_URL` to your Polarion REST URL, e.g. `https://polarion.company.example/polarion/rest/v1`. The container must reach it; VPN-only is fine.\n- Token: Polarion user page > Personal Access Token (`https://YOUR-POLARION/polarion/#/user_tokens?id=YOUR_USERNAME`) > Create Token. Copy it at once, it is shown only once.\n- \"X-Rest-Token generation is not allowed\"? Ask your Polarion administrator to set this in polarion.properties and restart Polarion:\n```\ncom.siemens.polarion.rest.enabled=true\ncom.siemens.polarion.rest.security.restApiToken.enabled=true\n```\nTo test the PAT and network path, use the container-side probe in docs/troubleshooting.md, section \"Probe Polarion from the MCP container\". Never pass the PAT as a curl argument."
-        },
-        {
-          "title": "Local development only: Polarion on the Docker host",
-          "how": "Only if Polarion runs on the same machine and the container cannot reach its company hostname. Inside a container `localhost` is the container itself.\n- Docker Desktop: use `https://host.docker.internal/...` as host.\n- Linux: add `--add-host=host.docker.internal:host-gateway` and use the same host.\n- Set `API_BASE_URL` to the full REST URL; the Docker host needs VPN access.\n- Polarion answers `request_rejected HTTP 400`? Add the hostname to `ALLOWED_HOSTS` on the Polarion container and recreate it (a restart is not enough). See docs/troubleshooting.md.\nFor team or cloud use, prefer the real Polarion hostname."
-        },
-        {
-          "title": "Team or cloud: hostname and HTTPS",
-          "how": "Cloud connectors (claude.ai, ChatGPT) need the MCP server at a public HTTPS address such as `https://mcp.mycompany.com/mcp`, even if the container runs on your laptop. Polarion itself may stay private. A local-only client can use `http://localhost:3000/mcp`.\n1) Create a DNS A record for the MCP hostname pointing to the server.\n2) Put a TLS proxy in front of port 3000, e.g. Caddy (https://caddyserver.com/docs/install), with the Caddyfile below. Start it with `caddy run`.\n3) Open only ports 80 and 443, never 3000. Apache and nginx work too (docs/deployment.md).\n4) Open `https://mcp.mycompany.com/health`. It confirms the server is up, not that Polarion is reachable.\nCaddyfile:\n```\nmcp.mycompany.com {\n    reverse_proxy 127.0.0.1:3000\n}\n```"
-        },
-        {
-          "title": "Cloud connectors only: token secret",
-          "how": "claude.ai, ChatGPT and Claude Desktop connectors use OAuth, which needs a secret of at least 32 characters. Create it once, keep it, reuse it on every restart (a new one logs everyone out). Never commit it.\n```\nopenssl rand -hex 32\n```\nNo openssl? Use `node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"`.\nSet these on the container (details in docs/configuration.md):\n- `MCP_PUBLIC_URL=https://mcp.mycompany.com` (origin only, no path)\n- `MCP_ALLOWED_HOSTS=mcp.mycompany.com`\n- `MCP_TOKEN_SECRET`: your secret\n- `MCP_ALLOWED_REDIRECT_PRESETS=claude` (or the exact callback in `MCP_ALLOWED_REDIRECT_PREFIXES`)\n- `TRUST_PROXY`: number of proxy hops, usually 1"
-        },
-        {
-          "title": "Check that it runs",
-          "how": "- `docker ps` shows the container, `docker logs polarion-mcp` its log.\n- `curl http://localhost:3000/health` checks liveness only, not Polarion or the PAT. For that use the probe in docs/troubleshooting.md.\n- Port 3000 taken? Change the left number, e.g. `-p 127.0.0.1:3100:3000`."
-        },
-        {
-          "title": "Using a server your team already runs",
-          "how": "You need two things from whoever runs the server:\n- The server URL, ending in `/mcp`. Check that `https://THEIR-SERVER/health` answers {\"status\":\"ok\"} (VPN may be needed).\n- How you sign in: OAuth in the browser (claude.ai, ChatGPT; the server must allow your client's redirect preset) or your own PAT as `Authorization: Bearer` header (Claude Code, Cursor, VS Code, API clients)."
-        },
-        {
-          "title": "Your Polarion token (PAT)",
-          "how": "- URL: your Polarion address plus `/polarion/rest/v1`, e.g. `https://polarion.mycompany.com/polarion/rest/v1` (keep the port if there is one).\n- Token: Polarion user page > Personal Access Token (`https://YOUR-POLARION/polarion/#/user_tokens?id=YOUR_USERNAME`) > Create Token. Copy it at once, it is shown only once.\n- \"X-Rest-Token generation is not allowed\"? Ask your Polarion administrator to set this in polarion.properties and restart Polarion:\n```\ncom.siemens.polarion.rest.enabled=true\ncom.siemens.polarion.rest.security.restApiToken.enabled=true\n```\nTest it (Windows PowerShell: `curl.exe`):\n```\ncurl -i -H \"Authorization: Bearer YOUR_PAT\" \"https://YOUR-POLARION/polarion/rest/v1/metadata\"\n```\n- 200 with metadata: works (Polarion 2512+)\n- 401: token wrong or expired\n- 403: access denied\n- 404 on Polarion 2506 or older: use stdio mode or upgrade to 2512+\n- 404 or timeout otherwise: wrong URL or network"
-        }
-      ]
+      "description": "A server your client connects to by URL. Needs Docker to host it; cloud clients also need public HTTPS and OAuth."
     }
   ],
   "faq": [

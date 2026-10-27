@@ -43,7 +43,8 @@ const filesUnder = (root, dir) => {
   });
 };
 const REQUIRED_GUIDE_SECTIONS = ['Prerequisites', 'Steps', 'Check', 'If it fails'];
-const missingGuideSections = guide => REQUIRED_GUIDE_SECTIONS.filter(section => !new RegExp(`^## ${section}\\s*$`, 'm').test(guide));
+// "Check" also matches "Check that it works".
+const missingGuideSections = (guide, sections = REQUIRED_GUIDE_SECTIONS) => sections.filter(section => !new RegExp(`^## ${section}\\b.*$`, 'm').test(guide));
 // The website lists options and links to the guides; it must not carry install procedures.
 function siteInstallProblems(html) {
   const section = /<!-- clients:start -->([\s\S]*?)<!-- clients:end -->/.exec(html)?.[1] ?? '';
@@ -87,7 +88,11 @@ function checker(root) {
         for (const [file, content] of renderGuides(manifest)) if (read(root, file) !== content) add('clients', file, 1, 'generated guide is missing or stale; run npm run docs:clients');
         if (!readme.includes(`<!-- faq:start -->\n${renderReadmeFaq(manifest)}\n<!-- faq:end -->`)) add('clients', 'README.md', 1, 'FAQ block differs from docs/clients.json; run npm run docs:clients');
         // Idiot-proof rule: every supported client x mode needs prerequisites, steps, a verification and a failure fix.
-        for (const mode of manifest.serverModes) if (!mode.before?.length) add('clients', 'docs/clients.json', 1, `setup ${mode.id} has no prerequisite items`);
+        for (const file of ['docs/guides/local-npm.md', 'docs/guides/server-docker.md']) {
+          const guide = read(root, file);
+          if (!guide) add('clients', file, 1, 'setup guide is missing');
+          else for (const section of missingGuideSections(guide, ['Prerequisites', 'Check', 'If it fails'])) add('clients', file, 1, `guide is missing the "${section}" section`);
+        }
         for (const client of manifest.clients) {
           if (!/^\d{4}-\d{2}-\d{2}$/.test(client.checked || '')) add('clients', 'docs/clients.json', 1, `${client.id} has no checked date`);
           for (const source of client.sources || []) if (!/^https:\/\/\S+$/.test(source)) add('clients', 'docs/clients.json', 1, `${client.id} has a source that is not a plain https URL: ${source}`);
