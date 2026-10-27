@@ -170,7 +170,7 @@ chown -R www-data:www-data /opt/polarion/data/svn/repo
     let projectsJson;
     try { projectsJson = JSON.parse(adminProjectsBody); }
     catch {
-      const matrix = { adminProjects: { status: adminProjectsResponse.status, bodyShape: adminProjectsBody.length ? "non-json" : "empty", expected: 200 } };
+      const matrix = { adminProjects: { status: adminProjectsResponse.status === 200 ? 200 : 0, bodyShape: adminProjectsBody.length ? "non-json" : "empty", expected: 200 } };
       await writeFile(output, `${JSON.stringify({ projectId: opts.project, version, matrix }, null, 2)}\n`, { mode: 0o600 });
       reserved = false;
       throw new Error(`PAT endpoint matrix mismatch: adminProjects was not JSON; redacted evidence saved to ${output}`);
