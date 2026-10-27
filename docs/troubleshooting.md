@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Setup problems: follow the [Local setup](guides/local-npm.md) or [Server setup](guides/server-docker.md) guide first; each ends with a check and an "If it fails" table.
+Setup problems: follow the [Local setup](guides/local-npm.md) or [Server setup](guides/server-docker.md) guide first; each contains a check and an "If it fails" table.
 
 ## HTTP Server Exits Immediately
 

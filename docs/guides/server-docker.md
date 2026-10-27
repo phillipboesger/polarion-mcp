@@ -2,7 +2,7 @@
 
 The server runs in a Docker container and your client connects to its URL. This is the supported way to host the HTTP server (other hosting options are in [Deployment](../deployment.md)). Use it for claude.ai, ChatGPT and other cloud clients, and for a team that shares one server.
 
-The only thing assumed is that your AI platform exists. Do Steps 1 and 2 first. Do Step 3 only if Polarion runs on the same machine. Then do Option A or Option B:
+The only thing assumed is that your AI platform exists. Do Steps 1 and 2 first. Do Step 3 only if Polarion runs on the machine that runs Docker. In Option B that machine is the server from B1, so do Steps 2 and 3 there. Then do Option A or Option B:
 
 - Option A: your client runs on your own computer (for example Claude Code or Cursor). No HTTPS needed.
 - Option B: a cloud client or a team connects from the internet. Needs a public HTTPS address.
@@ -95,7 +95,7 @@ curl http://localhost:3000/health
 
 Expected: JSON that contains `"status":"ok"`. This proves only that the server runs, not that Polarion is reachable.
 
-If not: `docker ps` shows whether the container runs. `docker logs polarion-mcp` shows why not. Port 3000 taken? Change the left number, for example `-p 127.0.0.1:3100:3000`, and use that port everywhere.
+If not: `docker ps` shows whether the container runs. `docker logs polarion-mcp` shows why not. Name already in use? Run `docker rm -f polarion-mcp`, then start it again. Port 3000 taken? Change the left number, for example `-p 127.0.0.1:3100:3000`, and use that port everywhere.
 
 Your client connects to `http://localhost:3000/mcp` and sends `Authorization: Bearer YOUR_PAT` (your client guide shows where the token goes). The container holds no Polarion credentials.
 
@@ -194,7 +194,7 @@ What the settings mean:
 
 - `MCP_PUBLIC_URL`: the public address, origin only, no path.
 - `MCP_ALLOWED_HOSTS`: the hostname clients use. The server rejects other Host headers.
-- `MCP_ALLOWED_REDIRECT_PRESETS=claude`: lets claude.ai and Claude Desktop finish sign-in. For ChatGPT use `MCP_ALLOWED_REDIRECT_PREFIXES` instead (see the ChatGPT guide).
+- `MCP_ALLOWED_REDIRECT_PRESETS=claude`: lets claude.ai and Claude Desktop finish sign-in. For ChatGPT use `MCP_ALLOWED_REDIRECT_PREFIXES` instead (see the [ChatGPT guide](clients/chatgpt-apps.md)).
 - `TRUST_PROXY=1`: one proxy (Caddy) sits in front.
 - The `mcp` service publishes no port, so only Caddy can reach it.
 
