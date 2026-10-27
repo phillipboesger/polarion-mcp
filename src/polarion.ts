@@ -64,7 +64,9 @@ export function pruneDisabledTools(text: string, enabled: EnabledTools): string 
 
 /** Read before anything else; also the server's `instructions`. */
 const INSTRUCTION_LINES: { text: string; needsWrite?: boolean }[] = [
-  { text: `- Start with getProjects to find a projectId. Work Item, Document and Test Run tools are project-scoped.` },
+  { text: `- Identity: call getCurrentUser for the signed-in user. A 403 there means this token cannot read that endpoint, not that login failed.` },
+  { text: `- Known project: call getProject with its projectId. Work Item, Document and Test Run tools are project-scoped.` },
+  { text: `- Unknown project ID: ask the user for it. getProjects lists projects only for users with global read access.` },
   { text: `- getAllWorkItems searches Work Items across projects.` },
   { text: `- Search with the \`query\` parameter (Lucene syntax, e.g. \`type:requirement AND status:open\`). See polarion://guide/query-syntax.` },
   { text: `- Lists are paged: page_size_ (usually at most 100) and page_number_ (1-based). Follow links.next until it is absent; meta.totalCount gives the total when there is more than one page.` },

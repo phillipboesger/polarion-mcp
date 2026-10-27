@@ -26,6 +26,8 @@ npm test
 npm run check:docs
 ```
 
+`npm run verify:setup` runs typecheck, lint, the strict docs check, the package check and the full test suite in one command. It fails on any skipped test. Add `--ui` for the docs browser tests. `npm run verify:setup:docker` adds the live tests against a Polarion you run yourself; see [docs/live-tests.md](../docs/live-tests.md).
+
 Additional gates are `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, and `npm run check:package`. See [docs/quality/e2e.md](../docs/quality/e2e.md), [docs/quality/static-analysis.md](../docs/quality/static-analysis.md), and [docs/quality/distribution.md](../docs/quality/distribution.md).
 
 For a real Polarion integration run, see [docs/live-tests.md](../docs/live-tests.md). Do not run it against production data.

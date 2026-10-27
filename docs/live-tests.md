@@ -23,6 +23,10 @@ LIVE_PAT=your-token npm run test:live
 
 The suite creates and removes test data on the configured instance. Use a disposable project with appropriate permissions.
 
-For the project-permission regression test, set `LIVE_PROJECT_PAT` to a separate user with REST GET permission in `LIVE_PROJECT` and no global REST GET permission. On Polarion 2512+, the test requires `/metadata` to return 200 and `/projects` to return 403 for that PAT, then verifies MCP initialization and project reads succeed. Without this variable, only that test is skipped.
+For the project-permission regression test, set `LIVE_PROJECT_PAT` to a separate user with REST GET permission in `LIVE_PROJECT` and no global REST GET permission. On Polarion 2512+, the test requires `/metadata` to return 200 and `/projects` to return 403 for that PAT, then verifies MCP initialization and project reads succeed. Without this variable, `npm run test:live` skips that test.
+
+### Local gate with Docker
+
+`npm run verify:setup:docker` runs the full local gate (static checks, code tests, then the live suite). It refuses to start unless `LIVE_API_BASE_URL`, `LIVE_PAT` and `LIVE_PROJECT_PAT` are set, and it fails on any skipped live case, so a green run means every live case executed. Provision the scoped users with `node scripts/live/provision-users.mjs --container NAME --url URL --project ID --output PRIVATE_JSON`. Keep the output file private and delete it afterwards. `npm run verify:setup` runs the same gate without the live tests.
 
 The Streamable HTTP/OAuth live suite requires Polarion 2512+ because its PAT preflight uses `/metadata`. The suite skips HTTP/OAuth on older instances when that endpoint returns 404; stdio tests still run.

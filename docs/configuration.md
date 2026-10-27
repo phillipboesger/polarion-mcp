@@ -6,7 +6,7 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 
 | Variable | Default | Read by | Secret? | Purpose |
 |---|---|---|---|---|
-| `API_BASE_URL` | `https://polarion.example.com/polarion/rest/v1` | `src/config.ts` at import | No | Polarion REST API base URL. Set this to your instance. |
+| `API_BASE_URL` | `https://polarion.example.com/polarion/rest/v1` | `src/config.ts` at import | No | Polarion REST API base URL reachable from the MCP process or container, ending in `/polarion/rest/v1`. For cloud MCP, Polarion may be private or VPN-only if the container can reach it. |
 | `BEARER_TOKEN` | Unset | `src/config.ts` when making calls | Yes | Polarion PAT for stdio and REST HTTP mode; fallback when a scheme-specific credential is absent. Streamable HTTP uses each request's PAT instead. |
 | `HTTP_PORT` | `3000` | `src/http-server.ts` startup | No | REST wrapper port; `PORT` takes precedence. |
 | `PORT` | Platform supplied, otherwise ignored | `src/http-server.ts`, `src/mcp-http-server.ts` | No | Hosting platform port. Takes precedence over `HTTP_PORT`. |
@@ -21,7 +21,7 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_TOKEN_SECRET_PREVIOUS` | Empty | `src/mcp-http-server.ts`, `src/sealed.ts` | Yes | Comma-separated prior sealing keys tried for opening existing values during key rotation. New values use `MCP_TOKEN_SECRET`. Remove old keys after clients have renewed. |
 | `GPT_CLIENT_ID` | Unset | `src/mcp-http-server.ts` startup | Yes | Enables the preconfigured Custom GPT OAuth flow when paired with `GPT_CLIENT_SECRET` and `MCP_PUBLIC_URL`. |
 | `GPT_CLIENT_SECRET` | Unset | `src/mcp-http-server.ts` startup | Yes | Custom GPT OAuth client secret. |
-| `MCP_ALLOWED_HOSTS` | Empty, no Host allowlist | `src/mcp-http-server.ts` startup | No | Comma-separated Host header allowlist for DNS-rebinding protection. |
+| `MCP_ALLOWED_HOSTS` | Empty, no Host allowlist | `src/mcp-http-server.ts` startup | No | Comma-separated allowlist for the inbound Host header of the MCP server (for example its public hostname); it does not control outbound access to Polarion. `ALLOWED_HOSTS` is a separate input for the Polarion Docker image, not this MCP server. |
 | `MCP_ALLOWED_ORIGINS` | Claude.ai and ChatGPT origins | `src/mcp-http-server.ts` startup | No | Comma-separated browser origin allowlist for MCP and OAuth routes. The `MCP_PUBLIC_URL` origin is always allowed. |
 | `MCP_ALLOWED_REDIRECT_PREFIXES` | Empty, registration allows redirect URIs | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Comma-separated exact redirect URI allowlist; entries ending in `/` are prefixes. Configure this or named presets for production OAuth. |
 | `MCP_ALLOWED_REDIRECT_PRESETS` | Empty | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Comma-separated built-in names: `claude`, `chatgpt`, `vscode`, `cursor`, `copilot-studio`, `gemini`, `loopback`. Verified callbacks currently exist for `claude` and `cursor`; `loopback` allows localhost callback ports. Unknown names are ignored. |
@@ -65,6 +65,10 @@ The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Tool
 
 `MCP_ALLOWED_ORIGINS` protects MCP and OAuth routes from browser-origin abuse and DNS rebinding. The request path is matched case-insensitively. The public origin in `MCP_PUBLIC_URL` is always accepted; otherwise configure trusted origins. Requests without an Origin header are not rejected. The REST wrapper uses the separate `HTTP_CORS_ORIGINS` setting.
 
+## Network paths
+
+Cloud providers must reach the MCP server over public HTTPS. The MCP process separately connects to the Polarion URL in `API_BASE_URL`; Polarion can remain private when that network path exists. HTTPS is mandatory for the cloud-facing MCP endpoint, including when the MCP process runs on a laptop. For a company CA, configure Node.js with the additional PEM trust bundle before startup; normal TLS verification remains enabled.
+
 ## Modes
 
 - Stdio: set `API_BASE_URL` and `BEARER_TOKEN`.
@@ -77,7 +81,7 @@ Access tokens last one hour. Refresh tokens last 14 days by default and are rene
 
 ## TLS and credential handling
 
-Keep `.env` out of version control and use least-privilege Polarion PATs. `NODE_TLS_REJECT_UNAUTHORIZED=0` disables TLS certificate verification and should only be used for trusted internal systems.
+Keep `.env` out of version control and use least-privilege Polarion PATs. TLS verification stays enabled by default. For a private CA, configure an additional Node.js trust bundle; `NODE_TLS_REJECT_UNAUTHORIZED=0` disables verification and is not a deployment recommendation.
 
 ## Script-only variables
 

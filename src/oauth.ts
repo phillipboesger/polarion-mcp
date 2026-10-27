@@ -31,6 +31,8 @@ import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handle
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
 import { fetchClientMetadata, parseClientIdentifierUrl, type CimdClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, safeEqual } from './sealed.js';
+import { tokenDiagnostic, tokenNetworkDiagnostic, type TokenDiagnostic, type TokenProbeResult } from './token-diagnostics.js';
+export type { TokenDiagnostic, TokenDiagnosticCategory, TokenProbeResult } from './token-diagnostics.js';
 
 /** Scope advertised by this server; the PAT itself carries the real permissions. */
 export const POLARION_SCOPE = 'polarion';
@@ -81,6 +83,24 @@ function normalizeResource(value: string): string {
 export type TokenCheck = boolean | 'forbidden' | 'unavailable';
 
 export type TokenValidator = (token: string) => Promise<TokenCheck>;
+/** Detailed default probe, while preserving the historical injected validator contract. */
+export type TokenCheckFunction = TokenValidator | ((token: string) => Promise<TokenProbeResult>);
+
+/** Normalize old test/integration validators and the strict metadata probe. */
+export async function normalizeTokenProbeResult(checker: TokenCheckFunction, token: string): Promise<TokenProbeResult> {
+  const result = await checker(token);
+  if (typeof result === 'object' && result !== null && 'valid' in result) return result;
+  if (result === true) return { valid: true };
+  if (result === 'forbidden') return { valid: false, diagnostic: { ...tokenDiagnostic('permission_denied', 403), message: 'Polarion recognized the token but denied access (HTTP 403).', action: 'Your account may lack a license or permission to use the REST API; ask your Polarion administrator. A new token will not help.' } };
+  if (result === 'unavailable') return { valid: false, diagnostic: { ...tokenDiagnostic('network_error'), message: 'Polarion could not be reached to check the token.', action: 'Try again in a moment.' } };
+  return { valid: false, diagnostic: { ...tokenDiagnostic('invalid_pat', 401), message: 'Polarion did not accept that token.', action: 'Check that you copied it completely and that it has not expired.' } };
+}
+
+/** User-safe diagnostic line including stable category and optional status. */
+export function formatTokenDiagnostic(diagnostic: TokenDiagnostic): string {
+  const status = diagnostic.upstreamStatus === undefined ? '' : ` HTTP ${diagnostic.upstreamStatus}`;
+  return `[${diagnostic.category}${status}] ${diagnostic.message} ${diagnostic.action}`;
+}
 
 /** Which token endpoint may redeem a code: the PKCE one, or the Custom GPT one. */
 type Flow = 'mcp' | 'gpt';
@@ -138,11 +158,14 @@ type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secre
  * Each tool must still obtain its own authorization from Polarion.
  *
  * @param token - The token to check.
- * @returns True if Polarion accepted it, false if it rejected it, 'forbidden'
- *   if it recognizes the token but denies this probe, or 'unavailable' if Polarion gave
- *   no usable answer.
+ * @returns A strict metadata success or a safe diagnostic for the failed probe.
  */
-export async function validatePolarionToken(token: string): Promise<TokenCheck> {
+export async function probePolarionToken(token: string): Promise<TokenProbeResult> {
+  const failed = (diagnostic: TokenDiagnostic): TokenProbeResult => {
+    const status = diagnostic.upstreamStatus === undefined ? '' : ` HTTP ${diagnostic.upstreamStatus}`;
+    console.error(`[WARN] Polarion token probe GET /metadata failed: ${diagnostic.category}${status}`);
+    return { valid: false, diagnostic };
+  };
   try {
     const response = await axios.get(`${API_BASE_URL}/metadata`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
@@ -159,22 +182,29 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
     if (response.status >= 200 && response.status < 300) {
       const metadata = isObject && !('errors' in body) ? body.data : undefined;
       if (isJson && metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
-        && metadata.type === 'metadata' && metadata.id === 'metadata') return true;
-      console.error(`[WARN] Polarion token check failed: HTTP ${response.status} - unusable metadata response`);
-      return 'unavailable';
+        && metadata.type === 'metadata' && metadata.id === 'metadata') return { valid: true };
+      return failed(tokenDiagnostic('unusable_response', response.status));
     }
-    // Why Polarion refused (status and its own error detail), never the token:
-    // without it a 403 on the login page is indistinguishable from a typo.
-    const detail = String(response.data?.errors?.[0]?.detail ?? response.data?.errors?.[0]?.title ?? '')
-      .replace(/\s+/g, ' ').slice(0, 200);
-    console.error(`[WARN] Polarion token check failed: HTTP ${response.status}${detail ? ` - ${detail}` : ''}`);
-    if (response.status === 401) return false;
-    if (response.status === 403) return 'forbidden';
-    return 'unavailable';
+    const category = response.status === 401 ? 'invalid_pat'
+      : response.status === 403 ? 'permission_denied'
+        : response.status === 400 ? 'request_rejected'
+          : response.status === 404 ? 'endpoint_missing'
+            : response.status >= 300 && response.status < 400 ? 'redirect'
+              : response.status >= 500 ? 'server_error' : 'unexpected_status';
+    return failed(tokenDiagnostic(category, response.status));
   } catch (error) {
-    console.error(`[WARN] Polarion token check failed: ${error instanceof Error ? error.message : String(error)}`);
-    return 'unavailable';
+    return failed(tokenNetworkDiagnostic(error));
   }
+}
+
+/** Backward-compatible result mapping for existing OAuth callers. */
+export async function validatePolarionToken(token: string): Promise<TokenCheck> {
+  const result = await probePolarionToken(token);
+  if (result.valid) return true;
+  const { diagnostic } = result;
+  if (diagnostic.category === 'invalid_pat') return false;
+  if (diagnostic.category === 'permission_denied') return 'forbidden';
+  return 'unavailable';
 }
 
 /** Hosts whose redirect URIs may use any port (RFC 8252 section 7.3). */
@@ -556,7 +586,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
   constructor(
     private readonly polarionUrl: string,
     private readonly sealer: Sealer,
-    private readonly validateToken: TokenValidator = validatePolarionToken,
+    private readonly validateToken: TokenCheckFunction = probePolarionToken,
     redirectAllowlist: readonly string[] = [],
     private readonly refreshTokenTtlSeconds = DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
     private readonly resourceAudience?: string,
@@ -655,23 +685,9 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     if (!polarionToken) {
       return { ok: false, reason: 'Enter your Polarion Personal Access Token.', pending: retry };
     }
-    const check = await this.validateToken(polarionToken);
-    if (check === 'unavailable') {
-      return { ok: false, reason: 'Polarion could not be reached to check the token. Try again in a moment.', pending: retry };
-    }
-    if (check === 'forbidden') {
-      return {
-        ok: false,
-        reason: 'Polarion recognized the token but denied access (HTTP 403). Your account may lack a license or the permission to use the REST API; ask your Polarion administrator. A new token will not help.',
-        pending: retry,
-      };
-    }
-    if (check !== true) {
-      return {
-        ok: false,
-        reason: 'Polarion did not accept that token. Check that you copied it completely and that it has not expired.',
-        pending: retry,
-      };
+    const check = await normalizeTokenProbeResult(this.validateToken, polarionToken);
+    if (!check.valid) {
+      return { ok: false, reason: formatTokenDiagnostic(check.diagnostic), pending: retry };
     }
 
     this.pendingLogins.delete(loginId);
@@ -795,14 +811,13 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
       || now >= entry.fiat + REFRESH_TOKEN_FAMILY_TTL_SECONDS) {
       throw new InvalidGrantError('Invalid refresh token');
     }
-    const check = await this.validateToken(entry.p);
-    if (check === 'unavailable') {
+    const check = await normalizeTokenProbeResult(this.validateToken, entry.p);
+    if (!check.valid && check.diagnostic.category !== 'invalid_pat' && check.diagnostic.category !== 'permission_denied') {
       // Not invalid_grant: that would make the client drop the login for good.
-      throw new ServerError('Polarion could not be reached to renew the login; try again later');
+      throw new ServerError(formatTokenDiagnostic(check.diagnostic));
     }
-    // Strictly true: 'forbidden' is a truthy string and must end the login too.
-    if (check !== true) {
-      throw new InvalidGrantError('Polarion no longer accepts the token behind this login');
+    if (!check.valid) {
+      throw new InvalidGrantError(formatTokenDiagnostic(check.diagnostic));
     }
     return this.issue({ clientId, polarionToken: entry.p, scopes: entry.s, resource: entry.r }, entry.fiat);
   }

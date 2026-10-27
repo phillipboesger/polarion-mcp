@@ -24,6 +24,21 @@ test("with every tool exposed nothing is pruned", async () => {
   assert.ok(listPolarionResources(all).some(r => r.uri === "polarion://guide/writing"))
 })
 
+test("onboarding guidance names identity and project tools, not a global listing", async () => {
+  const text = serverInstructions(all)
+  assert.match(text, /getCurrentUser/)
+  assert.match(text, /getProject with its projectId/)
+  assert.match(text, /A 403 there means this token cannot read that endpoint, not that login failed/)
+  assert.doesNotMatch(text, /Start with getProjects/)
+})
+
+test("without getCurrentUser the identity guidance disappears but project entry stays", async () => {
+  const enabled = new Set([...all].filter(name => name !== "getCurrentUser"))
+  const text = serverInstructions(enabled)
+  assert.doesNotMatch(text, /getCurrentUser/)
+  assert.match(text, /getProject with its projectId/)
+})
+
 test("read-only and small deployments are never pointed at a tool they do not have", async () => {
   for (const enabled of [readOnly, small]) assert.deepEqual(disabledToolsIn(await everythingTold(enabled), enabled), [])
 })

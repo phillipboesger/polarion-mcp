@@ -260,6 +260,19 @@ export function bearerCredential(header: string | undefined): string | undefined
   return value || undefined;
 }
 
+/**
+ * Says which layer refused the call. A 403 on `/user` is a scope limit of the
+ * endpoint, not a failed login, so the hint points at the project route instead.
+ */
+function permissionHint(status: number, url: string | undefined): string | undefined {
+  const path = url ? new URL(url, 'http://polarion.invalid').pathname.replace(/^\/polarion\/rest\/v1/, '') : '';
+  if (status === 401) return 'Hint: Polarion rejected the token (invalid, expired or revoked). Create a new PAT; a permission setting will not fix this.';
+  if (status === 403 && /^\/user\/?$/.test(path)) return 'Hint: Polarion denied GET /user for this account. That endpoint needs global REST read access, which project-only accounts often lack. Use getProject with a known projectId instead.';
+  if (status === 403) return 'Hint: the token was accepted but Polarion denied this request. Check the REST method permission and the item or project access for this account.';
+  if (status === 404 && /^\/projects\/[^/]+/.test(path)) return 'Hint: the project or item was not found, or this account cannot see it. Project IDs are case-sensitive.';
+  return undefined;
+}
+
 export function formatApiError(error: AxiosError): string {
   let message = 'API request failed.';
 
@@ -292,6 +305,8 @@ export function formatApiError(error: AxiosError): string {
     else {
       message += 'No response body received.';
     }
+    const hint = permissionHint(error.response.status, error.config?.url);
+    if (hint) message += ` ${hint}`;
   } else if (/maxContentLength/.test(error.message)) {
     // A download over the size cap: axios aborts it without a response.
     message = `File too large to return inline. Download it from Polarion directly${error.config?.url ? `: ${error.config.url}` : '.'}`;
