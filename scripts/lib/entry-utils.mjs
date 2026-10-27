@@ -200,7 +200,7 @@ export function hasSchemaProperty(entry, propName) {
  * @type {Record<string, string>}
  */
 export const PARAM_DESCRIPTIONS = {
-  projectId: "The Polarion project ID (its URL segment, e.g. `myproject`), case-sensitive. Required to scope the request to one project; call getProjects to list valid IDs.",
+  projectId: "The Polarion project ID (its URL segment, e.g. `myproject`), case-sensitive. Required to scope the request to one project. If the ID is unknown, ask the user; getProjects lists IDs only with global read access.",
   revision: "A specific repository revision (e.g. `1234`) to read the resource as it existed at that revision instead of the current HEAD. Omit to use the latest revision.",
   fields: "Sparse fieldset selector: an object keyed by resource type (e.g. `workitems`) whose value is a comma-separated list of attribute names to return (e.g. `id,title,status`), reducing payload size. Omit to return the default field set.",
   include: "Comma-separated list of related resource types to embed in the response (e.g. `author,attachments`) so they don't require a separate follow-up call. Omit to return only the primary resource.",

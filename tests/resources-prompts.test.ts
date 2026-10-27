@@ -77,7 +77,9 @@ test("initialize hands the client the server instructions", async () => {
   await server.connect(serverSide)
   const client = new Client({ name: "t", version: "1" })
   await client.connect(clientSide)
-  assert.match(client.getInstructions() ?? "", /getProjects/)
+  assert.match(client.getInstructions() ?? "", /getCurrentUser/)
+  assert.match(client.getInstructions() ?? "", /getProject with its projectId/)
+  assert.doesNotMatch(client.getInstructions() ?? "", /Start with getProjects/)
   const templates = await client.listResourceTemplates()
   assert.deepEqual(templates.resourceTemplates.map(template => template.uriTemplate), [
     "polarion://project/{projectId}/workitem/{workItemId}",
