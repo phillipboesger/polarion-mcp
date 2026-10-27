@@ -1,5 +1,7 @@
 # Troubleshooting
 
+Setup problems: follow the [Local setup](guides/local-npm.md) or [Server setup](guides/server-docker.md) guide first; each ends with a check and an "If it fails" table.
+
 ## HTTP Server Exits Immediately
 
 - The REST wrapper requires `HTTP_API_KEY`. Set it before starting `build/http-server.js`.

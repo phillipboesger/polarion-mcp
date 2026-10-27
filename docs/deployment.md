@@ -30,11 +30,7 @@ Cloud clients such as claude.ai and ChatGPT make two separate network connection
 
 ### Ordered setup
 
-1. Choose the Polarion REST URL from the MCP container's network and verify it ends in `/polarion/rest/v1`; use the final HTTPS URL, not a redirecting alias. Keep the PAT in a secret manager.
-2. Deploy the Streamable HTTP server on port 3000 and set `API_BASE_URL` to that Polarion URL. The caller supplies their PAT, or configure OAuth as below.
-3. Publish the MCP endpoint behind a TLS reverse proxy at a stable hostname. Forward the public Host and client IP, bind the app privately where practical, and set `MCP_ALLOWED_HOSTS` to the MCP hostname. Never expose the plaintext port to the internet.
-4. For OAuth, set `MCP_PUBLIC_URL` to the HTTPS origin only (no path), set a stable `MCP_TOKEN_SECRET` of at least 32 characters, allow the exact client callback URI through `MCP_ALLOWED_REDIRECT_PREFIXES` (or use a verified preset such as `claude`), and keep dynamic client registration (DCR) enabled unless CIMD is explicitly required. Set `TRUST_PROXY` to the actual trusted proxy hop count or address.
-5. Check `https://mcp.company.example/health` for liveness, then use the container-side Polarion probe in [troubleshooting](troubleshooting.md#probe-polarion-from-the-mcp-container). A healthy `/health` response does not prove Polarion connectivity.
+The step-by-step procedure (Docker, DNS, HTTPS with Caddy, OAuth secret, checks) lives in the [Server setup guide](guides/server-docker.md). Platform-specific notes follow here.
 
 If Polarion uses a company CA, mount its PEM certificate into the MCP container and set `NODE_EXTRA_CA_CERTS` to that path. TLS certificate verification remains enabled.
 
@@ -46,19 +42,7 @@ Render's checked-in `render.yaml` builds and starts the REST wrapper. To deploy 
 
 ## Docker
 
-The published image runs Streamable HTTP by default. A local PAT-authenticated server:
-
-```bash
-docker run -d --name polarion-mcp \
-  -p 127.0.0.1:3000:3000 \
-  -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \
-  -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.3
-```
-
-Connect to `http://localhost:3000/mcp` with `Authorization: Bearer YOUR_POLARION_PAT`. The image holds no shared Polarion credentials in this mode. Each caller supplies their own PAT.
-
-For team access, proxy HTTPS to the loopback port and include the public hostname in `MCP_ALLOWED_HOSTS`. For OAuth connectors, set `MCP_PUBLIC_URL` to the HTTPS origin, provide a stable `MCP_TOKEN_SECRET` of at least 32 characters, and configure exact redirect allowlists. Claude can use `MCP_ALLOWED_REDIRECT_PRESETS=claude`; add the callback supplied by ChatGPT as an exact `MCP_ALLOWED_REDIRECT_PREFIXES` entry. Use dynamic client registration (DCR) unless CIMD was explicitly enabled. Configure `TRUST_PROXY` for the actual trusted proxy chain. The Apache example below explains proxying and OAuth in more detail.
+The published image runs Streamable HTTP by default. Follow the [Server setup guide](guides/server-docker.md) for a local or public HTTPS server. It covers the loopback `docker run`, a complete Docker Compose file with Caddy, and the OAuth variables (`MCP_PUBLIC_URL`, `MCP_TOKEN_SECRET`, `MCP_ALLOWED_REDIRECT_PRESETS`, `MCP_ALLOWED_REDIRECT_PREFIXES`).
 
 For stdio, run the same image with `docker run -i --rm`, pass `API_BASE_URL` and `BEARER_TOKEN`, and override the command with `node build/index.js`. Do not detach a stdio container.
 
