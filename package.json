@@ -48,6 +48,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test:live": "node --test --test-concurrency=1 tests/live/*.test.mjs",
+    "verify:setup": "node scripts/verify-setup.mjs",
+    "verify:setup:docker": "node scripts/verify-setup.mjs --docker",
     "evals": "node evals/run.mjs",
     "check:package": "node scripts/check-package.mjs",
     "make:deeplinks": "node scripts/make-deeplinks.mjs",
