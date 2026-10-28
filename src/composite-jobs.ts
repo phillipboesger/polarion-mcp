@@ -3,12 +3,18 @@ import { abortableDelay, attrs, boundedNumber, errorResult, first, resultFailed,
 
 export const runJobAndWait: VirtualTool = {
   name: 'run_job_and_wait', title: 'Run Polarion job and wait', toolset: 'composites',
-  description: 'Executes a Polarion job and polls until it finishes, fails, times out, or this request is cancelled. The job itself is not cancelled when polling stops. Job semantics vary by jobId, so this tool is conservatively marked destructive.',
+  description: 'Submits one Polarion asynchronous job, polls until a terminal state or timeout, then returns `{jobId, status, state, message, logTail}`. Provide the `executeJob` request body with a job factory ID and any factory-specific parameters. Requires permission to execute that job. Polling cancellation or timeout stops waiting but does not cancel the Polarion job; use `executeJob` and `getJob` separately when you do not need a bounded wait and log tail.',
   inputSchema: { type: 'object', properties: {
-    requestBody: { type: 'object', description: 'Parameters passed to executeJob.', properties: { jobId: { type: 'string' }, name: { type: 'string' }, nodeId: { type: ['string', 'null'] }, params: { type: ['object', 'null'] }, scope: { type: ['string', 'null'] } }, required: ['jobId'] },
-    dry_run: { type: 'boolean', description: 'Preview the job request without executing it.' },
-    max_wait_seconds: { type: 'number', description: 'Maximum polling time; defaults to 120 seconds and is capped at 600.' },
-    log_tail_chars: { type: 'number', description: 'Maximum log tail length (default 4000, capped at 20000).' },
+    requestBody: { type: 'object', description: 'JSON body passed to `executeJob`; factory-specific parameters vary by jobId.', properties: {
+      jobId: { type: 'string', description: 'Polarion job factory ID, such as one listed by the server’s job catalog.' },
+      name: { type: 'string', description: 'Optional job name supplied to the selected factory.' },
+      nodeId: { type: ['string', 'null'], description: 'Optional Polarion node ID when the selected factory requires a node scope.' },
+      params: { type: ['object', 'null'], description: 'Optional factory-specific job parameters as a JSON object.' },
+      scope: { type: ['string', 'null'], description: 'Optional scope value interpreted by the selected job factory.' },
+    }, required: ['jobId'] },
+    dry_run: { type: 'boolean', description: 'Return a preview without submitting the job.' },
+    max_wait_seconds: { type: 'number', description: 'Maximum time to poll; defaults to 120 seconds and is capped at 600.' },
+    log_tail_chars: { type: 'number', description: 'Maximum returned log tail characters; defaults to 4000 and is capped at 20000.' },
   }, required: ['requestBody'] },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   dryRunSafe: true,
