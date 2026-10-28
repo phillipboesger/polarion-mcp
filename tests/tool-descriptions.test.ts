@@ -1,6 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import { toolDefinitionMap } from "../src/tools.js"
+import { COMPOSITE_TOOLS } from "../src/composite-tools.js"
 import { enabledTools } from "../src/tool-filter.js"
 import { executeApiTool } from "../src/executor.js"
 import type { McpToolDefinition } from "../src/types.js"
@@ -16,6 +18,50 @@ const GENERIC_LEADS = [
   /^Returns a list of \w+( \w+)? Relationships\./,
   /^(Marks|Unmarks) the Project\./,
 ]
+
+function schemaShape(schema: Record<string, unknown>): Record<string, unknown> {
+  const properties = schema.properties && typeof schema.properties === "object"
+    ? Object.fromEntries(Object.entries(schema.properties as Record<string, Record<string, unknown>>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, property]) => [name, schemaShape(property)]))
+    : {}
+  return {
+    ...(schema.type === undefined ? {} : { type: schema.type }),
+    required: [...(Array.isArray(schema.required) ? schema.required : [])].sort(),
+    properties,
+    ...(schema.items && typeof schema.items === "object" ? { items: schemaShape(schema.items as Record<string, unknown>) } : {}),
+  }
+}
+
+test("the full tool catalog keeps its baseline names and input schema shape", () => {
+  const baseline = JSON.parse(readFileSync("tests/fixtures/tool-surface-baseline.json", "utf8")) as Record<string, unknown>
+  const tools = [...toolDefinitionMap.values(), ...COMPOSITE_TOOLS]
+  const current = Object.fromEntries(tools.map(tool => [tool.name, schemaShape(tool.inputSchema as Record<string, unknown>)]).sort(([a], [b]) => String(a).localeCompare(String(b))))
+  assert.equal(tools.length, 293)
+  assert.deepEqual(current, baseline)
+})
+
+test("every composite input property has an explanatory description", () => {
+  const inspect = (name: string, schema: Record<string, unknown>, path = name): string[] => {
+    const properties = schema.properties && typeof schema.properties === "object"
+      ? schema.properties as Record<string, Record<string, unknown>>
+      : {}
+    return Object.entries(properties).flatMap(([key, property]) => [
+      ...(typeof property.description === "string" && property.description.trim() ? [] : [`${path}.${key}`]),
+      ...((property.items && typeof property.items === "object") ? inspect(name, property.items as Record<string, unknown>, `${path}.${key}[]`) : []),
+      ...(property.properties && typeof property.properties === "object" ? inspect(name, property, `${path}.${key}`) : []),
+    ])
+  }
+  const missing = COMPOSITE_TOOLS.flatMap(tool => inspect(tool.name, tool.inputSchema as Record<string, unknown>))
+  assert.deepEqual(missing, [])
+})
+
+test("tool descriptions and serialized list stay within size budgets", () => {
+  const tools = [...toolDefinitionMap.values(), ...COMPOSITE_TOOLS]
+  for (const tool of tools) assert.ok(tool.description.length <= 1200, `${tool.name}: ${tool.description.length} characters`)
+  const bytes = Buffer.byteLength(JSON.stringify(tools))
+  assert.ok(bytes <= 1_200_000, `tools/list payload is ${bytes} bytes`)
+})
 
 test("no tool description leads with a generic generated summary", () => {
   const offenders = [...toolDefinitionMap.values()]
