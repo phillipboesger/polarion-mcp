@@ -46,61 +46,61 @@ const ENUM_FIELD_HINT = '`fieldId` must be an enumeration-typed field (e.g. `sta
 export const TOOL_GUIDANCE = {
   // --- Low-scoring tools: identity, global pages and job downloads --------
   getCurrentUser:
-    'Returns the Polarion user represented by the bearer token or active session, including that user’s profile fields. The result depends on the credentials used for this request and is not an arbitrary user lookup; use \`getUser\` with a user ID to inspect another profile. A 403 means the credentials cannot read this endpoint, not that authentication failed.',
+    'Returns the Polarion user represented by the bearer token or active session, including that user’s profile fields. The result depends on the credentials used for this request and is not an arbitrary user lookup; use `getUser` with a user ID to inspect another profile. A 403 means the credentials cannot read this endpoint, not that authentication failed.',
   getGlobalPages:
-    'Lists Rich Pages across repository spaces, subject to the signed-in user’s global repository read permissions; returns an empty page when no matching pages are visible. Use \`getSpacePages\` for a known space, \`getRepositorySpacePages\` for one repository space, or `getPages` for a project space. Follow pagination links or use `max_items` to cap collection.',
+    'Lists Rich Pages across repository spaces, subject to the signed-in user’s global repository read permissions; returns an empty page when no matching pages are visible. Use `getSpacePages` for a known space, `getRepositorySpacePages` for one repository space, or `getPages` for a project space. Follow pagination links or use `max_items` to cap collection.',
   getSpacePages:
-    'Lists Rich Pages in the specified project space and returns the paginated JSON:API page collection. Requires a project ID and space ID visible to the signed-in user. Use \`getGlobalPages\` for pages across repository spaces or \`getRepositorySpacePages\` for a repository-level space outside projects.',
+    'Lists Rich Pages in the specified project space and returns the paginated JSON:API page collection. Requires a project ID and space ID visible to the signed-in user. Use `getGlobalPages` for pages across repository spaces or `getRepositorySpacePages` for a repository-level space outside projects.',
   getRepositorySpacePages:
-    'Lists Rich Pages in one repository-level space outside projects, returning a paginated JSON:API collection. Requires global repository access. Use \`getGlobalPages\` across repository spaces or \`getSpacePages\` for a project space.',
+    'Lists Rich Pages in one repository-level space outside projects, returning a paginated JSON:API collection. Requires global repository access. Use `getGlobalPages` across repository spaces or `getSpacePages` for a project space.',
   getJobLogContent:
-    'Downloads the plain-text execution log for one asynchronous Polarion job. Call after \`getJob\` reports a terminal state because a running job may have an incomplete log; `jobId` comes from the `jobs` resource returned by the operation that started it. Use \`getJobResultFileContent\` for produced files instead of logs.',
+    'Downloads the plain-text execution log for one asynchronous Polarion job. Call after `getJob` reports a terminal state because a running job may have an incomplete log; `jobId` comes from the `jobs` resource returned by the operation that started it. Use `getJobResultFileContent` for produced files instead of logs.',
   getTestRunAttachmentContent:
-    `Downloads one Test Run attachment and returns its file bytes as image, text, or embedded-resource content. ${DOWNLOAD_NOTE} Use \`getTestRunAttachment\` for metadata or \`getTestRunAttachments\` to list available attachment IDs; read the attachment only when its contents are needed.`,
+    'Downloads one Test Run attachment and returns its file bytes as image, text, or embedded-resource content. ' + DOWNLOAD_NOTE + ' Use `getTestRunAttachment` for metadata or `getTestRunAttachments` to list available attachment IDs; read the attachment only when its contents are needed.',
   getCurrentEnumOptionsForWorkItem:
-    `Returns the selected enum value(s) on one Work Item as option objects. ${ENUM_FIELD_HINT} Use \`getAvailableEnumOptionsForWorkItem\` to see values the item can be changed to; this tool reports only the current selection.`,
+    'Returns the selected enum value(s) on one Work Item as option objects. ' + ENUM_FIELD_HINT + ' Use `getAvailableEnumOptionsForWorkItem` to see values the item can be changed to; this tool reports only the current selection.',
   getBacklinkedWorkItems:
-    'Returns Work Items with an incoming link to the specified Work Item, paginated. Use \`getLinkedWorkItems\` for outgoing links, \`getExternallyLinkedWorkItem\` for links to another Polarion server, or \`getWorkItemsRelationships\` for raw relationship linkage without linked item details.',
+    'Returns Work Items with an incoming link to the specified Work Item, paginated. Use `getLinkedWorkItems` for outgoing links, `getExternallyLinkedWorkItem` for links to another Polarion server, or `getWorkItemsRelationships` for raw relationship linkage without linked item details.',
   getExternallyLinkedWorkItem:
-    'Returns Work Items linked to the specified item in another Polarion server, using the external-link relationship. Use \`getLinkedWorkItems\` or \`getBacklinkedWorkItems\` for links within this server and \`getWorkItemsRelationships\` for raw relationship identifiers.',
+    'Returns Work Items linked to the specified item in another Polarion server, using the external-link relationship. Use `getLinkedWorkItems` or `getBacklinkedWorkItems` for links within this server and `getWorkItemsRelationships` for raw relationship identifiers.',
   updateAvatar:
-    `Replaces one user's avatar image using the supplied image content. ${DOWNLOAD_NOTE} The request changes the stored avatar for the specified user and requires permission to update that profile. Use \`getAvatar\` to retrieve the current image; use \`patchUser\` for profile fields such as name or email.`,
+    'Replaces one user avatar image using the supplied image content. ' + DOWNLOAD_NOTE + ' The request changes the stored avatar for the specified user and requires permission to update that profile. Use `getAvatar` to retrieve the current image; use `patchUser` for profile fields such as name or email.',
   getTestStepResults:
     'Lists the execution results for steps in one Test Record, including result values and step references. Requires the project, Test Run, iteration, and Test Record identifiers. Use `getTestSteps` for the Test Case definition or `getTestRun` for overall execution status.',
   getMetadata:
     'Returns server-wide Polarion REST metadata available to REST API users. Use this for global field/configuration definitions; use `getProjectFieldsMetadata` for a project’s effective resource fields and `getFieldsMetadataForWorkItem` for fields on a specific Work Item.',
   // --- Low-scoring workflow distinctions ---------------------------------
   getTestRunAttachment:
-    'Returns metadata for one attachment on a Test Run, including its file name and content type. Use `getTestRunAttachmentContent` to download the bytes or \`getTestRunAttachments\` to list attachments.',
+    'Returns metadata for one attachment on a Test Run, including its file name and content type. Use `getTestRunAttachmentContent` to download the bytes or `getTestRunAttachments` to list attachments.',
   getTestRunAttachments:
-    'Lists attachment metadata on one Test Run. Use \`getTestRunAttachment\` for one known attachment ID and `getTestRunAttachmentContent` to read its file bytes.',
+    'Lists attachment metadata on one Test Run. Use `getTestRunAttachment` for one known attachment ID and `getTestRunAttachmentContent` to read its file bytes.',
   deleteProject:
-    'Permanently deletes a Polarion project and its project data, including contained resources; this cannot be recovered through the API. Requires project deletion permission. Use \`dry_run\` to preview the request, and use \`unmarkProject\` when the project data should remain in the repository.',
+    'Permanently deletes a Polarion project and its project data, including contained resources; this cannot be recovered through the API. Requires project deletion permission. Use `dry_run` to preview the request, and use `unmarkProject` when the project data should remain in the repository.',
   createProject:
-    'Creates a new Polarion project and returns the created project resource. Supply a unique project ID and any required template configuration; the signed-in user must have project creation permission. Use \`getProjectTemplates\` first when selecting a template, or `markProject` to register existing repository data as a project.',
+    'Creates a new Polarion project and returns the created project resource. Supply a unique project ID and any required template configuration; the signed-in user must have project creation permission. Use `getProjectTemplates` first when selecting a template, or `markProject` to register existing repository data as a project.',
   executeJob:
-    'Starts a Polarion asynchronous job and returns its `jobs` resource; this response means the job was accepted, not that it finished. Poll \`getJob\` with the returned job ID, then use \`getJobLogContent\` or \`getJobResultFileContent\` after completion. Use `run_job_and_wait` when bounded polling and a log tail are preferred.',
+    'Starts a Polarion asynchronous job and returns its `jobs` resource; this response means the job was accepted, not that it finished. Poll `getJob` with the returned job ID, then use `getJobLogContent` or `getJobResultFileContent` after completion. Use `run_job_and_wait` when bounded polling and a log tail are preferred.',
   importExcelTestResults:
-    'Imports test results from an Excel file into the specified Test Run and changes its execution data. The file must match the expected Polarion export/import format and the user must have permission to update the run. Use \`getExportExcelTests\` to create a compatible workbook; use \`importWordDocument\` for Word-based document import.',
+    'Imports test results from an Excel file into the specified Test Run and changes its execution data. The file must match the expected Polarion export/import format and the user must have permission to update the run. Use `getExportExcelTests` to create a compatible workbook; use `importWordDocument` for Word-based document import.',
   importWordDocument:
-    'Imports a Word document as a Polarion LiveDoc, creating or updating document content according to the request options. Requires project and space access plus a valid Word file; use `postDocuments` to create a LiveDoc from JSON:API data or \`importExcelTestResults\` for test-result spreadsheets.',
+    'Imports a Word document as a Polarion LiveDoc, creating or updating document content according to the request options. Requires project and space access plus a valid Word file; use `postDocuments` to create a LiveDoc from JSON:API data or `importExcelTestResults` for test-result spreadsheets.',
   // --- Document operation routing ----------------------------------------
   moveToDocument:
-    'Moves one existing Work Item from the project tracker into a LiveDoc and returns the move result. Requires the Work Item and target document to be writable. Use \`moveFromDocument\` to return an item to the tracker or \`moveWorkItemsToDocument\` to move a batch.',
+    'Moves one existing Work Item from the project tracker into a LiveDoc and returns the move result. Requires the Work Item and target document to be writable. Use `moveFromDocument` to return an item to the tracker or `moveWorkItemsToDocument` to move a batch.',
   moveWorkItemsToDocument:
-    'Moves a batch of existing Work Items from the project tracker into a LiveDoc. Provide the target document and the Work Item IDs in the request body; all items must be accessible and the document writable. Use \`moveToDocument\` for a single item or \`moveFromDocument\` to remove one from a document.',
+    'Moves a batch of existing Work Items from the project tracker into a LiveDoc. Provide the target document and the Work Item IDs in the request body; all items must be accessible and the document writable. Use `moveToDocument` for a single item or `moveFromDocument` to remove one from a document.',
   moveDocumentParts:
-    'Reorders or relocates parts within a LiveDoc using the requested part IDs and target position. Read current part IDs with \`getDocumentParts\` first; use \`overwriteDocumentParts\` only when replacing the document structure rather than moving existing parts.',
+    'Reorders or relocates parts within a LiveDoc using the requested part IDs and target position. Read current part IDs with `getDocumentParts` first; use `overwriteDocumentParts` only when replacing the document structure rather than moving existing parts.',
   overwriteDocumentParts:
-    'Replaces the parts of a LiveDoc with the supplied part list. This can remove or replace existing content, so read the current structure with \`getDocumentParts\` and use \`dry_run\` before writing. Use \`moveDocumentParts\` to reposition existing parts while retaining their identities.',
+    'Replaces the parts of a LiveDoc with the supplied part list. This can remove or replace existing content, so read the current structure with `getDocumentParts` and use `dry_run` before writing. Use `moveDocumentParts` to reposition existing parts while retaining their identities.',
   mergeDocumentToMaster:
-    'Merges the selected branched LiveDoc content into its master document and returns the merge job/result. Requires a valid branch/master relationship and write access to the master. Use \`branchDocument\` to create a branch, or \`moveDocumentParts\` for edits within one document.',
+    'Merges the selected branched LiveDoc content into its master document and returns the merge job/result. Requires a valid branch/master relationship and write access to the master. Use `branchDocument` to create a branch, or `moveDocumentParts` for edits within one document.',
   copyDocument:
-    'Copies one LiveDoc into a target project and space, creating a new document while leaving the source unchanged. Supply the target location and new document name in \`requestBody\`; omit target project/space only when the operation should remain in the source location. Use \`branchDocument\` when the copy must retain branch lineage.',
+    'Copies one LiveDoc into a target project and space, creating a new document while leaving the source unchanged. Supply the target location and new document name in `requestBody`; omit target project/space only when the operation should remain in the source location. Use `branchDocument` when the copy must retain branch lineage.',
   branchDocument:
-    'Creates a branched LiveDoc and returns an asynchronous `jobs` resource. `requestBody.documentConfigurations` identifies the source and optional target project, space, and document name; omit target project/space to branch within the source project and space. Requires read access to the source and write access to the target; poll \`getJob\` for completion. Use \`copyDocument\` when branch lineage is not needed.',
+    'Creates a branched LiveDoc and returns an asynchronous `jobs` resource. `requestBody.documentConfigurations` identifies the source and optional target project, space, and document name; omit target project/space to branch within the source project and space. Requires read access to the source and write access to the target; poll `getJob` for completion. Use `copyDocument` when branch lineage is not needed.',
   branchDocuments:
-    'Creates branches for multiple source LiveDocs and returns an asynchronous `jobs` resource. Each \`documentConfigurations\` entry supplies a source and may specify its own target; omitted targets stay with the source location. Requires source read and target write permissions; poll \`getJob\` for completion. Use \`branchDocument\` for one document.',
+    'Creates branches for multiple source LiveDocs and returns an asynchronous `jobs` resource. Each `documentConfigurations` entry supplies a source and may specify its own target; omitted targets stay with the source location. Requires source read and target write permissions; poll `getJob` for completion. Use `branchDocument` for one document.',
   // --- Collection lifecycle ----------------------------------------------
   closeCollection:
     'Closes one Collection, changing its lifecycle state while retaining its contents. Requires permission to update the Collection. Use `reopenCollection` to make a closed Collection active again, or `reuseCollection` when continuing its contents as a new cycle.',
@@ -110,27 +110,27 @@ export const TOOL_GUIDANCE = {
     'Starts a new use cycle for one Collection while retaining the existing collection history. Requires a valid Collection and update permission. Use `reopenCollection` to reactivate the same closed cycle or `copyCollection` when a separate Collection is needed.',
   // --- Comments, relationships and approval routing ----------------------
   postComments:
-    'Creates comments on the specified Work Item or resource using the request body and returns the created comment resources. The target must be writable by the signed-in user. Use \`getComments\` to list comments and \`postDocumentComments\` or \`postPageComments\` for comments on those specific resource families.',
+    'Creates comments on the specified Work Item or resource using the request body and returns the created comment resources. The target must be writable by the signed-in user. Use `getComments` to list comments and `postDocumentComments` or `postPageComments` for comments on those specific resource families.',
   postDocumentComments:
-    'Creates comments on one LiveDoc and returns the created comment resources. Requires write access to the document. Use \`getDocumentComments\` to read document comments; use \`postComments\` for Work Item comments.',
+    'Creates comments on one LiveDoc and returns the created comment resources. Requires write access to the document. Use `getDocumentComments` to read document comments; use `postComments` for Work Item comments.',
   postPageComments:
-    'Creates comments on one Rich Page and returns the created comment resources. Requires write access to the page. Use \`postComments\` for Work Item comments or \`postDocumentComments\` for LiveDocs.',
+    'Creates comments on one Rich Page and returns the created comment resources. Requires write access to the page. Use `postComments` for Work Item comments or `postDocumentComments` for LiveDocs.',
   patchDocumentComment:
-    'Updates the text or supported attributes of one comment on a LiveDoc. Requires permission to edit that comment. Use \`patchComment\` for a Work Item comment and \`patchPageComment\` for a Rich Page comment.',
+    'Updates the text or supported attributes of one comment on a LiveDoc. Requires permission to edit that comment. Use `patchComment` for a Work Item comment and `patchPageComment` for a Rich Page comment.',
   patchPageComment:
-    'Updates the text or supported attributes of one comment on a Rich Page. Requires permission to edit that comment. Use \`patchComment\` for a Work Item comment or \`patchDocumentComment\` for a LiveDoc comment.',
+    'Updates the text or supported attributes of one comment on a Rich Page. Requires permission to edit that comment. Use `patchComment` for a Work Item comment or `patchDocumentComment` for a LiveDoc comment.',
   patchComment:
-    'Updates one comment on a Work Item and returns the updated comment resource. Requires permission to edit that comment. Use \`patchDocumentComment\` or \`patchPageComment\` for comments on those resource families.',
+    'Updates one comment on a Work Item and returns the updated comment resource. Requires permission to edit that comment. Use `patchDocumentComment` or `patchPageComment` for comments on those resource families.',
   getComments:
-    'Lists comments associated with one Work Item. Use \`getDocumentComments\` for a LiveDoc, \`getPageComments\` for a Rich Page, or \`getTestRunComments\` for a Test Run.',
+    'Lists comments associated with one Work Item. Use `getDocumentComments` for a LiveDoc, `getPageComments` for a Rich Page, or `getTestRunComments` for a Test Run.',
   patchWorkItemApproval:
-    'Updates one approver’s decision on a Work Item approval entry. Use the approver’s user ID as the approval identifier; the user must be allowed to record the decision. Read the entry with \`getWorkItemApproval\` and use \`patchWorkItemApprovals\` only when changing multiple approvals.',
+    'Updates one approver’s decision on a Work Item approval entry. Use the approver’s user ID as the approval identifier; the user must be allowed to record the decision. Read the entry with `getWorkItemApproval` and use `patchWorkItemApprovals` only when changing multiple approvals.',
   patchWorkItemApprovals:
-    'Updates multiple approval entries on one Work Item using the supplied approval list. Requires permission for each requested decision. Use \`getWorkItemApprovals\` to inspect current entries and \`patchWorkItemApproval\` for one approver.',
+    'Updates multiple approval entries on one Work Item using the supplied approval list. Requires permission for each requested decision. Use `getWorkItemApprovals` to inspect current entries and `patchWorkItemApproval` for one approver.',
   postWorkItemApprovals:
-    'Adds approval entries for users on one Work Item. Provide approver user IDs in the request body; the signed-in user must have permission to configure approvals. Use \`getWorkItemApprovals\` to inspect existing entries and \`patchWorkItemApproval\` to record a decision.',
+    'Adds approval entries for users on one Work Item. Provide approver user IDs in the request body; the signed-in user must have permission to configure approvals. Use `getWorkItemApprovals` to inspect existing entries and `patchWorkItemApproval` to record a decision.',
   postWorkRecords:
-    'Creates time-tracking work records for one Work Item and returns the created entries. Each request-body record must include valid work-record attributes such as date and time spent; the user must have permission to log effort. Use \`getWorkRecords\` to inspect entries and \`deleteWorkRecord\` to remove an incorrect record.',
+    'Creates time-tracking work records for one Work Item and returns the created entries. Each request-body record must include valid work-record attributes such as date and time spent; the user must have permission to log effort. Use `getWorkRecords` to inspect entries and `deleteWorkRecord` to remove an incorrect record.',
   deleteCollectionsRelationship:
     'Removes the named relationship from one Collection; the related resource itself is not deleted. Read current links with `getCollectionsRelationship`; use `postCollectionsRelationships` to add links or `patchCollectionsRelationships` to replace the relationship set.',
   deletePlanRelationship:
