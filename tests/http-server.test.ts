@@ -41,7 +41,7 @@ test("REST wrapper hides internal errors, redacts logged credentials, and rate l
     assert.equal(fourth.status, 429)
     assert.match(fourth.headers.get("content-type") ?? "", /application\/json/)
     assert.equal((await fourth.json() as { error: string }).error, "Too many requests")
-  } finally { console.error = originalError; await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { console.error = originalError; await new Promise<void>(resolve => server.close(() => resolve())); }
 })
 
 test("built REST wrapper listens when invoked as http-server.js and copied index.js", async () => {
@@ -91,7 +91,7 @@ test("REST wrapper only sends CORS headers to configured origins", async () => {
     const denied = await fetch(url, { headers: { Origin: "https://denied.example" } })
     assert.equal(allowed.headers.get("access-control-allow-origin"), "https://allowed.example")
     assert.equal(denied.headers.get("access-control-allow-origin"), null)
-  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 })
 
 test("REST wrapper returns a truncated tool result as parseable JSON text", async () => {
@@ -113,7 +113,7 @@ test("REST wrapper returns a truncated tool result as parseable JSON text", asyn
     })
     const body = await response.json() as { result: string }
     assert.deepEqual(JSON.parse(body.result), envelope)
-  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 })
 
 test('REST tool route collects list pages through the shared wrapper over actual HTTP', async () => {
@@ -137,7 +137,7 @@ test('REST tool route collects list pages through the shared wrapper over actual
     assert.deepEqual(payload.data.map((item: { id: string }) => item.id), ['PRJ/WI-1', 'PRJ/WI-2', 'PRJ/WI-3', 'PRJ/WI-4', 'PRJ/WI-5']);
     assert.equal(payload.meta.totalCount, 5);
     assert.equal('next' in (payload.links ?? {}), false);
-  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 
 test('REST route aborts an in-flight upstream page when the client disconnects', async () => {
@@ -167,7 +167,7 @@ test('REST route aborts an in-flight upstream page when the client disconnects',
     await request;
     for (let attempt = 0; attempt < 50 && !upstreamSignal?.aborted; attempt++) await new Promise(resolve => setTimeout(resolve, 20));
     assert.equal(upstreamSignal?.aborted, true, 'the upstream page request must be cancelled with the client');
-  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 })
 
 test('REST maps invalid pagination arguments to 400 with the reason', async () => {
@@ -183,7 +183,7 @@ test('REST maps invalid pagination arguments to 400 with the reason', async () =
       assert.equal(body.success, false);
       assert.match(body.message, /max_items|page_size_/);
     }
-  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 
 test('repeated wrong API keys are throttled before authentication', async () => {
@@ -195,7 +195,7 @@ test('repeated wrong API keys are throttled before authentication', async () => 
     const statuses: number[] = [];
     for (let i = 0; i < 4; i++) statuses.push((await fetch(url, { headers: { Authorization: 'Bearer wrong' } })).status);
     assert.deepEqual(statuses, [401, 401, 429, 429]);
-  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 
 test('tool errors do not count against the failed-key throttle', async () => {
@@ -210,5 +210,5 @@ test('tool errors do not count against the failed-key throttle', async () => {
       assert.equal((await fetch(`${base}/api/tools/doesNotExist`, { method: 'POST', headers: { Authorization: 'Bearer right-key', 'content-type': 'application/json' }, body: '{}' })).status, 404);
     }
     assert.equal((await fetch(`${base}/api/tools`, { headers: { Authorization: 'Bearer right-key' } })).status, 200);
-  } finally { await new Promise<void>(resolve => server.close(() => resolve())) }
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });

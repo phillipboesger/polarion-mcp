@@ -132,6 +132,8 @@ footer div { display:flex; gap:20px; }
 .approval>span { font:25px/1 var(--mono); color:var(--warm); }
 .daily-note { color:var(--sub); font-size:12px; text-align:right; margin-top:18px; }
 .setup-section { border-top:1px solid var(--line); padding-top:80px; }
+.clients-heading { display:block; }
+.clients-heading>p { max-width:none; margin-top:16px; }
 .faq-section { border-top:1px solid var(--line); }
 .community-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr); gap:72px; }
 .faq-list details { border-top:1px solid var(--line); }
@@ -159,6 +161,7 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .community-layout { gap:32px; }
 }
 @media(max-width:700px) {
+  .clients-heading>p { margin-top:18px; }
   .hero { padding:52px 20px 58px; }
   .flow { grid-template-columns:minmax(0,1fr); padding:20px; }
   .flow-node { padding:16px 8px; }
@@ -207,14 +210,14 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .path-entries strong { display:block; color:white; margin-bottom:3px; }
 
 /* Integration map */
-.galaxy { position:relative; max-width:728px; margin:0 auto; }
+.galaxy { position:relative; max-width:1100px; margin:0 auto; }
 .galaxy-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 28px; }
 .galaxy-list h3 { color:var(--sub); font:11px var(--mono); letter-spacing:.1em; text-transform:uppercase; margin-bottom:8px; }
 .galaxy-list ul { list-style:none; display:grid; gap:6px; font-size:13px; color:var(--sub); }
 .galaxy-stage, .galaxy-hint, .galaxy-panel, .galaxy-sheet { display:none; }
 .galaxy.is-interactive .galaxy-list { display:none; }
 .galaxy.is-interactive .galaxy-stage { display:block; width:100%; height:auto; overflow:visible; }
-.galaxy.is-interactive .galaxy-hint { display:block; text-align:center; font:11px var(--mono); color:#8fb3cf; margin-top:-6px; min-height:16px; }
+.galaxy.is-interactive .galaxy-hint { display:block; text-align:center; font:11px var(--mono); color:#8fb3cf; margin:0; min-height:16px; }
 .galaxy.is-interactive .galaxy-panel:not([hidden]), .galaxy.is-interactive .galaxy-sheet:not([hidden]) { display:block; }
 .galaxy .ring { fill:none; stroke:rgba(189,238,255,.1); stroke-dasharray:2 6; }
 .galaxy .edge { fill:none; stroke:rgba(150,205,240,.3); stroke-width:1.2; transition:opacity .3s; }
@@ -237,6 +240,8 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .galaxy .pulse { fill:none; stroke:#62d6ff; opacity:.4; animation:galaxy-pulse 3.2s ease-out infinite; transform-origin:348px 320px; }
 @keyframes galaxy-pulse { from { transform:scale(1); opacity:.45; } to { transform:scale(1.5); opacity:0; } }
 .galaxy-panel, .galaxy-sheet { position:relative; margin-top:12px; border:1px solid rgba(98,214,255,.38); border-radius:14px; background:rgba(9,34,60,.9); padding:18px; font-size:13px; }
+.galaxy-panel { display:flex; align-items:center; justify-content:center; min-height:340px; }
+.galaxy-panel:has(> .ph) { display:block; }
 .galaxy-panel .x, .galaxy-sheet .x { position:absolute; right:10px; top:6px; min-width:44px; min-height:44px; background:none; border:0; color:#9fbfd8; font-size:24px; cursor:pointer; }
 .galaxy .ph { display:flex; align-items:center; gap:12px; margin-bottom:6px; padding-right:40px; }
 .galaxy .badge { width:46px; height:46px; border-radius:12px; background:#0d2a47; border:1px solid var(--c); display:grid; place-items:center; flex-shrink:0; }
@@ -264,5 +269,11 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .galaxy-list { grid-template-columns:minmax(0,1fr); }
   .galaxy-sheet { position:fixed; left:0; right:0; bottom:0; z-index:20; margin:0; max-height:75vh; overflow:auto; border-radius:16px 16px 0 0; }
   .galaxy .flow .p { white-space:normal; }
+}
+@media(min-width:701px) {
+  .galaxy.is-interactive { display:grid; grid-template-columns:minmax(0,696px) 340px; gap:24px; align-items:start; }
+  .galaxy.is-interactive .galaxy-stage { grid-column:1; grid-row:1; }
+  .galaxy.is-interactive .galaxy-panel:not([hidden]) { grid-column:2; grid-row:1; position:sticky; top:24px; margin-top:0; }
+  .galaxy.is-interactive .galaxy-sheet { display:none!important; }
 }
 @media(prefers-reduced-motion:reduce) { .galaxy *, .galaxy-sheet * { animation:none !important; transition:none !important; } }

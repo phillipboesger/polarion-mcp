@@ -35,6 +35,12 @@ test('hero breathes and the landing page follows the complete user journey', asy
   }
   await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
   await expect(page.locator('#clients-title')).toHaveText('Choose your path');
+  const heading = page.locator('#clients-title');
+  const intro = page.locator('.clients-heading>p');
+  expect(await heading.evaluate(el => el.compareDocumentPosition(document.querySelector('.clients-heading>p')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  expect(await intro.evaluate(el => el.compareDocumentPosition(document.querySelector('#clients .path-entries')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  expect(await intro.evaluate(el => Math.abs(el.getBoundingClientRect().width - document.querySelector('#clients .section-heading').getBoundingClientRect().width))).toBeLessThan(2);
+  await expect(page.locator('.under-setup')).toHaveCount(0);
   await expect(page.locator('#setup')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -46,16 +52,21 @@ const satellite = id => `.satellite[data-client="${id}"]`;
 // The fixed bottom sheet can cover map nodes on small screens, so dispatch clicks there.
 const isMobile = info => info.project.name.includes('mobile');
 const detailId = info => (isMobile(info) ? '#galaxy-sheet' : '#galaxy-panel');
+// Desktop keeps the side panel visible and shows the hint while nothing is selected; mobile hides the sheet.
+const expectDetailClosed = async (page, info) => {
+  if (isMobile(info)) await expect(page.locator('#galaxy-sheet')).toBeHidden();
+  else { await expect(page.locator('#galaxy-panel .ph')).toHaveCount(0); await expect(page.locator('#galaxy-panel #galaxy-hint')).toBeVisible(); }
+};
 const press = (info, locator) => (isMobile(info) ? locator.dispatchEvent('click') : locator.click());
 
-test('the map starts with six providers, no panel and a complete no-JS guide list', async ({ page }) => {
+test('the map starts with six providers, no panel and a complete no-JS guide list', async ({ page }, info) => {
   await page.goto('/');
   await expect(page.locator('#setup')).toHaveCount(0);
   await expect(page.locator('#clients .setup-steps, #clients pre, #clients ol, #clients input[name="path"]')).toHaveCount(0);
   await expect(page.locator('.node.primary')).toHaveCount(6);
   await expect(page.locator('.satellite')).toHaveCount(0);
-  await expect(page.locator('#galaxy-panel')).toBeHidden();
   await expect(page.locator('#galaxy-sheet')).toBeHidden();
+  await expectDetailClosed(page, info);
   await expect(page.locator('.galaxy-list')).toBeHidden();
   await expect(page.locator('#galaxy-hint')).toHaveText('Select a provider to see its options');
   await expect(page.locator('.galaxy-list a.guide-link')).toHaveCount(manifest.clients.length);
@@ -66,6 +77,22 @@ test('the map starts with six providers, no panel and a complete no-JS guide lis
   await expect(page.getByRole('link', { name: /Open the local guide/ })).toHaveAttribute('href', `${guideBase}local-npm.md`);
   await expect(page.getByRole('link', { name: /Open the server guide/ })).toHaveAttribute('href', `${guideBase}server-docker.md`);
   await noOverflow(page);
+});
+
+test('desktop map and portrait detail panel sit side by side; mobile keeps the bottom sheet', async ({ page }, info) => {
+  await page.goto('/');
+  const desktop = !info.project.name.includes('mobile');
+  await page.locator(primary('claude')).click();
+  await page.locator(satellite('claude-code')).dispatchEvent('click');
+  if (desktop) {
+    const map = await page.locator('.galaxy-stage').boundingBox();
+    const panel = await page.locator('#galaxy-panel').boundingBox();
+    expect(panel.x).toBeGreaterThan(map.x + map.width);
+    expect(panel.height).toBeGreaterThan(panel.width);
+  } else {
+    await expect(page.locator('#galaxy-sheet')).toBeVisible();
+    expect(await page.locator('#galaxy-sheet').evaluate(el => getComputedStyle(el).position)).toBe('fixed');
+  }
 });
 
 test('one provider branch is open at a time; hub, second click and Escape step back', async ({ page }, info) => {
@@ -81,7 +108,7 @@ test('one provider branch is open at a time; hub, second click and Escape step b
   await press(info, page.locator(satellite('claude-code')));
   await expect(page.locator(detailId(info))).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.locator(detailId(info))).toBeHidden();
+  await expectDetailClosed(page, info);
   await expect(page.locator('.satellite')).toHaveCount(4);
   await page.locator(satellite('claude-code')).focus();
   await page.keyboard.press('Escape');
@@ -89,7 +116,7 @@ test('one provider branch is open at a time; hub, second click and Escape step b
   await press(info, page.locator(primary('claude')));
   await press(info, page.locator('#galaxy-hub'));
   await expect(page.locator('.satellite')).toHaveCount(0);
-  await expect(page.locator(detailId(info))).toBeHidden();
+  await expectDetailClosed(page, info);
   await press(info, page.locator(primary('claude')));
   await press(info, page.locator(primary('claude')));
   await expect(page.locator('.satellite')).toHaveCount(0);
@@ -104,6 +131,7 @@ test('every client opens a panel with its guide, working modes and explained uns
     const panel = page.locator(detailId(info));
     await expect(panel).toBeVisible();
     await expect(panel.locator('h3')).toHaveText(client.name);
+    if (!isMobile(info)) await expect(page.locator('#galaxy > #galaxy-hint')).toHaveCount(0);
     await expect(panel.locator('a.go')).toHaveAttribute('href', `${guideBase}clients/${client.id}.md`);
     for (const mode of ['local', 'server']) {
       const button = panel.locator(`.env[data-env="${mode}"]`);
@@ -148,7 +176,7 @@ test('the map works from the keyboard', async ({ page }, info) => {
   await expect(page.locator(detailId(info))).toBeVisible();
   await expect(page.locator(detailId(info))).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(page.locator(detailId(info))).toBeHidden();
+  await expectDetailClosed(page, info);
   await expect(page.locator(satellite('codex-cli'))).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator(primary('openai'))).toBeFocused();
