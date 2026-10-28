@@ -327,6 +327,7 @@ let entries = splitTopLevelArrayEntries(mapArrayText);
 
 const names = entries.map((e) => getField(e, 'name'));
 const scopePairs = findScopePairs(names);
+const allProjectsByProjectTool = new Map(scopePairs.map(({ wide, narrow }) => [narrow, wide]));
 
 const unknownGuidance = Object.keys(TOOL_GUIDANCE).filter((name) => !names.includes(name));
 if (unknownGuidance.length) {
@@ -412,10 +413,12 @@ for (const [collection, items] of itemsByCollection) {
   const idx = byName.get(collection);
   if (idx === undefined) continue;
   const names_ = items.map((n) => `\\\`${n}\\\``).join(', ');
+  const globalSibling = allProjectsByProjectTool.get(collection);
+  const globalScopeNote = globalSibling ? ` For the same collection across projects, use \\\`${globalSibling}\\\` instead.` : '';
   const before = entries[idx];
   const result = appendCardinalityNote(
     entries[idx],
-    `Cardinality: targets the full collection or a batch. For a single item by ID, use ${names_} instead.`,
+    `Cardinality: targets the full collection or a batch. For a single item by ID, use ${names_} instead.${globalScopeNote}`,
   );
   entries[idx] = result.entry;
   if (result.skipped) cardinalityNoteSkipped++;

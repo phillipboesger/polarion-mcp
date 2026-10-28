@@ -137,12 +137,20 @@ function pageSize(args: Record<string, unknown>): number | undefined {
 
 const searchTool: VirtualTool = {
   name: 'search_work_items', title: 'Search Work Items',
-  description: 'Search work items with structured filters. Values are escaped and quoted into a Lucene query; the result includes that query for reuse.',
+  description: 'Search Work Items using structured filters, escaping values into a Lucene query. Returns `{query, results, links?, totalCount?, truncated?}` with concise item summaries. Provide `projectId` to search one project; omit it for the global `getAllWorkItems` search, which requires global read access. Use this for common filters; use `getWorkItems` or `getAllWorkItems` directly for advanced Lucene syntax, custom response fields, or includes.',
   toolset: 'composites', annotations: { readOnlyHint: true },
   inputSchema: { type: 'object', properties: {
-    projectId: { type: 'string' }, types: { type: 'array', items: { type: 'string' } }, statuses: { type: 'array', items: { type: 'string' } },
-    assignee: { type: 'string' }, text: { type: 'string' }, filters: { type: 'array', items: { type: 'object', properties: { field: { type: 'string' }, value: { type: 'string' } }, required: ['field', 'value'], additionalProperties: false } },
-    createdAfter: { type: 'string' }, updatedAfter: { type: 'string' }, sort: { type: 'string' }, page_size: { type: 'integer', minimum: 1, maximum: 1000 }, max_items: { type: 'integer', minimum: 1, maximum: 1000 },
+    projectId: { type: 'string', description: 'Optional project ID; omit to search across projects, subject to global read permissions.' },
+    types: { type: 'array', items: { type: 'string', description: 'Work Item type ID, such as `requirement`.' }, description: 'Limit results to these Work Item type IDs.' },
+    statuses: { type: 'array', items: { type: 'string', description: 'Workflow status ID, such as `open`.' }, description: 'Limit results to these workflow status IDs.' },
+    assignee: { type: 'string', description: 'Assignee user ID, not a display name or email address.' },
+    text: { type: 'string', description: 'Text to match in the Work Item text fields searched by Polarion.' },
+    filters: { type: 'array', items: { type: 'object', properties: { field: { type: 'string', description: 'Valid Work Item field ID, including custom fields available in the project.' }, value: { type: 'string', description: 'Exact value to match; escaped and quoted before adding to the Lucene query.' } }, required: ['field', 'value'], additionalProperties: false }, description: 'Additional exact field/value filters; unknown fields are rejected.' },
+    createdAfter: { type: 'string', description: 'Inclusive date/time lower bound for creation, in a format JavaScript Date.parse accepts.' },
+    updatedAfter: { type: 'string', description: 'Inclusive date/time lower bound for last update, in a format JavaScript Date.parse accepts.' },
+    sort: { type: 'string', description: 'Valid Work Item field ID; prefix with `-` for descending order. Unknown fields are rejected.' },
+    page_size: { type: 'integer', minimum: 1, maximum: 1000, description: 'Maximum items returned in the requested page, from 1 to 1000.' },
+    max_items: { type: 'integer', minimum: 1, maximum: 1000, description: 'Maximum results collected, from 1 to 1000; also used as page size if `page_size` is absent.' },
   } },
   async handler(args, ctx) {
     const fields = await workItemFields(typeof args.projectId === 'string' ? args.projectId : undefined, ctx);
@@ -188,7 +196,7 @@ const lintTool: VirtualTool = {
   name: 'lint_query', title: 'Lint Lucene Query',
   description: 'Check a Lucene query for unknown work-item fields, unbalanced quotes or parentheses, and suspicious boolean operators. This tool never executes the query.',
   toolset: 'composites', annotations: { readOnlyHint: true },
-  inputSchema: { type: 'object', properties: { query: { type: 'string' }, projectId: { type: 'string' } }, required: ['query'], additionalProperties: false },
+  inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Lucene query to inspect; the query is not executed.' }, projectId: { type: 'string', description: 'Optional project ID to check project-specific Work Item fields; omit to use common fields only.' } }, required: ['query'], additionalProperties: false },
   async handler(args, ctx) {
     if (typeof args.query !== 'string') throw new Error('query must be a string');
     const fields = await workItemFields(typeof args.projectId === 'string' ? args.projectId : undefined, ctx);
@@ -267,9 +275,9 @@ function validateDecodedPolarionIdentifier(decoded: string, allowProjectWorkItem
 
 const resolveTool: VirtualTool = {
   name: 'resolve_polarion_url', title: 'Resolve Polarion URL',
-  description: 'Resolve a same-host Polarion work item, document, page, test run, or plan URL to its entity identifiers. Set fetch to retrieve the entity.',
+  description: 'Parses a Polarion UI URL on the configured API host into entity identifiers for a Work Item, LiveDoc, Rich Page, Test Run, or Plan. Returns the identifiers alone by default; set `fetch` to also call the matching get tool and include its entity response. Requires a URL from the same Polarion host. Use this when the input is a UI link; call the resource get tool directly when IDs are already known.',
   toolset: 'composites', annotations: { readOnlyHint: true },
-  inputSchema: { type: 'object', properties: { url: { type: 'string' }, fetch: { type: 'boolean' } }, required: ['url'], additionalProperties: false },
+  inputSchema: { type: 'object', properties: { url: { type: 'string', description: 'Absolute Polarion UI URL on the same host as the configured API base URL.' }, fetch: { type: 'boolean', description: 'When true, fetch the referenced entity through its matching get tool; defaults to identifier parsing only.' } }, required: ['url'], additionalProperties: false },
   async handler(args, ctx) {
     if (typeof args.url !== 'string') throw new Error('url must be a string');
     const entity = parsePolarionUrl(args.url, ctx.apiBaseUrl);

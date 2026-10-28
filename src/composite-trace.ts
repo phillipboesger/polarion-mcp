@@ -22,8 +22,15 @@ function relationEdges(rows: JsonObject[], current: string, direction: 'up' | 'd
 }
 export const traceLinks: VirtualTool = {
   name: 'trace_links', title: 'Trace work item links', toolset: 'composites',
-  description: 'Builds a bounded, cycle-safe traceability tree across outgoing links and backlinks.',
-  inputSchema: { type: 'object', properties: { projectId: { type: 'string' }, workItemId: { type: 'string' }, direction: { type: 'string', enum: ['up', 'down', 'both'], default: 'both' }, roles: { type: 'array', items: { type: 'string' } }, depth: { type: 'integer', minimum: 0, maximum: 6, default: 3 }, node_cap: { type: 'integer', minimum: 1, maximum: 1000, default: 200 } }, required: ['projectId', 'workItemId'] },
+  description: 'Builds a bounded, cycle-safe trace tree from one Work Item and returns `{nodes, edges, truncated}`. Requires a project ID and Work Item ID readable by the signed-in Polarion user. Use this to traverse multiple link levels; use `getLinkedWorkItems` or `getBacklinkedWorkItems` for a single hop. `direction` selects outgoing, incoming, or both; the result is marked truncated when the depth or node cap limits traversal.',
+  inputSchema: { type: 'object', properties: {
+    projectId: { type: 'string', description: 'Project ID that owns the root Work Item, such as `PROJECT`.' },
+    workItemId: { type: 'string', description: 'Root Work Item ID within the project, such as `WI-123`, without the project prefix.' },
+    direction: { type: 'string', enum: ['up', 'down', 'both'], default: 'both', description: '`down` follows outgoing links, `up` follows backlinks, and `both` traverses both directions; defaults to `both`.' },
+    roles: { type: 'array', items: { type: 'string', description: 'Exact Polarion link role ID to retain.' }, description: 'Optional allowlist of link role IDs; omitted means include every role.' },
+    depth: { type: 'integer', minimum: 0, maximum: 6, default: 3, description: 'Maximum number of link hops from the root; defaults to 3 and is capped at 6.' },
+    node_cap: { type: 'integer', minimum: 1, maximum: 1000, default: 200, description: 'Maximum number of distinct Work Items to include; defaults to 200 and is capped at 1000.' },
+  }, required: ['projectId', 'workItemId'] },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   async handler(args, ctx) {
     const rootId = `${String(args.projectId)}/${String(args.workItemId)}`;

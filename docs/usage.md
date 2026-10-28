@@ -33,6 +33,19 @@ Start with `npm run start:http`. Set `HTTP_API_KEY`; requests use that key to ac
 
 The generated map in `src/tools.ts` contains 284 tools. Use `GET /api/tools` or MCP `tools/list` to discover the enabled set. For field metadata, use `getProjectFieldsMetadata` or a resource-specific `getFieldsMetadataFor…` tool. For enumeration options, use the corresponding `getAvailableEnumOptionsFor…` tool, such as `getAvailableEnumOptionsForWorkItemType`.
 
+### Choosing a resource scope
+
+Use the narrowest tool that matches the IDs and scope you know. Global listing tools require the caller's global read access; project tools require access to the named project.
+
+| Resource | One item | Project collection | Global collection |
+| --- | --- | --- | --- |
+| Work Items | `getWorkItem` | `getWorkItems` | `getAllWorkItems` |
+| LiveDocs | `getDocument` | `getDocuments` | `getAllDocuments` |
+| Rich Pages | `getPage` | `getSpacePages` | `getGlobalPages` |
+| Enumerations | Not applicable | `getProjectEnumeration` | `getGlobalEnumeration` |
+
+For one relationship, use its relationship tool when you need only JSON:API IDs, or `include` on the resource get tool when you need related resource data. Collection and singular names signal batch versus one-item operations; global and project variants signal access scope.
+
 Mutating generated and composite tools accept `dry_run` as a boolean or the compatibility values `"true"`, `"false"`, `1`, and `0`. Values normalize to canonical booleans; malformed values are rejected before side effects. A safe dry run validates and prepares the request, then returns a preview without sending it to Polarion. Read-only tools do not preview; `dry_run` is ignored for them. Composite arguments are validated against their input schemas before handlers run. Unknown arguments are rejected, except names beginning with `_`, which are reserved client metadata.
 
 `MCP_MAX_RESPONSE_CHARS` caps generated and composite response text; the default is 100,000 characters. Ordinary, unpaged generated calls retain complete `structuredContent`. Automatically collected paginated results are also bounded by the response cap and may have items removed, with `truncated: true` when content is omitted. See [configuration.md](./configuration.md) for the setting.

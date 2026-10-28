@@ -41,6 +41,16 @@ Guides record the vendor sources checked on 2026-10-24. They describe documented
 
 Cloud connectors need a server reachable by their provider. Deploy Streamable HTTP with TLS, `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, trusted proxy settings, and exact OAuth redirect allowlists. Claude can use `MCP_ALLOWED_REDIRECT_PRESETS=claude`; ChatGPT supplies its callback during setup. Use DCR unless CIMD is explicitly enabled on the server. Follow [deployment](deployment.md) for TLS and OAuth, and see [security](security.md) and [configuration](configuration.md).
 
+## Optional smaller tool lists
+
+The full catalog remains enabled by default. If you prefer a smaller list for a particular connection, choose the selector that matches the setup:
+
+- **Claude Desktop, Claude Code, Codex, VS Code, Cursor, Windsurf, Gemini CLI, and other local stdio clients:** set `MCP_TOOLSETS` on the local server process (for example `MCP_TOOLSETS=work-items,documents`) or `MCP_TOOLS` to an explicit comma-separated allowlist. Add `MCP_READ_ONLY=true` to expose only read-only tools. Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` for the enabled tools.
+- **claude.ai, ChatGPT, Copilot Studio, and other HTTP clients:** the server administrator can set `MCP_TOOLSETS` or `MCP_READ_ONLY` for every connection. An HTTP client can narrow an individual request with `X-MCP-Toolsets: work-items,documents`, or connect to `/mcp/work-items,documents`. `MCP_TOOLS` is a server environment allowlist. `MCP_MODE=discover` is also a server setting and presents the three discovery tools instead of the full tool list.
+- **REST wrapper clients:** `/api/tools` lists the wrapper's configured operations. The wrapper does not use MCP toolset selectors; use the MCP endpoint when you need `MCP_TOOLSETS`, `MCP_TOOLS`, `MCP_READ_ONLY`, or discovery mode.
+
+These are optional configuration choices for managing the tool surface. Client-specific tool limits are not assumed. See [usage](usage.md) and [configuration](configuration.md) for selector behavior and accepted toolset names.
+
 ## More questions
 
 ### It says 401 "Polarion did not accept this token".

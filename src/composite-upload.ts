@@ -209,14 +209,19 @@ function validateUploadTarget(value: unknown): asserts value is Record<string, u
 export function createUploadAttachmentTool(configProvider: () => UploadConfig = envConfig, fetchOptions: AttachmentFetchTestOptions = {}): VirtualTool {
   return {
     name: 'upload_attachment', title: 'Upload attachment', toolset: 'composites',
-    description: 'Uploads one file from an allowed local path (stdio only) or an allowlisted URL to a Polarion work item, test run, document, or page. Use dry_run to preview the file name, size, and SHA-256 without uploading.',
+    description: 'Uploads one file as a Polarion attachment to a Work Item, Test Run, LiveDoc, or Rich Page and returns the attachment result. Choose exactly one source: an absolute local path on stdio with `MCP_UPLOAD_ROOTS`, or an HTTPS URL on an allowlisted host with `MCP_UPLOAD_URL_HOSTS`. The authenticated Polarion user must have attachment write permission. Use `dry_run` to validate and preview name, size, and SHA-256; use the resource-specific attachment tools when editing existing attachment metadata or content.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {
     target: { type: 'object', additionalProperties: false, properties: {
-      type: { type: 'string', enum: ['work_item', 'test_run', 'document', 'page'] }, projectId: { type: 'string' }, id: { type: 'string' }, spaceId: { type: 'string' },
-    }, required: ['type', 'projectId', 'id'], description: 'Polarion reference. Documents and pages also require spaceId.' },
-    filePath: { type: 'string', description: 'Absolute local path. Available only on stdio when MCP_UPLOAD_ROOTS is configured.' },
-    url: { type: 'string', description: 'HTTPS URL on a hostname listed in MCP_UPLOAD_URL_HOSTS.' },
-    fileName: { type: 'string' }, title: { type: 'string' }, dry_run: { type: 'boolean', default: false },
+      type: { type: 'string', enum: ['work_item', 'test_run', 'document', 'page'], description: 'Target resource family.' },
+      projectId: { type: 'string', description: 'Project ID that owns the target resource.' },
+      id: { type: 'string', description: 'Work Item, Test Run, document, or page ID within the project; do not include the project prefix.' },
+      spaceId: { type: 'string', description: 'Required for `document` and `page`; space ID within the project.' },
+    }, required: ['type', 'projectId', 'id'], description: 'Polarion target reference; document and page targets also require spaceId.' },
+    filePath: { type: 'string', description: 'Absolute local file path, available only over stdio and only under a configured MCP_UPLOAD_ROOTS directory.' },
+    url: { type: 'string', description: 'Absolute HTTPS URL whose hostname is listed in MCP_UPLOAD_URL_HOSTS; HTTP requires explicit server opt-in.' },
+    fileName: { type: 'string', description: 'Optional attachment filename override without path separators; defaults to the source filename.' },
+    title: { type: 'string', description: 'Optional attachment title stored by Polarion.' },
+    dry_run: { type: 'boolean', default: false, description: 'Preview file metadata and digest without sending an attachment request.' },
     }, required: ['target'] },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx: VirtualToolContext) {
