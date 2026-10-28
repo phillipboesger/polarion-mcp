@@ -87,7 +87,7 @@
       const target = mobile.matches ? sheet : panel;
       const other = mobile.matches ? panel : sheet;
       // The hint lives in the desktop side panel while nothing is selected, otherwise above it.
-      panel.before(hint);
+      if (mobile.matches) panel.before(hint); else hint.remove();
       other.hidden = true;
       other.replaceChildren();
       const client = clients.get(state.client);

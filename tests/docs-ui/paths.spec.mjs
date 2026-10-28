@@ -131,6 +131,7 @@ test('every client opens a panel with its guide, working modes and explained uns
     const panel = page.locator(detailId(info));
     await expect(panel).toBeVisible();
     await expect(panel.locator('h3')).toHaveText(client.name);
+    if (!isMobile(info)) await expect(page.locator('#galaxy > #galaxy-hint')).toHaveCount(0);
     await expect(panel.locator('a.go')).toHaveAttribute('href', `${guideBase}clients/${client.id}.md`);
     for (const mode of ['local', 'server']) {
       const button = panel.locator(`.env[data-env="${mode}"]`);
