@@ -25,7 +25,7 @@ test('exports the requested geometry constants', () => {
 test('satellite geometry remains valid for every map node and count from one to five', () => {
   const primaries = data.map.map((node) => ({ node, position: primaryPosition(node.angle) }));
 
-  for (const { node, position: primary } of primaries) {
+  for (const { node } of primaries) {
     for (let count = 1; count <= 5; count += 1) {
       const satellites = satellitePositions(node.angle, count);
 

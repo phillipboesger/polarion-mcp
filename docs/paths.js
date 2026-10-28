@@ -14,6 +14,7 @@
     status.textContent = `${shown} clients shown`;
   };
   radios.forEach(radio => radio.addEventListener('change', () => apply(radio.value)));
+  if (radios.length && cards.length && status) apply('all');
   // Links to the removed inline panel (#setup/<client>) now land on the chooser.
   const legacyHash = () => { if (location.hash.startsWith('#setup')) location.replace('#clients'); };
   window.addEventListener('hashchange', legacyHash);

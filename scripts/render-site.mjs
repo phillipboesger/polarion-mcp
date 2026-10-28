@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { guideUrl, requirement } from './render-clients.mjs';
+import { HUB, ORBIT, RADII, VIEWBOX, layoutForMap } from './galaxy-layout.mjs';
+import { ICON_PATHS, renderNodeLogo } from './galaxy-logos.mjs';
 
 const repoBlob = 'https://github.com/phillipboesger/polarion-mcp/blob/main';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,42 +17,59 @@ const httpsUrl = value => {
 };
 
 export function renderSiteClientsBlock(manifest) {
-  const rendered = new Set();
-  const card = client => {
-    const supported = connection => !connection.reason;
-    return `<article class="provider-card client-card" data-client="${escapeHtml(client.id)}" data-local="${supported(client.local)}" data-server="${supported(client.server)}">
-              <h4>${escapeHtml(client.name)}</h4>
-              <p>${escapeHtml(client.summary)}</p>
-              <dl><div><dt>Local</dt><dd>${escapeHtml(requirement(client.local))}</dd></div><div><dt>Server</dt><dd>${escapeHtml(requirement(client.server))}</dd></div></dl>
-              <a class="guide-link" href="${httpsUrl(guideUrl(client.id))}" target="_blank" rel="noopener noreferrer">Open guide ↗</a>
-            </article>`;
-  };
-  const groups = manifest.groups.flatMap(group => group.cards).map(group => {
-    const clients = group.clients.filter(id => !rendered.has(id)).map(id => {
-      const client = manifest.clients.find(client => client.id === id);
-      if (!client) throw new Error(`Unknown client ${id}`);
-      rendered.add(id);
-      return client;
-    });
-    return clients.length ? `<section class="client-group" aria-labelledby="group-${group.id}">
-          <h3 id="group-${group.id}">${escapeHtml(group.name)}</h3>
-          <div class="path-grid">${clients.map(card).join('\n            ')}</div>
-        </section>` : '';
-  }).filter(Boolean).join('\n        ');
   const mode = id => manifest.serverModes.find(mode => mode.id === id);
+  const layout = layoutForMap(manifest.map);
+  const clientsById = new Map(manifest.clients.map(client => [client.id, client]));
+  const nodes = manifest.map.map(node => ({
+    id: node.id, name: node.name, color: node.color, angle: node.angle,
+    position: layout[node.id].primary, clients: node.clients,
+  }));
+  const clients = manifest.clients.map(client => {
+    const node = manifest.map.find(item => item.clients.includes(client.id));
+    return {
+      id: client.id, name: client.name, label: client.label, node: node?.id ?? null,
+      icon: client.icon, summary: client.summary, guide: `clients/${client.id}.md`,
+      satellite: node ? layout[node.id].satellites[client.id] : null,
+      modes: Object.fromEntries(['local', 'server'].map(id => [id, {
+        supported: !client[id].reason, reason: client[id].reason ?? null, requirement: requirement(client[id]),
+      }])),
+    };
+  });
+  const cv = (a, b, k = 0.14) => {
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
+    return `M${a.x} ${a.y} Q${mx - dy * k} ${my + dx * k} ${b.x} ${b.y}`;
+  };
+  const svg = `<svg class="galaxy-stage" viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="group" aria-label="Integration map"><defs>
+      <radialGradient id="hubg"><stop offset="0" stop-color="#2a79ad"/><stop offset="1" stop-color="#0d2f52"/></radialGradient>
+      <linearGradient id="gem" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4285f4"/><stop offset=".55" stop-color="#9b72cb"/><stop offset="1" stop-color="#d96570"/></linearGradient>
+    </defs>
+    <ellipse class="ring" cx="${HUB.x}" cy="${HUB.y}" rx="${ORBIT.rx}" ry="${ORBIT.ry}"/><ellipse class="ring" cx="${HUB.x}" cy="${HUB.y}" rx="${ORBIT.rx * 0.58}" ry="${ORBIT.ry * 0.58}"/>
+    <circle class="pulse" cx="${HUB.x}" cy="${HUB.y}" r="${RADII.hub}"/>
+    ${nodes.map(node => `<path class="edge" data-node="${escapeHtml(node.id)}" d="${cv(HUB, node.position)}"/>`).join('\n    ')}
+    <g id="galaxy-satellites"></g>
+    <g class="node hub" id="galaxy-hub" tabindex="0" role="button" aria-label="Polarion MCP, reset" transform="translate(${HUB.x} ${HUB.y})"><circle class="hubdisc" r="${RADII.hub}"/><rect x="-17" y="-40" width="34" height="38" rx="7" fill="rgba(98,214,255,.08)" stroke="#62d6ff" stroke-width="1.6"/><text y="-20" style="font:600 28px ui-monospace,Menlo,monospace;fill:#62d6ff;text-anchor:middle;dominant-baseline:central;pointer-events:none">p</text><text y="20" style="font:650 14px -apple-system,Segoe UI,sans-serif;letter-spacing:-.04em;fill:#fff;text-anchor:middle;pointer-events:none">polarion<tspan fill="#62d6ff">-mcp</tspan></text><text y="36" style="font:10px -apple-system,Segoe UI,sans-serif;fill:#b9d3e6;text-anchor:middle;pointer-events:none">Your bridge to Polarion</text></g>
+    ${nodes.map(node => `<g class="node primary" data-node="${escapeHtml(node.id)}" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeHtml(node.name)}" style="--c:${escapeHtml(node.color)}" transform="translate(${node.position.x} ${node.position.y})"><circle class="disc" r="${RADII.primary}"/>${renderNodeLogo(node.logo ?? node.id, node.color)}<text class="lbl" y="56">${escapeHtml(node.name)}</text></g>`).join('\n    ')}
+  </svg>`;
+  const guideBase = `${repoBlob}/docs/guides/`;
+  const json = JSON.stringify({ viewBox: VIEWBOX, hub: HUB, radii: RADII, nodes, clients, icons: ICON_PATHS, guideBase })
+    .replaceAll('<', '\\u003C').replaceAll('&', '\\u0026').replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029');
+  const listGroups = manifest.map.map(node => `<section><h3>${escapeHtml(node.name)}</h3><ul>${node.clients.map(id => { const client = clientsById.get(id); return `<li><a class="guide-link" href="${httpsUrl(guideUrl(id))}">${escapeHtml(client.name)}</a> - ${escapeHtml(client.summary)}</li>`; }).join('')}</ul></section>`).join('\n      ');
+  const docker = clientsById.get('docker');
   return `<div class="path-entries">
       <p><strong>${escapeHtml(mode('local').label)}</strong>${escapeHtml(mode('local').description)} <a href="${httpsUrl(`${repoBlob}/docs/guides/local-npm.md`)}" target="_blank" rel="noopener noreferrer">Open the local guide ↗</a></p>
       <p><strong>${escapeHtml(mode('server').label)}</strong>${escapeHtml(mode('server').description)} <a href="${httpsUrl(`${repoBlob}/docs/guides/server-docker.md`)}" target="_blank" rel="noopener noreferrer">Open the server guide ↗</a></p>
     </div>
-    <fieldset class="path-question"><legend>Does your client run on your computer (Local) or in the cloud or for a team (Server)?</legend>
-      <div class="path-options">
-        <label class="path-option"><input type="radio" name="path" value="all" checked /> Show all clients</label>
-        <label class="path-option"><input type="radio" name="path" value="local" /> On my computer (Local)</label>
-        <label class="path-option"><input type="radio" name="path" value="server" /> Cloud or team (Server)</label>
+    <div class="galaxy" id="galaxy">
+      ${svg}
+      <p class="galaxy-hint" id="galaxy-hint">Select a provider to see its options</p>
+      <div class="galaxy-panel" id="galaxy-panel" role="region" aria-label="Setup details" tabindex="-1" hidden></div>
+      <div class="galaxy-sheet" id="galaxy-sheet" role="dialog" aria-label="Setup details" hidden></div>
+      <script type="application/json" id="galaxy-data">${json}</script>
+      <p id="path-status" class="sr-only" role="status" aria-live="polite"></p>
+      <div class="galaxy-list">${listGroups}
+        <section><h3>Self-hosted server</h3><ul><li><a class="guide-link" href="${httpsUrl(guideUrl('docker'))}">${escapeHtml(docker.name)}</a> - ${escapeHtml(docker.summary)}</li></ul></section>
       </div>
-    </fieldset>
-    <div class="client-groups">${groups}</div>
-    <p id="path-status" class="sr-only" role="status" aria-live="polite"></p>`;
+    </div>`;
 }
 
 // Disjoint, ordered path rules: nested work items are counted with work items,
