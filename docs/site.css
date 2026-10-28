@@ -114,21 +114,21 @@ footer div { display:flex; gap:20px; }
 .day-tabs button:hover { border-color:var(--line); color:white; }
 .day-tabs button[aria-selected=true] { color:white; border-color:rgba(98,214,255,.5); background:#0c2c4c; }
 .day-panels { display:grid; min-width:0; }
-.day-chat { grid-area:1/1; min-width:0; padding:32px; border:1px solid var(--line); border-radius:14px; background:#0c2c4c; }
+.day-chat { grid-area:1/1; min-width:0; padding:24px 26px; border:1px solid var(--line); border-radius:14px; background:#0c2c4c; }
 /* Reserve the tallest conversation's space so changing tabs never moves setup. */
 .day-chat[hidden] { display:block!important; visibility:hidden; pointer-events:none; }
-.day-chat h3 { font-size:26px; margin-bottom:26px; }
-.chat-message { padding:18px 20px; border-radius:10px; font-size:14px; }
-.chat-message>span { display:block; margin-bottom:7px; font:10px var(--mono); letter-spacing:.05em; color:var(--accent); }
-.chat-message.user { background:#1c4a70; margin-left:36px; border:1px solid rgba(98,214,255,.22); }
+.day-chat h3 { font-size:21px; margin-bottom:16px; }
+.chat-message { padding:12px 16px; border-radius:10px; font-size:13px; }
+.chat-message>span { display:block; margin-bottom:4px; font:10px var(--mono); letter-spacing:.05em; color:var(--accent); }
+.chat-message.user { background:#1c4a70; margin-left:24px; border:1px solid rgba(98,214,255,.22); }
 .chat-message.assistant { background:#153b5e; border-left:2px solid var(--accent); }
-.chat-message p { line-height:1.7; }
-.tool-trail { margin:24px 0; padding-left:20px; border-left:1px dashed rgba(98,214,255,.4); }
+.chat-message p { line-height:1.55; }
+.tool-trail { margin:16px 0; padding-left:16px; border-left:1px dashed rgba(98,214,255,.4); }
 .tool-trail .eyebrow { color:#a8c2d8; font-size:9px; }
-.tool-trail ol { list-style:none; margin-top:14px; display:grid; gap:12px; }
+.tool-trail ol { list-style:none; margin-top:10px; display:grid; gap:8px; }
 .tool-trail code { color:var(--accent); font-size:12px; overflow-wrap:anywhere; }
 .tool-trail li p { color:var(--sub); font-size:12px; margin-top:2px; }
-.approval { display:flex; gap:12px; padding:18px 0 0; color:#f8d8a5; font-size:12px; }
+.approval { display:flex; gap:10px; padding:12px 0 0; color:#f8d8a5; font-size:12px; }
 .approval>span { font:25px/1 var(--mono); color:var(--warm); }
 .daily-note { color:var(--sub); font-size:12px; text-align:right; margin-top:18px; }
 .setup-section { border-top:1px solid var(--line); padding-top:80px; }
