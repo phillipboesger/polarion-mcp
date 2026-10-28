@@ -25,13 +25,8 @@
     };
     const html = (tag, attrs, ...children) => h(XHTML, tag, attrs, ...children);
     const svg = (tag, attrs, ...children) => h(SVG, tag, attrs, ...children);
-    // Icon paths are build-time constants from the manifest renderer; parse them as SVG, not HTML.
-    const icon = (name, scale) => {
-      const g = svg('g', { class: 'ico', transform: `translate(${-12 * scale} ${-12 * scale}) scale(${scale})` });
-      const doc = new DOMParser().parseFromString(`<svg xmlns="${SVG}">${data.icons[name] || ''}</svg>`, 'image/svg+xml');
-      g.append(...[...doc.documentElement.childNodes].map(node => document.importNode(node, true)));
-      return g;
-    };
+    // Icons are <symbol>s rendered into the stage's defs at build time.
+    const icon = (name, scale) => svg('use', { href: `#gi-${name}`, class: 'ico', x: -12 * scale, y: -12 * scale, width: 24 * scale, height: 24 * scale });
     const curve = (a, b, k) => {
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
       return `M${a.x} ${a.y} Q${mx - dy * k} ${my + dx * k} ${b.x} ${b.y}`;

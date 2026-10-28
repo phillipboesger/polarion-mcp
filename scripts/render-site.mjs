@@ -42,6 +42,7 @@ export function renderSiteClientsBlock(manifest) {
   const svg = `<svg class="galaxy-stage" viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="group" aria-label="Integration map"><defs>
       <radialGradient id="hubg"><stop offset="0" stop-color="#2a79ad"/><stop offset="1" stop-color="#0d2f52"/></radialGradient>
       <linearGradient id="gem" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4285f4"/><stop offset=".55" stop-color="#9b72cb"/><stop offset="1" stop-color="#d96570"/></linearGradient>
+    ${Object.entries(ICON_PATHS).map(([name, paths]) => `<symbol id="gi-${name}" viewBox="0 0 24 24">${paths}</symbol>`).join('')}
     </defs>
     <ellipse class="ring" cx="${HUB.x}" cy="${HUB.y}" rx="${ORBIT.rx}" ry="${ORBIT.ry}"/><ellipse class="ring" cx="${HUB.x}" cy="${HUB.y}" rx="${ORBIT.rx * 0.58}" ry="${ORBIT.ry * 0.58}"/>
     <circle class="pulse" cx="${HUB.x}" cy="${HUB.y}" r="${RADII.hub}"/>
@@ -51,7 +52,7 @@ export function renderSiteClientsBlock(manifest) {
     ${nodes.map(node => `<g class="node primary" data-node="${escapeHtml(node.id)}" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeHtml(node.name)}" style="--c:${escapeHtml(node.color)}" transform="translate(${node.position.x} ${node.position.y})"><circle class="disc" r="${RADII.primary}"/>${renderNodeLogo(node.logo ?? node.id, node.color)}<text class="lbl" y="56">${escapeHtml(node.name)}</text></g>`).join('\n    ')}
   </svg>`;
   const guideBase = `${repoBlob}/docs/guides/`;
-  const json = JSON.stringify({ viewBox: VIEWBOX, hub: HUB, radii: RADII, nodes, clients, icons: ICON_PATHS, guideBase })
+  const json = JSON.stringify({ viewBox: VIEWBOX, hub: HUB, radii: RADII, nodes, clients, guideBase })
     .replaceAll('<', '\\u003C').replaceAll('&', '\\u0026').replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029');
   const listGroups = manifest.map.map(node => `<section><h3>${escapeHtml(node.name)}</h3><ul>${node.clients.map(id => { const client = clientsById.get(id); return `<li><a class="guide-link" href="${httpsUrl(guideUrl(id))}">${escapeHtml(client.name)}</a> - ${escapeHtml(client.summary)}</li>`; }).join('')}</ul></section>`).join('\n      ');
   const docker = clientsById.get('docker');
