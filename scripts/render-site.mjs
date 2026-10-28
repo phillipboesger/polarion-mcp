@@ -39,7 +39,7 @@ export function renderSiteClientsBlock(manifest) {
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
     return `M${a.x} ${a.y} Q${mx - dy * k} ${my + dx * k} ${b.x} ${b.y}`;
   };
-  const svg = `<svg class="galaxy-stage" viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="group" aria-label="Integration map"><defs>
+  const svg = `<svg class="galaxy-stage" style="aspect-ratio:${VIEWBOX.width}/${VIEWBOX.height}" viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="group" aria-label="Integration map"><defs>
       <radialGradient id="hubg"><stop offset="0" stop-color="#2a79ad"/><stop offset="1" stop-color="#0d2f52"/></radialGradient>
       <linearGradient id="gem" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4285f4"/><stop offset=".55" stop-color="#9b72cb"/><stop offset="1" stop-color="#d96570"/></linearGradient>
     ${Object.entries(ICON_PATHS).map(([name, paths]) => `<symbol id="gi-${name}" viewBox="0 0 24 24">${paths}</symbol>`).join('')}
@@ -48,7 +48,7 @@ export function renderSiteClientsBlock(manifest) {
     <circle class="pulse" cx="${HUB.x}" cy="${HUB.y}" r="${RADII.hub}"/>
     ${nodes.map(node => `<path class="edge" data-node="${escapeHtml(node.id)}" d="${cv(HUB, node.position)}"/>`).join('\n    ')}
     <g id="galaxy-satellites"></g>
-    <g class="node hub" id="galaxy-hub" tabindex="0" role="button" aria-label="Polarion MCP, reset" transform="translate(${HUB.x} ${HUB.y})"><circle class="hubdisc" r="${RADII.hub}"/><rect x="-17" y="-40" width="34" height="38" rx="7" fill="rgba(98,214,255,.08)" stroke="#62d6ff" stroke-width="1.6"/><text y="-20" style="font:600 28px ui-monospace,Menlo,monospace;fill:#62d6ff;text-anchor:middle;dominant-baseline:central;pointer-events:none">p</text><text y="20" style="font:650 14px -apple-system,Segoe UI,sans-serif;letter-spacing:-.04em;fill:#fff;text-anchor:middle;pointer-events:none">polarion<tspan fill="#62d6ff">-mcp</tspan></text><text y="36" style="font:10px -apple-system,Segoe UI,sans-serif;fill:#b9d3e6;text-anchor:middle;pointer-events:none">Your bridge to Polarion</text></g>
+    <g class="node hub" id="galaxy-hub" tabindex="0" role="button" aria-label="Polarion MCP, reset" transform="translate(${HUB.x} ${HUB.y})"><circle class="hubdisc" r="${RADII.hub}"/><g transform="scale(1.5)"><rect x="-17" y="-40" width="34" height="38" rx="7" fill="rgba(98,214,255,.08)" stroke="#62d6ff" stroke-width="1.6"/><text y="-20" style="font:600 28px ui-monospace,Menlo,monospace;fill:#62d6ff;text-anchor:middle;dominant-baseline:central;pointer-events:none">p</text><text y="20" style="font:650 14px -apple-system,Segoe UI,sans-serif;letter-spacing:-.04em;fill:#fff;text-anchor:middle;pointer-events:none">polarion<tspan fill="#62d6ff">-mcp</tspan></text><text y="36" style="font:10px -apple-system,Segoe UI,sans-serif;fill:#b9d3e6;text-anchor:middle;pointer-events:none">Your bridge to Polarion</text></g></g>
     ${nodes.map(node => `<g class="node primary" data-node="${escapeHtml(node.id)}" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeHtml(node.name)}" style="--c:${escapeHtml(node.color)}" transform="translate(${node.position.x} ${node.position.y})"><circle class="disc" r="${RADII.primary}"/>${renderNodeLogo(node.logo ?? node.id, node.color)}<text class="lbl" y="56">${escapeHtml(node.name)}</text></g>`).join('\n    ')}
   </svg>`;
   const guideBase = `${repoBlob}/docs/guides/`;
@@ -62,7 +62,8 @@ export function renderSiteClientsBlock(manifest) {
     </div>
     <div class="galaxy" id="galaxy">
       ${svg}
-      <div class="galaxy-panel" id="galaxy-panel" role="region" aria-label="Setup details" tabindex="-1"><p class="galaxy-hint" id="galaxy-hint">Select a provider to see its options</p></div>
+      <p class="galaxy-hint" id="galaxy-hint">Select a provider to see its options</p>
+      <div class="galaxy-panel" id="galaxy-panel" role="region" aria-label="Setup details" tabindex="-1" hidden></div>
       <div class="galaxy-sheet" id="galaxy-sheet" role="dialog" aria-label="Setup details" hidden></div>
       <script type="application/json" id="galaxy-data">${json}</script>
       <p id="path-status" class="sr-only" role="status" aria-live="polite"></p>
@@ -135,6 +136,8 @@ export function renderSite(rootDir = root) {
   if (html.includes('<!-- domains:start -->')) html = replaceBlock(html, 'domains', renderDomains(toolsSource));
   if (html.includes('<!-- daily:start -->')) html = replaceBlock(html, 'daily', renderDailyUse(JSON.parse(fs.readFileSync(path.join(rootDir, 'docs/daily-use.json'), 'utf8'))));
   html = html.replaceAll('{{TOOL_COUNT}}', countDomains(toolsSource).total);
+  // The page makes no third-party requests (CSP connect-src 'none'), so the star count is rendered at build time.
+  if (Number.isInteger(manifest.githubStars)) html = html.replace(/<strong id="gh-stars">[^<]*<\/strong>/, `<strong id="gh-stars">${manifest.githubStars} ${manifest.githubStars === 1 ? 'star' : 'stars'}</strong>`);
   // Pages caches assets for hours: tie each asset URL to its content so a new HTML never meets old CSS/JS.
   return html.replace(/(href|src)="(site\.css|viz\.js|paths\.js|carousel\.js)(\?v=[0-9a-f]+)?"/g, (_, attr, file) => {
     const hash = createHash('sha1').update(fs.readFileSync(path.join(rootDir, 'docs', file))).digest('hex').slice(0, 8);
@@ -144,6 +147,13 @@ export function renderSite(rootDir = root) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
+    if (process.argv.includes('--refresh-stars')) {
+      const response = await fetch('https://api.github.com/repos/phillipboesger/polarion-mcp');
+      const { stargazers_count: stars } = await response.json();
+      const manifestPath = path.join(root, 'docs/clients.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      fs.writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, githubStars: stars }, null, 2)}\n`);
+    }
     const expected = renderSite();
     const htmlPath = path.join(root, 'docs/index.html');
     const current = fs.readFileSync(htmlPath, 'utf8');

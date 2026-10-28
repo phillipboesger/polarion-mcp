@@ -1,7 +1,7 @@
-export const VIEWBOX = { width: 696, height: 650 };
-export const HUB = { x: 348, y: 320 };
-export const ORBIT = { rx: 215, ry: 150 };
-export const RADII = { primary: 38, satellite: 29, hub: 60 };
+export const VIEWBOX = { width: 806, height: 700 };
+export const HUB = { x: 403, y: 340 };
+export const ORBIT = { rx: 250, ry: 185 };
+export const RADII = { primary: 38, satellite: 29, hub: 90 };
 
 const toRadians = (angleDeg) => angleDeg * Math.PI / 180;
 

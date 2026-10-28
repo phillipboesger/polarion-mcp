@@ -83,20 +83,52 @@
       });
     }
 
+    // Fit the canvas to what is visible: the hub with its providers, plus the open provider's tools.
+    const radii = data.radii;
+    function viewFor(providerId) {
+      const boxes = [[data.hub.x - radii.hub, data.hub.y - radii.hub, data.hub.x + radii.hub, data.hub.y + radii.hub]];
+      data.nodes.forEach(node => boxes.push([node.position.x - radii.primary, node.position.y - radii.primary, node.position.x + radii.primary, node.position.y + radii.primary + 30]));
+      const open = nodes.get(providerId);
+      if (open) open.clients.forEach(id => {
+        const { x, y } = clients.get(id).satellite;
+        boxes.push([x - radii.satellite, y - radii.satellite, x + radii.satellite, y + radii.satellite + 24]);
+      });
+      const pad = 24;
+      const minX = Math.min(...boxes.map(box => box[0])) - pad;
+      const minY = Math.min(...boxes.map(box => box[1])) - pad;
+      return [minX, minY, Math.max(...boxes.map(box => box[2])) + pad - minX, Math.max(...boxes.map(box => box[3])) + pad - minY];
+    }
+    let view = null;
+    let frame = 0;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function setView() {
+      const to = viewFor(state.provider);
+      cancelAnimationFrame(frame);
+      const from = view || to;
+      const apply = values => {
+        view = values;
+        stage.setAttribute('viewBox', values.join(' '));
+        stage.style.aspectRatio = `${values[2]} / ${values[3]}`;
+      };
+      if (reducedMotion.matches || from === to) { apply(to); return; }
+      const start = performance.now();
+      const step = now => {
+        const t = Math.min(1, (now - start) / 350);
+        const eased = 1 - Math.pow(1 - t, 3);
+        apply(from.map((value, index) => value + (to[index] - value) * eased));
+        if (t < 1) frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    }
+
     function renderPanel() {
       const target = mobile.matches ? sheet : panel;
       const other = mobile.matches ? panel : sheet;
-      // The hint lives in the desktop side panel while nothing is selected, otherwise above it.
-      if (mobile.matches) panel.before(hint); else hint.remove();
       other.hidden = true;
       other.replaceChildren();
       const client = clients.get(state.client);
-      if (!client) {
-        target.replaceChildren();
-        target.hidden = target !== panel;
-        if (target === panel) panel.append(hint);
-        return;
-      }
+      root.classList.toggle('has-detail', Boolean(client) && !mobile.matches);
+      if (!client) { target.hidden = true; target.replaceChildren(); return; }
       const node = nodes.get(client.node);
       const modes = client.modes;
       const text = (tag, attrs, value) => { const el = html(tag, attrs); el.textContent = value; return el; };
@@ -150,6 +182,7 @@
         el.classList.toggle('act', selected);
         el.setAttribute('aria-pressed', String(selected));
       });
+      setView();
       hint.textContent = !state.provider ? 'Select a provider to see its options' : state.client ? '' : 'Now pick your tool';
       renderPanel();
     }

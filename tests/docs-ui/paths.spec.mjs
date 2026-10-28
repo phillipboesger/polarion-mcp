@@ -23,7 +23,7 @@ test('hero breathes and the landing page follows the complete user journey', asy
   await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
   for (const text of ['284', 'Preview', 'Open source', 'Release', 'Stars']) await expect(page.locator('.proof').getByText(text, { exact: false })).toBeInViewport();
   await expect(page.locator('.hero .outcomes')).toHaveCount(0);
-  await expect(page.locator('.hero .button')).toHaveCount(2);
+  await expect(page.locator('.hero .button')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText(/unverified|Web connector/i);
   expect(await page.locator('main > section').evaluateAll(sections => sections.map(section => section.id || section.className))).toEqual(['hero', 'features', 'daily-use', 'clients', 'faq']);
   await noOverflow(page);
@@ -34,12 +34,18 @@ test('hero breathes and the landing page follows the complete user journey', asy
     await screenshot(page, `after-${info.project.name}-${section}.png`);
   }
   await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
-  await expect(page.locator('#clients-title')).toHaveText('Choose your path');
-  const heading = page.locator('#clients-title');
-  const intro = page.locator('.clients-heading>p');
-  expect(await heading.evaluate(el => el.compareDocumentPosition(document.querySelector('.clients-heading>p')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  await expect(page.locator('#clients-title')).toHaveText('How to install it for your client');
+  // Every chapter heading has its intro sentence directly below the title, across the full width.
+  for (const section of await page.locator('.section-heading').all()) {
+    const { below, full } = await section.evaluate(el => {
+      const h2 = el.querySelector('h2').getBoundingClientRect(); const p = el.querySelector(':scope > p').getBoundingClientRect(); const box = el.getBoundingClientRect();
+      return { below: p.top >= h2.bottom, full: Math.abs(p.width - box.width) < 2 };
+    });
+    expect(below).toBe(true);
+    expect(full).toBe(true);
+  }
+  const intro = page.locator('#clients .section-heading>p');
   expect(await intro.evaluate(el => el.compareDocumentPosition(document.querySelector('#clients .path-entries')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
-  expect(await intro.evaluate(el => Math.abs(el.getBoundingClientRect().width - document.querySelector('#clients .section-heading').getBoundingClientRect().width))).toBeLessThan(2);
   await expect(page.locator('.under-setup')).toHaveCount(0);
   await expect(page.locator('#setup')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -52,10 +58,14 @@ const satellite = id => `.satellite[data-client="${id}"]`;
 // The fixed bottom sheet can cover map nodes on small screens, so dispatch clicks there.
 const isMobile = info => info.project.name.includes('mobile');
 const detailId = info => (isMobile(info) ? '#galaxy-sheet' : '#galaxy-panel');
-// Desktop keeps the side panel visible and shows the hint while nothing is selected; mobile hides the sheet.
+// The side panel (desktop) and sheet (mobile) exist only while a tool is open; the map is centered without them.
 const expectDetailClosed = async (page, info) => {
-  if (isMobile(info)) await expect(page.locator('#galaxy-sheet')).toBeHidden();
-  else { await expect(page.locator('#galaxy-panel .ph')).toHaveCount(0); await expect(page.locator('#galaxy-panel #galaxy-hint')).toBeVisible(); }
+  await expect(page.locator(detailId(info))).toBeHidden();
+  if (!isMobile(info)) {
+    const map = await page.locator('.galaxy-stage').boundingBox();
+    const box = await page.locator('#galaxy').boundingBox();
+    expect(Math.abs(map.x + map.width / 2 - (box.x + box.width / 2))).toBeLessThan(2);
+  }
 };
 const press = (info, locator) => (isMobile(info) ? locator.dispatchEvent('click') : locator.click());
 
@@ -89,6 +99,7 @@ test('desktop map and portrait detail panel sit side by side; mobile keeps the b
     const panel = await page.locator('#galaxy-panel').boundingBox();
     expect(panel.x).toBeGreaterThan(map.x + map.width);
     expect(panel.height).toBeGreaterThan(panel.width);
+    expect(Math.abs(panel.y + panel.height / 2 - (map.y + map.height / 2))).toBeLessThan(2);
   } else {
     await expect(page.locator('#galaxy-sheet')).toBeVisible();
     expect(await page.locator('#galaxy-sheet').evaluate(el => getComputedStyle(el).position)).toBe('fixed');
@@ -131,7 +142,6 @@ test('every client opens a panel with its guide, working modes and explained uns
     const panel = page.locator(detailId(info));
     await expect(panel).toBeVisible();
     await expect(panel.locator('h3')).toHaveText(client.name);
-    if (!isMobile(info)) await expect(page.locator('#galaxy > #galaxy-hint')).toHaveCount(0);
     await expect(panel.locator('a.go')).toHaveAttribute('href', `${guideBase}clients/${client.id}.md`);
     for (const mode of ['local', 'server']) {
       const button = panel.locator(`.env[data-env="${mode}"]`);
@@ -216,11 +226,12 @@ test('reduced motion removes map animation', async ({ page }) => {
   expect(await page.locator('.galaxy .pulse').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
 });
 
-test('hero CTAs reach the chooser and the Docker link points to the server guide; old #setup links land on the chooser', async ({ page }) => {
+test('the hero has one CTA to the chooser and shows the star count; old #setup links land on the chooser', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Connect your assistant' }).click();
   await expect(page.locator('#clients-title')).toBeInViewport();
-  await expect(page.getByRole('link', { name: 'Run with Docker' })).toHaveAttribute('href', `${guideBase}server-docker.md`);
+  await expect(page.getByRole('link', { name: 'Run with Docker' })).toHaveCount(0);
+  await expect(page.locator('#gh-stars')).toHaveText(/^\d+ stars?$/);
   await page.goto('/#setup/claude-code');
   await expect(page).toHaveURL(/#clients$/);
 });

@@ -42,9 +42,9 @@ h1 span { color:var(--accent); }
 .proof strong { color:white; font-weight:600; }
 .proof a:hover { text-decoration:underline; }
 .section { max-width:1264px; margin:auto; padding:80px 32px; }
-.section-heading { display:flex; justify-content:space-between; align-items:end; gap:40px; margin-bottom:32px; }
+.section-heading { margin-bottom:32px; }
 h2 { font-weight:550; font-size:clamp(31px,3.5vw,46px); letter-spacing:-.045em; line-height:1.14; margin-top:10px; }
-.section-heading>p { color:var(--sub); max-width:440px; font-size:14px; }
+.section-heading>p { color:var(--sub); margin-top:16px; font-size:14px; }
 .setup-section { padding-top:60px; }
 h4 { font-weight:600; font-size:15px; letter-spacing:-.02em; }
 pre { white-space:pre-wrap; overflow-wrap:anywhere; overflow-x:auto; max-width:100%; min-width:0; padding:16px; background:#08233d; border:1px solid var(--line); border-top:0; border-radius:0 0 7px 7px; font-size:11px; line-height:1.7; tab-size:2; }
@@ -114,26 +114,24 @@ footer div { display:flex; gap:20px; }
 .day-tabs button:hover { border-color:var(--line); color:white; }
 .day-tabs button[aria-selected=true] { color:white; border-color:rgba(98,214,255,.5); background:#0c2c4c; }
 .day-panels { display:grid; min-width:0; }
-.day-chat { grid-area:1/1; min-width:0; padding:32px; border:1px solid var(--line); border-radius:14px; background:#0c2c4c; }
+.day-chat { grid-area:1/1; min-width:0; padding:24px 26px; border:1px solid var(--line); border-radius:14px; background:#0c2c4c; }
 /* Reserve the tallest conversation's space so changing tabs never moves setup. */
 .day-chat[hidden] { display:block!important; visibility:hidden; pointer-events:none; }
-.day-chat h3 { font-size:26px; margin-bottom:26px; }
-.chat-message { padding:18px 20px; border-radius:10px; font-size:14px; }
-.chat-message>span { display:block; margin-bottom:7px; font:10px var(--mono); letter-spacing:.05em; color:var(--accent); }
-.chat-message.user { background:#1c4a70; margin-left:36px; border:1px solid rgba(98,214,255,.22); }
+.day-chat h3 { font-size:21px; margin-bottom:16px; }
+.chat-message { padding:12px 16px; border-radius:10px; font-size:13px; }
+.chat-message>span { display:block; margin-bottom:4px; font:10px var(--mono); letter-spacing:.05em; color:var(--accent); }
+.chat-message.user { background:#1c4a70; margin-left:24px; border:1px solid rgba(98,214,255,.22); }
 .chat-message.assistant { background:#153b5e; border-left:2px solid var(--accent); }
-.chat-message p { line-height:1.7; }
-.tool-trail { margin:24px 0; padding-left:20px; border-left:1px dashed rgba(98,214,255,.4); }
+.chat-message p { line-height:1.55; }
+.tool-trail { margin:16px 0; padding-left:16px; border-left:1px dashed rgba(98,214,255,.4); }
 .tool-trail .eyebrow { color:#a8c2d8; font-size:9px; }
-.tool-trail ol { list-style:none; margin-top:14px; display:grid; gap:12px; }
+.tool-trail ol { list-style:none; margin-top:10px; display:grid; gap:8px; }
 .tool-trail code { color:var(--accent); font-size:12px; overflow-wrap:anywhere; }
 .tool-trail li p { color:var(--sub); font-size:12px; margin-top:2px; }
-.approval { display:flex; gap:12px; padding:18px 0 0; color:#f8d8a5; font-size:12px; }
+.approval { display:flex; gap:10px; padding:12px 0 0; color:#f8d8a5; font-size:12px; }
 .approval>span { font:25px/1 var(--mono); color:var(--warm); }
 .daily-note { color:var(--sub); font-size:12px; text-align:right; margin-top:18px; }
 .setup-section { border-top:1px solid var(--line); padding-top:80px; }
-.clients-heading { display:block; }
-.clients-heading>p { max-width:none; margin-top:16px; }
 .faq-section { border-top:1px solid var(--line); }
 .community-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr); gap:72px; }
 .faq-list details { border-top:1px solid var(--line); }
@@ -161,7 +159,6 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .community-layout { gap:32px; }
 }
 @media(max-width:700px) {
-  .clients-heading>p { margin-top:18px; }
   .hero { padding:52px 20px 58px; }
   .flow { grid-template-columns:minmax(0,1fr); padding:20px; }
   .flow-node { padding:16px 8px; }
@@ -204,7 +201,7 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .faq-more { margin:18px 0 0; font-size:14px; }
 
 
-/* Choose your path */
+/* Install section */
 .path-entries { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px; margin-bottom:32px; }
 .path-entries p { padding-left:16px; border-left:2px solid var(--accent); color:var(--sub); font-size:13px; }
 .path-entries strong { display:block; color:white; margin-bottom:3px; }
@@ -217,7 +214,7 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .galaxy-stage, .galaxy-hint, .galaxy-panel, .galaxy-sheet { display:none; }
 .galaxy.is-interactive .galaxy-list { display:none; }
 .galaxy.is-interactive .galaxy-stage { display:block; width:100%; height:auto; overflow:visible; }
-.galaxy.is-interactive .galaxy-hint { display:block; text-align:center; font:11px var(--mono); color:#8fb3cf; margin:0; min-height:16px; }
+.galaxy.is-interactive .galaxy-hint { display:block; text-align:center; font:11px var(--mono); color:#8fb3cf; margin-top:-6px; min-height:16px; }
 .galaxy.is-interactive .galaxy-panel:not([hidden]), .galaxy.is-interactive .galaxy-sheet:not([hidden]) { display:block; }
 .galaxy .ring { fill:none; stroke:rgba(189,238,255,.1); stroke-dasharray:2 6; }
 .galaxy .edge { fill:none; stroke:rgba(150,205,240,.3); stroke-width:1.2; transition:opacity .3s; }
@@ -237,11 +234,9 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .galaxy .satellite { animation:galaxy-pop .3s ease-out both; }
 @keyframes galaxy-pop { from { opacity:0; } to { opacity:1; } }
 .galaxy .hubdisc { fill:url(#hubg); stroke:#62d6ff; stroke-width:1.6; filter:drop-shadow(0 0 16px rgba(98,214,255,.55)); }
-.galaxy .pulse { fill:none; stroke:#62d6ff; opacity:.4; animation:galaxy-pulse 3.2s ease-out infinite; transform-origin:348px 320px; }
+.galaxy .pulse { fill:none; stroke:#62d6ff; opacity:.4; animation:galaxy-pulse 3.2s ease-out infinite; transform-box:fill-box; transform-origin:center; }
 @keyframes galaxy-pulse { from { transform:scale(1); opacity:.45; } to { transform:scale(1.5); opacity:0; } }
 .galaxy-panel, .galaxy-sheet { position:relative; margin-top:12px; border:1px solid rgba(98,214,255,.38); border-radius:14px; background:rgba(9,34,60,.9); padding:18px; font-size:13px; }
-.galaxy-panel { display:flex; align-items:center; justify-content:center; min-height:340px; }
-.galaxy-panel:has(> .ph) { display:block; }
 .galaxy-panel .x, .galaxy-sheet .x { position:absolute; right:10px; top:6px; min-width:44px; min-height:44px; background:none; border:0; color:#9fbfd8; font-size:24px; cursor:pointer; }
 .galaxy .ph { display:flex; align-items:center; gap:12px; margin-bottom:6px; padding-right:40px; }
 .galaxy .badge { width:46px; height:46px; border-radius:12px; background:#0d2a47; border:1px solid var(--c); display:grid; place-items:center; flex-shrink:0; }
@@ -271,9 +266,12 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .galaxy .flow .p { white-space:normal; }
 }
 @media(min-width:701px) {
-  .galaxy.is-interactive { display:grid; grid-template-columns:minmax(0,696px) 340px; gap:24px; align-items:start; }
-  .galaxy.is-interactive .galaxy-stage { grid-column:1; grid-row:1; }
-  .galaxy.is-interactive .galaxy-panel:not([hidden]) { grid-column:2; grid-row:1; position:sticky; top:24px; margin-top:0; }
+  /* Side panel only while a tool is open; otherwise the map stays centered. */
+  .galaxy.is-interactive .galaxy-stage { max-width:720px; margin-inline:auto; }
+  .galaxy.is-interactive.has-detail { display:grid; grid-template-columns:minmax(0,720px) 340px; gap:24px; justify-content:center; align-items:center; }
+  .galaxy.is-interactive.has-detail .galaxy-stage { grid-column:1; grid-row:1; margin:0; }
+  .galaxy.is-interactive.has-detail .galaxy-hint { grid-column:1; grid-row:2; }
+  .galaxy.is-interactive.has-detail .galaxy-panel:not([hidden]) { grid-column:2; grid-row:1; margin-top:0; }
   .galaxy.is-interactive .galaxy-sheet { display:none!important; }
 }
 @media(prefers-reduced-motion:reduce) { .galaxy *, .galaxy-sheet * { animation:none !important; transition:none !important; } }

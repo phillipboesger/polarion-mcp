@@ -16,10 +16,10 @@ const data = JSON.parse(readFileSync(new URL('../docs/clients.json', import.meta
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 test('exports the requested geometry constants', () => {
-  assert.deepEqual(VIEWBOX, { width: 696, height: 650 });
-  assert.deepEqual(HUB, { x: 348, y: 320 });
-  assert.deepEqual(ORBIT, { rx: 215, ry: 150 });
-  assert.deepEqual(RADII, { primary: 38, satellite: 29, hub: 60 });
+  assert.deepEqual(VIEWBOX, { width: 806, height: 700 });
+  assert.deepEqual(HUB, { x: 403, y: 340 });
+  assert.deepEqual(ORBIT, { rx: 250, ry: 185 });
+  assert.deepEqual(RADII, { primary: 38, satellite: 29, hub: 90 });
 });
 
 test('satellite geometry remains valid for every map node and count from one to five', () => {
