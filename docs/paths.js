@@ -83,19 +83,33 @@
       });
     }
 
-    // Zoom in on the hub and its six providers until one opens; the satellites need the full canvas.
-    const full = [0, 0, data.viewBox.width, data.viewBox.height];
-    const xs = data.nodes.map(node => node.position.x);
-    const ys = data.nodes.map(node => node.position.y);
-    const tight = [Math.min(...xs) - 70, Math.min(...ys) - 60, Math.max(...xs) - Math.min(...xs) + 140, Math.max(...ys) - Math.min(...ys) + 150];
+    // Fit the canvas to what is visible: the hub with its providers, plus the open provider's tools.
+    const radii = data.radii;
+    function viewFor(providerId) {
+      const boxes = [[data.hub.x - radii.hub, data.hub.y - radii.hub, data.hub.x + radii.hub, data.hub.y + radii.hub]];
+      data.nodes.forEach(node => boxes.push([node.position.x - radii.primary, node.position.y - radii.primary, node.position.x + radii.primary, node.position.y + radii.primary + 30]));
+      const open = nodes.get(providerId);
+      if (open) open.clients.forEach(id => {
+        const { x, y } = clients.get(id).satellite;
+        boxes.push([x - radii.satellite, y - radii.satellite, x + radii.satellite, y + radii.satellite + 24]);
+      });
+      const pad = 24;
+      const minX = Math.min(...boxes.map(box => box[0])) - pad;
+      const minY = Math.min(...boxes.map(box => box[1])) - pad;
+      return [minX, minY, Math.max(...boxes.map(box => box[2])) + pad - minX, Math.max(...boxes.map(box => box[3])) + pad - minY];
+    }
     let view = null;
     let frame = 0;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    function setView(closed) {
-      const to = closed ? tight : full;
+    function setView() {
+      const to = viewFor(state.provider);
       cancelAnimationFrame(frame);
       const from = view || to;
-      const apply = values => { view = values; stage.setAttribute('viewBox', values.join(' ')); };
+      const apply = values => {
+        view = values;
+        stage.setAttribute('viewBox', values.join(' '));
+        stage.style.aspectRatio = `${values[2]} / ${values[3]}`;
+      };
       if (reducedMotion.matches || from === to) { apply(to); return; }
       const start = performance.now();
       const step = now => {
@@ -168,7 +182,7 @@
         el.classList.toggle('act', selected);
         el.setAttribute('aria-pressed', String(selected));
       });
-      setView(!state.provider);
+      setView();
       hint.textContent = !state.provider ? 'Select a provider to see its options' : state.client ? '' : 'Now pick your tool';
       renderPanel();
     }
