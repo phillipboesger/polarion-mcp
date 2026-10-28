@@ -92,6 +92,82 @@
       ]
     }
   ],
+  "map": [
+    {
+      "id": "claude",
+      "name": "Claude",
+      "logo": "claude",
+      "color": "#ff8a5b",
+      "angle": -90,
+      "clients": [
+        "claude-desktop",
+        "claude-web-desktop",
+        "claude-code",
+        "claude-api"
+      ]
+    },
+    {
+      "id": "google",
+      "name": "Google Gemini",
+      "logo": "google",
+      "color": "#8ab4f8",
+      "angle": -30,
+      "clients": [
+        "gemini-cli",
+        "gemini-enterprise"
+      ]
+    },
+    {
+      "id": "custom",
+      "name": "Custom clients",
+      "logo": "custom",
+      "color": "#c4a0ff",
+      "angle": 30,
+      "clients": [
+        "generic-stdio",
+        "generic-http",
+        "rest-wrapper",
+        "n8n"
+      ]
+    },
+    {
+      "id": "editors",
+      "name": "Editors & IDEs",
+      "logo": "editors",
+      "color": "#62d6ff",
+      "angle": 90,
+      "clients": [
+        "vscode-copilot",
+        "cursor",
+        "windsurf",
+        "jetbrains-ai"
+      ]
+    },
+    {
+      "id": "ms",
+      "name": "Microsoft",
+      "logo": "ms",
+      "color": "#7fb8ff",
+      "angle": 150,
+      "clients": [
+        "copilot-studio"
+      ]
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "logo": "openai",
+      "color": "#5fe0c0",
+      "angle": 210,
+      "clients": [
+        "chatgpt-apps",
+        "custom-gpt",
+        "codex-cli",
+        "openai-api",
+        "openai-agents"
+      ]
+    }
+  ],
   "setups": [
     {
       "id": "local-json",
@@ -235,6 +311,7 @@
       "id": "claude-desktop",
       "name": "Claude Desktop",
       "label": "Claude Desktop",
+      "icon": "desktop",
       "provider": "claude",
       "sources": [
         "https://modelcontextprotocol.io/docs/develop/connect-local-servers",
@@ -319,6 +396,7 @@
       "id": "claude-web-desktop",
       "name": "claude.ai",
       "label": "claude.ai",
+      "icon": "globe",
       "provider": "claude",
       "sources": [
         "https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp"
@@ -378,6 +456,7 @@
       "id": "claude-code",
       "name": "Claude Code",
       "label": "Claude Code",
+      "icon": "terminal",
       "provider": "claude",
       "sources": [
         "https://code.claude.com/docs/en/mcp"
@@ -454,6 +533,7 @@
       "id": "claude-api",
       "name": "Claude API",
       "label": "API",
+      "icon": "api",
       "provider": "claude",
       "sources": [
         "https://platform.claude.com/docs/en/agents-and-tools/mcp-connector"
@@ -508,6 +588,7 @@
       "id": "chatgpt-apps",
       "name": "ChatGPT connector",
       "label": "ChatGPT",
+      "icon": "chat",
       "provider": "openai",
       "sources": [
         "https://developers.openai.com/api/docs/guides/custom-mcp-server"
@@ -563,6 +644,7 @@
       "id": "custom-gpt",
       "name": "Custom GPT Actions",
       "label": "Custom GPT",
+      "icon": "sliders",
       "provider": "openai",
       "sources": [
         "https://developers.openai.com/api/docs/actions/getting-started",
@@ -619,6 +701,7 @@
       "id": "openai-api",
       "name": "OpenAI Responses API",
       "label": "OpenAI API",
+      "icon": "api",
       "provider": "openai",
       "sources": [
         "https://developers.openai.com/api/docs/guides/tools-connectors-mcp"
@@ -675,6 +758,7 @@
       "id": "openai-agents",
       "name": "OpenAI Agents SDK",
       "label": "OpenAI Agents SDK",
+      "icon": "box",
       "provider": "openai",
       "sources": [
         "https://openai.github.io/openai-agents-python/mcp/",
@@ -755,6 +839,7 @@
       "id": "codex-cli",
       "name": "Codex",
       "label": "Codex",
+      "icon": "terminal",
       "provider": "openai",
       "sources": [
         "https://learn.chatgpt.com/docs/extend/mcp?surface=cli",
@@ -835,6 +920,7 @@
       "id": "copilot-studio",
       "name": "Microsoft Copilot Studio",
       "label": "Copilot Studio",
+      "icon": "bot",
       "provider": "microsoft",
       "sources": [
         "https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent"
@@ -889,6 +975,7 @@
       "id": "vscode-copilot",
       "name": "VS Code / GitHub Copilot",
       "label": "VS Code Copilot",
+      "icon": "code",
       "provider": "microsoft",
       "sources": [
         "https://code.visualstudio.com/docs/agents/reference/mcp-configuration",
@@ -972,6 +1059,7 @@
       "id": "gemini-cli",
       "name": "Gemini CLI",
       "label": "Gemini CLI",
+      "icon": "terminal",
       "provider": "google",
       "sources": [
         "https://geminicli.com/docs/tools/mcp-server/"
@@ -1052,6 +1140,7 @@
       "id": "gemini-enterprise",
       "name": "Gemini Enterprise",
       "label": "Gemini Enterprise",
+      "icon": "building",
       "provider": "google",
       "sources": [
         "https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server"
@@ -1107,6 +1196,7 @@
       "id": "cursor",
       "name": "Cursor",
       "label": "Cursor",
+      "icon": "cursor",
       "provider": "tools",
       "sources": [
         "https://cursor.com/docs/mcp"
@@ -1197,6 +1287,7 @@
       "id": "windsurf",
       "name": "Windsurf / Cascade",
       "label": "Windsurf",
+      "icon": "sail",
       "provider": "tools",
       "sources": [
         "https://docs.windsurf.com/windsurf/cascade/mcp"
@@ -1278,6 +1369,7 @@
       "id": "jetbrains-ai",
       "name": "JetBrains AI Assistant",
       "label": "JetBrains",
+      "icon": "ide",
       "provider": "tools",
       "sources": [
         "https://www.jetbrains.com/help/ai-assistant/mcp.html"
@@ -1351,6 +1443,7 @@
       "id": "docker",
       "name": "Docker team server",
       "label": "Docker",
+      "icon": "server",
       "provider": "custom",
       "sources": [
         "https://github.com/phillipboesger/polarion-mcp/blob/main/Dockerfile",
@@ -1398,6 +1491,7 @@
       "id": "generic-stdio",
       "name": "Other AI provider / any MCP client",
       "label": "Any MCP client",
+      "icon": "terminal",
       "provider": "custom",
       "sources": [
         "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"
@@ -1469,6 +1563,7 @@
       "id": "generic-http",
       "name": "Generic HTTP client",
       "label": "HTTP",
+      "icon": "plug",
       "provider": "custom",
       "sources": [
         "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports"
@@ -1516,6 +1611,7 @@
       "id": "rest-wrapper",
       "name": "REST wrapper / OpenAPI",
       "label": "REST / OpenAPI",
+      "icon": "swap",
       "provider": "custom",
       "sources": [
         "https://github.com/phillipboesger/polarion-mcp/blob/main/src/http-server.ts",
@@ -1563,6 +1659,7 @@
       "id": "n8n",
       "name": "n8n REST workflow",
       "label": "n8n",
+      "icon": "nodes",
       "provider": "custom",
       "sources": [
         "https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/",

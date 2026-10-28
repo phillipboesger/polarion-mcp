@@ -8,7 +8,8 @@
     "groups",
     "setups",
     "clients",
-    "serverModes"
+    "serverModes",
+    "map"
   ],
   "additionalProperties": false,
   "properties": {
@@ -145,6 +146,52 @@
           }
         }
       }
+    },
+    "map": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "logo",
+          "color",
+          "angle",
+          "clients"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "logo": {
+            "type": "string",
+            "minLength": 1
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "angle": {
+            "type": "integer"
+          },
+          "clients": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -263,7 +310,8 @@
         "defaultMode",
         "summary",
         "local",
-        "server"
+        "server",
+        "icon"
       ],
       "additionalProperties": false,
       "properties": {
@@ -347,6 +395,28 @@
         },
         "server": {
           "$ref": "#/$defs/connection"
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "desktop",
+            "globe",
+            "terminal",
+            "api",
+            "chat",
+            "sliders",
+            "box",
+            "bot",
+            "code",
+            "building",
+            "cursor",
+            "sail",
+            "ide",
+            "server",
+            "plug",
+            "swap",
+            "nodes"
+          ]
         }
       }
     },

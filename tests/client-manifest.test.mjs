@@ -9,6 +9,22 @@ import { toolsetsForDefinition } from '../build-tests/src/toolsets.js';
 const data = JSON.parse(fs.readFileSync('docs/clients.json', 'utf8'));
 const schema = JSON.parse(fs.readFileSync('docs/clients.schema.json', 'utf8'));
 
+test('integration map covers every non-docker client and every client has an icon', () => {
+  const clientIds = new Set(data.clients.map(client => client.id));
+  const mapped = data.map.flatMap(node => node.clients);
+  const counts = new Map(mapped.map(id => [id, 0]));
+  for (const id of mapped) counts.set(id, (counts.get(id) ?? 0) + 1);
+  assert.equal(data.map.length, 6);
+  assert.equal(new Set(data.map.map(node => node.id)).size, 6);
+  assert.equal(new Set(data.map.map(node => node.angle)).size, 6);
+  for (const id of mapped) assert.ok(clientIds.has(id), `unknown map client ${id}`);
+  for (const client of data.clients) {
+    assert.ok(client.icon, `${client.id} is missing an icon`);
+    if (client.id !== 'docker') assert.equal(counts.get(client.id), 1, `${client.id} must appear exactly once in the map`);
+  }
+  assert.equal(counts.get('docker') ?? 0, 0);
+});
+
 test('client manifest validates every client for local and server with a reason when unsupported', () => {
   const validate = new Ajv2020({ allErrors: true }).compile(schema);
   assert.ok(validate(data), JSON.stringify(validate.errors));
