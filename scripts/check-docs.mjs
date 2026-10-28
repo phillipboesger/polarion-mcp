@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderClientsBlock, renderGuides, renderReadmeFaq } from './render-clients.mjs';
 import { renderSite } from './render-site.mjs';
+import { ICON_PATHS } from './galaxy-logos.mjs';
 
 const RULES = {
   env: 'env-vars', tools: 'tool-references', prompts: 'prompt-resource-references',
@@ -113,6 +114,15 @@ function checker(root) {
           if (!guide) add('clients', guideFile, 1, `${client.id} has no guide`);
           else for (const section of missingGuideSections(guide)) add('clients', guideFile, 1, `guide is missing the "${section}" section`);
         }
+        const mapped = new Map();
+        for (const node of manifest.map || []) for (const id of node.clients) mapped.set(id, (mapped.get(id) || 0) + 1);
+        for (const client of manifest.clients) {
+          const count = mapped.get(client.id) || 0;
+          if (!Object.hasOwn(ICON_PATHS, client.icon)) add('clients', 'docs/clients.json', 1, `${client.id} has unknown icon ${client.icon}`);
+          if (client.id !== 'docker' && count !== 1) add('clients', 'docs/clients.json', 1, `${client.id} must be in exactly one map node (found ${count})`);
+        }
+        for (const id of mapped.keys()) if (!manifest.clients.some(client => client.id === id)) add('clients', 'docs/clients.json', 1, `map references unknown client ${id}`);
+        if (new Set((manifest.map || []).map(node => node.id)).size !== (manifest.map || []).length) add('clients', 'docs/clients.json', 1, 'map node ids must be unique');
         const html = read(root, 'docs/index.html');
         if (html !== renderSite(root)) add('clients', 'docs/index.html', 1, 'client paths differ from docs/clients.json; run npm run docs:site');
         for (const problem of siteInstallProblems(html)) add('clients', 'docs/index.html', 1, problem);
