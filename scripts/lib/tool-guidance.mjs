@@ -44,6 +44,157 @@ function attachmentPost(owner, patchTool, listTool) {
 const ENUM_FIELD_HINT = '`fieldId` must be an enumeration-typed field (e.g. `status`, `severity`, or a custom enum field).';
 
 export const TOOL_GUIDANCE = {
+  // --- Low-scoring tools: identity, global pages and job downloads --------
+  getCurrentUser:
+    'Returns the Polarion user represented by the bearer token or active session, including that user’s profile fields. The result depends on the credentials used for this request and is not an arbitrary user lookup; use \`getUser\` with a user ID to inspect another profile. A 403 means the credentials cannot read this endpoint, not that authentication failed.',
+  getGlobalPages:
+    'Lists Rich Pages across repository spaces, subject to the signed-in user’s global repository read permissions; returns an empty page when no matching pages are visible. Use \`getSpacePages\` for a known space, \`getRepositorySpacePages\` for one repository space, or `getPages` for a project space. Follow pagination links or use `max_items` to cap collection.',
+  getSpacePages:
+    'Lists Rich Pages in the specified project space and returns the paginated JSON:API page collection. Requires a project ID and space ID visible to the signed-in user. Use \`getGlobalPages\` for pages across repository spaces or \`getRepositorySpacePages\` for a repository-level space outside projects.',
+  getRepositorySpacePages:
+    'Lists Rich Pages in one repository-level space outside projects, returning a paginated JSON:API collection. Requires global repository access. Use \`getGlobalPages\` across repository spaces or \`getSpacePages\` for a project space.',
+  getJobLogContent:
+    'Downloads the plain-text execution log for one asynchronous Polarion job. Call after \`getJob\` reports a terminal state because a running job may have an incomplete log; `jobId` comes from the `jobs` resource returned by the operation that started it. Use \`getJobResultFileContent\` for produced files instead of logs.',
+  getTestRunAttachmentContent:
+    `Downloads one Test Run attachment and returns its file bytes as image, text, or embedded-resource content. ${DOWNLOAD_NOTE} Use \`getTestRunAttachment\` for metadata or \`getTestRunAttachments\` to list available attachment IDs; read the attachment only when its contents are needed.`,
+  getCurrentEnumOptionsForWorkItem:
+    `Returns the selected enum value(s) on one Work Item as option objects. ${ENUM_FIELD_HINT} Use \`getAvailableEnumOptionsForWorkItem\` to see values the item can be changed to; this tool reports only the current selection.`,
+  getBacklinkedWorkItems:
+    'Returns Work Items with an incoming link to the specified Work Item, paginated. Use \`getLinkedWorkItems\` for outgoing links, \`getExternallyLinkedWorkItem\` for links to another Polarion server, or \`getWorkItemsRelationships\` for raw relationship linkage without linked item details.',
+  getExternallyLinkedWorkItem:
+    'Returns Work Items linked to the specified item in another Polarion server, using the external-link relationship. Use \`getLinkedWorkItems\` or \`getBacklinkedWorkItems\` for links within this server and \`getWorkItemsRelationships\` for raw relationship identifiers.',
+  updateAvatar:
+    `Replaces one user's avatar image using the supplied image content. ${DOWNLOAD_NOTE} The request changes the stored avatar for the specified user and requires permission to update that profile. Use \`getAvatar\` to retrieve the current image; use \`patchUser\` for profile fields such as name or email.`,
+  getTestStepResults:
+    'Lists the execution results for steps in one Test Record, including result values and step references. Requires the project, Test Run, iteration, and Test Record identifiers. Use `getTestSteps` for the Test Case definition or `getTestRun` for overall execution status.',
+  getMetadata:
+    'Returns server-wide Polarion REST metadata available to REST API users. Use this for global field/configuration definitions; use `getProjectFieldsMetadata` for a project’s effective resource fields and `getFieldsMetadataForWorkItem` for fields on a specific Work Item.',
+  // --- Low-scoring workflow distinctions ---------------------------------
+  getTestRunAttachment:
+    'Returns metadata for one attachment on a Test Run, including its file name and content type. Use `getTestRunAttachmentContent` to download the bytes or \`getTestRunAttachments\` to list attachments.',
+  getTestRunAttachments:
+    'Lists attachment metadata on one Test Run. Use \`getTestRunAttachment\` for one known attachment ID and `getTestRunAttachmentContent` to read its file bytes.',
+  deleteProject:
+    'Permanently deletes a Polarion project and its project data, including contained resources; this cannot be recovered through the API. Requires project deletion permission. Use \`dry_run\` to preview the request, and use \`unmarkProject\` when the project data should remain in the repository.',
+  createProject:
+    'Creates a new Polarion project and returns the created project resource. Supply a unique project ID and any required template configuration; the signed-in user must have project creation permission. Use \`getProjectTemplates\` first when selecting a template, or `markProject` to register existing repository data as a project.',
+  executeJob:
+    'Starts a Polarion asynchronous job and returns its `jobs` resource; this response means the job was accepted, not that it finished. Poll \`getJob\` with the returned job ID, then use \`getJobLogContent\` or \`getJobResultFileContent\` after completion. Use `run_job_and_wait` when bounded polling and a log tail are preferred.',
+  importExcelTestResults:
+    'Imports test results from an Excel file into the specified Test Run and changes its execution data. The file must match the expected Polarion export/import format and the user must have permission to update the run. Use \`getExportExcelTests\` to create a compatible workbook; use \`importWordDocument\` for Word-based document import.',
+  importWordDocument:
+    'Imports a Word document as a Polarion LiveDoc, creating or updating document content according to the request options. Requires project and space access plus a valid Word file; use `postDocuments` to create a LiveDoc from JSON:API data or \`importExcelTestResults\` for test-result spreadsheets.',
+  // --- Document operation routing ----------------------------------------
+  moveToDocument:
+    'Moves one existing Work Item from the project tracker into a LiveDoc and returns the move result. Requires the Work Item and target document to be writable. Use \`moveFromDocument\` to return an item to the tracker or \`moveWorkItemsToDocument\` to move a batch.',
+  moveWorkItemsToDocument:
+    'Moves a batch of existing Work Items from the project tracker into a LiveDoc. Provide the target document and the Work Item IDs in the request body; all items must be accessible and the document writable. Use \`moveToDocument\` for a single item or \`moveFromDocument\` to remove one from a document.',
+  moveDocumentParts:
+    'Reorders or relocates parts within a LiveDoc using the requested part IDs and target position. Read current part IDs with \`getDocumentParts\` first; use \`overwriteDocumentParts\` only when replacing the document structure rather than moving existing parts.',
+  overwriteDocumentParts:
+    'Replaces the parts of a LiveDoc with the supplied part list. This can remove or replace existing content, so read the current structure with \`getDocumentParts\` and use \`dry_run\` before writing. Use \`moveDocumentParts\` to reposition existing parts while retaining their identities.',
+  mergeDocumentToMaster:
+    'Merges the selected branched LiveDoc content into its master document and returns the merge job/result. Requires a valid branch/master relationship and write access to the master. Use \`branchDocument\` to create a branch, or \`moveDocumentParts\` for edits within one document.',
+  copyDocument:
+    'Copies one LiveDoc into a target project and space, creating a new document while leaving the source unchanged. Supply the target location and new document name in \`requestBody\`; omit target project/space only when the operation should remain in the source location. Use \`branchDocument\` when the copy must retain branch lineage.',
+  branchDocument:
+    'Creates a branched LiveDoc and returns an asynchronous `jobs` resource. `requestBody.documentConfigurations` identifies the source and optional target project, space, and document name; omit target project/space to branch within the source project and space. Requires read access to the source and write access to the target; poll \`getJob\` for completion. Use \`copyDocument\` when branch lineage is not needed.',
+  branchDocuments:
+    'Creates branches for multiple source LiveDocs and returns an asynchronous `jobs` resource. Each \`documentConfigurations\` entry supplies a source and may specify its own target; omitted targets stay with the source location. Requires source read and target write permissions; poll \`getJob\` for completion. Use \`branchDocument\` for one document.',
+  // --- Collection lifecycle ----------------------------------------------
+  closeCollection:
+    'Closes one Collection, changing its lifecycle state while retaining its contents. Requires permission to update the Collection. Use `reopenCollection` to make a closed Collection active again, or `reuseCollection` when continuing its contents as a new cycle.',
+  reopenCollection:
+    'Reopens one previously closed Collection so it can be used again. Requires permission to update the Collection. Use `closeCollection` to close an active one or `reuseCollection` to start a new cycle while preserving the earlier state.',
+  reuseCollection:
+    'Starts a new use cycle for one Collection while retaining the existing collection history. Requires a valid Collection and update permission. Use `reopenCollection` to reactivate the same closed cycle or `copyCollection` when a separate Collection is needed.',
+  // --- Comments, relationships and approval routing ----------------------
+  postComments:
+    'Creates comments on the specified Work Item or resource using the request body and returns the created comment resources. The target must be writable by the signed-in user. Use \`getComments\` to list comments and \`postDocumentComments\` or \`postPageComments\` for comments on those specific resource families.',
+  postDocumentComments:
+    'Creates comments on one LiveDoc and returns the created comment resources. Requires write access to the document. Use \`getDocumentComments\` to read document comments; use \`postComments\` for Work Item comments.',
+  postPageComments:
+    'Creates comments on one Rich Page and returns the created comment resources. Requires write access to the page. Use \`postComments\` for Work Item comments or \`postDocumentComments\` for LiveDocs.',
+  patchDocumentComment:
+    'Updates the text or supported attributes of one comment on a LiveDoc. Requires permission to edit that comment. Use \`patchComment\` for a Work Item comment and \`patchPageComment\` for a Rich Page comment.',
+  patchPageComment:
+    'Updates the text or supported attributes of one comment on a Rich Page. Requires permission to edit that comment. Use \`patchComment\` for a Work Item comment or \`patchDocumentComment\` for a LiveDoc comment.',
+  patchComment:
+    'Updates one comment on a Work Item and returns the updated comment resource. Requires permission to edit that comment. Use \`patchDocumentComment\` or \`patchPageComment\` for comments on those resource families.',
+  getComments:
+    'Lists comments associated with one Work Item. Use \`getDocumentComments\` for a LiveDoc, \`getPageComments\` for a Rich Page, or \`getTestRunComments\` for a Test Run.',
+  patchWorkItemApproval:
+    'Updates one approver’s decision on a Work Item approval entry. Use the approver’s user ID as the approval identifier; the user must be allowed to record the decision. Read the entry with \`getWorkItemApproval\` and use \`patchWorkItemApprovals\` only when changing multiple approvals.',
+  patchWorkItemApprovals:
+    'Updates multiple approval entries on one Work Item using the supplied approval list. Requires permission for each requested decision. Use \`getWorkItemApprovals\` to inspect current entries and \`patchWorkItemApproval\` for one approver.',
+  postWorkItemApprovals:
+    'Adds approval entries for users on one Work Item. Provide approver user IDs in the request body; the signed-in user must have permission to configure approvals. Use \`getWorkItemApprovals\` to inspect existing entries and \`patchWorkItemApproval\` to record a decision.',
+  postWorkRecords:
+    'Creates time-tracking work records for one Work Item and returns the created entries. Each request-body record must include valid work-record attributes such as date and time spent; the user must have permission to log effort. Use \`getWorkRecords\` to inspect entries and \`deleteWorkRecord\` to remove an incorrect record.',
+  deleteCollectionsRelationship:
+    'Removes the named relationship from one Collection; the related resource itself is not deleted. Read current links with `getCollectionsRelationship`; use `postCollectionsRelationships` to add links or `patchCollectionsRelationships` to replace the relationship set.',
+  deletePlanRelationship:
+    'Removes the named relationship from one Plan without deleting the related resource. Read current links with `getPlanRelationship`; use `postPlanRelationships` to add links or `patchPlanRelationships` to replace them.',
+  deleteWorkItemsRelationship:
+    'Removes one named JSON:API relationship from a Work Item; this edits linkage and does not delete related Work Items. Use `getWorkItemsRelationships` to inspect raw linkage or linked-work-item tools for link roles and related item details.',
+  deletePage:
+    'Permanently deletes one Rich Page and its content; this cannot be undone through this API. Requires page deletion permission. Use `dry_run` to preview the request or `patchRichPage` to edit without deleting.',
+  deleteLicenseSlots:
+    'Deletes specified license slots from the Polarion server. This is a server-wide administrative change requiring license administration permission. Read current assignments with `getLicenseSlots` and capacity with `getLicense` before removal.',
+  deleteTestRecord:
+    'Deletes one Test Record execution in a Test Run iteration, not the Test Case definition. Use `getTestRecords` to identify the record and `patchTestRecord` when only its values should change.',
+  deleteTestRecordTestParameter:
+    'Removes one parameter value from a Test Record execution without deleting the record or Test Case. Use `getTestRecordTestParameters` to inspect values and `patchTestRecordTestParameters` to change rather than remove them.',
+  patchCollections:
+    'Updates one Collection’s attributes from the supplied JSON:API request body. Use `patchCollectionsRelationships` for linkage changes or `postCollections` to create another Collection.',
+  patchCollectionsRelationships:
+    'Replaces relationship linkage on one Collection with the supplied relationship data. Read existing links with `getCollectionsRelationship`; use `postCollectionsRelationships` to add links without replacing the full set.',
+  patchDocument:
+    'Updates attributes of one LiveDoc using its JSON:API request body; only supplied attributes change. Rich text uses `{type: "text/html", value: "<p>…</p>"}`. Use `patchDocumentParts` for structured body parts or `patchRichPage` for a wiki page.',
+  patchLicense:
+    'Updates the server license configuration from the supplied request body. This is a global administrative change requiring license administration permission. Inspect capacity with `getLicense` and assignments with `getLicenseSlots` first.',
+  patchPageRelationships:
+    'Replaces relationship linkage on one Rich Page. Read links with `getPageRelationships`; use `postPageRelationships` to add links without replacing the existing set.',
+  patchPlan:
+    'Updates one Plan’s attributes from the supplied JSON:API request body. Use `patchPlanRelationships` for linkage changes or `postPlans` to create a Plan.',
+  patchProject:
+    'Updates one Polarion project’s attributes from the supplied JSON:API request body. Requires project administration permission. Use `getProject` to inspect current values and `deleteProject` only to remove the project.',
+  patchUser:
+    'Updates profile attributes for one user from the supplied JSON:API request body. Requires permission to edit that user; use `getUser` to inspect the profile and `updateAvatar` for the image.',
+  postBacklinkedWorkItems:
+    'Creates incoming Work Item links to the specified target from the Work Items in the request body. Supply valid project-scoped IDs and link roles. Use `postLinkedWorkItems` for outgoing links or `getBacklinkedWorkItems` to inspect incoming links.',
+  postCollections:
+    'Creates Collections from the supplied JSON:API resource data and returns the created resources. Requires project permission to create Collections. Use `getCollections` to list existing ones or `patchCollections` to update one.',
+  postCollectionsRelationships:
+    'Adds relationship links to one Collection without replacing its other links. Provide JSON:API linkage; use `getCollectionsRelationship` to inspect the set or `patchCollectionsRelationships` to replace it.',
+  postDocumentParts:
+    'Adds structured parts to a LiveDoc and returns the created parts. Use valid LiveDoc part types and read existing content with `getDocumentParts` first; use `overwriteDocumentParts` only when replacing the full structure.',
+  postExternallyLinkedWorkItems:
+    'Creates links from a Work Item to items in another Polarion server using external references. Use `postLinkedWorkItems` for links within this server and `getExternallyLinkedWorkItem` to inspect external links.',
+  postPageRelationships:
+    'Adds relationship links to one Rich Page while preserving existing linkage. Provide JSON:API relationship data; inspect links with `getPageRelationships` or use `patchPageRelationships` to replace the set.',
+  postPages:
+    'Creates Rich Pages in the specified project space from JSON:API resource data and returns the new page resources. Requires write access to the project and space. Use `getSpacePages` for project pages or `getGlobalPages` for repository-wide pages.',
+  postPlanRelationships:
+    'Adds relationship links to one Plan while retaining existing links. Provide JSON:API linkage; use `getPlanRelationship` to inspect the set or `patchPlanRelationships` to replace it.',
+  postProjectTestParameterDefinitions:
+    'Creates Test Parameter Definitions for a project. Supply each definition’s name and supported attributes; use `getProjectTestParameterDefinitions` to inspect existing definitions and `patchProjectTestParameterDefinitions` to update them.',
+  postTestRecords:
+    'Creates Test Record executions in a Test Run iteration from the supplied case references and result data. Use `getTestRecords` to inspect executions or `postTestStepResults` to add step-level outcomes.',
+  postTestRunComments:
+    'Creates comments on one Test Run and returns the created comment resources. Requires write access to the run. Use `getTestRunComments` to list them or `postComments` for Work Item comments.',
+  postTestRunParameterDefinitions:
+    'Creates parameter definitions for one Test Run. Use `getTestRunParameterDefinitions` to inspect the current set and `patchTestRunParameterDefinitions` to update it.',
+  postTestRunTestParameters:
+    'Creates Test Parameter values for a Test Run and iteration. Values must match the run’s parameter definitions; use `getTestRunTestParameters` to inspect values and `patchTestRunTestParameters` to update them.',
+  postTestStepResults:
+    'Creates execution results for Test Steps in a Test Record. Use `getTestSteps` for the Test Case definition and `getTestStepResults` to read recorded outcomes.',
+  postTestSteps:
+    'Creates Test Steps on a Test Case and returns them. Use `getTestSteps` to read the current sequence and `patchTestSteps` to update existing steps.',
+  postUsers:
+    'Creates Polarion user accounts from the supplied user resource data. Requires user administration permission and valid unique user IDs. Use `getUser` to inspect an account or `patchUser` to update one.',
+  postWorkItemRelationships:
+    'Adds relationship linkage to one Work Item while preserving existing relationships. Provide JSON:API linkage; inspect it with `getWorkItemsRelationships` or use `patchWorkItemRelationships` to replace it.',
   // --- Whole-list replacement (verified on Polarion 2606) -------------------
   patchGlobalEnumeration:
     'Replaces the entire option list of one global Enumeration: options missing from `requestBody` are deleted, not merged. Read the current list with `getGlobalEnumeration` first and send every option you want to keep.',

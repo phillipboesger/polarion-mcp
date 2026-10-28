@@ -3,7 +3,7 @@ import { abortableDelay, attrs, boundedNumber, errorResult, first, resultFailed,
 
 export const runJobAndWait: VirtualTool = {
   name: 'run_job_and_wait', title: 'Run Polarion job and wait', toolset: 'composites',
-  description: 'Submits one Polarion asynchronous job, polls until a terminal state or timeout, then returns `{jobId, status, state, message, logTail}`. Provide the `executeJob` request body with a job factory ID and any factory-specific parameters. Requires permission to execute that job. Polling cancellation or timeout stops waiting but does not cancel the Polarion job; use `executeJob` and `getJob` separately when you do not need a bounded wait and log tail.',
+  description: 'Submits one Polarion asynchronous job, polls until a terminal state or timeout, then returns `{jobId, status, state, message, logTail}`. Provide the `executeJob` request body with a job factory ID and any factory-specific parameters; job semantics vary by factory. Requires permission to execute that job. Polling cancellation or timeout stops waiting but does not cancel the Polarion job; use `executeJob` and `getJob` separately when you do not need a bounded wait and log tail.',
   inputSchema: { type: 'object', properties: {
     requestBody: { type: 'object', description: 'JSON body passed to `executeJob`; factory-specific parameters vary by jobId.', properties: {
       jobId: { type: 'string', description: 'Polarion job factory ID, such as one listed by the server’s job catalog.' },
