@@ -22,7 +22,7 @@ docker run -d --name polarion-mcp \
   -p 127.0.0.1:3000:3000 \
   -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \
   -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.3
+  ghcr.io/phillipboesger/polarion-mcp:1.4.4
 ```
 
 The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends their own Polarion PAT. For team access, proxy HTTPS to the loopback port, forward the public Host, and add your public hostname to MCP_ALLOWED_HOSTS. Cloud connectors also need OAuth; their Docker choice includes that configuration.

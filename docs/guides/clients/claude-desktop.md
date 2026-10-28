@@ -27,7 +27,7 @@ docker run -d --name polarion-mcp \
   -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \
   -e MCP_ALLOWED_REDIRECT_PRESETS=claude \
   -e TRUST_PROXY=1 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.3
+  ghcr.io/phillipboesger/polarion-mcp:1.4.4
 ```
 
 Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and forward the public Host. TRUST_PROXY=1 assumes exactly one trusted proxy hop; adjust it to your network. Generate a stable secret of at least 32 characters. The claude redirect preset allows the claude.ai callback used by Claude web and Desktop connectors.

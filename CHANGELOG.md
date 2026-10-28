@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.4
+
+### Improvements
+
+- Tool descriptions: curated guidance, sibling routing and parameter hints for the lowest-rated tools, and a description on every composite tool input property. Tool names, schemas and behavior are unchanged.
+- Docs: a table of look-alike tool families in the usage guide and per-client notes on smaller tool lists (toolsets, allowlist, read-only, discover mode).
+
 ## 1.4.3
 
 ### Fixes
