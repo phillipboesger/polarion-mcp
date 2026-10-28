@@ -20,7 +20,8 @@ export const ICON_PATHS = {
 
 const icon = (name, color, scale = 1.25) => `<g class="ico" style="--c:${color}" transform="translate(${-12 * scale} ${-12 * scale}) scale(${scale})">${ICON_PATHS[name] ?? ICON_PATHS.code}</g>`;
 
-export function renderNodeLogo(id, color) {
+export function renderNodeLogo(id, rawColor) {
+  const color = String(rawColor).replace(/[^#\w(),.% -]/g, '');
   switch (id) {
     case 'claude': {
       let rays = '';

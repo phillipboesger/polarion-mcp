@@ -120,7 +120,11 @@ ${why.length ? `<p class="why">${why.join(' ')}</p>` : ''}
         el.classList.toggle('hot', open && Boolean(state.client));
       });
       satEdges.forEach(el => el.classList.toggle('hot', el.dataset.client === state.client));
-      layer.querySelectorAll('.satellite').forEach(el => el.classList.toggle('act', el.dataset.client === state.client));
+      layer.querySelectorAll('.satellite').forEach(el => {
+        const selected = el.dataset.client === state.client;
+        el.classList.toggle('act', selected);
+        el.setAttribute('aria-pressed', String(selected));
+      });
       hint.textContent = !state.provider ? 'Select a provider to see its options' : state.client ? '' : 'Now pick your tool';
       renderPanel();
     }
