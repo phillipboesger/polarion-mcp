@@ -5,7 +5,7 @@
   if (root && dataEl) {
     const data = JSON.parse(dataEl.textContent);
     const SVG = 'http://www.w3.org/2000/svg';
-    const stage = root.querySelector('.galaxy-stage');
+        const stage = root.querySelector('.galaxy-stage');
     const layer = document.getElementById('galaxy-satellites');
     const hint = document.getElementById('galaxy-hint');
     const panel = document.getElementById('galaxy-panel');
@@ -15,8 +15,23 @@
     const nodes = new Map(data.nodes.map(node => [node.id, node]));
     const clients = new Map(data.clients.map(client => [client.id, client]));
     const state = { provider: null, client: null, env: 'local' };
-    const esc = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const icon = (name, scale) => `<g class="ico" transform="translate(${-12 * scale} ${-12 * scale}) scale(${scale})">${data.icons[name] || ''}</g>`;
+    const XHTML = 'http://www.w3.org/1999/xhtml';
+    // DOM builder: text always goes through textContent, never through HTML parsing.
+    const h = (ns, tag, attrs = {}, ...children) => {
+      const el = document.createElementNS(ns, tag);
+      for (const [key, value] of Object.entries(attrs)) if (value !== false && value != null) el.setAttribute(key, value === true ? '' : value);
+      for (const child of children) el.append(child);
+      return el;
+    };
+    const html = (tag, attrs, ...children) => h(XHTML, tag, attrs, ...children);
+    const svg = (tag, attrs, ...children) => h(SVG, tag, attrs, ...children);
+    // Icon paths are build-time constants from the manifest renderer; parse them as SVG, not HTML.
+    const icon = (name, scale) => {
+      const g = svg('g', { class: 'ico', transform: `translate(${-12 * scale} ${-12 * scale}) scale(${scale})` });
+      const doc = new DOMParser().parseFromString(`<svg xmlns="${SVG}">${data.icons[name] || ''}</svg>`, 'image/svg+xml');
+      g.append(...[...doc.documentElement.childNodes].map(node => document.importNode(node, true)));
+      return g;
+    };
     const curve = (a, b, k) => {
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
       return `M${a.x} ${a.y} Q${mx - dy * k} ${my + dx * k} ${b.x} ${b.y}`;
@@ -39,7 +54,7 @@
     }
 
     function drawSatellites() {
-      layer.innerHTML = '';
+      layer.replaceChildren();
       satEdges = [];
       const node = nodes.get(state.provider);
       if (!node) return;
@@ -64,7 +79,9 @@
         g.setAttribute('transform', `translate(${client.satellite.x} ${client.satellite.y})`);
         g.style.setProperty('--c', node.color);
         g.dataset.client = id;
-        g.innerHTML = `<circle class="disc" r="${data.radii.satellite}"/>${icon(client.icon, 1.1)}<text class="lbl s" y="45">${esc(client.label)}</text>`;
+        const label = svg('text', { class: 'lbl s', y: 45 });
+        label.textContent = client.label;
+        g.append(svg('circle', { class: 'disc', r: data.radii.satellite }), icon(client.icon, 1.1), label);
         g.addEventListener('click', () => selectClient(id));
         g.addEventListener('keydown', event => activate(event, () => selectClient(id)));
         layer.appendChild(g);
@@ -75,27 +92,33 @@
       const target = mobile.matches ? sheet : panel;
       const other = mobile.matches ? panel : sheet;
       other.hidden = true;
-      other.innerHTML = '';
+      other.replaceChildren();
       const client = clients.get(state.client);
-      if (!client) { target.hidden = true; target.innerHTML = ''; return; }
+      if (!client) { target.hidden = true; target.replaceChildren(); return; }
       const node = nodes.get(client.node);
       const modes = client.modes;
-      const why = ['local', 'server'].filter(key => !modes[key].supported).map(key => `${envInfo[key][0]}: ${esc(modes[key].reason)}`);
+      const text = (tag, attrs, value) => { const el = html(tag, attrs); el.textContent = value; return el; };
+      const why = ['local', 'server'].filter(key => !modes[key].supported).map(key => `${envInfo[key][0]}: ${modes[key].reason}`);
       const envButton = key => {
         const supported = modes[key].supported;
-        return `<button type="button" class="env${supported ? '' : ' off'}${supported && state.env === key ? ' on' : ''}" data-env="${key}" aria-pressed="${supported && state.env === key}"${supported ? '' : ' aria-disabled="true"'}><b>${envInfo[key][0]}</b><span>${envInfo[key][1]}</span></button>`;
+        const on = supported && state.env === key;
+        return html('button', { type: 'button', class: `env${supported ? '' : ' off'}${on ? ' on' : ''}`, 'data-env': key, 'aria-pressed': String(on), 'aria-disabled': supported ? null : 'true' },
+          text('b', {}, envInfo[key][0]), text('span', {}, envInfo[key][1]));
       };
-      const chips = modes[state.env].requirement.split('; ').filter(Boolean).map(item => `<li>${esc(item)}</li>`).join('');
+      const badge = svg('svg', { viewBox: '-16 -16 32 32', width: 30, height: 30, style: `--c:${node.color}` }, icon(client.icon, 1.1));
+      const close = text('button', { type: 'button', class: 'x', 'aria-label': 'Close details' }, '\u00d7');
+      const guide = text('a', { class: 'go guide-link', href: data.guideBase + client.guide, target: '_blank', rel: 'noopener noreferrer' }, 'View setup guide \u2192');
+      const chips = html('ul', { class: 'chips' }, ...modes[state.env].requirement.split('; ').filter(Boolean).map(item => text('li', {}, item)));
+      const flow = html('div', { class: 'flow' }, text('span', { class: 'p' }, client.label), html('span', { class: 'ln' }), text('span', { class: 'p m' }, flowMiddle(state.env)), html('span', { class: 'ln' }), text('span', { class: 'p' }, 'Polarion'));
       target.style.setProperty('--c', node.color);
       target.hidden = false;
-      target.innerHTML = `<button type="button" class="x" aria-label="Close details">&times;</button>
-<div class="ph"><div class="badge"><svg viewBox="-16 -16 32 32" width="30" height="30" style="--c:${node.color}">${icon(client.icon, 1.1)}</svg></div><div><h3>${esc(client.name)}</h3><small>${esc(node.name)}</small></div></div>
-<p class="desc">${esc(client.summary)}</p>
-<p class="lab">How do you want to connect?</p><div class="envs">${envButton('local')}${envButton('server')}</div>
-${why.length ? `<p class="why">${why.join(' ')}</p>` : ''}
-<p class="lab">Requirements</p><ul class="chips">${chips}</ul>
-<div class="flow"><span class="p">${esc(client.label)}</span><span class="ln"></span><span class="p m">${flowMiddle(state.env)}</span><span class="ln"></span><span class="p">Polarion</span></div>
-<a class="go guide-link" href="${esc(data.guideBase + client.guide)}" target="_blank" rel="noopener noreferrer">View setup guide &rarr;</a>`;
+      target.replaceChildren(close,
+        html('div', { class: 'ph' }, html('div', { class: 'badge' }, badge), html('div', {}, text('h3', {}, client.name), text('small', {}, node.name))),
+        text('p', { class: 'desc' }, client.summary),
+        text('p', { class: 'lab' }, 'How do you want to connect?'),
+        html('div', { class: 'envs' }, envButton('local'), envButton('server')),
+        ...(why.length ? [text('p', { class: 'why' }, why.join(' '))] : []),
+        text('p', { class: 'lab' }, 'Requirements'), chips, flow, guide);
       target.querySelector('.x').addEventListener('click', closeClient);
       target.querySelectorAll('.env').forEach(button => button.addEventListener('click', () => {
         if (button.getAttribute('aria-disabled') === 'true') return;
