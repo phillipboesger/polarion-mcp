@@ -6,13 +6,13 @@
     "url": "https://github.com/phillipboesger/polarion-mcp",
     "source": "github"
   },
-  "version": "1.4.3",
+  "version": "1.4.4",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "polarion-mcp",
-      "version": "1.4.3",
+      "version": "1.4.4",
       "runtimeHint": "npx",
       "runtimeArguments": [
         {
@@ -41,7 +41,7 @@
     {
       "registryType": "oci",
       "identifier": "ghcr.io/phillipboesger/polarion-mcp",
-      "version": "1.4.3",
+      "version": "1.4.4",
       "transport": {
         "type": "stdio"
       },

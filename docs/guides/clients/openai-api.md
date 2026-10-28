@@ -20,7 +20,7 @@ docker run -d --name polarion-mcp \
   -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \
   -e MCP_ALLOWED_HOSTS=YOUR-SERVER \
   -e TRUST_PROXY=1 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.3
+  ghcr.io/phillipboesger/polarion-mcp:1.4.4
 ```
 
 Required for cloud API calls: a publicly reachable HTTPS endpoint at https://YOUR-SERVER/mcp. Configure a TLS reverse proxy to 127.0.0.1:3000, forward the public Host and use a real public hostname in MCP_ALLOWED_HOSTS. TRUST_PROXY=1 assumes exactly one trusted hop. Each API request sends your Polarion PAT; OAuth is not required for this PAT-header path.
