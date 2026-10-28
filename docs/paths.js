@@ -86,17 +86,11 @@
     function renderPanel() {
       const target = mobile.matches ? sheet : panel;
       const other = mobile.matches ? panel : sheet;
-      // The hint lives in the desktop side panel while nothing is selected, otherwise above it.
-      if (mobile.matches) panel.before(hint); else hint.remove();
       other.hidden = true;
       other.replaceChildren();
       const client = clients.get(state.client);
-      if (!client) {
-        target.replaceChildren();
-        target.hidden = target !== panel;
-        if (target === panel) panel.append(hint);
-        return;
-      }
+      root.classList.toggle('has-detail', Boolean(client) && !mobile.matches);
+      if (!client) { target.hidden = true; target.replaceChildren(); return; }
       const node = nodes.get(client.node);
       const modes = client.modes;
       const text = (tag, attrs, value) => { const el = html(tag, attrs); el.textContent = value; return el; };

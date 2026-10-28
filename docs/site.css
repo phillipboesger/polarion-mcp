@@ -217,7 +217,7 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .galaxy-stage, .galaxy-hint, .galaxy-panel, .galaxy-sheet { display:none; }
 .galaxy.is-interactive .galaxy-list { display:none; }
 .galaxy.is-interactive .galaxy-stage { display:block; width:100%; height:auto; overflow:visible; }
-.galaxy.is-interactive .galaxy-hint { display:block; text-align:center; font:11px var(--mono); color:#8fb3cf; margin:0; min-height:16px; }
+.galaxy.is-interactive .galaxy-hint { display:block; text-align:center; font:11px var(--mono); color:#8fb3cf; margin-top:-6px; min-height:16px; }
 .galaxy.is-interactive .galaxy-panel:not([hidden]), .galaxy.is-interactive .galaxy-sheet:not([hidden]) { display:block; }
 .galaxy .ring { fill:none; stroke:rgba(189,238,255,.1); stroke-dasharray:2 6; }
 .galaxy .edge { fill:none; stroke:rgba(150,205,240,.3); stroke-width:1.2; transition:opacity .3s; }
@@ -240,8 +240,6 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .galaxy .pulse { fill:none; stroke:#62d6ff; opacity:.4; animation:galaxy-pulse 3.2s ease-out infinite; transform-origin:348px 320px; }
 @keyframes galaxy-pulse { from { transform:scale(1); opacity:.45; } to { transform:scale(1.5); opacity:0; } }
 .galaxy-panel, .galaxy-sheet { position:relative; margin-top:12px; border:1px solid rgba(98,214,255,.38); border-radius:14px; background:rgba(9,34,60,.9); padding:18px; font-size:13px; }
-.galaxy-panel { display:flex; align-items:center; justify-content:center; min-height:340px; }
-.galaxy-panel:has(> .ph) { display:block; }
 .galaxy-panel .x, .galaxy-sheet .x { position:absolute; right:10px; top:6px; min-width:44px; min-height:44px; background:none; border:0; color:#9fbfd8; font-size:24px; cursor:pointer; }
 .galaxy .ph { display:flex; align-items:center; gap:12px; margin-bottom:6px; padding-right:40px; }
 .galaxy .badge { width:46px; height:46px; border-radius:12px; background:#0d2a47; border:1px solid var(--c); display:grid; place-items:center; flex-shrink:0; }
@@ -271,9 +269,12 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .galaxy .flow .p { white-space:normal; }
 }
 @media(min-width:701px) {
-  .galaxy.is-interactive { display:grid; grid-template-columns:minmax(0,696px) 340px; gap:24px; align-items:start; }
-  .galaxy.is-interactive .galaxy-stage { grid-column:1; grid-row:1; }
-  .galaxy.is-interactive .galaxy-panel:not([hidden]) { grid-column:2; grid-row:1; position:sticky; top:24px; margin-top:0; }
+  /* Side panel only while a tool is open; otherwise the map stays centered. */
+  .galaxy.is-interactive .galaxy-stage { max-width:696px; margin-inline:auto; }
+  .galaxy.is-interactive.has-detail { display:grid; grid-template-columns:minmax(0,696px) 340px; gap:24px; justify-content:center; align-items:center; }
+  .galaxy.is-interactive.has-detail .galaxy-stage { grid-column:1; grid-row:1; margin:0; }
+  .galaxy.is-interactive.has-detail .galaxy-hint { grid-column:1; grid-row:2; }
+  .galaxy.is-interactive.has-detail .galaxy-panel:not([hidden]) { grid-column:2; grid-row:1; margin-top:0; }
   .galaxy.is-interactive .galaxy-sheet { display:none!important; }
 }
 @media(prefers-reduced-motion:reduce) { .galaxy *, .galaxy-sheet * { animation:none !important; transition:none !important; } }

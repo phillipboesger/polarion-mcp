@@ -52,10 +52,14 @@ const satellite = id => `.satellite[data-client="${id}"]`;
 // The fixed bottom sheet can cover map nodes on small screens, so dispatch clicks there.
 const isMobile = info => info.project.name.includes('mobile');
 const detailId = info => (isMobile(info) ? '#galaxy-sheet' : '#galaxy-panel');
-// Desktop keeps the side panel visible and shows the hint while nothing is selected; mobile hides the sheet.
+// The side panel (desktop) and sheet (mobile) exist only while a tool is open; the map is centered without them.
 const expectDetailClosed = async (page, info) => {
-  if (isMobile(info)) await expect(page.locator('#galaxy-sheet')).toBeHidden();
-  else { await expect(page.locator('#galaxy-panel .ph')).toHaveCount(0); await expect(page.locator('#galaxy-panel #galaxy-hint')).toBeVisible(); }
+  await expect(page.locator(detailId(info))).toBeHidden();
+  if (!isMobile(info)) {
+    const map = await page.locator('.galaxy-stage').boundingBox();
+    const box = await page.locator('#galaxy').boundingBox();
+    expect(Math.abs(map.x + map.width / 2 - (box.x + box.width / 2))).toBeLessThan(2);
+  }
 };
 const press = (info, locator) => (isMobile(info) ? locator.dispatchEvent('click') : locator.click());
 
@@ -89,6 +93,7 @@ test('desktop map and portrait detail panel sit side by side; mobile keeps the b
     const panel = await page.locator('#galaxy-panel').boundingBox();
     expect(panel.x).toBeGreaterThan(map.x + map.width);
     expect(panel.height).toBeGreaterThan(panel.width);
+    expect(Math.abs(panel.y + panel.height / 2 - (map.y + map.height / 2))).toBeLessThan(2);
   } else {
     await expect(page.locator('#galaxy-sheet')).toBeVisible();
     expect(await page.locator('#galaxy-sheet').evaluate(el => getComputedStyle(el).position)).toBe('fixed');
@@ -131,7 +136,6 @@ test('every client opens a panel with its guide, working modes and explained uns
     const panel = page.locator(detailId(info));
     await expect(panel).toBeVisible();
     await expect(panel.locator('h3')).toHaveText(client.name);
-    if (!isMobile(info)) await expect(page.locator('#galaxy > #galaxy-hint')).toHaveCount(0);
     await expect(panel.locator('a.go')).toHaveAttribute('href', `${guideBase}clients/${client.id}.md`);
     for (const mode of ['local', 'server']) {
       const button = panel.locator(`.env[data-env="${mode}"]`);
