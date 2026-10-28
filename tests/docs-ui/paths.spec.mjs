@@ -35,6 +35,12 @@ test('hero breathes and the landing page follows the complete user journey', asy
   }
   await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
   await expect(page.locator('#clients-title')).toHaveText('Choose your path');
+  const heading = page.locator('#clients-title');
+  const intro = page.locator('.clients-heading>p');
+  expect(await heading.evaluate(el => el.compareDocumentPosition(document.querySelector('.clients-heading>p')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  expect(await intro.evaluate(el => el.compareDocumentPosition(document.querySelector('#clients .path-entries')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  expect(await intro.evaluate(el => Math.abs(el.getBoundingClientRect().width - document.querySelector('#clients .section-heading').getBoundingClientRect().width))).toBeLessThan(2);
+  await expect(page.locator('.under-setup')).toHaveCount(0);
   await expect(page.locator('#setup')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -57,7 +63,7 @@ test('the map starts with six providers, no panel and a complete no-JS guide lis
   await expect(page.locator('#galaxy-panel')).toBeHidden();
   await expect(page.locator('#galaxy-sheet')).toBeHidden();
   await expect(page.locator('.galaxy-list')).toBeHidden();
-  await expect(page.locator('#galaxy-hint')).toHaveText('Select a provider to see its options');
+  await expect(page.locator('#galaxy-panel #galaxy-hint')).toHaveText('Select a provider to see its options');
   await expect(page.locator('.galaxy-list a.guide-link')).toHaveCount(manifest.clients.length);
   for (const client of manifest.clients) {
     await expect(page.locator(`.galaxy-list a[href="${guideBase}clients/${client.id}.md"]`)).toHaveCount(1);
@@ -66,6 +72,22 @@ test('the map starts with six providers, no panel and a complete no-JS guide lis
   await expect(page.getByRole('link', { name: /Open the local guide/ })).toHaveAttribute('href', `${guideBase}local-npm.md`);
   await expect(page.getByRole('link', { name: /Open the server guide/ })).toHaveAttribute('href', `${guideBase}server-docker.md`);
   await noOverflow(page);
+});
+
+test('desktop map and portrait detail panel sit side by side; mobile keeps the bottom sheet', async ({ page }, info) => {
+  await page.goto('/');
+  const desktop = !info.project.name.includes('mobile');
+  await page.locator(primary('claude')).click();
+  await page.locator(satellite('claude-code')).dispatchEvent('click');
+  if (desktop) {
+    const map = await page.locator('.galaxy-stage').boundingBox();
+    const panel = await page.locator('#galaxy-panel').boundingBox();
+    expect(panel.x).toBeGreaterThan(map.x + map.width);
+    expect(panel.height).toBeGreaterThan(panel.width);
+  } else {
+    await expect(page.locator('#galaxy-sheet')).toBeVisible();
+    expect(await page.locator('#galaxy-sheet').evaluate(el => getComputedStyle(el).position)).toBe('fixed');
+  }
 });
 
 test('one provider branch is open at a time; hub, second click and Escape step back', async ({ page }, info) => {

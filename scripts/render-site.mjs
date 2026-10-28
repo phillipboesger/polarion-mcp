@@ -62,8 +62,7 @@ export function renderSiteClientsBlock(manifest) {
     </div>
     <div class="galaxy" id="galaxy">
       ${svg}
-      <p class="galaxy-hint" id="galaxy-hint">Select a provider to see its options</p>
-      <div class="galaxy-panel" id="galaxy-panel" role="region" aria-label="Setup details" tabindex="-1" hidden></div>
+      <div class="galaxy-panel" id="galaxy-panel" role="region" aria-label="Setup details" tabindex="-1"><p class="galaxy-hint" id="galaxy-hint">Select a provider to see its options</p></div>
       <div class="galaxy-sheet" id="galaxy-sheet" role="dialog" aria-label="Setup details" hidden></div>
       <script type="application/json" id="galaxy-data">${json}</script>
       <p id="path-status" class="sr-only" role="status" aria-live="polite"></p>
