@@ -23,7 +23,7 @@ test('hero breathes and the landing page follows the complete user journey', asy
   await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
   for (const text of ['284', 'Preview', 'Open source', 'Release', 'Stars']) await expect(page.locator('.proof').getByText(text, { exact: false })).toBeInViewport();
   await expect(page.locator('.hero .outcomes')).toHaveCount(0);
-  await expect(page.locator('.hero .button')).toHaveCount(2);
+  await expect(page.locator('.hero .button')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText(/unverified|Web connector/i);
   expect(await page.locator('main > section').evaluateAll(sections => sections.map(section => section.id || section.className))).toEqual(['hero', 'features', 'daily-use', 'clients', 'faq']);
   await noOverflow(page);
@@ -226,11 +226,12 @@ test('reduced motion removes map animation', async ({ page }) => {
   expect(await page.locator('.galaxy .pulse').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
 });
 
-test('hero CTAs reach the chooser and the Docker link points to the server guide; old #setup links land on the chooser', async ({ page }) => {
+test('the hero has one CTA to the chooser and shows the star count; old #setup links land on the chooser', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Connect your assistant' }).click();
   await expect(page.locator('#clients-title')).toBeInViewport();
-  await expect(page.getByRole('link', { name: 'Run with Docker' })).toHaveAttribute('href', `${guideBase}server-docker.md`);
+  await expect(page.getByRole('link', { name: 'Run with Docker' })).toHaveCount(0);
+  await expect(page.locator('#gh-stars')).toHaveText(/^\d+ stars?$/);
   await page.goto('/#setup/claude-code');
   await expect(page).toHaveURL(/#clients$/);
 });

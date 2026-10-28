@@ -1824,5 +1824,6 @@
       "q": "Windsurf now says Devin. Which steps do I follow?",
       "a": "The vendor docs moved to docs.devin.ai and describe this configuration only for the legacy Cascade agent. If your tab uses the Devin Local agent, MCP servers are set up in Devin CLI config files, which this guide does not cover yet."
     }
-  ]
+  ],
+  "githubStars": 6
 }

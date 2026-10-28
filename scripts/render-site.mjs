@@ -136,6 +136,8 @@ export function renderSite(rootDir = root) {
   if (html.includes('<!-- domains:start -->')) html = replaceBlock(html, 'domains', renderDomains(toolsSource));
   if (html.includes('<!-- daily:start -->')) html = replaceBlock(html, 'daily', renderDailyUse(JSON.parse(fs.readFileSync(path.join(rootDir, 'docs/daily-use.json'), 'utf8'))));
   html = html.replaceAll('{{TOOL_COUNT}}', countDomains(toolsSource).total);
+  // The page makes no third-party requests (CSP connect-src 'none'), so the star count is rendered at build time.
+  if (Number.isInteger(manifest.githubStars)) html = html.replace(/<strong id="gh-stars">[^<]*<\/strong>/, `<strong id="gh-stars">${manifest.githubStars} ${manifest.githubStars === 1 ? 'star' : 'stars'}</strong>`);
   // Pages caches assets for hours: tie each asset URL to its content so a new HTML never meets old CSS/JS.
   return html.replace(/(href|src)="(site\.css|viz\.js|paths\.js|carousel\.js)(\?v=[0-9a-f]+)?"/g, (_, attr, file) => {
     const hash = createHash('sha1').update(fs.readFileSync(path.join(rootDir, 'docs', file))).digest('hex').slice(0, 8);
@@ -145,6 +147,13 @@ export function renderSite(rootDir = root) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
+    if (process.argv.includes('--refresh-stars')) {
+      const response = await fetch('https://api.github.com/repos/phillipboesger/polarion-mcp');
+      const { stargazers_count: stars } = await response.json();
+      const manifestPath = path.join(root, 'docs/clients.json');
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      fs.writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, githubStars: stars }, null, 2)}\n`);
+    }
     const expected = renderSite();
     const htmlPath = path.join(root, 'docs/index.html');
     const current = fs.readFileSync(htmlPath, 'utf8');
