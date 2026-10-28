@@ -113,6 +113,16 @@ const guideCases: Array<[string, (root: string) => void, RegExp]> = [
     const file = path.join(root, 'docs/index.html');
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('<!-- clients:end -->', '<ol><li>Install it</li></ol>\n<!-- clients:end -->'));
   }, /website clients section contains numbered steps/],
+  ['a client missing from the integration map', root => {
+    const file = path.join(root, 'docs/clients.json');
+    const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+    manifest.map.find((node: { id: string }) => node.id === 'editors').clients = ['vscode-copilot', 'windsurf', 'jetbrains-ai'];
+    fs.writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
+  }, /cursor must be in exactly one map node \(found 0\)/],
+  ['an unknown client icon', root => {
+    const file = path.join(root, 'docs/clients.json');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('"icon": "cursor"', '"icon": "bogus"'));
+  }, /cursor has unknown icon bogus/],
   ['a website link to a missing guide', root => {
     const file = path.join(root, 'docs/index.html');
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('docs/guides/clients/cursor.md', 'docs/guides/clients/nope.md'));

@@ -41,18 +41,26 @@ test('hero breathes and the landing page follows the complete user journey', asy
 
 const guideBase = 'https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/';
 
-test('every client card shows both requirements and a valid GitHub guide link, with no setup panel', async ({ page }) => {
+const primary = id => `.node.primary[data-node="${id}"]`;
+const satellite = id => `.satellite[data-client="${id}"]`;
+// The fixed bottom sheet can cover map nodes on small screens, so dispatch clicks there.
+const isMobile = info => info.project.name.includes('mobile');
+const detailId = info => (isMobile(info) ? '#galaxy-sheet' : '#galaxy-panel');
+const press = (info, locator) => (isMobile(info) ? locator.dispatchEvent('click') : locator.click());
+
+test('the map starts with six providers, no panel and a complete no-JS guide list', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#setup')).toHaveCount(0);
-  await expect(page.locator('#clients .setup-steps, #clients pre, #clients ol')).toHaveCount(0);
-  await expect(page.locator('.client-card')).toHaveCount(manifest.clients.length);
+  await expect(page.locator('#clients .setup-steps, #clients pre, #clients ol, #clients input[name="path"]')).toHaveCount(0);
+  await expect(page.locator('.node.primary')).toHaveCount(6);
+  await expect(page.locator('.satellite')).toHaveCount(0);
+  await expect(page.locator('#galaxy-panel')).toBeHidden();
+  await expect(page.locator('#galaxy-sheet')).toBeHidden();
+  await expect(page.locator('.galaxy-list')).toBeHidden();
+  await expect(page.locator('#galaxy-hint')).toHaveText('Select a provider to see its options');
+  await expect(page.locator('.galaxy-list a.guide-link')).toHaveCount(manifest.clients.length);
   for (const client of manifest.clients) {
-    const card = page.locator(`.client-card[data-client="${client.id}"]`);
-    await expect(card).toHaveCount(1);
-    await expect(card.locator('h4')).toHaveText(client.name);
-    await expect(card.locator('dd').nth(0)).not.toBeEmpty();
-    await expect(card.locator('dd').nth(1)).not.toBeEmpty();
-    await expect(card.getByRole('link', { name: /Open guide/ })).toHaveAttribute('href', `${guideBase}clients/${client.id}.md`);
+    await expect(page.locator(`.galaxy-list a[href="${guideBase}clients/${client.id}.md"]`)).toHaveCount(1);
     expect(fs.existsSync(`docs/guides/clients/${client.id}.md`)).toBe(true);
   }
   await expect(page.getByRole('link', { name: /Open the local guide/ })).toHaveAttribute('href', `${guideBase}local-npm.md`);
@@ -60,27 +68,124 @@ test('every client card shows both requirements and a valid GitHub guide link, w
   await noOverflow(page);
 });
 
-test('the local/server question filters the client cards and is keyboard reachable', async ({ page }) => {
+test('one provider branch is open at a time; hub, second click and Escape step back', async ({ page }, info) => {
   await page.goto('/');
-  const supports = mode => manifest.clients.filter(client => !client[mode].reason).map(client => client.id);
-  for (const mode of ['local', 'server']) {
-    await page.getByLabel(mode === 'local' ? /On my computer/ : /Cloud or team/).check();
-    const shown = await page.locator('.client-card:not([hidden])').evaluateAll(cards => cards.map(card => card.dataset.client));
-    expect(shown.sort()).toEqual(supports(mode).sort());
-    await expect(page.locator('#path-status')).toHaveText(`${shown.length} clients shown`);
-    for (const group of await page.locator('.client-group').all()) {
-      const visibleCards = await group.locator('.client-card:not([hidden])').count();
-      await expect(group).toBeVisible({ visible: visibleCards > 0 });
-    }
-    await noOverflow(page);
+  for (const node of manifest.map) {
+    await press(info, page.locator(primary(node.id)));
+    await expect(page.locator(primary(node.id))).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('.satellite')).toHaveCount(node.clients.length);
+    await expect(page.locator('.node.primary[aria-expanded="true"]')).toHaveCount(1);
   }
-  await page.getByLabel(/Show all clients/).check();
-  await expect(page.locator('.client-card:not([hidden])')).toHaveCount(manifest.clients.length);
-  await page.getByLabel(/Show all clients/).focus();
-  await page.keyboard.press('ArrowDown');
-  await expect(page.getByLabel(/On my computer/)).toBeChecked();
-  await page.locator('.client-card a').first().focus();
-  await expect(page.locator('.client-card a').first()).toBeFocused();
+  await press(info, page.locator(primary('claude')));
+  await expect(page.locator('.satellite')).toHaveCount(4);
+  await press(info, page.locator(satellite('claude-code')));
+  await expect(page.locator(detailId(info))).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(detailId(info))).toBeHidden();
+  await expect(page.locator('.satellite')).toHaveCount(4);
+  await page.locator(satellite('claude-code')).focus();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.satellite')).toHaveCount(0);
+  await press(info, page.locator(primary('claude')));
+  await press(info, page.locator('#galaxy-hub'));
+  await expect(page.locator('.satellite')).toHaveCount(0);
+  await expect(page.locator(detailId(info))).toBeHidden();
+  await press(info, page.locator(primary('claude')));
+  await press(info, page.locator(primary('claude')));
+  await expect(page.locator('.satellite')).toHaveCount(0);
+});
+
+test('every client opens a panel with its guide, working modes and explained unsupported modes', async ({ page }, info) => {
+  await page.goto('/');
+  for (const client of manifest.clients.filter(item => item.id !== 'docker')) {
+    const node = manifest.map.find(item => item.clients.includes(client.id));
+    await press(info, page.locator(primary(node.id)));
+    await press(info, page.locator(satellite(client.id)));
+    const panel = page.locator(detailId(info));
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('h3')).toHaveText(client.name);
+    await expect(panel.locator('a.go')).toHaveAttribute('href', `${guideBase}clients/${client.id}.md`);
+    for (const mode of ['local', 'server']) {
+      const button = panel.locator(`.env[data-env="${mode}"]`);
+      if (client[mode].reason) {
+        await expect(button).toHaveAttribute('aria-disabled', 'true');
+        await expect(panel.locator('.why')).toContainText(client[mode].reason);
+      } else {
+        await expect(button).not.toHaveAttribute('aria-disabled', 'true');
+      }
+    }
+    const first = client.local.reason ? 'server' : 'local';
+    await expect(panel.locator(`.env[data-env="${first}"]`)).toHaveAttribute('aria-pressed', 'true');
+    await expect(panel.locator('.chips li').first()).toBeVisible();
+    await press(info, page.locator('#galaxy-hub'));
+  }
+});
+
+test('switching the environment updates requirements and flow; disabled modes stay put', async ({ page }, info) => {
+  await page.goto('/');
+  await press(info, page.locator(primary('claude')));
+  await press(info, page.locator(satellite('claude-code')));
+  const panel = page.locator(detailId(info));
+  await expect(panel.locator('.flow')).toContainText('Polarion MCP (npx)');
+  await panel.locator('.env[data-env="server"]').click();
+  await expect(panel.locator('.flow')).toContainText('Polarion MCP (Docker)');
+  await expect(panel.locator('.env[data-env="server"]')).toHaveAttribute('aria-pressed', 'true');
+  await press(info, page.locator('#galaxy-hub'));
+  await press(info, page.locator(primary('editors')));
+  await press(info, page.locator(satellite('jetbrains-ai')));
+  await panel.locator('.env[data-env="server"]').click({ force: true });
+  await expect(panel.locator('.env[data-env="local"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel.locator('.why')).toContainText('Authorization header');
+});
+
+test('the map works from the keyboard', async ({ page }, info) => {
+  await page.goto('/');
+  await page.locator(primary('openai')).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator(primary('openai'))).toHaveAttribute('aria-expanded', 'true');
+  await page.locator(satellite('codex-cli')).focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator(detailId(info))).toBeVisible();
+  await expect(page.locator(detailId(info))).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(detailId(info))).toBeHidden();
+  await expect(page.locator(satellite('codex-cli'))).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator(primary('openai'))).toBeFocused();
+  await expect(page.locator('#path-status')).not.toBeEmpty();
+});
+
+test('nodes stay large enough and the map never overflows on desktop', async ({ page }, info) => {
+  await page.goto('/');
+  await page.locator('#galaxy-hub').scrollIntoViewIfNeeded();
+  const size = async selector => (await page.locator(selector).first().locator('.disc').boundingBox()).width;
+  const wide = info.project.name.includes('mobile') ? 0 : 1;
+  await page.locator(primary('editors')).click();
+  if (wide) {
+    expect(await size(primary('editors'))).toBeGreaterThanOrEqual(70);
+    expect(await size('.satellite')).toBeGreaterThanOrEqual(50);
+  }
+  await page.locator(satellite('cursor')).click();
+  await noOverflow(page);
+  await screenshot(page, `after-${info.project.name}-galaxy.png`);
+});
+
+test('the chooser degrades to a guide list without JavaScript', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.locator('.galaxy-list')).toBeVisible();
+  await expect(page.locator('.galaxy-stage')).toBeHidden();
+  await expect(page.locator('.galaxy-list a.guide-link')).toHaveCount(manifest.clients.length);
+  await context.close();
+});
+
+test('reduced motion removes map animation', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.locator(primary('claude')).click();
+  expect(await page.locator(satellite('claude-code')).evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  expect(await page.locator('.galaxy .pulse').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
 });
 
 test('hero CTAs reach the chooser and the Docker link points to the server guide; old #setup links land on the chooser', async ({ page }) => {

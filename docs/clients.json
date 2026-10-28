@@ -757,7 +757,7 @@
     {
       "id": "openai-agents",
       "name": "OpenAI Agents SDK",
-      "label": "OpenAI Agents SDK",
+      "label": "Agents SDK",
       "icon": "box",
       "provider": "openai",
       "sources": [
@@ -974,7 +974,7 @@
     {
       "id": "vscode-copilot",
       "name": "VS Code / GitHub Copilot",
-      "label": "VS Code Copilot",
+      "label": "VS Code",
       "icon": "code",
       "provider": "microsoft",
       "sources": [
@@ -1139,7 +1139,7 @@
     {
       "id": "gemini-enterprise",
       "name": "Gemini Enterprise",
-      "label": "Gemini Enterprise",
+      "label": "Enterprise",
       "icon": "building",
       "provider": "google",
       "sources": [
@@ -1490,7 +1490,7 @@
     {
       "id": "generic-stdio",
       "name": "Other AI provider / any MCP client",
-      "label": "Any MCP client",
+      "label": "Any client",
       "icon": "terminal",
       "provider": "custom",
       "sources": [
