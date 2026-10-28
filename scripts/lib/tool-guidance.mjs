@@ -51,14 +51,10 @@ export const TOOL_GUIDANCE = {
     'Lists Rich Pages across repository spaces, subject to the signed-in user’s global repository read permissions; returns an empty page when no matching pages are visible. Use `getSpacePages` for a known space, `getRepositorySpacePages` for one repository space, or `getPages` for a project space. Follow pagination links or use `max_items` to cap collection.',
   getSpacePages:
     'Lists Rich Pages in the specified project space and returns the paginated JSON:API page collection. Requires a project ID and space ID visible to the signed-in user. Use `getGlobalPages` for pages across repository spaces or `getRepositorySpacePages` for a repository-level space outside projects.',
-  getRepositorySpacePages:
-    'Lists Rich Pages in one repository-level space outside projects, returning a paginated JSON:API collection. Requires global repository access. Use `getGlobalPages` across repository spaces or `getSpacePages` for a project space.',
   getJobLogContent:
     'Downloads the plain-text execution log for one asynchronous Polarion job. Call after `getJob` reports a terminal state because a running job may have an incomplete log; `jobId` comes from the `jobs` resource returned by the operation that started it. Use `getJobResultFileContent` for produced files instead of logs.',
   getTestRunAttachmentContent:
     'Downloads one Test Run attachment and returns its file bytes as image, text, or embedded-resource content. ' + DOWNLOAD_NOTE + ' Use `getTestRunAttachment` for metadata or `getTestRunAttachments` to list available attachment IDs; read the attachment only when its contents are needed.',
-  getCurrentEnumOptionsForWorkItem:
-    'Returns the selected enum value(s) on one Work Item as option objects. ' + ENUM_FIELD_HINT + ' Use `getAvailableEnumOptionsForWorkItem` to see values the item can be changed to; this tool reports only the current selection.',
   getBacklinkedWorkItems:
     'Returns Work Items with an incoming link to the specified Work Item, paginated. Use `getLinkedWorkItems` for outgoing links, `getExternallyLinkedWorkItem` for links to another Polarion server, or `getWorkItemsRelationships` for raw relationship linkage without linked item details.',
   getExternallyLinkedWorkItem:
