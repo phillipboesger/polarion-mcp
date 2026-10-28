@@ -34,7 +34,7 @@ test('hero breathes and the landing page follows the complete user journey', asy
     await screenshot(page, `after-${info.project.name}-${section}.png`);
   }
   await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
-  await expect(page.locator('#clients-title')).toHaveText('Choose your path');
+  await expect(page.locator('#clients-title')).toHaveText('How to install it for your client');
   const heading = page.locator('#clients-title');
   const intro = page.locator('.clients-heading>p');
   expect(await heading.evaluate(el => el.compareDocumentPosition(document.querySelector('.clients-heading>p')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();

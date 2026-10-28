@@ -204,7 +204,7 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .faq-more { margin:18px 0 0; font-size:14px; }
 
 
-/* Choose your path */
+/* Install section */
 .path-entries { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px; margin-bottom:32px; }
 .path-entries p { padding-left:16px; border-left:2px solid var(--accent); color:var(--sub); font-size:13px; }
 .path-entries strong { display:block; color:white; margin-bottom:3px; }
