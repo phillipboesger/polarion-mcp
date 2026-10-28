@@ -72,6 +72,9 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "overrides": {
+    "qs": "^6.17.0"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
     "axios": "^1.9.0",
