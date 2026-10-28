@@ -83,6 +83,30 @@
       });
     }
 
+    // Zoom in on the hub and its six providers until one opens; the satellites need the full canvas.
+    const full = [0, 0, data.viewBox.width, data.viewBox.height];
+    const xs = data.nodes.map(node => node.position.x);
+    const ys = data.nodes.map(node => node.position.y);
+    const tight = [Math.min(...xs) - 70, Math.min(...ys) - 60, Math.max(...xs) - Math.min(...xs) + 140, Math.max(...ys) - Math.min(...ys) + 150];
+    let view = null;
+    let frame = 0;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function setView(closed) {
+      const to = closed ? tight : full;
+      cancelAnimationFrame(frame);
+      const from = view || to;
+      const apply = values => { view = values; stage.setAttribute('viewBox', values.join(' ')); };
+      if (reducedMotion.matches || from === to) { apply(to); return; }
+      const start = performance.now();
+      const step = now => {
+        const t = Math.min(1, (now - start) / 350);
+        const eased = 1 - Math.pow(1 - t, 3);
+        apply(from.map((value, index) => value + (to[index] - value) * eased));
+        if (t < 1) frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    }
+
     function renderPanel() {
       const target = mobile.matches ? sheet : panel;
       const other = mobile.matches ? panel : sheet;
@@ -144,6 +168,7 @@
         el.classList.toggle('act', selected);
         el.setAttribute('aria-pressed', String(selected));
       });
+      setView(!state.provider);
       hint.textContent = !state.provider ? 'Select a provider to see its options' : state.client ? '' : 'Now pick your tool';
       renderPanel();
     }

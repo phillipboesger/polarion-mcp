@@ -39,7 +39,7 @@ export function renderSiteClientsBlock(manifest) {
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
     return `M${a.x} ${a.y} Q${mx - dy * k} ${my + dx * k} ${b.x} ${b.y}`;
   };
-  const svg = `<svg class="galaxy-stage" viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="group" aria-label="Integration map"><defs>
+  const svg = `<svg class="galaxy-stage" style="aspect-ratio:${VIEWBOX.width}/${VIEWBOX.height}" viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="group" aria-label="Integration map"><defs>
       <radialGradient id="hubg"><stop offset="0" stop-color="#2a79ad"/><stop offset="1" stop-color="#0d2f52"/></radialGradient>
       <linearGradient id="gem" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4285f4"/><stop offset=".55" stop-color="#9b72cb"/><stop offset="1" stop-color="#d96570"/></linearGradient>
     ${Object.entries(ICON_PATHS).map(([name, paths]) => `<symbol id="gi-${name}" viewBox="0 0 24 24">${paths}</symbol>`).join('')}
@@ -48,7 +48,7 @@ export function renderSiteClientsBlock(manifest) {
     <circle class="pulse" cx="${HUB.x}" cy="${HUB.y}" r="${RADII.hub}"/>
     ${nodes.map(node => `<path class="edge" data-node="${escapeHtml(node.id)}" d="${cv(HUB, node.position)}"/>`).join('\n    ')}
     <g id="galaxy-satellites"></g>
-    <g class="node hub" id="galaxy-hub" tabindex="0" role="button" aria-label="Polarion MCP, reset" transform="translate(${HUB.x} ${HUB.y})"><circle class="hubdisc" r="${RADII.hub}"/><rect x="-17" y="-40" width="34" height="38" rx="7" fill="rgba(98,214,255,.08)" stroke="#62d6ff" stroke-width="1.6"/><text y="-20" style="font:600 28px ui-monospace,Menlo,monospace;fill:#62d6ff;text-anchor:middle;dominant-baseline:central;pointer-events:none">p</text><text y="20" style="font:650 14px -apple-system,Segoe UI,sans-serif;letter-spacing:-.04em;fill:#fff;text-anchor:middle;pointer-events:none">polarion<tspan fill="#62d6ff">-mcp</tspan></text><text y="36" style="font:10px -apple-system,Segoe UI,sans-serif;fill:#b9d3e6;text-anchor:middle;pointer-events:none">Your bridge to Polarion</text></g>
+    <g class="node hub" id="galaxy-hub" tabindex="0" role="button" aria-label="Polarion MCP, reset" transform="translate(${HUB.x} ${HUB.y})"><circle class="hubdisc" r="${RADII.hub}"/><g transform="scale(1.5)"><rect x="-17" y="-40" width="34" height="38" rx="7" fill="rgba(98,214,255,.08)" stroke="#62d6ff" stroke-width="1.6"/><text y="-20" style="font:600 28px ui-monospace,Menlo,monospace;fill:#62d6ff;text-anchor:middle;dominant-baseline:central;pointer-events:none">p</text><text y="20" style="font:650 14px -apple-system,Segoe UI,sans-serif;letter-spacing:-.04em;fill:#fff;text-anchor:middle;pointer-events:none">polarion<tspan fill="#62d6ff">-mcp</tspan></text><text y="36" style="font:10px -apple-system,Segoe UI,sans-serif;fill:#b9d3e6;text-anchor:middle;pointer-events:none">Your bridge to Polarion</text></g></g>
     ${nodes.map(node => `<g class="node primary" data-node="${escapeHtml(node.id)}" role="button" tabindex="0" aria-expanded="false" aria-label="${escapeHtml(node.name)}" style="--c:${escapeHtml(node.color)}" transform="translate(${node.position.x} ${node.position.y})"><circle class="disc" r="${RADII.primary}"/>${renderNodeLogo(node.logo ?? node.id, node.color)}<text class="lbl" y="56">${escapeHtml(node.name)}</text></g>`).join('\n    ')}
   </svg>`;
   const guideBase = `${repoBlob}/docs/guides/`;
