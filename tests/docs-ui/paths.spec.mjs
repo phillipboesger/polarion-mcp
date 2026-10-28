@@ -35,11 +35,17 @@ test('hero breathes and the landing page follows the complete user journey', asy
   }
   await page.screenshot({ path: path.join(screenshotDir, `after-${info.project.name}-full.png`), fullPage: true });
   await expect(page.locator('#clients-title')).toHaveText('How to install it for your client');
-  const heading = page.locator('#clients-title');
-  const intro = page.locator('.clients-heading>p');
-  expect(await heading.evaluate(el => el.compareDocumentPosition(document.querySelector('.clients-heading>p')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+  // Every chapter heading has its intro sentence directly below the title, across the full width.
+  for (const section of await page.locator('.section-heading').all()) {
+    const { below, full } = await section.evaluate(el => {
+      const h2 = el.querySelector('h2').getBoundingClientRect(); const p = el.querySelector(':scope > p').getBoundingClientRect(); const box = el.getBoundingClientRect();
+      return { below: p.top >= h2.bottom, full: Math.abs(p.width - box.width) < 2 };
+    });
+    expect(below).toBe(true);
+    expect(full).toBe(true);
+  }
+  const intro = page.locator('#clients .section-heading>p');
   expect(await intro.evaluate(el => el.compareDocumentPosition(document.querySelector('#clients .path-entries')) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
-  expect(await intro.evaluate(el => Math.abs(el.getBoundingClientRect().width - document.querySelector('#clients .section-heading').getBoundingClientRect().width))).toBeLessThan(2);
   await expect(page.locator('.under-setup')).toHaveCount(0);
   await expect(page.locator('#setup')).toHaveCount(0);
   expect(errors).toEqual([]);

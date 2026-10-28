@@ -42,9 +42,9 @@ h1 span { color:var(--accent); }
 .proof strong { color:white; font-weight:600; }
 .proof a:hover { text-decoration:underline; }
 .section { max-width:1264px; margin:auto; padding:80px 32px; }
-.section-heading { display:flex; justify-content:space-between; align-items:end; gap:40px; margin-bottom:32px; }
+.section-heading { margin-bottom:32px; }
 h2 { font-weight:550; font-size:clamp(31px,3.5vw,46px); letter-spacing:-.045em; line-height:1.14; margin-top:10px; }
-.section-heading>p { color:var(--sub); max-width:440px; font-size:14px; }
+.section-heading>p { color:var(--sub); margin-top:16px; font-size:14px; }
 .setup-section { padding-top:60px; }
 h4 { font-weight:600; font-size:15px; letter-spacing:-.02em; }
 pre { white-space:pre-wrap; overflow-wrap:anywhere; overflow-x:auto; max-width:100%; min-width:0; padding:16px; background:#08233d; border:1px solid var(--line); border-top:0; border-radius:0 0 7px 7px; font-size:11px; line-height:1.7; tab-size:2; }
@@ -132,8 +132,6 @@ footer div { display:flex; gap:20px; }
 .approval>span { font:25px/1 var(--mono); color:var(--warm); }
 .daily-note { color:var(--sub); font-size:12px; text-align:right; margin-top:18px; }
 .setup-section { border-top:1px solid var(--line); padding-top:80px; }
-.clients-heading { display:block; }
-.clients-heading>p { max-width:none; margin-top:16px; }
 .faq-section { border-top:1px solid var(--line); }
 .community-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr); gap:72px; }
 .faq-list details { border-top:1px solid var(--line); }
@@ -161,7 +159,6 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .community-layout { gap:32px; }
 }
 @media(max-width:700px) {
-  .clients-heading>p { margin-top:18px; }
   .hero { padding:52px 20px 58px; }
   .flow { grid-template-columns:minmax(0,1fr); padding:20px; }
   .flow-node { padding:16px 8px; }
