@@ -67,7 +67,7 @@ A local container launched by the IDE. It is not a shared HTTP team server. Need
         "API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1",
         "-e",
         "BEARER_TOKEN=YOUR_POLARION_PAT",
-        "ghcr.io/phillipboesger/polarion-mcp:1.4.4",
+        "ghcr.io/phillipboesger/polarion-mcp:1.4.5",
         "node",
         "build/index.js"
       ]
