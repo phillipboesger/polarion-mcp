@@ -2,6 +2,8 @@
 
 Windsurf editor. Default: **Local**.
 
+Official documentation: [docs.windsurf.com](https://docs.windsurf.com/windsurf/cascade/mcp), [docs.windsurf.com](https://docs.windsurf.com/fr/windsurf/cascade/mcp), [docs.devin.ai](https://docs.devin.ai/desktop/cascade/mcp)
+
 Verification status:
 
 - Local: verified by documentation only

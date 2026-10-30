@@ -2,6 +2,8 @@
 
 Gemini Enterprise agents for your organization. Default: **Server**.
 
+Official documentation: [docs.cloud.google.com](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
+
 Verification status:
 
 - Server: verified by documentation only
@@ -83,7 +85,7 @@ Checked against the vendor documentation on 2026-10-30.
 
 Not confirmed in the vendor documentation:
 
-- Google requires you to register Gemini Enterprise as an OAuth client with your identity provider and enter a Client ID and Client Secret. How to obtain them from THIS server (its dynamic registration endpoint /register vs a preconfigured client) is not documented by Google and was not verified against the server. Google documents only No authentication or OAuth 2.0, no PAT/Authorization header option.
+- Google requires you to register Gemini Enterprise as an OAuth client with your identity provider and enter a Client ID and Client Secret. How to obtain them from THIS server (its dynamic registration endpoint /register vs a preconfigured client) is not documented by Google. This server's /register issues a client ID and, for client_secret_post or client_secret_basic registrations, a client secret (tests/dcr-client-compat.test.ts); whether Gemini Enterprise can use dynamic registration at all is untested. Google documents only No authentication or OAuth 2.0, no PAT/Authorization header option.
 - The server's /authorize and /token paths are taken from the repo deployment docs (Apache proxy list), not from a live run against Gemini Enterprise.
 - Google gives the redirect URL https://vertexaisearch.cloud.google.com/oauth-redirect; the repo 'gemini' preset has no fixed callback, so it must be added as an exact entry.
 - The scopes value for this server is not defined by Google; ask the server administrator.

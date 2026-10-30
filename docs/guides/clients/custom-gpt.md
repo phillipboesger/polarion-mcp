@@ -2,6 +2,8 @@
 
 Custom GPT with Actions over REST/OpenAPI. Default: **Server**.
 
+Official documentation: [developers.openai.com](https://developers.openai.com/api/docs/actions/getting-started), [developers.openai.com](https://developers.openai.com/api/docs/actions/authentication)
+
 Verification status:
 
 - Server: verified by documentation only

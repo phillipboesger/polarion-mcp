@@ -2,6 +2,8 @@
 
 Open WebUI or LibreChat with Ollama, vLLM, OpenRouter or any OpenAI-compatible model. Default: **Server**.
 
+Official documentation: [docs.openwebui.com](https://docs.openwebui.com/features/extensibility/mcp), [docs.openwebui.com](https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama), [www.librechat.ai](https://www.librechat.ai/docs/features/mcp)
+
 Verification status:
 
 - Server: verified by documentation only

@@ -2,6 +2,8 @@
 
 Claude app on your computer. Default: **Local**.
 
+Official documentation: [modelcontextprotocol.io](https://modelcontextprotocol.io/docs/develop/connect-local-servers), [support.claude.com](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp), [claude.com](https://claude.com/docs/connectors/custom/add-unlisted.md)
+
 Verification status:
 
 - Local: verified by documentation only

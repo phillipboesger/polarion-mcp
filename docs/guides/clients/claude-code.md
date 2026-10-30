@@ -2,6 +2,8 @@
 
 Claude in your terminal. Default: **Local**.
 
+Official documentation: [code.claude.com](https://code.claude.com/docs/en/mcp), [code.claude.com](https://code.claude.com/docs/en/mcp-quickstart), [claude.com](https://claude.com/docs/connectors/building/authentication.md)
+
 Verification status:
 
 - Local: verified by documentation only

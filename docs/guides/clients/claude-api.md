@@ -2,6 +2,8 @@
 
 Your own code calling the Claude Messages API. Default: **Server**.
 
+Official documentation: [platform.claude.com](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
+
 Verification status:
 
 - Server: verified by documentation only

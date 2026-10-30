@@ -2,6 +2,8 @@
 
 Your own code calling the OpenAI Responses API. Default: **Server**.
 
+Official documentation: [developers.openai.com](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
+
 Verification status:
 
 - Server: verified by documentation only

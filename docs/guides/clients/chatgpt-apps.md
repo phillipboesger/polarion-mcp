@@ -2,6 +2,8 @@
 
 ChatGPT connector, connects from the cloud. Default: **Server**.
 
+Official documentation: [developers.openai.com](https://developers.openai.com/api/docs/guides/custom-mcp-server)
+
 Verification status:
 
 - Server: verified by documentation only

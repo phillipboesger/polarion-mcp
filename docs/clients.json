@@ -972,16 +972,17 @@
         "https://openai.github.io/openai-agents-python/mcp/",
         "https://openai.github.io/openai-agents-python/ref/mcp/server/",
         "https://openai.github.io/openai-agents-python/quickstart/",
-        "https://pypi.org/project/openai-agents/"
+        "https://pypi.org/project/openai-agents/",
+        "https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/src/agents/mcp/server.py",
+        "https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/pyproject.toml"
       ],
       "checked": "2026-10-30",
       "note": "",
       "redirectUris": [],
       "defaultMode": "local",
       "unverified": [
-        "The vendor MCP page states no minimum Python version; Python 3.10 or newer comes from the PyPI listing of openai-agents.",
-        "The MCP guide gives the dependency range mcp>=1.19.0,<3 and optional pins (mcp<2 or mcp>=2); it does not say which one this server needs. Behaviour with MCP v2 (server/discover probe, then fallback to initialize) is documented but was not tested against this server.",
-        "Field defaults of MCPServerStreamableHttpParams (timeout, sse_read_timeout, terminate_on_close): the API reference text for that class was not readable in our fetch; the SSE variant documents timeout 5 s and sse_read_timeout 5 min."
+        "The current main branch of openai-agents-python pins mcp>=1.30.0,<3 (excluding 2.0 and 2.1); the MCP guide still shows mcp>=1.19.0,<3. Which range this server needs, and behaviour with MCP v2, was not tested against this server.",
+        "Whether the env of MCPServerStdio is merged with or replaces the parent environment: that is implemented in the mcp SDK, not in openai-agents."
       ],
       "summary": "Python agents built with the OpenAI Agents SDK.",
       "local": {
@@ -993,7 +994,7 @@
           "Replace YOUR-POLARION (URL ends in /polarion/rest/v1) and YOUR_POLARION_PAT",
           "Run: python polarion_agent.py"
         ],
-        "note": "Keep the Polarion PAT and your provider API key in your application secret store. The default client_session_timeout_seconds is 5, so the snippet raises it to 60 to give npx time on first start; the SDK docs say npx -y can download packages on first start and recommend preinstalling. MCPServerStdio closes the subprocess pipes when the async with block ends.",
+        "note": "Keep the Polarion PAT and your provider API key in your application secret store. The default client_session_timeout_seconds is 5, so the snippet raises it to 60 to give npx time on first start; the SDK docs say npx -y can download packages on first start and recommend preinstalling. MCPServerStdio closes the subprocess pipes when the async with block ends. Streamable HTTP defaults in the source: timeout 5 s, sse_read_timeout 5 min, terminate_on_close on. Python 3.10 or newer is required.",
         "needs": [
           "Python 3.10+, OpenAI API key",
           "Node.js 22+"
@@ -1025,7 +1026,7 @@
           "Replace https://YOUR-SERVER/mcp and YOUR_POLARION_PAT",
           "Run: python polarion_agent.py"
         ],
-        "note": "Put the token in headers, not in the URL. cache_tools_list=True is only for servers whose tool list rarely changes; call invalidate_tools_cache() to refresh. client_session_timeout_seconds defaults to 5 seconds. MCPServerStreamableHttp is the vendor's recommended class for self-managed remote servers. Alternative: HostedMCPTool lets OpenAI's Responses API connect to the server; it works only with OpenAI models that support hosted MCP and is not added to mcp_servers.",
+        "note": "Put the token in headers, not in the URL. cache_tools_list=True is only for servers whose tool list rarely changes; call invalidate_tools_cache() to refresh. client_session_timeout_seconds defaults to 5 seconds. MCPServerStreamableHttp is the vendor's recommended class for self-managed remote servers. Alternative: HostedMCPTool lets OpenAI's Responses API connect to the server; it works only with OpenAI models that support hosted MCP and is not added to mcp_servers. Streamable HTTP defaults in the source: timeout 5 s, sse_read_timeout 5 min, terminate_on_close on. Python 3.10 or newer is required.",
         "snippet": "import asyncio\nfrom agents import Agent, Runner\nfrom agents.mcp import MCPServerStreamableHttp\n\nasync def main():\n    async with MCPServerStreamableHttp(\n        name=\"Polarion\",\n        params={\n            \"url\": \"https://YOUR-SERVER/mcp\",\n            \"headers\": {\"Authorization\": \"Bearer YOUR_POLARION_PAT\"},\n        },\n        cache_tools_list=True,\n    ) as server:\n        agent = Agent(name=\"Polarion assistant\", mcp_servers=[server])\n        result = await Runner.run(agent, \"Which Polarion user am I? Use getCurrentUser.\")\n        print(result.final_output)\n\nasyncio.run(main())",
         "needs": [
           "An OpenAI API key",
@@ -1061,17 +1062,18 @@
       "sources": [
         "https://learn.chatgpt.com/docs/extend/mcp?surface=cli",
         "https://learn.chatgpt.com/docs/extend/mcp?surface=ide",
-        "https://learn.chatgpt.com/docs/cli/reference"
+        "https://learn.chatgpt.com/docs/cli/reference",
+        "https://github.com/openai/codex/blob/f752c97f7d0be0cbef5cece327f52a16ad6fb1c6/codex-rs/cli/src/mcp_cmd.rs"
       ],
       "checked": "2026-10-30",
       "note": "",
       "redirectUris": [],
       "defaultMode": "local",
       "unverified": [
-        "Windows path of config.toml: the vendor pages read say only ~/.codex/config.toml and have no MCP-specific Windows section; %USERPROFILE%\\.codex\\config.toml is an inference. The only vendor mention of CODEX_HOME is in the CLI reference for profiles.",
-        "How the IDE extension and desktop app receive POLARION_PAT: the docs say env_vars and plain names read from Codex's local environment, but do not say that bearer_token_env_var inherits from the process that launched the editor.",
-        "The vendor MCP page does not describe the /mcp slash command; it links to a separate slash-command reference that we did not read.",
-        "Whether the desktop app or IDE form can set a bearer token env var: the pages list name, STDIO or Streamable HTTP, and command or URL only."
+        "Windows path of config.toml: the Codex source resolves $CODEX_HOME, else <home>/.codex (https://github.com/openai/codex/blob/f752c97f7d0be0cbef5cece327f52a16ad6fb1c6/codex-rs/utils/home-dir/src/lib.rs). %USERPROFILE%\\.codex\\config.toml follows from how the dirs crate resolves the home folder, which is not shown in that repository.",
+        "Codex reads the bearer_token_env_var variable from the environment of the process that hosts the MCP client and fails if it is unset or empty (source: codex-rs/codex-mcp/src/rmcp_client.rs). Which environment the IDE extension or desktop app gives that process is not documented.",
+        "Whether the desktop app or IDE form can set a bearer token env var: the pages list name, STDIO or Streamable HTTP, and command or URL only.",
+        "Whether a plain CLI session picks up a server added with codex mcp add without a new session: the command only writes the global config; only the app-server has a reload path for running threads."
       ],
       "summary": "OpenAI Codex in your terminal.",
       "local": {
@@ -1511,7 +1513,7 @@
       "redirectUris": [],
       "defaultMode": "server",
       "unverified": [
-        "Google requires you to register Gemini Enterprise as an OAuth client with your identity provider and enter a Client ID and Client Secret. How to obtain them from THIS server (its dynamic registration endpoint /register vs a preconfigured client) is not documented by Google and was not verified against the server. Google documents only No authentication or OAuth 2.0, no PAT/Authorization header option.",
+        "Google requires you to register Gemini Enterprise as an OAuth client with your identity provider and enter a Client ID and Client Secret. How to obtain them from THIS server (its dynamic registration endpoint /register vs a preconfigured client) is not documented by Google. This server's /register issues a client ID and, for client_secret_post or client_secret_basic registrations, a client secret (tests/dcr-client-compat.test.ts); whether Gemini Enterprise can use dynamic registration at all is untested. Google documents only No authentication or OAuth 2.0, no PAT/Authorization header option.",
         "The server's /authorize and /token paths are taken from the repo deployment docs (Apache proxy list), not from a live run against Gemini Enterprise.",
         "Google gives the redirect URL https://vertexaisearch.cloud.google.com/oauth-redirect; the repo 'gemini' preset has no fixed callback, so it must be added as an exact entry.",
         "The scopes value for this server is not defined by Google; ask the server administrator.",
@@ -2237,7 +2239,7 @@
       "defaultMode": "server",
       "unverified": [
         "End-to-end run in an M365 tenant has not been done yet (planned in T3.4). Agents Toolkit labels come from Microsoft Learn (build-mcp-plugins, updated 2026-09-30) and the Microsoft lab and may change.",
-        "Microsoft states that dynamic client registration without a client secret is not supported yet and that the authorization server must issue a secret at registration. Whether this server's registration issues one is not covered by vendor docs and still needs a test.",
+        "Microsoft states that dynamic client registration without a client secret is not supported yet and that the authorization server must issue a secret at registration. This server issues a secret for client_secret_post and client_secret_basic registrations and rejects a wrong one (covered by tests/dcr-client-compat.test.ts); only Microsoft's actual client behaviour is untested.",
         "Microsoft documents the steps to publish to the whole organisation only per method (publish-plugin-organization was not read); this guide covers sideloading for development.",
         "Microsoft documents no timeout or tool-count limit for MCP plugins in declarative agents; the 30 second tool-call limit and TLS 1.2 requirement appear only for the Work IQ Dev Tools connector route."
       ],
@@ -2322,7 +2324,7 @@
       "unverified": [
         "Mistral does not document a fixed OAuth callback URL for Le Chat, so no built-in preset exists.",
         "Mistral's docs do not say which menu group holds Connectors in every app version, or whether Team plans differ from Free/Pro/Student beyond 'administrator only'.",
-        "Mistral's docs mention no client secret field for custom connectors; they only say OAuth 2.1 uses dynamic client registration.",
+        "Mistral's docs mention no client secret field for custom connectors; they only say OAuth 2.1 uses dynamic client registration. This server accepts public registration (no secret), an empty client_secret field, and secret-based registrations (tests/dcr-client-compat.test.ts); only Le Chat's real behaviour is untested.",
         "Not yet tested with a Le Chat account (T5.3)."
       ],
       "summary": "Mistral’s chat assistant, EU-hosted.",
@@ -2366,8 +2368,7 @@
           }
         ],
         "serverSetup": "docker-mistral"
-      },
-      "thirdPartySources": true
+      }
     },
     {
       "id": "self-hosted",

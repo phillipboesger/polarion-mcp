@@ -2,6 +2,8 @@
 
 Cursor editor. Default: **Local**.
 
+Official documentation: [cursor.com](https://cursor.com/docs/mcp)
+
 Verification status:
 
 - Local: verified by documentation only

@@ -2,6 +2,8 @@
 
 AI Assistant in JetBrains IDEs. Default: **Local**.
 
+Official documentation: [www.jetbrains.com](https://www.jetbrains.com/help/ai-assistant/mcp.html)
+
 Verification status:
 
 - Local: verified by documentation only

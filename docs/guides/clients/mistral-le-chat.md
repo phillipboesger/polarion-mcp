@@ -2,6 +2,8 @@
 
 Mistral’s chat assistant, EU-hosted. Default: **Server**.
 
+Official documentation: [docs.mistral.ai](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors), [docs.mistral.ai](https://docs.mistral.ai/studio/connectors/management)
+
 Verification status:
 
 - Server: verified by documentation only
@@ -71,16 +73,16 @@ Expected: Le Chat calls getCurrentUser and shows your Polarion user.
 
 ## Sources
 
-Checked against third-party guides on 2026-10-30.
+Checked against the vendor documentation on 2026-10-30.
 
-- [Third-party guide 1](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors)
-- [Third-party guide 2](https://docs.mistral.ai/studio/connectors/management)
+- [Official documentation 1](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors)
+- [Official documentation 2](https://docs.mistral.ai/studio/connectors/management)
 
 Not confirmed in the vendor documentation:
 
 - Mistral does not document a fixed OAuth callback URL for Le Chat, so no built-in preset exists.
 - Mistral's docs do not say which menu group holds Connectors in every app version, or whether Team plans differ from Free/Pro/Student beyond 'administrator only'.
-- Mistral's docs mention no client secret field for custom connectors; they only say OAuth 2.1 uses dynamic client registration.
+- Mistral's docs mention no client secret field for custom connectors; they only say OAuth 2.1 uses dynamic client registration. This server accepts public registration (no secret), an empty client_secret field, and secret-based registrations (tests/dcr-client-compat.test.ts); only Le Chat's real behaviour is untested.
 - Not yet tested with a Le Chat account (T5.3).
 
 Back to the [client index](../../clients.md).

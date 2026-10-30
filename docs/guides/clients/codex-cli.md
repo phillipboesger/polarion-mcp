@@ -2,6 +2,8 @@
 
 OpenAI Codex in your terminal. Default: **Local**.
 
+Official documentation: [learn.chatgpt.com](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), [learn.chatgpt.com](https://learn.chatgpt.com/docs/extend/mcp?surface=ide), [learn.chatgpt.com](https://learn.chatgpt.com/docs/cli/reference)
+
 Verification status:
 
 - Local: verified by documentation only
@@ -117,12 +119,13 @@ Checked against the vendor documentation on 2026-10-30.
 - [Official documentation 1](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 - [Official documentation 2](https://learn.chatgpt.com/docs/extend/mcp?surface=ide)
 - [Official documentation 3](https://learn.chatgpt.com/docs/cli/reference)
+- [Official documentation 4](https://github.com/openai/codex/blob/f752c97f7d0be0cbef5cece327f52a16ad6fb1c6/codex-rs/cli/src/mcp_cmd.rs)
 
 Not confirmed in the vendor documentation:
 
-- Windows path of config.toml: the vendor pages read say only ~/.codex/config.toml and have no MCP-specific Windows section; %USERPROFILE%\.codex\config.toml is an inference. The only vendor mention of CODEX_HOME is in the CLI reference for profiles.
-- How the IDE extension and desktop app receive POLARION_PAT: the docs say env_vars and plain names read from Codex's local environment, but do not say that bearer_token_env_var inherits from the process that launched the editor.
-- The vendor MCP page does not describe the /mcp slash command; it links to a separate slash-command reference that we did not read.
+- Windows path of config.toml: the Codex source resolves $CODEX_HOME, else <home>/.codex (https://github.com/openai/codex/blob/f752c97f7d0be0cbef5cece327f52a16ad6fb1c6/codex-rs/utils/home-dir/src/lib.rs). %USERPROFILE%\.codex\config.toml follows from how the dirs crate resolves the home folder, which is not shown in that repository.
+- Codex reads the bearer_token_env_var variable from the environment of the process that hosts the MCP client and fails if it is unset or empty (source: codex-rs/codex-mcp/src/rmcp_client.rs). Which environment the IDE extension or desktop app gives that process is not documented.
 - Whether the desktop app or IDE form can set a bearer token env var: the pages list name, STDIO or Streamable HTTP, and command or URL only.
+- Whether a plain CLI session picks up a server added with codex mcp add without a new session: the command only writes the global config; only the app-server has a reload path for running threads.
 
 Back to the [client index](../../clients.md).

@@ -31,6 +31,7 @@ export function renderSiteClientsBlock(manifest) {
     return {
       id: client.id, name: client.name, label: client.label, node: node?.id ?? null,
       icon: client.icon, summary: client.summary, guide: `clients/${client.id}.md`,
+      vendorDocs: (client.sources ?? []).find(source => !source.includes('github.com/phillipboesger') && !/\/blob\/[0-9a-f]{40}\//.test(source)) ?? null,
       satellite: node ? layout[node.id].satellites[client.id] : null,
       modes: Object.fromEntries(['local', 'server'].map(id => [id, {
         supported: !client[id].reason, reason: client[id].reason ?? null, requirement: requirement(client[id]), verifiedByDeveloper: Boolean(client.verified?.[id]),

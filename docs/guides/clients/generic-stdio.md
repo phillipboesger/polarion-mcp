@@ -2,6 +2,8 @@
 
 Any MCP client that starts local programs. Default: **Local**.
 
+Official documentation: [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+
 Verification status:
 
 - Local: verified by documentation only

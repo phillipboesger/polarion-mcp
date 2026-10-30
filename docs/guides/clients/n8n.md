@@ -2,6 +2,8 @@
 
 n8n workflows calling the REST wrapper. Default: **Server**.
 
+Official documentation: [docs.n8n.io](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/), [docs.n8n.io](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/common-issues/), [docs.n8n.io](https://docs.n8n.io/integrations/builtin/credentials/httprequest/)
+
 Verification status:
 
 - Server: verified by documentation only

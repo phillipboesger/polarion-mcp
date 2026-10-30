@@ -2,6 +2,8 @@
 
 GitHub Copilot agent mode in VS Code, Visual Studio, JetBrains IDEs, Eclipse and Xcode. Default: **Local**.
 
+Official documentation: [code.visualstudio.com](https://code.visualstudio.com/docs/agents/reference/mcp-configuration), [code.visualstudio.com](https://code.visualstudio.com/docs/copilot/customization/mcp-servers), [code.visualstudio.com](https://code.visualstudio.com/docs/agents/run/manage-mcp-servers)
+
 Verification status:
 
 - Local: verified by documentation only

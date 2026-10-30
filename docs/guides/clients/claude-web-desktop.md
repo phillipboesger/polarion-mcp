@@ -2,6 +2,8 @@
 
 Claude in the browser, connects from the cloud. Default: **Server**.
 
+Official documentation: [support.claude.com](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp), [claude.com](https://claude.com/docs/connectors/custom/add-unlisted.md), [claude.com](https://claude.com/docs/connectors/building/authentication.md)
+
 Verification status:
 
 - Server: verified by documentation only

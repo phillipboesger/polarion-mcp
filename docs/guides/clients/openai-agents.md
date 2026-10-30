@@ -2,6 +2,8 @@
 
 Python agents built with the OpenAI Agents SDK. Default: **Local**.
 
+Official documentation: [openai.github.io](https://openai.github.io/openai-agents-python/mcp/), [openai.github.io](https://openai.github.io/openai-agents-python/ref/mcp/server/), [openai.github.io](https://openai.github.io/openai-agents-python/quickstart/)
+
 Verification status:
 
 - Local: verified by documentation only
@@ -67,7 +69,7 @@ async def main():
 asyncio.run(main())
 ```
 
-Keep the Polarion PAT and your provider API key in your application secret store. The default client_session_timeout_seconds is 5, so the snippet raises it to 60 to give npx time on first start; the SDK docs say npx -y can download packages on first start and recommend preinstalling. MCPServerStdio closes the subprocess pipes when the async with block ends.
+Keep the Polarion PAT and your provider API key in your application secret store. The default client_session_timeout_seconds is 5, so the snippet raises it to 60 to give npx time on first start; the SDK docs say npx -y can download packages on first start and recommend preinstalling. MCPServerStdio closes the subprocess pipes when the async with block ends. Streamable HTTP defaults in the source: timeout 5 s, sse_read_timeout 5 min, terminate_on_close on. Python 3.10 or newer is required.
 
 ### Server
 
@@ -97,7 +99,7 @@ async def main():
 asyncio.run(main())
 ```
 
-Put the token in headers, not in the URL. cache_tools_list=True is only for servers whose tool list rarely changes; call invalidate_tools_cache() to refresh. client_session_timeout_seconds defaults to 5 seconds. MCPServerStreamableHttp is the vendor's recommended class for self-managed remote servers. Alternative: HostedMCPTool lets OpenAI's Responses API connect to the server; it works only with OpenAI models that support hosted MCP and is not added to mcp_servers.
+Put the token in headers, not in the URL. cache_tools_list=True is only for servers whose tool list rarely changes; call invalidate_tools_cache() to refresh. client_session_timeout_seconds defaults to 5 seconds. MCPServerStreamableHttp is the vendor's recommended class for self-managed remote servers. Alternative: HostedMCPTool lets OpenAI's Responses API connect to the server; it works only with OpenAI models that support hosted MCP and is not added to mcp_servers. Streamable HTTP defaults in the source: timeout 5 s, sse_read_timeout 5 min, terminate_on_close on. Python 3.10 or newer is required.
 
 ## Check
 
@@ -139,11 +141,12 @@ Checked against the vendor documentation on 2026-10-30.
 - [Official documentation 2](https://openai.github.io/openai-agents-python/ref/mcp/server/)
 - [Official documentation 3](https://openai.github.io/openai-agents-python/quickstart/)
 - [Official documentation 4](https://pypi.org/project/openai-agents/)
+- [Official documentation 5](https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/src/agents/mcp/server.py)
+- [Official documentation 6](https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/pyproject.toml)
 
 Not confirmed in the vendor documentation:
 
-- The vendor MCP page states no minimum Python version; Python 3.10 or newer comes from the PyPI listing of openai-agents.
-- The MCP guide gives the dependency range mcp>=1.19.0,<3 and optional pins (mcp<2 or mcp>=2); it does not say which one this server needs. Behaviour with MCP v2 (server/discover probe, then fallback to initialize) is documented but was not tested against this server.
-- Field defaults of MCPServerStreamableHttpParams (timeout, sse_read_timeout, terminate_on_close): the API reference text for that class was not readable in our fetch; the SSE variant documents timeout 5 s and sse_read_timeout 5 min.
+- The current main branch of openai-agents-python pins mcp>=1.30.0,<3 (excluding 2.0 and 2.1); the MCP guide still shows mcp>=1.19.0,<3. Which range this server needs, and behaviour with MCP v2, was not tested against this server.
+- Whether the env of MCPServerStdio is merged with or replaces the parent environment: that is implemented in the mcp SDK, not in openai-agents.
 
 Back to the [client index](../../clients.md).

@@ -2,6 +2,8 @@
 
 Google’s agent CLI (agy) and IDE, the successor to Gemini CLI. Default: **Local**.
 
+Official documentation: [antigravity.google](https://antigravity.google/docs/mcp), [developers.google.com](https://developers.google.com/workspace/guides/configure-mcp-servers), [geminicli.com](https://geminicli.com/docs/tools/mcp-server/)
+
 Verification status:
 
 - Local: verified by documentation only

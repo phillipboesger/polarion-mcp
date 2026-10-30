@@ -2,6 +2,8 @@
 
 Microsoft Copilot Studio agents for your team. Default: **Server**.
 
+Official documentation: [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent), [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp), [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-components-to-agent)
+
 Verification status:
 
 - Server: verified by documentation only
