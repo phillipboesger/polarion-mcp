@@ -73,7 +73,7 @@ jobs:
           echo "${out}" | grep -q '"serverInfo"' || { echo "::error::stdio initialize failed: ${out}"; exit 1; }
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -113,7 +113,7 @@ jobs:
       attestations: write
     steps:
       - name: Log in to the registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
