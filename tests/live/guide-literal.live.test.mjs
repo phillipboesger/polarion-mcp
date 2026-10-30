@@ -11,7 +11,13 @@ import { manifest, parseLocal, run } from "../lib/guide-literal.mjs";
 
 const build = path.resolve("build/index.js");
 
-test("every documented local snippet starts the server and returns the live user", async t => {
+// getCurrentUser reads /metadata, which Polarion 2506 does not have (same probe as live.test.mjs).
+const metadataProbe = await fetch(`${API_BASE_URL}/metadata`, { headers: { authorization: `Bearer ${PAT}` }, redirect: "manual" });
+await metadataProbe.text();
+
+test("every documented local snippet starts the server and returns the live user", {
+  skip: metadataProbe.status === 404 && "getCurrentUser requires Polarion 2512+ (/metadata)",
+}, async t => {
   for (const client of manifest.clients.filter(entry => !entry.local.reason)) {
     await t.test(client.id, async () => {
       const { result, text } = await run(parseLocal(client), API_BASE_URL, PAT, build);
