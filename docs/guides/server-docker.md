@@ -61,7 +61,7 @@ Test it (Windows PowerShell: `curl.exe`):
 curl -i -H "Authorization: Bearer YOUR_PAT" "https://YOUR-POLARION/polarion/rest/v1/metadata"
 ```
 
-Expected: `HTTP/1.1 200` with JSON containing `metadata` (Polarion 2512 or newer).
+Expected: `HTTP/1.1 200` with JSON containing `metadata` (Polarion 2512 or newer). On 2506, `/metadata` returns 404 and the server checks tokens with `GET /projects` instead, so the user needs global REST GET.
 
 If not: 401 means the token is wrong or expired. 403 means access denied. 404 means a wrong URL or Polarion 2506 or older, which the HTTP server does not support (use [Local setup](local-npm.md) or upgrade). A timeout means a wrong address or a missing VPN.
 

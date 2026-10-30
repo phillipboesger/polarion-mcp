@@ -2115,7 +2115,7 @@
     {
       "id": "forbidden-403",
       "q": "It says 403 \"Polarion denied access\".",
-      "a": "Polarion denied access. Check the user's license and REST or item permissions for the affected tool. The metadata authentication probe requires Polarion 2512+ and does not require global REST GET permission. A 403 during login is rejected."
+      "a": "Polarion denied access. Check the user's license and REST or item permissions for the affected tool. On Polarion 2512+ the login check reads /metadata and needs no global REST GET permission. On 2506 it reads /projects, which does. A 403 during login is rejected."
     },
     {
       "id": "oauth-loop",
@@ -2124,8 +2124,8 @@
     },
     {
       "id": "polarion-2506",
-      "q": "Does HTTP/OAuth work with Polarion 2506 or older?",
-      "a": "HTTP MCP and OAuth need Polarion 2512+: the login check calls GET /metadata, which older versions answer with 404. Use the local setup (stdio with your own BEARER_TOKEN) or upgrade Polarion. The server does not fall back to project listing or accept a 403. Tool access still follows your Polarion permissions."
+      "q": "Does HTTP/OAuth work with Polarion 2506?",
+      "a": "Yes. On 2512+ the login check calls GET /metadata and needs no global REST GET permission. 2506 has no /metadata, so the server reads GET /projects instead; that user must be allowed global REST GET. A 403 is never accepted. Tool access still follows your Polarion permissions."
     },
     {
       "id": "bearer",
@@ -2140,7 +2140,7 @@
     {
       "id": "polarion-versions",
       "q": "Which Polarion versions work?",
-      "a": "Live integration tests run against Polarion 2506 (stdio) and 2606. HTTP/OAuth connectors such as claude.ai and ChatGPT need Polarion 2512 or newer. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance."
+      "a": "Live integration tests run against Polarion 2506, 2512 and 2606, including HTTP/OAuth. The full tool set is targeted at the newest release; 2506 and 2512 stay usable with the limits in Polarion versions. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance."
     },
     {
       "id": "clients-list",

@@ -62,15 +62,15 @@ The token was cut off, has expired, or belongs to another Polarion. Test the tok
 
 ### It says 403 "Polarion denied access".
 
-Polarion denied access. Check the user's license and REST or item permissions for the affected tool. The metadata authentication probe requires Polarion 2512+ and does not require global REST GET permission. A 403 during login is rejected.
+Polarion denied access. Check the user's license and REST or item permissions for the affected tool. On Polarion 2512+ the login check reads /metadata and needs no global REST GET permission. On 2506 it reads /projects, which does. A 403 during login is rejected.
 
 ### The connector login in claude.ai or ChatGPT fails or loops.
 
 Check `MCP_PUBLIC_URL` (exact https address, no path), the padlock, that the redirect preset or callback is allowed (`MCP_ALLOWED_REDIRECT_PRESETS=claude`; the log says `redirect_uri rejected`), and that `MCP_TOKEN_SECRET` did not change.
 
-### Does HTTP/OAuth work with Polarion 2506 or older?
+### Does HTTP/OAuth work with Polarion 2506?
 
-HTTP MCP and OAuth need Polarion 2512+: the login check calls GET /metadata, which older versions answer with 404. Use the local setup (stdio with your own BEARER_TOKEN) or upgrade Polarion. The server does not fall back to project listing or accept a 403. Tool access still follows your Polarion permissions.
+Yes. On 2512+ the login check calls GET /metadata and needs no global REST GET permission. 2506 has no /metadata, so the server reads GET /projects instead; that user must be allowed global REST GET. A 403 is never accepted. Tool access still follows your Polarion permissions.
 
 ### What does Bearer mean in an Authorization header?
 
@@ -82,7 +82,7 @@ In your personal client settings or an environment variable, never in a file ins
 
 ### Which Polarion versions work?
 
-Live integration tests run against Polarion 2506 (stdio) and 2606. HTTP/OAuth connectors such as claude.ai and ChatGPT need Polarion 2512 or newer. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
+Live integration tests run against Polarion 2506, 2512 and 2606, including HTTP/OAuth. The full tool set is targeted at the newest release; 2506 and 2512 stay usable with the limits in Polarion versions. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
 
 ### Which AI clients can I use?
 

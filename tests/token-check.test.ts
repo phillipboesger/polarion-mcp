@@ -17,6 +17,32 @@ const observed: Array<{ url: string; authorization: string | undefined }> = []
 const polarion = createServer((req, res) => {
   observed.push({ url: req.url ?? "", authorization: req.headers.authorization })
   const token = (req.headers.authorization ?? "").replace(/^Bearer /, "").replace(SECRET_PAT, "")
+  if (token.startsWith("legacy")) {
+    // Polarion before 2512: no /metadata; /projects answers according to the token.
+    const path = new URL(req.url ?? "", "http://polarion").pathname
+    if (path.endsWith("/metadata") || token === "legacyNothing") {
+      res.writeHead(404, { "content-type": "application/json" })
+      res.end(JSON.stringify({ errors: [{ status: "404", detail: "Not Found" }] }))
+    } else if (token === "legacyHtml") {
+      res.writeHead(200, { "content-type": "text/html" })
+      res.end("<html>SSO login</html>")
+    } else if (token === "legacyServerError" || token === "legacyRedirect" || token === "legacyBroken") {
+      const status = token === "legacyServerError" ? 500 : token === "legacyRedirect" ? 302 : 400
+      res.writeHead(status, token === "legacyRedirect" ? { location: "/login" } : { "content-type": "application/json" })
+      res.end(status === 302 ? undefined : JSON.stringify({ errors: [{ status: String(status), detail: `fail ${(req.headers.authorization ?? "").replace("Bearer ", "")}` }] }))
+    } else if (token === "legacyText" || token === "legacyErrorsAndData" || token === "legacyEmptyList") {
+      res.writeHead(200, { "content-type": token === "legacyText" ? "text/plain" : "application/json" })
+      res.end(JSON.stringify(token === "legacyErrorsAndData" ? { errors: [{ title: "x" }], data: [] } : token === "legacyEmptyList" ? { data: [] } : { data: [] }))
+    } else if (token === "legacyEmptyObject") {
+      res.writeHead(200, { "content-type": "application/json" })
+      res.end(JSON.stringify({ data: { type: "projects", id: "x" } }))
+    } else {
+      const status = token === "legacyRevoked" ? 401 : token === "legacyForbidden" ? 403 : 200
+      res.writeHead(status, { "content-type": "application/json" })
+      res.end(JSON.stringify(status === 200 ? { data: [{ type: "projects", id: "demo" }] } : { errors: [{ status: String(status), detail: "denied" }] }))
+    }
+    return
+  }
   if (token === "projectOnly" && req.url === "/polarion/rest/v1/projects/drivepilot") {
     res.writeHead(200, { "content-type": "application/json" })
     res.end(JSON.stringify({ data: { type: "projects", id: "drivepilot" } }))
@@ -92,7 +118,7 @@ test("the default direct-PAT MCP validator exposes safe metadata diagnostics", a
       assert.equal(response.headers.get("mcp-session-id"), null, "a failed probe must not open a session")
       const body = await response.json() as { error: { message: string } }
       assert.match(body.error.message, new RegExp(`^\\[${category}`))
-      assert.match(body.error.message, /GET \/metadata/)
+      assert.match(body.error.message, /GET \/(metadata|projects)/)
       if (token === "broken" || token === "unsupported") assert.match(body.error.message, /API_BASE_URL/)
       assert.doesNotMatch(body.error.message, /secret-pat-value|No access for/)
     }
@@ -251,7 +277,7 @@ test("the detailed probe classifies metadata HTTP outcomes deterministically", a
       assert.equal(result.diagnostic.category, category)
       assert.equal(result.diagnostic.upstreamStatus, status)
       assert.equal(result.diagnostic.retryable, retryable)
-      assert.match(result.diagnostic.message, /^Polarion token probe GET \/metadata:/)
+      assert.match(result.diagnostic.message, /^Polarion token probe GET \/(metadata|projects):/)
       assert.ok(result.diagnostic.action.length > 0)
       assert.deepEqual((await probePolarionToken(`${SECRET_PAT}${token}`)), result, "diagnostics are deterministic")
       assert.doesNotMatch(JSON.stringify(result.diagnostic), new RegExp(SECRET_PAT))
@@ -288,11 +314,96 @@ test("network and TLS errors are safely classified without leaking Axios text", 
   }
 })
 
-test("redirects and unsupported endpoints cannot authenticate a PAT or trigger a fallback", async () => {
-  for (const mode of ["redirect", "unsupported"]) {
+test("redirects and a missing /metadata plus /projects cannot authenticate a PAT", async () => {
+  observed.length = 0
+  assert.equal((await check(`${SECRET_PAT}redirect`)).result, "unavailable")
+  assert.equal(observed.length, 1, "a redirect never falls back")
+  observed.length = 0
+  assert.equal((await check(`${SECRET_PAT}legacyNothing`)).result, "unavailable")
+  assert.deepEqual(observed.map(request => new URL(request.url, "http://polarion").pathname), ["/polarion/rest/v1/metadata", "/polarion/rest/v1/projects"])
+  const result = await probePolarionToken(`${SECRET_PAT}legacyNothing`)
+  assert.equal(result.valid, false)
+  if (!result.valid) {
+    assert.equal(result.diagnostic.category, "endpoint_missing")
+    assert.match(result.diagnostic.message, /GET \/projects/)
+  }
+})
+
+test("Polarion before 2512 falls back to /projects after a 404 from /metadata", async () => {
+  observed.length = 0
+  assert.equal((await check(`${SECRET_PAT}legacy`)).result, true)
+  assert.deepEqual(observed.map(request => new URL(request.url, "http://polarion").pathname), ["/polarion/rest/v1/metadata", "/polarion/rest/v1/projects"])
+  assert.equal(new URL(observed[1]!.url, "http://polarion").searchParams.get("page[size]"), "1")
+  assert.equal(observed[1]!.authorization, `Bearer ${SECRET_PAT}legacy`)
+  assert.equal((await check(`${SECRET_PAT}legacyRevoked`)).result, false, "an invalid PAT is rejected by the fallback")
+  assert.equal((await check(`${SECRET_PAT}legacyForbidden`)).result, "forbidden")
+  for (const mode of ["legacyHtml", "legacyEmptyObject"]) assert.equal((await check(`${SECRET_PAT}${mode}`)).result, "unavailable", `${mode} must not authenticate`)
+})
+
+test("fallback failures stay classified, never authenticate, and keep the token out of logs", async () => {
+  const cases = [
+    ["legacyServerError", "server_error", 500, true], ["legacyRedirect", "redirect", 302, false],
+    ["legacyBroken", "request_rejected", 400, false], ["legacyText", "unusable_response", 200, false],
+    ["legacyErrorsAndData", "unusable_response", 200, false],
+  ] as const
+  for (const [mode, category, status, retryable] of cases) {
+    const result = await probePolarionToken(`${SECRET_PAT}${mode}`)
+    assert.equal(result.valid, false, mode)
+    if (!result.valid) {
+      assert.equal(result.diagnostic.category, category, mode)
+      assert.equal(result.diagnostic.upstreamStatus, status, mode)
+      assert.equal(result.diagnostic.retryable, retryable, mode)
+      assert.match(result.diagnostic.message, /GET \/projects/, mode)
+      assert.doesNotMatch(JSON.stringify(result.diagnostic), new RegExp(SECRET_PAT))
+    }
+    assert.doesNotMatch((await check(`${SECRET_PAT}${mode}`)).log, new RegExp(SECRET_PAT), mode)
+  }
+  assert.equal((await check(`${SECRET_PAT}legacyEmptyList`)).result, true, "an empty project list is still a valid answer")
+})
+
+test("a network error on the fallback is classified and reported for /projects", async () => {
+  const originalGet = axios.get.bind(axios)
+  let calls = 0
+  try {
+    axios.get = (async (url: string, config?: unknown) => {
+      if (++calls === 1) return originalGet(url, config as never)
+      throw Object.assign(new Error(`secret ${SECRET_PAT}`), { code: "ECONNREFUSED" })
+    }) as typeof axios.get
+    const { result, log } = await check(`${SECRET_PAT}legacy`)
+    assert.equal(result, "unavailable")
+    assert.match(log, /GET \/projects failed: connection_refused/)
+    assert.doesNotMatch(log, /secret/)
+  } finally {
+    axios.get = originalGet
+  }
+})
+
+test("the legacy-fallback INFO line is written once per process", async () => {
+  const first = await check(`${SECRET_PAT}legacy`)
+  const second = await check(`${SECRET_PAT}legacy`)
+  // An earlier test may already have written it; either way a repeat probe must not log it again.
+  assert.equal(second.log.includes("[INFO]"), false)
+  assert.equal(first.log.includes("[INFO]"), false)
+})
+
+test("a forbidden fallback explains that old releases need global REST GET, without leaking the token", async () => {
+  const result = await probePolarionToken(`${SECRET_PAT}legacyForbidden`)
+  assert.equal(result.valid, false)
+  if (!result.valid) {
+    assert.equal(result.diagnostic.category, "permission_denied")
+    assert.match(result.diagnostic.message, /GET \/projects/)
+    assert.match(result.diagnostic.action, /global REST GET/)
+    assert.match(result.diagnostic.action, /2512/)
+    assert.doesNotMatch(JSON.stringify(result.diagnostic), new RegExp(SECRET_PAT))
+  }
+  assert.match((await check(`${SECRET_PAT}legacyForbidden`)).log, /Polarion token probe GET \/projects failed: permission_denied HTTP 403/)
+})
+
+test("401 and 403 from /metadata are final and never reach /projects", async () => {
+  for (const mode of ["revoked", "forbidden"]) {
     observed.length = 0
-    assert.equal((await check(`${SECRET_PAT}${mode}`)).result, "unavailable", mode)
-    assert.equal(observed.length, 1)
+    await check(`${SECRET_PAT}${mode}`)
+    assert.equal(observed.length, 1, mode)
     assert.equal(new URL(observed[0]!.url, "http://polarion").pathname, "/polarion/rest/v1/metadata")
   }
 })
