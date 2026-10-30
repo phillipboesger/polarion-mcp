@@ -14,15 +14,15 @@ Regeneration updates the generated `src/tools.ts`; handwritten runtime modules a
 
 ## Supported Polarion releases
 
-The full tool surface targets the newest release (2606). Releases 2506 and 2512 must stay usable; the live suite runs against 2506, 2512 and 2606 (see [live tests](./live-tests.md)).
+The full tool surface targets the newest release (2606). Releases 2506 and 2512 must stay usable; the live suite runs against 2506, 2512 and 2606 (see [live tests](./live-tests.md)). The 2512 cells were confirmed by the live run of PR #111.
 
 | Area | 2606 | 2512 | 2506 |
 |---|---|---|---|
 | Local (stdio) setup | Yes | Yes | Yes |
 | HTTP/OAuth login check | `GET /metadata` | `GET /metadata` | Fallback `GET /projects` |
 | Global REST GET permission required for login | No | No | Yes |
-| `getCurrentUser` (`GET /user`) | Yes | Not confirmed | No (404, use the other tools) |
-| Job execution (`/jobs`) | Yes | Not confirmed | No (only `GET /jobs/{id}` and file download) |
+| `getCurrentUser` (`GET /user`) | Yes | Yes | No (404, use the other tools) |
+| Job execution (`/jobs`) | Yes | Yes | No (only `GET /jobs/{id}` and file download) |
 
 Deviations on older releases:
 
