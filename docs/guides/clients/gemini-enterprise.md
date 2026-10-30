@@ -1,4 +1,4 @@
-# Connect Gemini Enterprise
+# Connect Gemini (Enterprise)
 
 Gemini Enterprise agents for your organization. Default: **Server**.
 

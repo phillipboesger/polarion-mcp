@@ -113,58 +113,7 @@
       "clients": [
         "claude-desktop",
         "claude-web-desktop",
-        "claude-code",
-        "claude-api"
-      ]
-    },
-    {
-      "id": "google",
-      "name": "Google Gemini",
-      "logo": "google",
-      "color": "#8ab4f8",
-      "angle": -30,
-      "clients": [
-        "antigravity",
-        "gemini-enterprise"
-      ]
-    },
-    {
-      "id": "custom",
-      "name": "Custom clients",
-      "logo": "custom",
-      "color": "#c4a0ff",
-      "angle": 30,
-      "clients": [
-        "generic-stdio",
-        "generic-http",
-        "rest-wrapper",
-        "n8n",
-        "mistral-le-chat",
-        "self-hosted"
-      ]
-    },
-    {
-      "id": "editors",
-      "name": "Editors & IDEs",
-      "logo": "editors",
-      "color": "#62d6ff",
-      "angle": 90,
-      "clients": [
-        "github-copilot",
-        "cursor",
-        "windsurf",
-        "jetbrains-ai"
-      ]
-    },
-    {
-      "id": "ms",
-      "name": "Microsoft",
-      "logo": "ms",
-      "color": "#7fb8ff",
-      "angle": 150,
-      "clients": [
-        "copilot-studio",
-        "m365-copilot"
+        "claude-code"
       ]
     },
     {
@@ -172,11 +121,81 @@
       "name": "OpenAI",
       "logo": "openai",
       "color": "#5fe0c0",
-      "angle": 210,
+      "angle": -39,
       "clients": [
         "chatgpt-apps",
         "custom-gpt",
-        "codex-cli",
+        "codex-cli"
+      ]
+    },
+    {
+      "id": "ms",
+      "name": "Microsoft",
+      "logo": "ms",
+      "color": "#7fb8ff",
+      "angle": 13,
+      "clients": [
+        "m365-copilot",
+        "copilot-studio",
+        "github-copilot"
+      ]
+    },
+    {
+      "id": "google",
+      "name": "Google Gemini",
+      "logo": "google",
+      "color": "#8ab4f8",
+      "angle": 64,
+      "clients": [
+        "antigravity",
+        "gemini-enterprise"
+      ]
+    },
+    {
+      "id": "mistral",
+      "name": "Mistral",
+      "logo": "mistral",
+      "color": "#ffb454",
+      "angle": 116,
+      "clients": [
+        "mistral-le-chat"
+      ]
+    },
+    {
+      "id": "editors",
+      "name": "Other Editors & IDEs",
+      "logo": "editors",
+      "color": "#62d6ff",
+      "angle": 167,
+      "clients": [
+        "cursor",
+        "windsurf",
+        "jetbrains-ai"
+      ]
+    },
+    {
+      "id": "selfhosted",
+      "name": "Self-hosted & own",
+      "logo": "selfhosted",
+      "color": "#c4a0ff",
+      "angle": 219,
+      "clients": [
+        "self-hosted",
+        "generic-stdio",
+        "generic-http",
+        "rest-wrapper",
+        "n8n"
+      ]
+    },
+    {
+      "id": "advanced",
+      "name": "APIs & SDKs",
+      "logo": "api",
+      "color": "#9aa7b4",
+      "angle": 0,
+      "site": false,
+      "clients": [
+        "claude-api",
         "openai-api",
         "openai-agents"
       ]
@@ -1289,8 +1308,8 @@
     },
     {
       "id": "gemini-enterprise",
-      "name": "Gemini Enterprise",
-      "label": "Enterprise",
+      "name": "Gemini (Enterprise)",
+      "label": "Gemini (Enterprise)",
       "icon": "building",
       "provider": "google",
       "sources": [

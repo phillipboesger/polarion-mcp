@@ -14,9 +14,10 @@ test('integration map covers every non-docker client and every client has an ico
   const mapped = data.map.flatMap(node => node.clients);
   const counts = new Map(mapped.map(id => [id, 0]));
   for (const id of mapped) counts.set(id, (counts.get(id) ?? 0) + 1);
-  assert.equal(data.map.length, 6);
-  assert.equal(new Set(data.map.map(node => node.id)).size, 6);
-  assert.equal(new Set(data.map.map(node => node.angle)).size, 6);
+  assert.equal(data.map.length, 8);
+  assert.equal(data.map.filter(node => node.site !== false).length, 7);
+  assert.equal(new Set(data.map.map(node => node.id)).size, 8);
+  assert.equal(new Set(data.map.map(node => node.angle)).size, 8);
   for (const id of mapped) assert.ok(clientIds.has(id), `unknown map client ${id}`);
   for (const client of data.clients) {
     assert.ok(client.icon, `${client.id} is missing an icon`);

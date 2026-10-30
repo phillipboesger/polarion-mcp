@@ -34,6 +34,8 @@ export function renderNodeLogo(id, rawColor) {
     case 'openai': return [0, 60, 120].map(rotation => `<rect x="-7" y="-16" width="14" height="32" rx="7" transform="rotate(${rotation})" fill="none" stroke="${color}" stroke-width="2.3"/>`).join('');
     case 'google': return '<path d="M0-18C2-6 6-2 18 0 6 2 2 6 0 18-2 6-6 2-18 0-6-2-2-6 0-18Z" fill="url(#gem)"/>';
     case 'ms': return '<rect x="-15" y="-15" width="14" height="14" fill="#f25022"/><rect x="1" y="-15" width="14" height="14" fill="#7fba00"/><rect x="-15" y="1" width="14" height="14" fill="#00a4ef"/><rect x="1" y="1" width="14" height="14" fill="#ffb900"/>';
+    case 'mistral': return [-12,-4,4,12].flatMap((y,i)=>[0,1,2].map(c=>`<rect x="${-15+c*10.5}" y="${y-3.5}" width="9" height="7" fill="${color}" opacity="${(c===1&&i%3===0)||(i===3&&c===1)?0.35:1}"/>`)).join('');
+    case 'selfhosted': return icon('server', color);
     case 'editors': return icon('code', color);
     default: return icon('api', color);
   }

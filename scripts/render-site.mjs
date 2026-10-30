@@ -18,14 +18,16 @@ const httpsUrl = value => {
 
 export function renderSiteClientsBlock(manifest) {
   const mode = id => manifest.serverModes.find(mode => mode.id === id);
-  const layout = layoutForMap(manifest.map);
+  // Nodes flagged site:false (APIs & SDKs) stay in the repo docs; the site only points to them.
+  const siteMap = manifest.map.filter(node => node.site !== false);
+  const layout = layoutForMap(siteMap);
   const clientsById = new Map(manifest.clients.map(client => [client.id, client]));
-  const nodes = manifest.map.map(node => ({
+  const nodes = siteMap.map(node => ({
     id: node.id, name: node.name, color: node.color, angle: node.angle,
     position: layout[node.id].primary, clients: node.clients,
   }));
   const clients = manifest.clients.map(client => {
-    const node = manifest.map.find(item => item.clients.includes(client.id));
+    const node = siteMap.find(item => item.clients.includes(client.id));
     return {
       id: client.id, name: client.name, label: client.label, node: node?.id ?? null,
       icon: client.icon, summary: client.summary, guide: `clients/${client.id}.md`,
@@ -62,11 +64,12 @@ export function renderSiteClientsBlock(manifest) {
     </div>
     <div class="galaxy" id="galaxy">
       ${svg}
-      <p class="galaxy-hint" id="galaxy-hint">Select a provider to see its options</p>
+      <p class="galaxy-hint" id="galaxy-hint">Select a product to see its options</p>
       <div class="galaxy-panel" id="galaxy-panel" role="region" aria-label="Setup details" tabindex="-1" hidden></div>
       <div class="galaxy-sheet" id="galaxy-sheet" role="dialog" aria-label="Setup details" hidden></div>
       <script type="application/json" id="galaxy-data">${json}</script>
       <p id="path-status" class="sr-only" role="status" aria-live="polite"></p>
+      <p class="galaxy-more">Building on an API or SDK instead (Claude API, OpenAI Responses API, OpenAI Agents SDK)? See <a href="${httpsUrl(`${repoBlob}/docs/clients.md`)}" target="_blank" rel="noopener noreferrer">all supported clients ↗</a>.</p>
       <div class="galaxy-list">${listGroups}
         <section><h3>Self-hosted server</h3><ul><li><a class="guide-link" href="${httpsUrl(guideUrl('docker'))}">${escapeHtml(docker.name)}</a> - ${escapeHtml(docker.summary)}</li></ul></section>
       </div>

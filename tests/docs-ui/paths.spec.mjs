@@ -57,6 +57,8 @@ const primary = id => `.node.primary[data-node="${id}"]`;
 const satellite = id => `.satellite[data-client="${id}"]`;
 // The fixed bottom sheet can cover map nodes on small screens, so dispatch clicks there.
 const isMobile = info => info.project.name.includes('mobile');
+const siteMap = manifest.map.filter(node => node.site !== false);
+const siteClients = new Set(siteMap.flatMap(node => node.clients));
 const detailId = info => (isMobile(info) ? '#galaxy-sheet' : '#galaxy-panel');
 // The side panel (desktop) and sheet (mobile) exist only while a tool is open; the map is centered without them.
 const expectDetailClosed = async (page, info) => {
@@ -69,17 +71,18 @@ const expectDetailClosed = async (page, info) => {
 };
 const press = (info, locator) => (isMobile(info) ? locator.dispatchEvent('click') : locator.click());
 
-test('the map starts with six providers, no panel and a complete no-JS guide list', async ({ page }, info) => {
+test('the map starts with seven products, no panel and a complete no-JS guide list', async ({ page }, info) => {
   await page.goto('/');
   await expect(page.locator('#setup')).toHaveCount(0);
   await expect(page.locator('#clients .setup-steps, #clients pre, #clients ol, #clients input[name="path"]')).toHaveCount(0);
-  await expect(page.locator('.node.primary')).toHaveCount(6);
+  await expect(page.locator('.node.primary')).toHaveCount(7);
   await expect(page.locator('.satellite')).toHaveCount(0);
   await expect(page.locator('#galaxy-sheet')).toBeHidden();
   await expectDetailClosed(page, info);
   await expect(page.locator('.galaxy-list')).toBeHidden();
-  await expect(page.locator('#galaxy-hint')).toHaveText('Select a provider to see its options');
+  await expect(page.locator('#galaxy-hint')).toHaveText('Select a product to see its options');
   await expect(page.locator('.galaxy-list a.guide-link')).toHaveCount(manifest.clients.length);
+  await expect(page.locator('.galaxy-more a')).toHaveAttribute('href', `${guideBase.replace('guides/', '')}clients.md`);
   for (const client of manifest.clients) {
     await expect(page.locator(`.galaxy-list a[href="${guideBase}clients/${client.id}.md"]`)).toHaveCount(1);
     expect(fs.existsSync(`docs/guides/clients/${client.id}.md`)).toBe(true);
@@ -108,19 +111,19 @@ test('desktop map and portrait detail panel sit side by side; mobile keeps the b
 
 test('one provider branch is open at a time; hub, second click and Escape step back', async ({ page }, info) => {
   await page.goto('/');
-  for (const node of manifest.map) {
+  for (const node of siteMap) {
     await press(info, page.locator(primary(node.id)));
     await expect(page.locator(primary(node.id))).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator('.satellite')).toHaveCount(node.clients.length);
+    await expect(page.locator('.satellite')).toHaveCount(node.clients.length === 1 ? 0 : node.clients.length);
     await expect(page.locator('.node.primary[aria-expanded="true"]')).toHaveCount(1);
   }
   await press(info, page.locator(primary('claude')));
-  await expect(page.locator('.satellite')).toHaveCount(4);
+  await expect(page.locator('.satellite')).toHaveCount(3);
   await press(info, page.locator(satellite('claude-code')));
   await expect(page.locator(detailId(info))).toBeVisible();
   await page.keyboard.press('Escape');
   await expectDetailClosed(page, info);
-  await expect(page.locator('.satellite')).toHaveCount(4);
+  await expect(page.locator('.satellite')).toHaveCount(3);
   await page.locator(satellite('claude-code')).focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('.satellite')).toHaveCount(0);
@@ -135,10 +138,10 @@ test('one provider branch is open at a time; hub, second click and Escape step b
 
 test('every client opens a panel with its guide, working modes and explained unsupported modes', async ({ page }, info) => {
   await page.goto('/');
-  for (const client of manifest.clients.filter(item => item.id !== 'docker')) {
-    const node = manifest.map.find(item => item.clients.includes(client.id));
+  for (const client of manifest.clients.filter(item => siteClients.has(item.id))) {
+    const node = siteMap.find(item => item.clients.includes(client.id));
     await press(info, page.locator(primary(node.id)));
-    await press(info, page.locator(satellite(client.id)));
+    if (node.clients.length > 1) await press(info, page.locator(satellite(client.id)));
     const panel = page.locator(detailId(info));
     await expect(panel).toBeVisible();
     await expect(panel.locator('h3')).toHaveText(client.name);
@@ -320,4 +323,15 @@ test('topic carousel advances on its own, responds to controls and honors reduce
   await track.scrollIntoViewIfNeeded();
   await page.waitForTimeout(5500);
   expect(await track.evaluate(el => el.scrollLeft)).toBeLessThan(10);
+});
+
+test('a node with one client opens its panel directly and closes with it', async ({ page }, info) => {
+  await page.goto('/');
+  await press(info, page.locator(primary('mistral')));
+  await expect(page.locator('.satellite')).toHaveCount(0);
+  await expect(page.locator(detailId(info))).toBeVisible();
+  await expect(page.locator(detailId(info)).locator('h3')).toHaveText('Mistral Le Chat');
+  await page.keyboard.press('Escape');
+  await expectDetailClosed(page, info);
+  await expect(page.locator(primary('mistral'))).toHaveAttribute('aria-expanded', 'false');
 });

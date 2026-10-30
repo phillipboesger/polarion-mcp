@@ -163,8 +163,8 @@
     },
     "map": {
       "type": "array",
-      "minItems": 6,
-      "maxItems": 6,
+      "minItems": 8,
+      "maxItems": 8,
       "items": {
         "type": "object",
         "required": [
@@ -195,6 +195,9 @@
           },
           "angle": {
             "type": "integer"
+          },
+          "site": {
+            "const": false
           },
           "clients": {
             "type": "array",

@@ -52,7 +52,7 @@
       layer.replaceChildren();
       satEdges = [];
       const node = nodes.get(state.provider);
-      if (!node) return;
+      if (!node || node.clients.length === 1) return;
       const origin = node.position;
       node.clients.forEach(id => {
         const client = clients.get(id);
@@ -184,7 +184,7 @@
         el.setAttribute('aria-pressed', String(selected));
       });
       setView();
-      hint.textContent = !state.provider ? 'Select a provider to see its options' : state.client ? '' : 'Now pick your tool';
+      hint.textContent = !state.provider ? 'Select a product to see its options' : state.client ? '' : 'Now pick your tool';
       renderPanel();
     }
 
@@ -194,6 +194,8 @@
       state.provider = state.provider === id ? null : id;
       state.client = null;
       drawSatellites();
+      const only = state.provider ? nodes.get(state.provider).clients : [];
+      if (only.length === 1) { selectClient(only[0]); return; }
       sync();
       announce(state.provider ? `${nodes.get(state.provider).name}: ${nodes.get(state.provider).clients.length} clients` : 'Overview');
     }
@@ -211,6 +213,8 @@
     function closeClient() {
       const previous = state.client;
       state.client = null;
+      // A node with a single client opens its panel directly, so closing it closes the node too.
+      if (state.provider && nodes.get(state.provider).clients.length === 1) { const open = primaries.find(el => el.dataset.node === state.provider); state.provider = null; drawSatellites(); sync(); open?.focus(); return; }
       sync();
       const back = layer.querySelector(`.satellite[data-client="${previous}"]`);
       if (back) back.focus();

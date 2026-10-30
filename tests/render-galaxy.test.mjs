@@ -9,10 +9,10 @@ const island = html => JSON.parse(/<script type="application\/json" id="galaxy-d
 test('renders a deterministic integration galaxy with manifest data', () => {
   const first = renderSiteClientsBlock(manifest);
   assert.equal(first, renderSiteClientsBlock(manifest));
-  assert.equal((first.match(/class="node primary"/g) || []).length, 6);
+  assert.equal((first.match(/class="node primary"/g) || []).length, 7);
   assert.doesNotMatch(first, /name="path"/);
   const data = island(first);
-  assert.deepEqual(data.nodes.map(node => node.id), manifest.map.map(node => node.id));
+  assert.deepEqual(data.nodes.map(node => node.id), manifest.map.filter(node => node.site !== false).map(node => node.id));
   assert.deepEqual(data.clients.map(client => client.id), manifest.clients.map(client => client.id));
 });
 
