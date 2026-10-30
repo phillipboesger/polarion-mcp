@@ -28,7 +28,7 @@ const guidance: Record<TokenDiagnosticCategory, { message: string; action: strin
   invalid_pat: { message: 'Polarion token probe GET /metadata: Polarion rejected the token.', action: 'Check whether the PAT is valid and has not been revoked.', retryable: false },
   permission_denied: { message: 'Polarion token probe GET /metadata: Polarion denied access for this token.', action: 'Check that the PAT can access Polarion REST metadata.', retryable: false },
   request_rejected: { message: 'Polarion token probe GET /metadata: Polarion rejected the request.', action: 'Check that API_BASE_URL uses the hostname Polarion and its proxy accept (the address users open in the browser). The server log shows Polarion\'s own message. For the Polarion Docker image, a missing ALLOWED_HOSTS entry is one possible cause.', retryable: false },
-  endpoint_missing: { message: 'Polarion token probe GET /metadata: the endpoint was not found.', action: 'Check API_BASE_URL ends in /polarion/rest/v1 and uses the final server address. HTTP/OAuth requires Polarion 2512 or newer.', retryable: false },
+  endpoint_missing: { message: 'Polarion token probe GET /metadata: the endpoint was not found.', action: 'Check API_BASE_URL ends in /polarion/rest/v1 and uses the final server address. Polarion 2506 and newer are supported.', retryable: false },
   redirect: { message: 'Polarion token probe GET /metadata: the request was redirected.', action: 'Check the configured REST base URL and proxy or login routing.', retryable: false },
   server_error: { message: 'Polarion token probe GET /metadata: Polarion returned a server error.', action: 'Retry later and check Polarion availability.', retryable: true },
   unexpected_status: { message: 'Polarion token probe GET /metadata: Polarion returned an unexpected status.', action: 'Check Polarion and proxy configuration.', retryable: false },
@@ -47,9 +47,10 @@ export function tokenDiagnostic(category: TokenDiagnosticCategory, upstreamStatu
   const entry = guidance[category];
   let { message, action } = entry;
   if (endpoint === '/projects') {
-    message = message.replace('GET /metadata', 'GET /projects');
+    message = message.replace('GET /metadata', 'GET /projects').replace('usable JSON metadata', 'usable JSON project list');
     // Releases before 2512 have no /metadata, so only an ordinary REST read can tell a valid token from an invalid one.
     if (category === 'permission_denied') action = 'This Polarion has no /metadata (before 2512), so the login check reads GET /projects. Allow global REST GET for this user, or upgrade to Polarion 2512 or newer.';
+    if (category === 'unusable_response') action = 'Check that GET /projects returns a JSON project list. A login page or proxy may be answering instead of Polarion.';
     if (category === 'endpoint_missing') action = 'Neither /metadata nor /projects was found. Check API_BASE_URL ends in /polarion/rest/v1 and that REST is enabled.';
   }
   return { category, ...(upstreamStatus === undefined ? {} : { upstreamStatus }), retryable: entry.retryable, message, action };

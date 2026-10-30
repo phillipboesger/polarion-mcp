@@ -26,6 +26,13 @@ const polarion = createServer((req, res) => {
     } else if (token === "legacyHtml") {
       res.writeHead(200, { "content-type": "text/html" })
       res.end("<html>SSO login</html>")
+    } else if (token === "legacyServerError" || token === "legacyRedirect" || token === "legacyBroken") {
+      const status = token === "legacyServerError" ? 500 : token === "legacyRedirect" ? 302 : 400
+      res.writeHead(status, token === "legacyRedirect" ? { location: "/login" } : { "content-type": "application/json" })
+      res.end(status === 302 ? undefined : JSON.stringify({ errors: [{ status: String(status), detail: `fail ${(req.headers.authorization ?? "").replace("Bearer ", "")}` }] }))
+    } else if (token === "legacyText" || token === "legacyErrorsAndData" || token === "legacyEmptyList") {
+      res.writeHead(200, { "content-type": token === "legacyText" ? "text/plain" : "application/json" })
+      res.end(JSON.stringify(token === "legacyErrorsAndData" ? { errors: [{ title: "x" }], data: [] } : token === "legacyEmptyList" ? { data: [] } : { data: [] }))
     } else if (token === "legacyEmptyObject") {
       res.writeHead(200, { "content-type": "application/json" })
       res.end(JSON.stringify({ data: { type: "projects", id: "x" } }))
@@ -331,6 +338,52 @@ test("Polarion before 2512 falls back to /projects after a 404 from /metadata", 
   assert.equal((await check(`${SECRET_PAT}legacyRevoked`)).result, false, "an invalid PAT is rejected by the fallback")
   assert.equal((await check(`${SECRET_PAT}legacyForbidden`)).result, "forbidden")
   for (const mode of ["legacyHtml", "legacyEmptyObject"]) assert.equal((await check(`${SECRET_PAT}${mode}`)).result, "unavailable", `${mode} must not authenticate`)
+})
+
+test("fallback failures stay classified, never authenticate, and keep the token out of logs", async () => {
+  const cases = [
+    ["legacyServerError", "server_error", 500, true], ["legacyRedirect", "redirect", 302, false],
+    ["legacyBroken", "request_rejected", 400, false], ["legacyText", "unusable_response", 200, false],
+    ["legacyErrorsAndData", "unusable_response", 200, false],
+  ] as const
+  for (const [mode, category, status, retryable] of cases) {
+    const result = await probePolarionToken(`${SECRET_PAT}${mode}`)
+    assert.equal(result.valid, false, mode)
+    if (!result.valid) {
+      assert.equal(result.diagnostic.category, category, mode)
+      assert.equal(result.diagnostic.upstreamStatus, status, mode)
+      assert.equal(result.diagnostic.retryable, retryable, mode)
+      assert.match(result.diagnostic.message, /GET \/projects/, mode)
+      assert.doesNotMatch(JSON.stringify(result.diagnostic), new RegExp(SECRET_PAT))
+    }
+    assert.doesNotMatch((await check(`${SECRET_PAT}${mode}`)).log, new RegExp(SECRET_PAT), mode)
+  }
+  assert.equal((await check(`${SECRET_PAT}legacyEmptyList`)).result, true, "an empty project list is still a valid answer")
+})
+
+test("a network error on the fallback is classified and reported for /projects", async () => {
+  const originalGet = axios.get.bind(axios)
+  let calls = 0
+  try {
+    axios.get = (async (url: string, config?: unknown) => {
+      if (++calls === 1) return originalGet(url, config as never)
+      throw Object.assign(new Error(`secret ${SECRET_PAT}`), { code: "ECONNREFUSED" })
+    }) as typeof axios.get
+    const { result, log } = await check(`${SECRET_PAT}legacy`)
+    assert.equal(result, "unavailable")
+    assert.match(log, /GET \/projects failed: connection_refused/)
+    assert.doesNotMatch(log, /secret/)
+  } finally {
+    axios.get = originalGet
+  }
+})
+
+test("the legacy-fallback INFO line is written once per process", async () => {
+  const first = await check(`${SECRET_PAT}legacy`)
+  const second = await check(`${SECRET_PAT}legacy`)
+  // An earlier test may already have written it; either way a repeat probe must not log it again.
+  assert.equal(second.log.includes("[INFO]"), false)
+  assert.equal(first.log.includes("[INFO]"), false)
 })
 
 test("a forbidden fallback explains that old releases need global REST GET, without leaking the token", async () => {

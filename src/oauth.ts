@@ -202,15 +202,17 @@ export async function probePolarionToken(token: string): Promise<TokenProbeResul
     }
     if (response.status !== 404) return failed(classify(response.status, '/metadata'), '/metadata', upstreamDetail(response.data, token));
 
-    if (!legacyProbeLogged) {
-      legacyProbeLogged = true;
-      console.error('[INFO] Polarion has no /metadata (before 2512). Tokens are checked with GET /projects, which needs global REST GET permission for the user.');
-    }
     endpoint = '/projects';
     const fallback = await get('/projects?page%5Bsize%5D=1');
     if (fallback.status >= 200 && fallback.status < 300) {
       const list = asObject(fallback.data);
-      if (isJson(fallback) && list && !('errors' in list) && Array.isArray(list.data)) return { valid: true };
+      if (isJson(fallback) && list && !('errors' in list) && Array.isArray(list.data)) {
+        if (!legacyProbeLogged) {
+          legacyProbeLogged = true;
+          console.error('[INFO] GET /metadata returned 404 (Polarion before 2512, or a proxy path). Tokens are checked with GET /projects, which needs global REST GET permission for the user.');
+        }
+        return { valid: true };
+      }
       return failed(tokenDiagnostic('unusable_response', fallback.status, '/projects'), '/projects', upstreamDetail(fallback.data, token));
     }
     return failed(classify(fallback.status, '/projects'), '/projects', upstreamDetail(fallback.data, token));

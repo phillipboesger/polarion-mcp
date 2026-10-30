@@ -30,7 +30,7 @@ What this means in practice:
 
 Direct PAT initialization, OAuth login, and refresh check authentication against Polarion (`GET <API_BASE_URL>/metadata`), and Polarion's answer decides. The server log shows it as `Polarion token probe GET /metadata failed: <category> HTTP <status> - <Polarion's message>`, for example `request_rejected HTTP 400`. The same category and status appear in the error shown to the user; Polarion's own message appears only in the log. A host-side curl can test the URL from that host, but it does not prove the Docker container can reach the same address. Use the container-side probe below for deployment diagnostics. Do not put a real PAT in a command argument, shell history, or logs.
 
-HTTP 200 with a usable metadata response allows connection. HTTP 401 rejects the PAT; HTTP 403 denies access. The probe requires Polarion 2512+ and does not require global REST GET permission.
+HTTP 200 with a usable metadata response allows connection. HTTP 401 rejects the PAT; HTTP 403 denies access. The probe reads `/metadata` (2512+, no global REST GET needed). On Polarion 2506 it falls back to `GET /projects`, which needs global REST GET.
 
 <!-- faq:start -->
 **It says 401 "Polarion did not accept this token".**
@@ -158,7 +158,7 @@ unset POLARION_PAT
 (exit "$probe_status")
 ```
 
-The PAT is not printed or placed in command arguments. An authenticated metadata response confirms the PAT on Polarion 2512+. HTTP 401 indicates a bad or expired PAT; 403 indicates denial; 400 may indicate an unacceptable hostname or request; 404 requires checking the REST URL and supported Polarion version. Redirects or HTML require checking SSO/proxy routing. For DNS, timeout, or TLS errors, check container network access and certificate trust. For a company CA, mount its PEM and set `NODE_EXTRA_CA_CERTS=/certs/company-ca.pem`; keep certificate verification enabled. `/health` checks MCP liveness only, not Polarion readiness.
+The PAT is not printed or placed in command arguments. An authenticated metadata response confirms the PAT on Polarion 2512+; on 2506 a project list from `GET /projects` does. HTTP 401 indicates a bad or expired PAT; 403 indicates denial; 400 may indicate an unacceptable hostname or request; 404 requires checking the REST URL and supported Polarion version. Redirects or HTML require checking SSO/proxy routing. For DNS, timeout, or TLS errors, check container network access and certificate trust. For a company CA, mount its PEM and set `NODE_EXTRA_CA_CERTS=/certs/company-ca.pem`; keep certificate verification enabled. `/health` checks MCP liveness only, not Polarion readiness.
 
 ## 403 Origin Rejected
 
