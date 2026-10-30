@@ -28,7 +28,7 @@ test("the generated guides carry the identity demo and the site no longer lists 
 test("troubleshooting names the log line the server writes and the Polarion ALLOWED_HOSTS fix", async () => {
   const troubleshooting = await readFile(path.join(root, "docs/troubleshooting.md"), "utf8")
   const source = await readFile(path.join(root, "src/oauth.ts"), "utf8")
-  assert.match(source, /Polarion token probe GET \/metadata failed/)
+  assert.match(source, /Polarion token probe GET \$\{endpoint\} failed/)
   assert.doesNotMatch(troubleshooting + manifest, /Polarion token check failed/, "documented log line must match what the server logs")
   assert.match(troubleshooting, /request_rejected HTTP 400/)
   assert.match(troubleshooting, /ALLOWED_HOSTS=localhost,127\.0\.0\.1,0\.0\.0\.0,host\.docker\.internal/)

@@ -159,13 +159,16 @@ describe("stdio server against Polarion", () => {
 
 const metadataProbe = await fetch(`${API_BASE_URL}/metadata`, { headers: { authorization: `Bearer ${PAT}` }, redirect: "manual" });
 await metadataProbe.text();
-describe("Streamable HTTP server with OAuth against Polarion", {
-  skip: metadataProbe.status === 404 && "HTTP/OAuth PAT validation requires Polarion 2512+ (/metadata)",
-}, () => {
+// Before 2512 there is no /metadata; the server then validates tokens with GET /projects (needs global REST GET).
+const legacyProbe = metadataProbe.status === 404
+  ? await fetch(`${API_BASE_URL}/projects?page%5Bsize%5D=1`, { headers: { authorization: `Bearer ${PAT}` }, redirect: "manual" })
+  : undefined;
+await legacyProbe?.text();
+describe("Streamable HTTP server with OAuth against Polarion", () => {
   let server;
 
   before(async () => {
-    assert.equal(metadataProbe.status, 200, "metadata authentication must succeed before HTTP/OAuth tests");
+    assert.equal(legacyProbe?.status ?? metadataProbe.status, 200, "token authentication (/metadata, or /projects before 2512) must succeed before HTTP/OAuth tests");
     server = await startHttpServer();
   });
 

@@ -51,7 +51,7 @@ jobs:
       fail-fast: false
       matrix:
         # Pin the tag: ":latest" follows the newest release and would change under us.
-        polarion: ["2506", "2606"]
+        polarion: ["2506", "2512", "2606"]
     env:
       IMAGE: ghcr.io/phillipboesger/polarion-docker:v${{ matrix.polarion }}
       POLARION_URL: http://localhost:8080

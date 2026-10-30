@@ -22,7 +22,7 @@ Polarion checks three things. A failure in one does not mean the others are wron
 What this means in practice:
 
 - `getCurrentUser` calls `GET /user`, a global endpoint. A project-only account can get a 403 there and still read its projects with `getProject(projectId)`. That 403 limits the endpoint; it is not a failed login.
-- Connecting does not need global GET. The login check uses `GET /metadata` on Polarion 2512+.
+- Connecting does not need global GET on Polarion 2512+: the login check uses `GET /metadata`. On 2506 there is no `/metadata`, so the check reads `GET /projects` and the user needs global REST GET. A log line `GET /projects failed: permission_denied` means exactly that.
 - Do not grant global write permissions to make onboarding pass.
 - Upgrading from 1.4.1 to 1.4.2 changes the login check to `/metadata`. Update the image or package and recreate the container; a restart keeps the old image.
 
@@ -37,13 +37,13 @@ HTTP 200 with a usable metadata response allows connection. HTTP 401 rejects the
 The token was cut off, has expired, or belongs to another Polarion. Test the token with the `/metadata` request in the setup guide (docs/guides/local-npm.md or docs/troubleshooting.md) and create a new token.
 
 **It says 403 "Polarion denied access".**
-Polarion denied access. Check the user's license and REST or item permissions for the affected tool. The metadata authentication probe requires Polarion 2512+ and does not require global REST GET permission. A 403 during login is rejected.
+Polarion denied access. Check the user's license and REST or item permissions for the affected tool. On Polarion 2512+ the login check reads /metadata and needs no global REST GET permission. On 2506 it reads /projects, which does. A 403 during login is rejected.
 
 **The connector login in claude.ai or ChatGPT fails or loops.**
 Check `MCP_PUBLIC_URL` (exact https address, no path), the padlock, that the redirect preset or callback is allowed (`MCP_ALLOWED_REDIRECT_PRESETS=claude`; the log says `redirect_uri rejected`), and that `MCP_TOKEN_SECRET` did not change.
 
-**Does HTTP/OAuth work with Polarion 2506 or older?**
-HTTP MCP and OAuth need Polarion 2512+: the login check calls GET /metadata, which older versions answer with 404. Use the local setup (stdio with your own BEARER_TOKEN) or upgrade Polarion. The server does not fall back to project listing or accept a 403. Tool access still follows your Polarion permissions.
+**Does HTTP/OAuth work with Polarion 2506?**
+Yes. On 2512+ the login check calls GET /metadata and needs no global REST GET permission. 2506 has no /metadata, so the server reads GET /projects instead; that user must be allowed global REST GET. A 403 is never accepted. Tool access still follows your Polarion permissions.
 
 **What does Bearer mean in an Authorization header?**
 It is just the word Bearer, one space, then your token: `Bearer YOUR_POLARION_PAT`. Without the word Bearer the server answers 401.
@@ -52,7 +52,7 @@ It is just the word Bearer, one space, then your token: `Bearer YOUR_POLARION_PA
 In your personal client settings or an environment variable, never in a file inside a shared project or repository. Anyone who can read the file can act as you in Polarion. With the OAuth connectors you type the token only on the server's login page and the AI client never stores it.
 
 **Which Polarion versions work?**
-Live integration tests run against Polarion 2506 (stdio) and 2606. HTTP/OAuth connectors such as claude.ai and ChatGPT need Polarion 2512 or newer. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
+Live integration tests run against Polarion 2506, 2512 and 2606, including HTTP/OAuth. The full tool set is targeted at the newest release; 2506 and 2512 stay usable with the limits in Polarion versions. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
 
 **Which AI clients can I use?**
 Any client that supports MCP over stdio or Streamable HTTP. The setup guide above lists the tested paths for Claude, ChatGPT and Codex, Copilot Studio, VS Code, Gemini, Cursor, Windsurf and JetBrains. Other clients can use the generic stdio or HTTP entries, or the REST wrapper.

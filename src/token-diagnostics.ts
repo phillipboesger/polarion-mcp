@@ -40,9 +40,19 @@ const guidance: Record<TokenDiagnosticCategory, { message: string; action: strin
   network_error: { message: 'Polarion token probe GET /metadata: a network error occurred.', action: 'Check network access to Polarion and retry.', retryable: true },
 };
 
-export function tokenDiagnostic(category: TokenDiagnosticCategory, upstreamStatus?: number): TokenDiagnostic {
-  const { message, action, retryable } = guidance[category];
-  return { category, ...(upstreamStatus === undefined ? {} : { upstreamStatus }), retryable, message, action };
+/** Probe endpoints: /metadata (2512+, no global REST GET needed) and the /projects fallback for older releases. */
+export type TokenProbeEndpoint = '/metadata' | '/projects';
+
+export function tokenDiagnostic(category: TokenDiagnosticCategory, upstreamStatus?: number, endpoint: TokenProbeEndpoint = '/metadata'): TokenDiagnostic {
+  const entry = guidance[category];
+  let { message, action } = entry;
+  if (endpoint === '/projects') {
+    message = message.replace('GET /metadata', 'GET /projects');
+    // Releases before 2512 have no /metadata, so only an ordinary REST read can tell a valid token from an invalid one.
+    if (category === 'permission_denied') action = 'This Polarion has no /metadata (before 2512), so the login check reads GET /projects. Allow global REST GET for this user, or upgrade to Polarion 2512 or newer.';
+    if (category === 'endpoint_missing') action = 'Neither /metadata nor /projects was found. Check API_BASE_URL ends in /polarion/rest/v1 and that REST is enabled.';
+  }
+  return { category, ...(upstreamStatus === undefined ? {} : { upstreamStatus }), retryable: entry.retryable, message, action };
 }
 
 /** Classifies only stable Axios code fields; never incorporates exception text. */

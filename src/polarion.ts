@@ -64,7 +64,7 @@ export function pruneDisabledTools(text: string, enabled: EnabledTools): string 
 
 /** Read before anything else; also the server's `instructions`. */
 const INSTRUCTION_LINES: { text: string; needsWrite?: boolean }[] = [
-  { text: `- Identity: call getCurrentUser for the signed-in user. A 403 there means this token cannot read that endpoint, not that login failed.` },
+  { text: `- Identity: call getCurrentUser for the signed-in user. A 403 there means this token cannot read that endpoint, not that login failed. A 404 means this Polarion release (2506) has no /user endpoint; the login still worked, use the other tools.` },
   { text: `- Known project: call getProject with its projectId. Work Item, Document and Test Run tools are project-scoped.` },
   { text: `- Unknown project ID: ask the user for it. getProjects lists projects only for users with global read access.` },
   { text: `- getAllWorkItems searches Work Items across projects.` },
