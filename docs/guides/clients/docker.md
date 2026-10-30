@@ -45,7 +45,7 @@ No new container is needed when your team already hosts the server.
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: The client lists project names, or at least the tool list.
+Expected: The client shows your Polarion user, or at least the tool list.
 
 ## If it fails
 

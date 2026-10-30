@@ -77,13 +77,13 @@ The PAT is read from POLARION_PAT at runtime. Keep it in a private environment.
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: Codex asks to call a Polarion tool; approve it. /mcp shows polarion enabled.
+Expected: Codex asks to call getCurrentUser; approve it. It shows your Polarion user, and /mcp shows polarion enabled.
 
 ### Server
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: Codex asks to call a Polarion tool; approve it. /mcp shows polarion enabled.
+Expected: Codex asks to call getCurrentUser; approve it. It shows your Polarion user, and /mcp shows polarion enabled.
 
 ## If it fails
 
@@ -93,6 +93,7 @@ Expected: Codex asks to call a Polarion tool; approve it. /mcp shows polarion en
 |---|---|
 | polarion shows a startup timeout | Set startup_timeout_sec = 30 under [mcp_servers.polarion], or run npx -y polarion-mcp once beforehand. |
 | Server missing in /mcp after adding | Restart Codex. In the IDE select "Restart extension". |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ### Server
 

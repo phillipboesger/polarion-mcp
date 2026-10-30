@@ -94,6 +94,7 @@ Expected: The assistant calls getCurrentUser and shows your Polarion user. A 403
 |---|---|
 | Status shows error or not connected | Select polarion and click Reconnect. Check the JSON and that Node.js 22+ is visible to the IDE. |
 | You cannot add servers | Your administrator may manage servers through JetBrains IDE Services or Central. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 

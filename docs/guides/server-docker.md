@@ -224,6 +224,10 @@ If not: a "variable is not set" message means `.env` is missing or misnamed. `do
 
 Apache or nginx instead of Caddy: see [Deployment](../deployment.md).
 
+## Behind a corporate proxy (optional)
+
+Add `-e HTTPS_PROXY=http://proxy.company.example:3128` and `-e NO_PROXY=.company.example` to `docker run`, or the same two lines under `environment:` in the Compose file. Only `https://` Polarion URLs go through the proxy. A `407` error in the log means the proxy credentials in the URL are wrong.
+
 ## Check that it works
 
 Option A: the `/health` check in Option A plus the client check at the end. Option B, run all three:

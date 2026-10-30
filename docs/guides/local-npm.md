@@ -77,6 +77,17 @@ If not:
 | 404 | Wrong URL, or Polarion 2506 or older (no `/metadata`). Fix the URL, or upgrade to 2512+. |
 | Timeout or certificate error | Wrong address, VPN needed, or a company certificate. See [Troubleshooting](../troubleshooting.md). |
 
+## Behind a corporate proxy (optional)
+
+If your network reaches Polarion only through a proxy, add `HTTPS_PROXY` (and `NO_PROXY` for hosts that must skip it) to the `env` block of the server entry, next to `API_BASE_URL`:
+
+```json
+"HTTPS_PROXY": "http://proxy.company.example:3128",
+"NO_PROXY": ".company.example,localhost"
+```
+
+Only `https://` Polarion URLs go through the proxy. A proxy that needs a login takes it as `http://user:password@proxy.company.example:3128`. A `407` error means those credentials are wrong; the password never appears in the error.
+
 ## Start the server once (optional smoke test)
 
 This shows that `npx` can download and start the server. Your client normally does this for you.

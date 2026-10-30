@@ -114,11 +114,16 @@
       "items": {
         "type": "object",
         "required": [
+          "id",
           "q",
           "a"
         ],
         "additionalProperties": false,
         "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "q": {
             "type": "string",
             "minLength": 1
@@ -135,11 +140,16 @@
       "items": {
         "type": "object",
         "required": [
+          "id",
           "q",
           "a"
         ],
         "additionalProperties": false,
         "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
           "q": {
             "type": "string",
             "minLength": 1
@@ -421,6 +431,51 @@
             "swap",
             "nodes"
           ]
+        },
+        "legacyIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Former client ids; the generator writes a redirect stub guide for each."
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "description": "IDE variants that share one snippet and differ only in how the config is opened.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "minVersion",
+              "openSteps"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "openSteps": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
         }
       }
     },

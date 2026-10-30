@@ -61,6 +61,7 @@ Expected: The assistant calls getCurrentUser and shows your Polarion user. A 403
 |---|---|
 | The tool cannot be added | Your Power Platform data policy may block the connector. Ask your Power Platform administrator. |
 | Copilot Studio cannot reach the server | The server must be reachable over public HTTPS. http://localhost:3000/mcp will not work. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 

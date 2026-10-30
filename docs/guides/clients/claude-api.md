@@ -67,7 +67,7 @@ Add these fields to your Messages request. Enable the mcp-client-2025-11-20 beta
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: Response has mcp_tool_use and mcp_tool_result blocks, then a project list.
+Expected: Response has mcp_tool_use and mcp_tool_result blocks, then your Polarion user.
 
 ## If it fails
 
@@ -77,6 +77,7 @@ Expected: Response has mcp_tool_use and mcp_tool_result blocks, then a project l
 |---|---|
 | Error about beta header or mcp_servers | Send the header anthropic-beta: mcp-client-2025-11-20 (or the SDK's betas option). |
 | The API cannot connect to the server | The URL must be https:// and publicly reachable. localhost and stdio servers cannot be used. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 

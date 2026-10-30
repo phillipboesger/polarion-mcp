@@ -55,7 +55,7 @@ Team: only Owners and Primary Owners can add connectors; Enterprise: Owners, Pri
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: Claude calls a Polarion tool and lists your project names.
+Expected: Claude calls a Polarion tool and shows your Polarion user.
 
 ## If it fails
 
@@ -65,6 +65,7 @@ Expected: Claude calls a Polarion tool and lists your project names.
 |---|---|
 | Connecting fails or sign-in does not open | The server must be reachable from the public internet. VPN or firewalled servers fail; behind a firewall, allow Anthropic's outbound range 160.79.104.0/21. |
 | Sign-in ends with a redirect_uri error | The administrator must set MCP_ALLOWED_REDIRECT_PRESETS=claude on the server. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 

@@ -100,13 +100,13 @@ Use inside your async application with openai-agents installed and Agent importe
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: The printed final_output names projects from your Polarion.
+Expected: The printed final_output names your Polarion user.
 
 ### Server
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: The printed final_output names projects from your Polarion.
+Expected: The printed final_output names your Polarion user.
 
 ## If it fails
 
@@ -116,6 +116,7 @@ Expected: The printed final_output names projects from your Polarion.
 |---|---|
 | RuntimeError or 'server not initialized' | Use the server only inside the async with block, and call Runner.run before it ends. |
 | Timeout while starting the server | Run npx -y polarion-mcp once in a terminal so the package is cached, then retry. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ### Server
 

@@ -23,8 +23,8 @@ Connecting to a team's server URL is the client side of the Server setup: it nee
 | OpenAI Agents SDK | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openai-agents.md) |
 | Codex | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/codex-cli.md) |
 | Microsoft Copilot Studio | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/copilot-studio.md) |
-| VS Code / GitHub Copilot | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/vscode-copilot.md) |
-| Gemini CLI | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/gemini-cli.md) |
+| GitHub Copilot | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/github-copilot.md) |
+| Antigravity (CLI + IDE) | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/antigravity.md) |
 | Gemini Enterprise | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/gemini-enterprise.md) |
 | Cursor | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/cursor.md) |
 | Windsurf / Cascade | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/windsurf.md) |
@@ -34,18 +34,21 @@ Connecting to a team's server URL is the client side of the Server setup: it nee
 | Generic HTTP client | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-http.md) |
 | REST wrapper / OpenAPI | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/rest-wrapper.md) |
 | n8n REST workflow | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/n8n.md) |
+| Microsoft 365 Copilot / Teams | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/m365-copilot.md) |
+| Mistral Le Chat | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/mistral-le-chat.md) |
+| Self-hosted models (Open WebUI) | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/self-hosted.md) |
 
 Guides record the vendor sources checked on 2026-10-24. They describe documented configuration, not an end-to-end test of every client account or subscription. The source of truth is [clients.json](clients.json); run `npm run docs:clients` and `npm run docs:site` after editing it.
 
 ## Team server prerequisites
 
-Cloud connectors need a server reachable by their provider. Deploy Streamable HTTP with TLS, `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, trusted proxy settings, and exact OAuth redirect allowlists. Claude can use `MCP_ALLOWED_REDIRECT_PRESETS=claude`; ChatGPT supplies its callback during setup. Use DCR unless CIMD is explicitly enabled on the server. Follow [deployment](deployment.md) for TLS and OAuth, and see [security](security.md) and [configuration](configuration.md).
+Cloud connectors need a server reachable by their provider. Deploy Streamable HTTP with TLS, `MCP_PUBLIC_URL`, a stable `MCP_TOKEN_SECRET`, trusted proxy settings, and exact OAuth redirect allowlists. Claude can use `MCP_ALLOWED_REDIRECT_PRESETS=claude` and Microsoft 365 Copilot `m365`; ChatGPT supplies its callback during setup. Use DCR unless CIMD is explicitly enabled on the server. Follow [deployment](deployment.md) for TLS and OAuth, and see [security](security.md) and [configuration](configuration.md).
 
 ## Optional smaller tool lists
 
 The full catalog remains enabled by default. If you prefer a smaller list for a particular connection, choose the selector that matches the setup:
 
-- **Claude Desktop, Claude Code, Codex, VS Code, Cursor, Windsurf, Gemini CLI, and other local stdio clients:** set `MCP_TOOLSETS` on the local server process (for example `MCP_TOOLSETS=work-items,documents`) or `MCP_TOOLS` to an explicit comma-separated allowlist. Add `MCP_READ_ONLY=true` to expose only read-only tools. Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` for the enabled tools.
+- **Claude Desktop, Claude Code, Codex, VS Code, Cursor, Windsurf, Antigravity, and other local stdio clients:** set `MCP_TOOLSETS` on the local server process (for example `MCP_TOOLSETS=work-items,documents`) or `MCP_TOOLS` to an explicit comma-separated allowlist. Add `MCP_READ_ONLY=true` to expose only read-only tools. Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` for the enabled tools.
 - **claude.ai, ChatGPT, Copilot Studio, and other HTTP clients:** the server administrator can set `MCP_TOOLSETS` or `MCP_READ_ONLY` for every connection. An HTTP client can narrow an individual request with `X-MCP-Toolsets: work-items,documents`, or connect to `/mcp/work-items,documents`. `MCP_TOOLS` is a server environment allowlist. `MCP_MODE=discover` is also a server setting and presents the three discovery tools instead of the full tool list.
 - **REST wrapper clients:** `/api/tools` lists the wrapper's configured operations. The wrapper does not use MCP toolset selectors; use the MCP endpoint when you need `MCP_TOOLSETS`, `MCP_TOOLS`, `MCP_READ_ONLY`, or discovery mode.
 
@@ -67,7 +70,7 @@ Check `MCP_PUBLIC_URL` (exact https address, no path), the padlock, that the red
 
 ### Does HTTP/OAuth work with Polarion 2506 or older?
 
-HTTP MCP initialization and OAuth login/refresh require Polarion 2512 or newer. They validate the PAT through GET /metadata, which is available from 2512 without global REST GET permission. Polarion 2506 and older return 404 on this endpoint, so HTTP/OAuth connections fail the preflight. Use stdio mode with API_BASE_URL and your own BEARER_TOKEN, or upgrade Polarion to 2512+. The server does not fall back to project/user listing or accept 403 as successful validation. Tool access still depends on your Polarion permissions.
+HTTP MCP and OAuth need Polarion 2512+: the login check calls GET /metadata, which older versions answer with 404. Use the local setup (stdio with your own BEARER_TOKEN) or upgrade Polarion. The server does not fall back to project listing or accept a 403. Tool access still follows your Polarion permissions.
 
 ### What does Bearer mean in an Authorization header?
 
@@ -87,11 +90,11 @@ Any client that supports MCP over stdio or Streamable HTTP. The setup guide abov
 
 ### It says 503 "Polarion could not be reached".
 
-The server got no usable answer from Polarion. Read the `Polarion token probe GET /metadata failed` line in `docker logs polarion-mcp`; it shows the category, the HTTP status and Polarion's own message. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and that the MCP container can reach it; a private Polarion host may be reachable from the server network or VPN even when the AI provider cannot reach Polarion directly. Do not use `localhost` from inside Docker. Use the container-side Node probe in docs/troubleshooting.md. `/health` only confirms MCP liveness.
+The server got no usable answer from Polarion. Read the `Polarion token probe GET /metadata failed` line in `docker logs polarion-mcp`. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and reachable from the MCP container (not `localhost` inside Docker). Use the container-side probe in docs/troubleshooting.md. `/health` only confirms the MCP server runs.
 
 ### Can claude.ai or ChatGPT connect to a server on my own laptop?
 
-The provider must reach the MCP endpoint over public HTTPS, even if the MCP container runs on your laptop; `http://localhost` is not reachable from provider cloud. The container can separately reach a private Polarion instance over its network or VPN, so Polarion itself need not be public. Use a local stdio setup when you do not want to publish an MCP endpoint. Desktop and command-line clients may use `http://localhost:3000/mcp` locally.
+The provider must reach the MCP endpoint over public HTTPS, so `http://localhost` does not work for claude.ai or ChatGPT. Polarion itself can stay private if the MCP container can reach it over your network or VPN. Desktop and command-line clients may use `http://localhost:3000/mcp`. Use a local stdio setup if you do not want to publish an endpoint.
 
 ### What is the difference between the ChatGPT connector and a Custom GPT?
 
@@ -136,3 +139,31 @@ Google's page says Gemini CLI was replaced by Antigravity CLI on 18 June 2026 fo
 ### Windsurf now says Devin. Which steps do I follow?
 
 The vendor docs moved to docs.devin.ai and describe this configuration only for the legacy Cascade agent. If your tab uses the Devin Local agent, MCP servers are set up in Devin CLI config files, which this guide does not cover yet.
+
+### The error says `request_rejected HTTP 400`.
+
+Polarion or a proxy in front of it refused the hostname in `API_BASE_URL`. Use the address your users open in the browser. For the Polarion Docker image, add the name (for example `host.docker.internal`) to `ALLOWED_HOSTS` on the Polarion container and recreate it. See "ALLOWED_HOSTS recipe" in docs/troubleshooting.md. `MCP_ALLOWED_HOSTS` is a different setting.
+
+### Every call returns 404, or `/rest/v1` does not exist.
+
+The REST API is not enabled or the path is wrong. Open `https://YOUR-POLARION/polarion/rest/v1/swagger-ui` in a browser; it must load. `API_BASE_URL` has to end in `/polarion/rest/v1`. Ask your Polarion administrator to enable the REST API if the page is missing.
+
+### The PAT page says token generation is not allowed, or my token stopped working.
+
+An administrator must set `com.siemens.polarion.rest.security.restApiToken.enabled=true` and restart Polarion before PATs exist. A token also stops working when it expires or is revoked. Create a new one and replace it in your client; never paste it into a chat.
+
+### My client warns about too many tools (VS Code 128, Cursor, Windsurf 100).
+
+The full catalog has 284 tools. Set `MCP_TOOLSETS` (for example `work-items,documents`) or `MCP_TOOLS` on the server, add `MCP_READ_ONLY=true`, or use `MCP_MODE=discover`. In VS Code you can also untick tools in the tools picker.
+
+### GitHub Copilot shows no MCP servers on Business or Enterprise.
+
+The organization policy "MCP servers in Copilot" is off by default. An organization or enterprise owner must enable it in the Copilot policies. Free and Pro plans are not affected by this policy.
+
+### My network needs a proxy to reach Polarion.
+
+Set `HTTPS_PROXY` (for example `http://proxy.corp:3128`, credentials as `user:pass@` are allowed) and `NO_PROXY` (for example `.corp.example,localhost`) in the environment of the local server or the container. Only https:// Polarion URLs go through the proxy, using CONNECT. A 407 means the proxy credentials are wrong.
+
+### My Ollama or other self-hosted model never calls the tools.
+
+The model must support tool calling; many small models do not. Pick one that does, enable native function calling for it in Open WebUI, and make sure the MCP URL is reachable from the Open WebUI container (use the container name, not `localhost`).

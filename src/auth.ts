@@ -23,6 +23,8 @@
  */
 
 import axios from 'axios';
+import { shouldRejectUnauthorized } from './config.js';
+import { httpsAgent } from './httpClient.js';
 
 /**
  * Acquires an OAuth2 token using client credentials flow
@@ -108,7 +110,8 @@ export async function acquireOAuth2Token(schemeName: string, scheme: any): Promi
         // Basic Auth: base64(clientId:clientSecret)
         'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
       },
-      data: formData.toString()
+      data: formData.toString(),
+      httpsAgent: httpsAgent(shouldRejectUnauthorized()),
     });
 
     // Process the response

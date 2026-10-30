@@ -65,7 +65,7 @@ Add this tools field to a Responses request. Use your OpenAI API key for the API
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: mcp_list_tools, mcp_approval_request; after approval, mcp_call and projects.
+Expected: mcp_list_tools, mcp_approval_request; after approval, mcp_call and your Polarion user.
 
 ## If it fails
 

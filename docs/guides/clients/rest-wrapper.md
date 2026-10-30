@@ -50,7 +50,7 @@ REST uses the deployment PAT, shared by all calls through this wrapper.
 
 Ask your assistant: `curl -X POST https://YOUR-SERVER/api/tools/getCurrentUser -H "Authorization: Bearer YOUR_WRAPPER_API_KEY" -H "Content-Type: application/json" -d '{}'`
 
-Expected: JSON with the Polarion projects. Without the key, /api/tools answers 401.
+Expected: JSON with your Polarion user. Without the key, /api/tools answers 401.
 
 ## If it fails
 

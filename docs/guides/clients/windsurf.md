@@ -105,6 +105,7 @@ Expected: The assistant calls getCurrentUser and shows your Polarion user. A 403
 |---|---|
 | Too many tools: some are missing | Cascade allows 100 enabled tools in total. Switch off other servers or use disabledTools. |
 | Nothing changes in Devin Local agent | This config only applies to the legacy Cascade agent. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ### Server
 

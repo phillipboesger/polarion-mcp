@@ -43,17 +43,27 @@
           "description": "Team agents and your editor",
           "clients": [
             "copilot-studio",
-            "vscode-copilot"
+            "m365-copilot",
+            "github-copilot"
           ]
         },
         {
           "id": "google",
           "name": "Google",
           "mark": "G",
-          "description": "Gemini Enterprise and Gemini CLI",
+          "description": "Gemini Enterprise and Antigravity",
           "clients": [
-            "gemini-cli",
+            "antigravity",
             "gemini-enterprise"
+          ]
+        },
+        {
+          "id": "mistral",
+          "name": "Mistral",
+          "mark": "L",
+          "description": "Le Chat, EU-hosted",
+          "clients": [
+            "mistral-le-chat"
           ]
         },
         {
@@ -68,7 +78,8 @@
             "rest-wrapper",
             "n8n",
             "openai-api",
-            "openai-agents"
+            "openai-agents",
+            "self-hosted"
           ]
         }
       ]
@@ -83,7 +94,7 @@
           "mark": "</>",
           "description": "Use the client you already work in.",
           "clients": [
-            "vscode-copilot",
+            "github-copilot",
             "cursor",
             "windsurf",
             "jetbrains-ai"
@@ -113,7 +124,7 @@
       "color": "#8ab4f8",
       "angle": -30,
       "clients": [
-        "gemini-cli",
+        "antigravity",
         "gemini-enterprise"
       ]
     },
@@ -127,7 +138,9 @@
         "generic-stdio",
         "generic-http",
         "rest-wrapper",
-        "n8n"
+        "n8n",
+        "mistral-le-chat",
+        "self-hosted"
       ]
     },
     {
@@ -137,7 +150,7 @@
       "color": "#62d6ff",
       "angle": 90,
       "clients": [
-        "vscode-copilot",
+        "github-copilot",
         "cursor",
         "windsurf",
         "jetbrains-ai"
@@ -150,7 +163,8 @@
       "color": "#7fb8ff",
       "angle": 150,
       "clients": [
-        "copilot-studio"
+        "copilot-studio",
+        "m365-copilot"
       ]
     },
     {
@@ -304,6 +318,54 @@
       "language": "bash",
       "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.5",
       "note": "Required for cloud API calls: a publicly reachable HTTPS endpoint at https://YOUR-SERVER/mcp. Configure a TLS reverse proxy to 127.0.0.1:3000, forward the public Host and use a real public hostname in MCP_ALLOWED_HOSTS. TRUST_PROXY=1 assumes exactly one trusted hop. Each API request sends your Polarion PAT; OAuth is not required for this PAT-header path."
+    },
+    {
+      "id": "antigravity-json",
+      "title": "Antigravity MCP configuration",
+      "kind": "Local · JSON",
+      "language": "json",
+      "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"command\": \"npx\",\n      \"args\": [\n        \"-y\",\n        \"polarion-mcp\"\n      ],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+      "note": "Node.js 22+ is required. Antigravity uses mcpServers in mcp_config.json."
+    },
+    {
+      "id": "antigravity-remote",
+      "title": "Antigravity remote MCP configuration",
+      "kind": "Remote · JSON",
+      "language": "json",
+      "snippet": "{\n  \"mcpServers\": {\n    \"polarion\": {\n      \"serverUrl\": \"https://YOUR-SERVER/mcp\",\n      \"headers\": {\n        \"Authorization\": \"Bearer YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
+      "note": "Antigravity needs serverUrl for remote servers; url and httpUrl are not read."
+    },
+    {
+      "id": "docker-m365",
+      "title": "HTTPS team server for Microsoft 365 Copilot",
+      "kind": "Self-hosted · Docker",
+      "language": "bash",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PRESETS=m365 \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.5",
+      "note": "Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and forward the public Host. TRUST_PROXY=1 assumes exactly one trusted hop. The m365 preset allows only Microsoft’s fixed callback https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect. Generate a stable secret of at least 32 characters."
+    },
+    {
+      "id": "docker-mistral",
+      "title": "HTTPS team server for Mistral Le Chat",
+      "kind": "Self-hosted · Docker",
+      "language": "bash",
+      "snippet": "docker run -d --name polarion-mcp \\\n  -p 127.0.0.1:3000:3000 \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=YOUR-SERVER \\\n  -e MCP_PUBLIC_URL=https://YOUR-SERVER \\\n  -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \\\n  -e MCP_ALLOWED_REDIRECT_PREFIXES=https://YOUR-LE-CHAT-CALLBACK \\\n  -e TRUST_PROXY=1 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.5",
+      "note": "Mistral does not document the Le Chat callback URL, so there is no built-in mistral preset (it stays empty and denies everything). Add the connector once, copy the redirect_uri that the server rejects from its log, put it in MCP_ALLOWED_REDIRECT_PREFIXES and restart. Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000. Generate a stable secret of at least 32 characters."
+    },
+    {
+      "id": "docker-self-hosted",
+      "title": "Team server for self-hosted chat UIs",
+      "kind": "Self-hosted · Docker",
+      "language": "bash",
+      "snippet": "docker network create chat\ndocker run -d --name polarion-mcp --network chat \\\n  -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \\\n  -e MCP_ALLOWED_HOSTS=polarion-mcp:3000,localhost:3000 \\\n  ghcr.io/phillipboesger/polarion-mcp:1.4.5",
+      "note": "Put Open WebUI on the same Docker network and use http://polarion-mcp:3000/mcp as the URL. localhost inside the Open WebUI container is the container itself, not your host. Each user sends their own PAT; for a shared instance use a service account PAT and restrict who can use the tool."
+    },
+    {
+      "id": "open-webui",
+      "title": "Open WebUI external tool",
+      "kind": "Remote · Admin UI",
+      "language": "text",
+      "snippet": "Type: MCP (Streamable HTTP)\nURL: http://polarion-mcp:3000/mcp\nAuth: Bearer\nKey: YOUR_POLARION_PAT",
+      "note": "Admin Settings > External Tools. Pick MCP (Streamable HTTP), not OpenAPI. Selecting Bearer with an empty key sends an empty Authorization header."
     }
   ],
   "clients": [
@@ -345,7 +407,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Claude calls a Polarion tool and lists your project names."
+          "expect": "Claude calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -355,6 +417,10 @@
           {
             "symptom": "Server fails to start (npx not found)",
             "fix": "Run node --version and npx -y polarion-mcp in a terminal. Node.js must be 22 or newer."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ]
       },
@@ -376,7 +442,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Claude calls a Polarion tool and lists your project names."
+          "expect": "Claude calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -386,6 +452,10 @@
           {
             "symptom": "Sign-in ends with a redirect_uri error",
             "fix": "The administrator must set MCP_ALLOWED_REDIRECT_PRESETS=claude on the server."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "teamNote": "Team: only Owners and Primary Owners can add connectors; Enterprise: Owners, Primary Owners and custom roles with \"Manage access to Libraries\". They go to Organization settings > Connectors, click \"Add\", hover \"Custom\", select \"Web\", enter name and URL, then continue as above. Members then open Customize > Connectors, find the connector (usually labeled \"Custom\") and click \"Connect\".",
@@ -436,7 +506,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Claude calls a Polarion tool and lists your project names."
+          "expect": "Claude calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -446,6 +516,10 @@
           {
             "symptom": "Sign-in ends with a redirect_uri error",
             "fix": "The administrator must set MCP_ALLOWED_REDIRECT_PRESETS=claude on the server."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "teamNote": "Team: only Owners and Primary Owners can add connectors; Enterprise: Owners, Primary Owners and custom roles with \"Manage access to Libraries\". They go to Organization settings > Connectors, click \"Add\", hover \"Custom\", select \"Web\", enter name and URL, then continue as above. Members then open Customize > Connectors, find the connector (usually labeled \"Custom\") and click \"Connect\".",
@@ -486,7 +560,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Claude lists your projects. /mcp shows polarion as connected."
+          "expect": "Claude shows your Polarion user. /mcp shows polarion as connected."
         },
         "fails": [
           {
@@ -496,6 +570,10 @@
           {
             "symptom": "/mcp shows polarion as failed",
             "fix": "Run claude mcp get polarion. Check node --version (22+) and that API_BASE_URL ends in /polarion/rest/v1."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ]
       },
@@ -514,7 +592,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Claude lists your projects. /mcp shows polarion as connected."
+          "expect": "Claude shows your Polarion user. /mcp shows polarion as connected."
         },
         "fails": [
           {
@@ -524,6 +602,10 @@
           {
             "symptom": "/mcp shows polarion as failed",
             "fix": "Run claude mcp get polarion. Check the URL opens from your machine and the PAT is valid."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker"
@@ -569,7 +651,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Response has mcp_tool_use and mcp_tool_result blocks, then a project list."
+          "expect": "Response has mcp_tool_use and mcp_tool_result blocks, then your Polarion user."
         },
         "fails": [
           {
@@ -579,6 +661,10 @@
           {
             "symptom": "The API cannot connect to the server",
             "fix": "The URL must be https:// and publicly reachable. localhost and stdio servers cannot be used."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker-public"
@@ -625,7 +711,7 @@
         ],
         "verify": {
           "prompt": "@Polarion Which Polarion user am I? Use the Polarion tool getCurrentUser.",
-          "expect": "ChatGPT calls a Polarion tool and lists project names and IDs."
+          "expect": "ChatGPT calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -635,6 +721,10 @@
           {
             "symptom": "Sign-in fails with a redirect_uri error",
             "fix": "Send the callback address ChatGPT shows to the admin for MCP_ALLOWED_REDIRECT_PREFIXES."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker-chatgpt"
@@ -739,7 +829,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "mcp_list_tools, mcp_approval_request; after approval, mcp_call and projects."
+          "expect": "mcp_list_tools, mcp_approval_request; after approval, mcp_call and your Polarion user."
         },
         "fails": [
           {
@@ -791,7 +881,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The printed final_output names projects from your Polarion."
+          "expect": "The printed final_output names your Polarion user."
         },
         "fails": [
           {
@@ -801,6 +891,10 @@
           {
             "symptom": "Timeout while starting the server",
             "fix": "Run npx -y polarion-mcp once in a terminal so the package is cached, then retry."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ]
       },
@@ -820,7 +914,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The printed final_output names projects from your Polarion."
+          "expect": "The printed final_output names your Polarion user."
         },
         "fails": [
           {
@@ -873,7 +967,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Codex asks to call a Polarion tool; approve it. /mcp shows polarion enabled."
+          "expect": "Codex asks to call getCurrentUser; approve it. It shows your Polarion user, and /mcp shows polarion enabled."
         },
         "fails": [
           {
@@ -883,6 +977,10 @@
           {
             "symptom": "Server missing in /mcp after adding",
             "fix": "Restart Codex. In the IDE select \"Restart extension\"."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ]
       },
@@ -901,7 +999,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Codex asks to call a Polarion tool; approve it. /mcp shows polarion enabled."
+          "expect": "Codex asks to call getCurrentUser; approve it. It shows your Polarion user, and /mcp shows polarion enabled."
         },
         "fails": [
           {
@@ -966,15 +1064,19 @@
           {
             "symptom": "Copilot Studio cannot reach the server",
             "fix": "The server must be reachable over public HTTPS. http://localhost:3000/mcp will not work."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker"
       }
     },
     {
-      "id": "vscode-copilot",
-      "name": "VS Code / GitHub Copilot",
-      "label": "VS Code",
+      "id": "github-copilot",
+      "name": "GitHub Copilot",
+      "label": "GitHub Copilot",
       "icon": "code",
       "provider": "microsoft",
       "sources": [
@@ -984,16 +1086,17 @@
         "https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/extend-copilot-chat-with-mcp"
       ],
       "checked": "2026-10-24",
-      "note": "",
+      "note": "MCP support is generally available in VS Code; Eclipse, JetBrains IDEs and Visual Studio are in public preview. On Copilot Business and Enterprise an organization policy (\"MCP servers in Copilot\") is off by default and an admin must enable it. JetBrains AI Assistant is a separate client.",
       "redirectUris": [],
       "defaultMode": "local",
       "unverified": [
         "Docs do not give the file path of the user mcp.json per OS (steps rely on the command MCP: Open User Configuration). The docs mark user-profile mcp.json as 'deprecated in the guided flow' in favour of ~/.copilot/mcp-config.json (top-level mcpServers); the reference page still documents MCP: Open User Configuration, so it is used here.",
         "Exact wording of the trust prompt is not documented.",
         "Whether the tools icon is still at the top left of the chat box and the mode dropdown still reads Agent in the newest VS Code (taken from the GitHub Docs page; the VS Code page mentions 'Configure Tools' / Chat: Open Customizations > Tools instead).",
-        "The minimum VS Code version 1.99 is from the GitHub Docs page and may be outdated."
+        "Eclipse minimum (2024-09) is from GitHub Docs; the JetBrains and Visual Studio minimum versions and the exact menu labels come from release notes and third-party guides and are not re-checked here.",
+        "The snippet uses the servers key (VS Code format). JetBrains and Eclipse accept the same key in GitHub Docs examples; Visual Studio .mcp.json support for http headers was not confirmed."
       ],
-      "summary": "GitHub Copilot agent mode in VS Code.",
+      "summary": "GitHub Copilot agent mode in VS Code, Eclipse, JetBrains IDEs and Visual Studio.",
       "local": {
         "setup": "vscode-json",
         "steps": [
@@ -1006,12 +1109,12 @@
         "note": "",
         "snippet": "{\n  \"servers\": {\n    \"polarion\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\n        \"-y\",\n        \"polarion-mcp\"\n      ],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
         "needs": [
-          "VS Code 1.99+ with GitHub Copilot",
+          "GitHub Copilot in VS Code 1.99+, Eclipse, a JetBrains IDE or Visual Studio (see the IDE list)",
           "Node.js 22+"
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -1021,6 +1124,10 @@
           {
             "symptom": "'npx not found' or 'command not found'",
             "fix": "Install Node.js 22+, then fully quit and reopen the app."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ]
       },
@@ -1036,11 +1143,11 @@
         ],
         "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL.",
         "needs": [
-          "VS Code 1.99+ with GitHub Copilot"
+          "GitHub Copilot in VS Code 1.99+, Eclipse, a JetBrains IDE or Visual Studio (see the IDE list)"
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -1050,91 +1157,135 @@
           {
             "symptom": "Copilot Business/Enterprise: MCP blocked",
             "fix": "Your organisation must enable the policy 'MCP servers in Copilot'. Ask your GitHub admin."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker"
-      }
+      },
+      "legacyIds": [
+        "vscode-copilot"
+      ],
+      "variants": [
+        {
+          "id": "vscode",
+          "label": "VS Code",
+          "minVersion": "VS Code 1.99+ with GitHub Copilot",
+          "openSteps": [
+            "Run MCP: Open User Configuration from the Command Palette."
+          ]
+        },
+        {
+          "id": "eclipse",
+          "label": "Eclipse",
+          "minVersion": "Eclipse 2024-09+ with the GitHub Copilot plugin",
+          "openSteps": [
+            "Open the Copilot menu in the status bar and choose Edit Preferences.",
+            "Under GitHub Copilot, open MCP and paste the JSON from the snippet into the server configuration field."
+          ]
+        },
+        {
+          "id": "jetbrains",
+          "label": "JetBrains IDEs",
+          "minVersion": "A JetBrains IDE with the GitHub Copilot plugin (check the plugin page for the current minimum)",
+          "openSteps": [
+            "Click the Copilot icon in the status bar, then Edit settings > Model Context Protocol (MCP) > Configure.",
+            "Paste the JSON from the snippet into the opened mcp.json."
+          ]
+        },
+        {
+          "id": "visual-studio",
+          "label": "Visual Studio",
+          "minVersion": "Visual Studio 2022 17.14+ with GitHub Copilot",
+          "openSteps": [
+            "In Copilot Chat, switch to Agent mode and click the tools icon, then Add MCP server (or create a .mcp.json next to your solution).",
+            "Paste the JSON from the snippet; Visual Studio also reads the servers key from .mcp.json."
+          ]
+        }
+      ]
     },
     {
-      "id": "gemini-cli",
-      "name": "Gemini CLI",
-      "label": "Gemini CLI",
+      "id": "antigravity",
+      "name": "Antigravity (CLI + IDE)",
+      "label": "Antigravity",
       "icon": "terminal",
       "provider": "google",
       "sources": [
+        "https://developers.google.com/workspace/guides/configure-mcp-servers",
         "https://geminicli.com/docs/tools/mcp-server/"
       ],
       "checked": "2026-10-24",
-      "note": "Run Gemini in a trusted folder. If the server shows Disconnected, use gemini trust to trust that folder.",
+      "note": "Antigravity CLI and IDE read the same mcp_config.json. Gemini CLI users can import their servers once; Gemini CLI itself keeps working for Code Assist and API-key users.",
       "redirectUris": [],
       "defaultMode": "local",
       "unverified": [
-        "Gemini CLI's own docs say it was replaced by Antigravity CLI on 2026-06-18 for no-cost-tier and Google One users. Third-party sources (not Google) say Code Assist Standard/Enterprise licences and API-key users can keep using Gemini CLI. Antigravity CLI config location (~/.gemini/antigravity-cli/mcp_config.json vs ~/.antigravity/) is reported inconsistently, so it is NOT covered.",
-        "Docs show 'gemini mcp add [options] <name> <commandOrUrl> [args...]' but do not say whether a trailing '-y' is parsed as an option. The command is taken from the repo and not run here.",
-        "The docs do not document the exact message gemini prints after mcp add.",
-        "Docs example for settings.json uses key httpUrl for Streamable HTTP and headers for Authorization; this matches what gemini mcp add --transport http writes, but the written file was not inspected."
+        "Config file location differs between sources: Google documents ~/.gemini/antigravity/mcp_config.json, a Google codelab shows ~/.gemini/config/mcp_config.json and a third-party guide ~/.gemini/antigravity-cli/mcp_config.json. The steps tell you to open it from the IDE or /mcp panel; check which path your version reads.",
+        "Environment variable substitution inside mcp_config.json is reported as not working, so the snippets put the PAT inline.",
+        "Whether agy mcp add exists as a command is not documented; the CLI steps edit the file instead."
       ],
-      "summary": "Gemini in your terminal.",
+      "summary": "Google Antigravity CLI (agy) and IDE; replaces Gemini CLI.",
       "local": {
-        "setup": "cli",
+        "setup": "antigravity-json",
         "steps": [
-          "Replace YOUR-POLARION and YOUR_POLARION_PAT in the command below",
-          "Run the command; it saves to ~/.gemini/settings.json",
-          "Run gemini trust in your project folder if it is not trusted yet",
-          "Run gemini mcp list; polarion must end with Connected",
-          "Start gemini and type /mcp; polarion must show CONNECTED"
+          "Open mcp_config.json: in the IDE use Manage MCP Servers > View raw config; in the CLI run agy and open the /mcp panel (the file is under ~/.gemini/, see the note).",
+          "Add the polarion entry to mcpServers; replace YOUR-POLARION and YOUR_POLARION_PAT.",
+          "Save, then restart agy or reload the IDE.",
+          "Type /mcp in agy; polarion must show as connected."
         ],
-        "snippet": "gemini mcp add --scope user --env API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 --env BEARER_TOKEN=YOUR_POLARION_PAT polarion npx -y polarion-mcp",
-        "note": "Run Gemini in a trusted folder. If the server shows Disconnected, use gemini trust.",
+        "note": "Command, args and env stay the same as in every other local client. The key is mcpServers.",
         "needs": [
-          "Gemini CLI signed in or with an API key",
-          "Node.js 22+, and a folder you trust"
+          "Antigravity CLI (agy) or IDE signed in",
+          "Node.js 22+"
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
-            "symptom": "polarion shows Disconnected",
-            "fix": "For a local (npx) server the folder must be trusted: run gemini trust there and start Gemini again."
+            "symptom": "polarion missing in /mcp",
+            "fix": "Check the JSON for typos and the file path your version reads, then restart agy."
           },
           {
-            "symptom": "Server added but does not start",
-            "fix": "Edit ~/.gemini/settings.json: add polarion under mcpServers (npx, args [\"-y\",\"polarion-mcp\"], env vars)."
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off or expired. Create a new token and paste it unchanged."
           }
         ]
       },
       "server": {
-        "setup": "remote-cli",
-        "snippet": "gemini mcp add --scope user --transport http --header \"Authorization: Bearer YOUR_POLARION_PAT\" polarion https://YOUR-SERVER/mcp",
+        "setup": "antigravity-remote",
         "steps": [
-          "Replace YOUR-SERVER and YOUR_POLARION_PAT in the command below",
-          "Run the command; it saves to ~/.gemini/settings.json",
-          "Run gemini mcp list; polarion must end with Connected",
-          "Start gemini and type /mcp; polarion must show CONNECTED"
+          "Open mcp_config.json as in the local steps.",
+          "Add the polarion entry with serverUrl (not httpUrl or url) and the Authorization header; replace YOUR-SERVER and YOUR_POLARION_PAT.",
+          "Save, then restart agy or reload the IDE.",
+          "Type /mcp in agy; polarion must show as connected."
         ],
         "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL.",
         "needs": [
-          "Gemini CLI signed in or with an API key",
-          "A folder you trust to run it in"
+          "Antigravity CLI (agy) or IDE signed in",
+          "The https://.../mcp address from your admin"
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
-            "symptom": "polarion shows Disconnected",
-            "fix": "Check the address and PAT. Open the /mcp address in a browser to check it is reachable."
+            "symptom": "polarion missing or disconnected",
+            "fix": "Use serverUrl, not url or httpUrl. Check the URL ends in /mcp."
           },
           {
-            "symptom": "401 or 'Polarion did not accept this token'",
-            "fix": "PAT is wrong, expired or revoked. Create a new PAT in Polarion and paste it again."
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off or expired. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker"
-      }
+      },
+      "legacyIds": [
+        "gemini-cli"
+      ]
     },
     {
       "id": "gemini-enterprise",
@@ -1177,7 +1328,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "Gemini Enterprise calls a Polarion action and lists project names."
+          "expect": "Gemini Enterprise calls a Polarion action and shows your Polarion user."
         },
         "fails": [
           {
@@ -1187,6 +1338,10 @@
           {
             "symptom": "Verify Auth fails",
             "fix": "Allow https://vertexaisearch.cloud.google.com/oauth-redirect (MCP_ALLOWED_REDIRECT_PREFIXES)."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker"
@@ -1239,7 +1394,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -1249,6 +1404,10 @@
           {
             "symptom": "Server fails to connect",
             "fix": "Press Cmd/Ctrl+Shift+U, choose MCP Logs in the Output panel and read the error."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ]
       },
@@ -1268,7 +1427,7 @@
         ],
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -1278,6 +1437,10 @@
           {
             "symptom": "Server fails to connect",
             "fix": "Press Cmd/Ctrl+Shift+U, choose MCP Logs in the Output panel and read the error."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "serverSetup": "docker"
@@ -1330,6 +1493,10 @@
           {
             "symptom": "Nothing changes in Devin Local agent",
             "fix": "This config only applies to the legacy Cascade agent."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ]
       },
@@ -1414,6 +1581,10 @@
           {
             "symptom": "You cannot add servers",
             "fix": "Your administrator may manage servers through JetBrains IDE Services or Central."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "alternative": {
@@ -1469,7 +1640,7 @@
         "note": "No new container is needed when your team already hosts the server.",
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The client lists project names, or at least the tool list."
+          "expect": "The client shows your Polarion user, or at least the tool list."
         },
         "fails": [
           {
@@ -1513,7 +1684,7 @@
         "note": "Any MCP-capable client works. For OpenAPI-only integrations, choose REST / OpenAPI.",
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -1523,6 +1694,10 @@
           {
             "symptom": "Server starts but no tools appear",
             "fix": "Some clients limit tool count. Enable tools in the client or reduce them with MCP_TOOLSETS."
+          },
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
           }
         ],
         "needs": [
@@ -1541,7 +1716,7 @@
         "note": "Remote MCP uses per-user PATs. The client must be able to reach this URL.",
         "verify": {
           "prompt": "Which Polarion user am I? Use getCurrentUser.",
-          "expect": "The assistant calls a Polarion tool and lists project names."
+          "expect": "The assistant calls a Polarion tool and shows your Polarion user."
         },
         "fails": [
           {
@@ -1637,7 +1812,7 @@
         "note": "REST uses the deployment PAT, shared by all calls through this wrapper.",
         "verify": {
           "prompt": "curl -X POST https://YOUR-SERVER/api/tools/getCurrentUser -H \"Authorization: Bearer YOUR_WRAPPER_API_KEY\" -H \"Content-Type: application/json\" -d '{}'",
-          "expect": "JSON with the Polarion projects. Without the key, /api/tools answers 401."
+          "expect": "JSON with your Polarion user. Without the key, /api/tools answers 401."
         },
         "fails": [
           {
@@ -1703,6 +1878,192 @@
         ],
         "serverSetup": "rest"
       }
+    },
+    {
+      "id": "m365-copilot",
+      "name": "Microsoft 365 Copilot / Teams",
+      "label": "M365 Copilot",
+      "icon": "bot",
+      "provider": "microsoft",
+      "sources": [
+        "https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth",
+        "https://microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth"
+      ],
+      "checked": "2026-10-30",
+      "note": "A declarative agent calls the MCP server as an action. Sign-in uses Microsoft’s fixed OAuth callback, so the server only needs the m365 preset. Do not bind the OAuth registration to an existing Teams app ID for an MCP server.",
+      "redirectUris": [
+        {
+          "uri": "https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect",
+          "verified": true,
+          "notes": "Same for every plugin and provider per Microsoft Learn."
+        }
+      ],
+      "defaultMode": "server",
+      "unverified": [
+        "End-to-end run in an M365 tenant with a Copilot licence has not been done yet (planned in T3.4). Agents Toolkit menu labels come from the Microsoft lab and may change.",
+        "Whether Copilot sends the DCR client without a secret to this server is untested."
+      ],
+      "summary": "Declarative agents in Microsoft 365 Copilot Chat and Teams.",
+      "local": {
+        "reason": "Microsoft 365 Copilot calls the MCP server from Microsoft’s cloud, so it needs a public HTTPS server."
+      },
+      "server": {
+        "setup": "connector",
+        "steps": [
+          "Set up the server with Docker and the m365 preset (the server example below), reachable at https://YOUR-SERVER/mcp.",
+          "In VS Code, install Microsoft 365 Agents Toolkit and create a Declarative Agent with an action from an existing MCP server.",
+          "Enter https://YOUR-SERVER/mcp as the server URL and choose OAuth with dynamic client registration; the toolkit creates the auth config.",
+          "Select the polarion tools the agent should use (a subset is better than all).",
+          "Provision the agent, then open it in Microsoft 365 Copilot Chat or Teams and sign in with your Polarion PAT on the server login page."
+        ],
+        "note": "Teams publishing needs an admin to allow the app. Select only the tools the agent needs.",
+        "needs": [
+          "Microsoft 365 tenant with a Copilot licence and custom app upload",
+          "Microsoft 365 Agents Toolkit",
+          "Public HTTPS server address with OAuth"
+        ],
+        "verify": {
+          "prompt": "Which Polarion user am I? Use getCurrentUser.",
+          "expect": "The agent calls getCurrentUser and shows your Polarion user."
+        },
+        "fails": [
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off or expired. Create a new token and paste it unchanged."
+          },
+          {
+            "symptom": "Sign-in ends with a redirect_uri error",
+            "fix": "The administrator must set MCP_ALLOWED_REDIRECT_PRESETS=m365 on the server."
+          },
+          {
+            "symptom": "Provisioning works but every tool call returns 404",
+            "fix": "The auth config ID in the manifest is wrong or the registration is bound to a Teams app ID. Recreate it with Any Teams app."
+          }
+        ],
+        "serverSetup": "docker-m365"
+      }
+    },
+    {
+      "id": "mistral-le-chat",
+      "name": "Mistral Le Chat",
+      "label": "Le Chat",
+      "icon": "chat",
+      "provider": "mistral",
+      "sources": [
+        "https://docs.civic.com/civic/quickstart/clients/mistral-lechat",
+        "https://docs.bko.finologee.com/docs/mcp-mistral"
+      ],
+      "checked": "2026-10-30",
+      "note": "EU option: Le Chat is operated by Mistral AI in France. Le Chat registers via DCR and may send an empty client secret.",
+      "redirectUris": [],
+      "defaultMode": "server",
+      "unverified": [
+        "Mistral’s own documentation for custom connectors was not available; steps come from two third-party guides.",
+        "The Le Chat callback URL is not documented, so no built-in preset exists.",
+        "Not yet tested with a Le Chat account (T5.3)."
+      ],
+      "summary": "Mistral’s chat assistant, EU-hosted.",
+      "local": {
+        "reason": "Le Chat connects from Mistral’s cloud, so it needs a public HTTPS server."
+      },
+      "server": {
+        "setup": "connector",
+        "steps": [
+          "Set up the server with Docker and OAuth (server example below), reachable at https://YOUR-SERVER/mcp.",
+          "In Le Chat open Intelligence > Connectors > Add Connector > Custom MCP Connector (on Team plans an admin must do this).",
+          "Enter name Polarion and the URL https://YOUR-SERVER/mcp; leave the client secret empty so Le Chat registers itself.",
+          "Click Connect and enter your Polarion PAT on the server login page.",
+          "Enable the connector in a new chat."
+        ],
+        "note": "If login fails with a redirect_uri error, copy the rejected URI from the server log into MCP_ALLOWED_REDIRECT_PREFIXES.",
+        "needs": [
+          "Le Chat account (admin role on Team plans)",
+          "Public HTTPS server address with OAuth"
+        ],
+        "verify": {
+          "prompt": "Which Polarion user am I? Use getCurrentUser.",
+          "expect": "Le Chat calls getCurrentUser and shows your Polarion user."
+        },
+        "fails": [
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off or expired. Create a new token and paste it unchanged."
+          },
+          {
+            "symptom": "Sign-in ends with a redirect_uri error",
+            "fix": "Add the rejected callback from the server log to MCP_ALLOWED_REDIRECT_PREFIXES and restart."
+          }
+        ],
+        "serverSetup": "docker-mistral"
+      }
+    },
+    {
+      "id": "self-hosted",
+      "name": "Self-hosted models (Open WebUI)",
+      "label": "Self-hosted",
+      "icon": "server",
+      "provider": "other",
+      "sources": [
+        "https://docs.openwebui.com/features/extensibility/mcp",
+        "https://www.librechat.ai/docs/features/mcp"
+      ],
+      "checked": "2026-10-30",
+      "note": "Ollama, vLLM and OpenRouter are model backends, not MCP clients. Open WebUI is the MCP client and talks to any OpenAI-compatible backend, so only the model URL and key change per backend. The model must support tool calling.",
+      "redirectUris": [],
+      "defaultMode": "server",
+      "unverified": [
+        "Not yet tested with Ollama or OpenRouter chats (T4.3).",
+        "The LibreChat snippet follows its docs and was not run here."
+      ],
+      "summary": "Open WebUI or LibreChat with Ollama, vLLM, OpenRouter or any OpenAI-compatible model.",
+      "local": {
+        "reason": "The chat UI connects to the server by URL; use the Local setup of a desktop client instead if you only need stdio."
+      },
+      "server": {
+        "setup": "open-webui",
+        "steps": [
+          "Start the server on the same Docker network as Open WebUI (server example below).",
+          "In Open WebUI open Admin Settings > External Tools > Add and choose MCP (Streamable HTTP), not OpenAPI.",
+          "Enter http://polarion-mcp:3000/mcp, choose Bearer and paste your Polarion PAT as key.",
+          "Verify the connection; the tool list must appear. Save.",
+          "In a chat with a tool-calling model, enable the polarion tool."
+        ],
+        "alternative": {
+          "title": "LibreChat",
+          "description": "Same connection in librechat.yaml.",
+          "needs": [],
+          "steps": [
+            "Add the block below to librechat.yaml.",
+            "Restart LibreChat and enable the polarion tools in a chat."
+          ],
+          "language": "yaml",
+          "snippet": "mcpServers:\n  polarion:\n    type: streamable-http\n    url: http://polarion-mcp:3000/mcp\n    headers:\n      Authorization: \"Bearer YOUR_POLARION_PAT\""
+        },
+        "note": "Choose the model backend in Open WebUI under Connections (Ollama URL, vLLM or OpenRouter base URL and key); the MCP setup is identical for all of them.",
+        "needs": [
+          "Open WebUI (or LibreChat) running in Docker",
+          "A model with tool calling support"
+        ],
+        "verify": {
+          "prompt": "Which Polarion user am I? Use getCurrentUser.",
+          "expect": "The model calls getCurrentUser and shows your Polarion user."
+        },
+        "fails": [
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off or expired. Create a new token and paste it unchanged."
+          },
+          {
+            "symptom": "The model never calls the tool",
+            "fix": "The model does not support tool calling. Pick one that does and enable native function calling for it."
+          },
+          {
+            "symptom": "Connection refused to localhost:3000",
+            "fix": "localhost inside the Open WebUI container is that container. Use the polarion-mcp container name on a shared Docker network."
+          }
+        ],
+        "serverSetup": "docker-self-hosted"
+      }
     }
   ],
   "serverModes": [
@@ -1719,110 +2080,171 @@
   ],
   "faq": [
     {
+      "id": "setup-choice",
       "q": "Which setup do I need?",
       "a": "Local: your client starts the server on your computer with `npx`. Server: you host the server with Docker and the client connects by URL; claude.ai and ChatGPT need it. Custom GPT Actions and n8n use the REST wrapper on a server."
     },
     {
+      "id": "create-pat",
       "q": "How do I create a Polarion personal access token (PAT)?",
       "a": "Polarion user page > Personal Access Token > name and expiry > Create Token. Copy it at once, it is shown only once. If the page says token generation is not allowed, your administrator must enable `com.siemens.polarion.rest.security.restApiToken.enabled=true`."
     },
     {
+      "id": "data-safety",
       "q": "Is my data safe? Which permissions apply?",
       "a": "Polarion enforces the permissions of the token owner. Server mode uses each caller's own token and the server stores none. Tool results go to your AI provider, so your organization's data policies apply."
     },
     {
+      "id": "read-only",
       "q": "Can I limit the server to read-only?",
       "a": "Yes: set `MCP_READ_ONLY=1` and restart. Only read tools are exposed. In write-enabled sessions every write tool can preview with `dry_run: true`."
     },
     {
+      "id": "disconnected",
       "q": "My AI client says \"Disconnected\" or \"Failed to connect\".",
       "a": "Local: run `npx -y polarion-mcp` in a terminal with the same values to see the real error (Node older than 22 and JSON typos are common). Server: open `https://YOUR-SERVER/health`, then read `docker logs polarion-mcp`."
     }
   ],
   "faqMore": [
     {
+      "id": "pat-401",
       "q": "It says 401 \"Polarion did not accept this token\".",
       "a": "The token was cut off, has expired, or belongs to another Polarion. Test the token with the `/metadata` request in the setup guide (docs/guides/local-npm.md or docs/troubleshooting.md) and create a new token."
     },
     {
+      "id": "forbidden-403",
       "q": "It says 403 \"Polarion denied access\".",
       "a": "Polarion denied access. Check the user's license and REST or item permissions for the affected tool. The metadata authentication probe requires Polarion 2512+ and does not require global REST GET permission. A 403 during login is rejected."
     },
     {
+      "id": "oauth-loop",
       "q": "The connector login in claude.ai or ChatGPT fails or loops.",
       "a": "Check `MCP_PUBLIC_URL` (exact https address, no path), the padlock, that the redirect preset or callback is allowed (`MCP_ALLOWED_REDIRECT_PRESETS=claude`; the log says `redirect_uri rejected`), and that `MCP_TOKEN_SECRET` did not change."
     },
     {
+      "id": "polarion-2506",
       "q": "Does HTTP/OAuth work with Polarion 2506 or older?",
-      "a": "HTTP MCP initialization and OAuth login/refresh require Polarion 2512 or newer. They validate the PAT through GET /metadata, which is available from 2512 without global REST GET permission. Polarion 2506 and older return 404 on this endpoint, so HTTP/OAuth connections fail the preflight. Use stdio mode with API_BASE_URL and your own BEARER_TOKEN, or upgrade Polarion to 2512+. The server does not fall back to project/user listing or accept 403 as successful validation. Tool access still depends on your Polarion permissions."
+      "a": "HTTP MCP and OAuth need Polarion 2512+: the login check calls GET /metadata, which older versions answer with 404. Use the local setup (stdio with your own BEARER_TOKEN) or upgrade Polarion. The server does not fall back to project listing or accept a 403. Tool access still follows your Polarion permissions."
     },
     {
+      "id": "bearer",
       "q": "What does Bearer mean in an Authorization header?",
       "a": "It is just the word Bearer, one space, then your token: `Bearer YOUR_POLARION_PAT`. Without the word Bearer the server answers 401."
     },
     {
+      "id": "token-storage",
       "q": "Where do I keep my token safely?",
       "a": "In your personal client settings or an environment variable, never in a file inside a shared project or repository. Anyone who can read the file can act as you in Polarion. With the OAuth connectors you type the token only on the server's login page and the AI client never stores it."
     },
     {
+      "id": "polarion-versions",
       "q": "Which Polarion versions work?",
       "a": "Live integration tests run against Polarion 2506 (stdio) and 2606. HTTP/OAuth connectors such as claude.ai and ChatGPT need Polarion 2512 or newer. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance."
     },
     {
+      "id": "clients-list",
       "q": "Which AI clients can I use?",
       "a": "Any client that supports MCP over stdio or Streamable HTTP. The setup guide above lists the tested paths for Claude, ChatGPT and Codex, Copilot Studio, VS Code, Gemini, Cursor, Windsurf and JetBrains. Other clients can use the generic stdio or HTTP entries, or the REST wrapper."
     },
     {
+      "id": "unreachable-503",
       "q": "It says 503 \"Polarion could not be reached\".",
-      "a": "The server got no usable answer from Polarion. Read the `Polarion token probe GET /metadata failed` line in `docker logs polarion-mcp`; it shows the category, the HTTP status and Polarion's own message. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and that the MCP container can reach it; a private Polarion host may be reachable from the server network or VPN even when the AI provider cannot reach Polarion directly. Do not use `localhost` from inside Docker. Use the container-side Node probe in docs/troubleshooting.md. `/health` only confirms MCP liveness."
+      "a": "The server got no usable answer from Polarion. Read the `Polarion token probe GET /metadata failed` line in `docker logs polarion-mcp`. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and reachable from the MCP container (not `localhost` inside Docker). Use the container-side probe in docs/troubleshooting.md. `/health` only confirms the MCP server runs."
     },
     {
+      "id": "laptop-server",
       "q": "Can claude.ai or ChatGPT connect to a server on my own laptop?",
-      "a": "The provider must reach the MCP endpoint over public HTTPS, even if the MCP container runs on your laptop; `http://localhost` is not reachable from provider cloud. The container can separately reach a private Polarion instance over its network or VPN, so Polarion itself need not be public. Use a local stdio setup when you do not want to publish an MCP endpoint. Desktop and command-line clients may use `http://localhost:3000/mcp` locally."
+      "a": "The provider must reach the MCP endpoint over public HTTPS, so `http://localhost` does not work for claude.ai or ChatGPT. Polarion itself can stay private if the MCP container can reach it over your network or VPN. Desktop and command-line clients may use `http://localhost:3000/mcp`. Use a local stdio setup if you do not want to publish an endpoint."
     },
     {
+      "id": "chatgpt-connector-vs-gpt",
       "q": "What is the difference between the ChatGPT connector and a Custom GPT?",
       "a": "The ChatGPT connector speaks MCP and everyone signs in with their own Polarion token. A Custom GPT uses the separate REST wrapper with one shared key (`HTTP_API_KEY`), so every call runs as the one Polarion user whose token the wrapper holds."
     },
     {
+      "id": "certificate-public",
       "q": "Certificate errors: the public HTTPS address does not work.",
       "a": "For cloud connectors, ensure the MCP hostname resolves publicly, ports 80 and 443 reach the TLS proxy, and the certificate is valid for that hostname. Keep certificate verification enabled. A private Polarion hostname may still be used for the separate connection from the MCP container."
     },
     {
+      "id": "certificate-polarion",
       "q": "My Polarion uses a company or self-signed certificate.",
       "a": "Keep TLS verification enabled. Mount the company CA PEM into the MCP container and set `NODE_EXTRA_CA_CERTS=/certs/ca.pem` (for example `-v /path/ca.pem:/certs/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/ca.pem`). For npm mode, set `NODE_EXTRA_CA_CERTS` in the client environment. This adds trusted roots without disabling certificate checks."
     },
     {
+      "id": "pin-version",
       "q": "Should I use polarion-mcp@latest or a pinned version?",
       "a": "The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.5` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client."
     },
     {
+      "id": "update-docker",
       "q": "How do I update the Docker server?",
       "a": "Choose the new tag on the GitHub package page, then run `docker pull ghcr.io/phillipboesger/polarion-mcp:NEWTAG`, `docker rm -f polarion-mcp`, and the same `docker run` command with the new tag. Keep `MCP_TOKEN_SECRET` unchanged so users stay signed in. With a team URL the administrator updates the server and you only reconnect."
     },
     {
+      "id": "unsupported-engine",
       "q": "It says \"Unsupported engine\" or the Node version is too old.",
       "a": "The package needs Node.js 22 or newer: `node -v` must print v22 or higher. Install the LTS from nodejs.org and open a new terminal; with nvm run `nvm install 22 && nvm use 22`. Desktop apps can use a different Node than your terminal, so install Node system-wide and fully restart the app. Docker avoids this because the image bundles Node 22."
     },
     {
+      "id": "windows-npx",
       "q": "Windows: the client cannot start npx.",
       "a": "Typical symptoms are `spawn npx ENOENT` or a server that never starts. Use `cmd` as the command with the arguments `/c`, `npx`, `-y`, `polarion-mcp`, because npx is `npx.cmd` on Windows. Backslashes in JSON paths must be doubled (`C:\\\\path\\\\ca.pem`). Restart the app completely after every change."
     },
     {
+      "id": "port-in-use",
       "q": "Port 3000 is already in use.",
       "a": "Change only the left number of the port mapping: `-p 127.0.0.1:3100:3000`, then use `http://localhost:3100/mcp` and set `MCP_ALLOWED_HOSTS=localhost:3100,127.0.0.1:3100`. Remove an old container with `docker rm -f polarion-mcp`. On macOS and Linux `lsof -i :3000` shows who uses the port; on Windows use `netstat -ano | findstr :3000`."
     },
     {
+      "id": "rate-limit-429",
       "q": "It says 429 \"Too many requests\".",
       "a": "The server limits requests per address. Behind a proxy set `TRUST_PROXY=1`, otherwise all users share one counter, then wait 15 minutes for the window to reset. The REST wrapper has a fixed limit per 15 minutes."
     },
     {
+      "id": "gemini-cli-replaced",
       "q": "Gemini CLI says it was replaced. Which tool should I use?",
       "a": "Google's page says Gemini CLI was replaced by Antigravity CLI on 18 June 2026 for no-cost-tier and Google One users. If your Gemini CLI still runs, for example with an API key or a company license, the steps in this guide work. Antigravity CLI has its own setup that this guide does not cover yet."
     },
     {
+      "id": "windsurf-devin",
       "q": "Windsurf now says Devin. Which steps do I follow?",
       "a": "The vendor docs moved to docs.devin.ai and describe this configuration only for the legacy Cascade agent. If your tab uses the Devin Local agent, MCP servers are set up in Devin CLI config files, which this guide does not cover yet."
+    },
+    {
+      "id": "request-rejected-400",
+      "q": "The error says `request_rejected HTTP 400`.",
+      "a": "Polarion or a proxy in front of it refused the hostname in `API_BASE_URL`. Use the address your users open in the browser. For the Polarion Docker image, add the name (for example `host.docker.internal`) to `ALLOWED_HOSTS` on the Polarion container and recreate it. See \"ALLOWED_HOSTS recipe\" in docs/troubleshooting.md. `MCP_ALLOWED_HOSTS` is a different setting."
+    },
+    {
+      "id": "rest-disabled-404",
+      "q": "Every call returns 404, or `/rest/v1` does not exist.",
+      "a": "The REST API is not enabled or the path is wrong. Open `https://YOUR-POLARION/polarion/rest/v1/swagger-ui` in a browser; it must load. `API_BASE_URL` has to end in `/polarion/rest/v1`. Ask your Polarion administrator to enable the REST API if the page is missing."
+    },
+    {
+      "id": "pat-disabled-or-expired",
+      "q": "The PAT page says token generation is not allowed, or my token stopped working.",
+      "a": "An administrator must set `com.siemens.polarion.rest.security.restApiToken.enabled=true` and restart Polarion before PATs exist. A token also stops working when it expires or is revoked. Create a new one and replace it in your client; never paste it into a chat."
+    },
+    {
+      "id": "tool-limit",
+      "q": "My client warns about too many tools (VS Code 128, Cursor, Windsurf 100).",
+      "a": "The full catalog has 284 tools. Set `MCP_TOOLSETS` (for example `work-items,documents`) or `MCP_TOOLS` on the server, add `MCP_READ_ONLY=true`, or use `MCP_MODE=discover`. In VS Code you can also untick tools in the tools picker."
+    },
+    {
+      "id": "org-mcp-policy",
+      "q": "GitHub Copilot shows no MCP servers on Business or Enterprise.",
+      "a": "The organization policy \"MCP servers in Copilot\" is off by default. An organization or enterprise owner must enable it in the Copilot policies. Free and Pro plans are not affected by this policy."
+    },
+    {
+      "id": "corporate-proxy",
+      "q": "My network needs a proxy to reach Polarion.",
+      "a": "Set `HTTPS_PROXY` (for example `http://proxy.corp:3128`, credentials as `user:pass@` are allowed) and `NO_PROXY` (for example `.corp.example,localhost`) in the environment of the local server or the container. Only https:// Polarion URLs go through the proxy, using CONNECT. A 407 means the proxy credentials are wrong."
+    },
+    {
+      "id": "self-hosted-no-tool-calls",
+      "q": "My Ollama or other self-hosted model never calls the tools.",
+      "a": "The model must support tool calling; many small models do not. Pick one that does, enable native function calling for it in Open WebUI, and make sure the MCP URL is reachable from the Open WebUI container (use the container name, not `localhost`)."
     }
   ],
   "githubStars": 6

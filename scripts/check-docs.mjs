@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderClientsBlock, renderGuides, renderReadmeFaq } from './render-clients.mjs';
+import { renderClientsBlock, renderGuides, renderReadmeFaq, renderFaqList } from './render-clients.mjs';
 import { renderSite } from './render-site.mjs';
 import { ICON_PATHS } from './galaxy-logos.mjs';
 
@@ -88,6 +88,11 @@ function checker(root) {
       if (manifest.groups) {
         for (const [file, content] of renderGuides(manifest)) if (read(root, file) !== content) add('clients', file, 1, 'generated guide is missing or stale; run npm run docs:clients');
         if (!readme.includes(`<!-- faq:start -->\n${renderReadmeFaq(manifest)}\n<!-- faq:end -->`)) add('clients', 'README.md', 1, 'FAQ block differs from docs/clients.json; run npm run docs:clients');
+        const troubleshooting = read(root, 'docs/troubleshooting.md').replace(/\r\n/g, '\n');
+        if (!troubleshooting.includes(`<!-- faq:start -->\n${renderFaqList(manifest)}\n<!-- faq:end -->`)) add('clients', 'docs/troubleshooting.md', 1, 'FAQ block differs from docs/clients.json; run npm run docs:clients');
+        for (const item of [...manifest.faq, ...(manifest.faqMore || [])]) {
+          if (item.q.length + item.a.length > 500) add('clients', 'docs/clients.json', 1, `FAQ ${item.id} has ${item.q.length + item.a.length} characters; keep question plus answer at 500 or fewer`);
+        }
         // Idiot-proof rule: every supported client x mode needs prerequisites, steps, a verification and a failure fix.
         for (const file of ['docs/guides/local-npm.md', 'docs/guides/server-docker.md']) {
           const guide = read(root, file);

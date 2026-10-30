@@ -18,7 +18,6 @@
 
 import { randomBytes } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import https from 'node:https';
 import axios from 'axios';
 import type { Response } from 'express';
 import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js';
@@ -29,6 +28,7 @@ import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, Inv
 import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
+import { httpsAgent } from './httpClient.js';
 import { fetchClientMetadata, parseClientIdentifierUrl, type CimdClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, safeEqual } from './sealed.js';
 import { tokenDiagnostic, tokenNetworkDiagnostic, upstreamDetail, type TokenDiagnostic, type TokenProbeResult } from './token-diagnostics.js';
@@ -170,7 +170,7 @@ export async function probePolarionToken(token: string): Promise<TokenProbeResul
   try {
     const response = await axios.get(`${API_BASE_URL}/metadata`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      httpsAgent: new https.Agent({ rejectUnauthorized: shouldRejectUnauthorized() }),
+      httpsAgent: httpsAgent(shouldRejectUnauthorized()),
       timeout: 15_000,
       maxRedirects: 0,
       validateStatus: () => true,
@@ -211,7 +211,7 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
 /** Hosts whose redirect URIs may use any port (RFC 8252 section 7.3). */
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-export type RedirectPresetName = 'claude' | 'chatgpt' | 'vscode' | 'cursor' | 'copilot-studio' | 'gemini' | 'loopback';
+export type RedirectPresetName = 'claude' | 'chatgpt' | 'vscode' | 'cursor' | 'copilot-studio' | 'gemini' | 'm365' | 'mistral' | 'loopback';
 
 /**
  * Verified literal callback URIs from docs/clients.json. Entries that are
@@ -224,6 +224,9 @@ export const REDIRECT_PRESET_URIS = {
   cursor: ['https://www.cursor.com/agents/mcp/oauth/callback', 'http://localhost:8787/callback'],
   'copilot-studio': [],
   gemini: [],
+  m365: ['https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect'],
+  // Mistral does not document the Le Chat callback; stays empty and fails closed.
+  mistral: [],
   loopback: [],
 } as const satisfies Readonly<Record<RedirectPresetName, readonly string[]>>;
 

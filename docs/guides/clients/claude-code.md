@@ -60,13 +60,13 @@ Remote MCP uses per-user PATs. The client must be able to reach this URL.
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: Claude lists your projects. /mcp shows polarion as connected.
+Expected: Claude shows your Polarion user. /mcp shows polarion as connected.
 
 ### Server
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: Claude lists your projects. /mcp shows polarion as connected.
+Expected: Claude shows your Polarion user. /mcp shows polarion as connected.
 
 ## If it fails
 
@@ -76,6 +76,7 @@ Expected: Claude lists your projects. /mcp shows polarion as connected.
 |---|---|
 | claude command not found | Claude Code is not installed or the terminal was not reopened after installing. |
 | /mcp shows polarion as failed | Run claude mcp get polarion. Check node --version (22+) and that API_BASE_URL ends in /polarion/rest/v1. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ### Server
 
@@ -83,6 +84,7 @@ Expected: Claude lists your projects. /mcp shows polarion as connected.
 |---|---|
 | claude command not found | Claude Code is not installed or the terminal was not reopened after installing. |
 | /mcp shows polarion as failed | Run claude mcp get polarion. Check the URL opens from your machine and the PAT is valid. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 

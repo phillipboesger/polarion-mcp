@@ -9,6 +9,10 @@
 
 import https from 'node:https';
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios';
+import { ProxyTunnelAgent, proxyFromEnv } from './proxy.js';
+
+// axios would send an HTTPS request to the proxy as a plain forward request. The agent tunnels instead.
+axios.defaults.proxy = false;
 
 export const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
@@ -59,18 +63,22 @@ function isRetryable(method: string, status: number): boolean {
 /** Longest Retry-After (seconds) a call waits out. */
 const MAX_RETRY_AFTER_S = 60;
 
-const agents = new Map<boolean, https.Agent>();
+const agents = new Map<string, https.Agent>();
 
 /**
  * @param rejectUnauthorized - Whether TLS certificates are verified.
+ * @param env - Environment for HTTPS_PROXY / NO_PROXY; injectable for tests.
  * @returns A shared keep-alive agent, so calls reuse connections instead of
- *   paying a TLS handshake each.
+ *   paying a TLS handshake each. It tunnels through HTTPS_PROXY when set.
  */
-export function httpsAgent(rejectUnauthorized: boolean): https.Agent {
-  let agent = agents.get(rejectUnauthorized);
+export function httpsAgent(rejectUnauthorized: boolean, env: NodeJS.ProcessEnv = process.env): https.Agent {
+  const proxy = proxyFromEnv(env);
+  const key = `${rejectUnauthorized}|${proxy ? `${proxy.url.href}|${proxy.noProxy.join(',')}` : ''}`;
+  let agent = agents.get(key);
   if (!agent) {
-    agent = new https.Agent({ keepAlive: true, rejectUnauthorized });
-    agents.set(rejectUnauthorized, agent);
+    const options = { keepAlive: true, rejectUnauthorized };
+    agent = proxy ? new ProxyTunnelAgent(options, proxy) : new https.Agent(options);
+    agents.set(key, agent);
   }
   return agent;
 }

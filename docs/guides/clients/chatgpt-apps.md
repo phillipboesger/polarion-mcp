@@ -52,7 +52,7 @@ Use DCR unless the administrator explicitly enabled CIMD. Access depends on work
 
 Ask your assistant: `@Polarion Which Polarion user am I? Use the Polarion tool getCurrentUser.`
 
-Expected: ChatGPT calls a Polarion tool and lists project names and IDs.
+Expected: ChatGPT calls a Polarion tool and shows your Polarion user.
 
 ## If it fails
 
@@ -62,6 +62,7 @@ Expected: ChatGPT calls a Polarion tool and lists project names and IDs.
 |---|---|
 | Add custom MCP server option is missing | Your workspace administrator has not allowed custom MCP servers for you. Ask them to enable it. |
 | Sign-in fails with a redirect_uri error | Send the callback address ChatGPT shows to the admin for MCP_ALLOWED_REDIRECT_PREFIXES. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 

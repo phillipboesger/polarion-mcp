@@ -163,3 +163,93 @@ test('HTML references resolve and the landing page keeps essential content inlin
   assert.doesNotMatch(html, /—/);
   assert.doesNotMatch(html, /github\.com[^"\s]+\/discussions/);
 });
+
+const connections = data.clients.flatMap(client => ['local', 'server'].filter(mode => !client[mode].reason).map(mode => ({ client, mode, connection: client[mode] })));
+const clientById = id => data.clients.find(client => client.id === id);
+
+test('K1: prompts that ask for getCurrentUser expect the user, not projects', () => {
+  for (const { client, mode, connection } of connections) {
+    if (!connection.verify.prompt.includes('getCurrentUser')) continue;
+    assert.match(connection.verify.expect, /user/i, `${client.id}/${mode}`);
+    assert.doesNotMatch(connection.verify.expect, /project/i, `${client.id}/${mode}`);
+  }
+});
+
+test('K10: every supported mode has steps, a prerequisite server, a check and failure fixes including 401', () => {
+  for (const { client, mode, connection } of connections) {
+    assert.ok(connection.steps.length >= 2, `${client.id}/${mode} steps`);
+    assert.ok(connection.verify.prompt && connection.verify.expect, `${client.id}/${mode} verify`);
+    assert.ok(connection.fails.length >= 2, `${client.id}/${mode} needs at least two failure fixes`);
+    assert.ok(connection.fails.some(fail => /401/.test(fail.symptom)), `${client.id}/${mode} needs a 401 fix`);
+    if (mode === 'server' && !connection.verify.prompt.startsWith('curl') && !['n8n', 'rest-wrapper', 'docker'].includes(client.id)) {
+      assert.ok(connection.serverSetup, `${client.id}/${mode} must show the server it needs`);
+    }
+  }
+});
+
+test('K2: every server example uses a known redirect preset and the image tag of this release', () => {
+  const presets = new Set(['claude', 'chatgpt', 'vscode', 'cursor', 'copilot-studio', 'gemini', 'm365', 'mistral', 'loopback']);
+  const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  for (const setup of data.setups) {
+    for (const [, value] of setup.snippet.matchAll(/MCP_ALLOWED_REDIRECT_PRESETS=([\w,-]+)/g)) {
+      for (const preset of value.split(',')) assert.ok(presets.has(preset), `${setup.id}: unknown preset ${preset}`);
+    }
+    for (const [, tag] of setup.snippet.matchAll(/ghcr\.io\/phillipboesger\/polarion-mcp:([\w.-]+)/g)) assert.equal(tag, version, `${setup.id} image tag`);
+  }
+});
+
+test('K3: Microsoft 365 Copilot sits under Microsoft, is server only and uses the m365 preset', () => {
+  const client = clientById('m365-copilot');
+  const microsoft = data.groups[0].cards.find(card => card.id === 'microsoft');
+  assert.ok(microsoft.clients.includes('m365-copilot'));
+  assert.ok(client.local.reason);
+  assert.match(data.setups.find(setup => setup.id === client.server.serverSetup).snippet, /MCP_ALLOWED_REDIRECT_PRESETS=m365/);
+  assert.deepEqual(client.redirectUris.map(entry => entry.uri), ['https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect']);
+});
+
+test('K4/K5: self-hosted models and Mistral Le Chat have their own entries', () => {
+  const selfHosted = clientById('self-hosted');
+  assert.match(selfHosted.note, /not MCP clients/);
+  assert.match(selfHosted.note, /tool calling/);
+  assert.ok(selfHosted.server.alternative.snippet.includes('streamable-http'));
+  assert.ok(data.groups[0].cards.find(card => card.id === 'mistral').clients.includes('mistral-le-chat'));
+  assert.doesNotMatch(data.setups.find(setup => setup.id === clientById('mistral-le-chat').server.serverSetup).snippet, /PRESETS=mistral/, 'no undocumented callback may be presented as a preset');
+});
+
+test('K6: GitHub Copilot covers four IDEs with one shared snippet and keeps the old guide', () => {
+  const copilot = clientById('github-copilot');
+  assert.deepEqual(copilot.variants.map(variant => variant.id), ['vscode', 'eclipse', 'jetbrains', 'visual-studio']);
+  for (const variant of copilot.variants) assert.ok(variant.minVersion && variant.openSteps.length, variant.id);
+  assert.deepEqual(copilot.legacyIds, ['vscode-copilot']);
+  assert.match(fs.readFileSync('docs/guides/clients/vscode-copilot.md', 'utf8'), /github-copilot\.md/);
+  assert.match(copilot.note, /MCP servers in Copilot/);
+  assert.equal(clientById('vscode-copilot'), undefined);
+});
+
+test('K7: Antigravity uses serverUrl for remote servers and keeps the Gemini CLI link', () => {
+  const agy = clientById('antigravity');
+  const remote = data.setups.find(setup => setup.id === agy.server.setup).snippet;
+  assert.doesNotThrow(() => JSON.parse(remote));
+  assert.ok(JSON.parse(remote).mcpServers.polarion.serverUrl);
+  assert.doesNotMatch(remote, /httpUrl|"url"/);
+  assert.deepEqual(agy.legacyIds, ['gemini-cli']);
+  assert.match(fs.readFileSync('docs/guides/clients/gemini-cli.md', 'utf8'), /antigravity\.md/);
+});
+
+test('K12: FAQ entries are short, have ids and cover the required topics', () => {
+  const entries = [...data.faq, ...data.faqMore];
+  assert.equal(new Set(entries.map(entry => entry.id)).size, entries.length);
+  for (const entry of entries) assert.ok(entry.q.length + entry.a.length <= 500, `${entry.id} is ${entry.q.length + entry.a.length} characters`);
+  const required = ['rest-disabled-404', 'request-rejected-400', 'tool-limit', 'org-mcp-policy', 'corporate-proxy', 'pat-disabled-or-expired', 'self-hosted-no-tool-calls', 'pat-401', 'forbidden-403', 'unreachable-503', 'rate-limit-429', 'oauth-loop'];
+  for (const id of required) assert.ok(entries.some(entry => entry.id === id), `missing FAQ ${id}`);
+});
+
+test('K13: manifest and generated guides contain no em dashes or stock AI words', () => {
+  const stock = /\b(delve|tapestry|testament|seamless(ly)?|leverag(e|es|ing)|unlock(s|ing)?|pivotal|elevate|game-chang\w+)\b/i;
+  const files = ['docs/clients.json', 'docs/clients.md', 'docs/guides/local-npm.md', 'docs/guides/server-docker.md', ...fs.readdirSync('docs/guides/clients').map(file => `docs/guides/clients/${file}`)];
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8');
+    assert.ok(!text.includes('—'), `${file} contains an em dash`);
+    assert.doesNotMatch(text, stock, file);
+  }
+});

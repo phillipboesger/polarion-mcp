@@ -51,7 +51,7 @@ Tools (actions) are disabled until you enable them. An admin may need to overrid
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: Gemini Enterprise calls a Polarion action and lists project names.
+Expected: Gemini Enterprise calls a Polarion action and shows your Polarion user.
 
 ## If it fails
 
@@ -61,6 +61,7 @@ Expected: Gemini Enterprise calls a Polarion action and lists project names.
 |---|---|
 | Cannot create the Custom MCP Server data store | An admin must override the org policy that blocks Custom MCP data stores and allow your server's domain. |
 | Verify Auth fails | Allow https://vertexaisearch.cloud.google.com/oauth-redirect (MCP_ALLOWED_REDIRECT_PREFIXES). |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 

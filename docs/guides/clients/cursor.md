@@ -87,13 +87,13 @@ Remote MCP uses per-user PATs. The client must be able to reach this URL.
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: The assistant calls a Polarion tool and lists project names.
+Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 ### Server
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: The assistant calls a Polarion tool and lists project names.
+Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 ## If it fails
 
@@ -103,6 +103,7 @@ Expected: The assistant calls a Polarion tool and lists project names.
 |---|---|
 | polarion missing or its toggle is off | Check the JSON is valid. Turn the toggle on under Customize, or restart Cursor. |
 | Server fails to connect | Press Cmd/Ctrl+Shift+U, choose MCP Logs in the Output panel and read the error. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ### Server
 
@@ -110,6 +111,7 @@ Expected: The assistant calls a Polarion tool and lists project names.
 |---|---|
 | polarion missing or its toggle is off | Check the JSON is valid. Turn the toggle on under Customize, or restart Cursor. |
 | Server fails to connect | Press Cmd/Ctrl+Shift+U, choose MCP Logs in the Output panel and read the error. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ## Sources
 
