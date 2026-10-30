@@ -2,7 +2,7 @@
 
 Mistral’s chat assistant, EU-hosted. Default: **Server**.
 
-EU option: Le Chat is operated by Mistral AI in France. Le Chat registers via DCR and may send an empty client secret.
+Operated by Mistral AI in France. Le Chat registers itself (DCR) and may send an empty client secret.
 
 - **Local is not supported:** Le Chat connects from Mistral’s cloud, so it needs a public HTTPS server.
 
@@ -34,7 +34,7 @@ Mistral does not document the Le Chat callback URL, so there is no built-in mist
 
 ### Server
 
-1. Set up the server with Docker and OAuth (server example below), reachable at https://YOUR-SERVER/mcp.
+1. Set up the server with Docker and OAuth (see the server example under Prerequisites), reachable at https://YOUR-SERVER/mcp.
 2. In Le Chat open Intelligence > Connectors > Add Connector > Custom MCP Connector (on Team plans an admin must do this).
 3. Enter name Polarion and the URL https://YOUR-SERVER/mcp; leave the client secret empty so Le Chat registers itself.
 4. Click Connect and enter your Polarion PAT on the server login page.
@@ -65,10 +65,10 @@ Expected: Le Chat calls getCurrentUser and shows your Polarion user.
 
 ## Sources
 
-Checked against the vendor documentation on 2026-10-30.
+Checked against third-party guides on 2026-10-30.
 
-- [Official documentation 1](https://docs.civic.com/civic/quickstart/clients/mistral-lechat)
-- [Official documentation 2](https://docs.bko.finologee.com/docs/mcp-mistral)
+- [Third-party guide 1](https://docs.civic.com/civic/quickstart/clients/mistral-lechat)
+- [Third-party guide 2](https://docs.bko.finologee.com/docs/mcp-mistral)
 
 Not confirmed in the vendor documentation:
 

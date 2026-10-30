@@ -476,6 +476,102 @@
               }
             }
           }
+        },
+        "thirdPartySources": {
+          "type": "boolean"
+        },
+        "verified": {
+          "type": "object",
+          "description": "Per mode: last end-to-end run.",
+          "additionalProperties": false,
+          "properties": {
+            "local": {
+              "type": "object",
+              "required": [
+                "date",
+                "mcpVersion",
+                "polarion",
+                "client",
+                "clientVersion",
+                "by",
+                "evidence"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "mcpVersion": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "polarion": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "client": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "clientVersion": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "by": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "evidence": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "server": {
+              "type": "object",
+              "required": [
+                "date",
+                "mcpVersion",
+                "polarion",
+                "client",
+                "clientVersion",
+                "by",
+                "evidence"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "mcpVersion": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "polarion": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "client": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "clientVersion": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "by": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "evidence": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
         }
       }
     },

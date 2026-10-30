@@ -1,0 +1,3 @@
+YOUR-MCP-HOST {
+    reverse_proxy mcp:3000
+}

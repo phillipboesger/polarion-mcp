@@ -12,7 +12,7 @@ The snippets below are the same in every IDE. Only the way to open the configura
 
 Needs: VS Code 1.99+ with GitHub Copilot.
 
-1. Run MCP: Open User Configuration from the Command Palette.
+1. Run MCP: Open User Configuration from the Command Palette, then continue with the steps below.
 
 ### Eclipse
 
@@ -89,7 +89,7 @@ The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends
 }
 ```
 
-Node.js 22+ is required. VS Code uses a servers object. Select the tools you need in chat; the full catalog can exceed the client tool budget.
+The top-level key is `servers`, not `mcpServers`. Select the tools you need in chat; the full catalog can exceed the client tool budget.
 
 ### Server
 

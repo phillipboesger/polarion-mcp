@@ -1,0 +1,5 @@
+# Overlay: ChatGPT connector (replace the callback ChatGPT shows)
+services:
+  mcp:
+    environment:
+      MCP_ALLOWED_REDIRECT_PREFIXES: https://YOUR-CLIENT/EXACT-CALLBACK

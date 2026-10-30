@@ -209,7 +209,7 @@ test('K3: Microsoft 365 Copilot sits under Microsoft, is server only and uses th
 
 test('K4/K5: self-hosted models and Mistral Le Chat have their own entries', () => {
   const selfHosted = clientById('self-hosted');
-  assert.match(selfHosted.note, /not MCP clients/);
+  assert.match(selfHosted.note, /only supply the model/);
   assert.match(selfHosted.note, /tool calling/);
   assert.ok(selfHosted.server.alternative.snippet.includes('streamable-http'));
   assert.ok(data.groups[0].cards.find(card => card.id === 'mistral').clients.includes('mistral-le-chat'));
@@ -252,4 +252,33 @@ test('K13: manifest and generated guides contain no em dashes or stock AI words'
     assert.ok(!text.includes('—'), `${file} contains an em dash`);
     assert.doesNotMatch(text, stock, file);
   }
+});
+
+test('K2: the compose file in the Server guide is the example file and every overlay uses a known preset', () => {
+  const guide = fs.readFileSync('docs/guides/server-docker.md', 'utf8');
+  const base = fs.readFileSync('docs/examples/compose.yaml', 'utf8').trimEnd();
+  assert.ok(guide.includes(`\`\`\`yaml\n${base}\n\`\`\``), 'guide compose block differs from docs/examples/compose.yaml');
+  assert.ok(guide.includes(fs.readFileSync('docs/examples/Caddyfile', 'utf8').trimEnd()));
+  const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  assert.ok(base.includes(`polarion-mcp:${version}`));
+  assert.doesNotMatch(base, /REDIRECT/, 'the base has no redirect setting; overlays add it');
+  const presets = new Set(['claude', 'chatgpt', 'vscode', 'cursor', 'copilot-studio', 'gemini', 'm365', 'mistral', 'loopback']);
+  const overlays = fs.readdirSync('docs/examples/overlays');
+  assert.deepEqual(overlays.sort(), ['chatgpt.yaml', 'claude.yaml', 'm365.yaml', 'mistral.yaml', 'proxy.yaml']);
+  for (const file of overlays) {
+    const text = fs.readFileSync(`docs/examples/overlays/${file}`, 'utf8');
+    assert.match(text, /^services:\n {2}mcp:\n {4}environment:\n/m, file);
+    for (const [, preset] of text.matchAll(/MCP_ALLOWED_REDIRECT_PRESETS: ([\w,-]+)/g)) assert.ok(presets.has(preset), `${file}: ${preset}`);
+    assert.ok(guide.includes(`\`${file}\``), `${file} is not in the guide table`);
+  }
+  assert.match(fs.readFileSync('docs/troubleshooting.md', 'utf8'), /ALLOWED_HOSTS recipe/);
+});
+
+test('T8.5: a verified block must be complete and the schema rejects partial ones', () => {
+  const validate = new Ajv2020({ allErrors: true }).compile(schema);
+  const copy = structuredClone(data);
+  copy.clients[0].verified = { local: { date: '2026-10-30', mcpVersion: '1.4.5', polarion: '2606', client: 'Claude Desktop', clientVersion: '1.0', by: 'Phillip', evidence: 'screenshot' } };
+  assert.ok(validate(copy), JSON.stringify(validate.errors));
+  delete copy.clients[0].verified.local.evidence;
+  assert.equal(validate(copy), false);
 });

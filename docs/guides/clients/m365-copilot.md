@@ -2,7 +2,7 @@
 
 Declarative agents in Microsoft 365 Copilot Chat and Teams. Default: **Server**.
 
-A declarative agent calls the MCP server as an action. Sign-in uses Microsoft’s fixed OAuth callback, so the server only needs the m365 preset. Do not bind the OAuth registration to an existing Teams app ID for an MCP server.
+Microsoft uses one fixed OAuth callback, so set MCP_ALLOWED_REDIRECT_PRESETS=m365 on the server. Do not bind the OAuth registration to an existing Teams app ID for an MCP server.
 
 - **Local is not supported:** Microsoft 365 Copilot calls the MCP server from Microsoft’s cloud, so it needs a public HTTPS server.
 
@@ -35,7 +35,7 @@ Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and fo
 
 ### Server
 
-1. Set up the server with Docker and the m365 preset (the server example below), reachable at https://YOUR-SERVER/mcp.
+1. Set up the server with Docker and the m365 preset (see the server example under Prerequisites), reachable at https://YOUR-SERVER/mcp.
 2. In VS Code, install Microsoft 365 Agents Toolkit and create a Declarative Agent with an action from an existing MCP server.
 3. Enter https://YOUR-SERVER/mcp as the server URL and choose OAuth with dynamic client registration; the toolkit creates the auth config.
 4. Select the polarion tools the agent should use (a subset is better than all).
@@ -45,7 +45,7 @@ Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and fo
 https://YOUR-SERVER/mcp
 ```
 
-Teams publishing needs an admin to allow the app. Select only the tools the agent needs.
+Teams publishing needs an admin to allow the app.
 
 ## Check
 

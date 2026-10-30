@@ -2,7 +2,7 @@
 
 Open WebUI or LibreChat with Ollama, vLLM, OpenRouter or any OpenAI-compatible model. Default: **Server**.
 
-Ollama, vLLM and OpenRouter are model backends, not MCP clients. Open WebUI is the MCP client and talks to any OpenAI-compatible backend, so only the model URL and key change per backend. The model must support tool calling.
+Open WebUI is the MCP client. Ollama, vLLM and OpenRouter only supply the model, so only the model URL and key change per backend. The model must support tool calling.
 
 - **Local is not supported:** The chat UI connects to the server by URL; use the Local setup of a desktop client instead if you only need stdio.
 
@@ -30,7 +30,7 @@ Put Open WebUI on the same Docker network and use http://polarion-mcp:3000/mcp a
 
 ### Server
 
-1. Start the server on the same Docker network as Open WebUI (server example below).
+1. Start the server on the same Docker network as Open WebUI (see the server example under Prerequisites).
 2. In Open WebUI open Admin Settings > External Tools > Add and choose MCP (Streamable HTTP), not OpenAPI.
 3. Enter http://polarion-mcp:3000/mcp, choose Bearer and paste your Polarion PAT as key.
 4. Verify the connection; the tool list must appear. Save.

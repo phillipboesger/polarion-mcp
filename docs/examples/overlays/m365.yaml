@@ -1,0 +1,5 @@
+# Overlay: Microsoft 365 Copilot and Teams
+services:
+  mcp:
+    environment:
+      MCP_ALLOWED_REDIRECT_PRESETS: m365

@@ -1,6 +1,6 @@
 # Connect Antigravity (CLI + IDE)
 
-Google Antigravity CLI (agy) and IDE; replaces Gemini CLI. Default: **Local**.
+Google’s agent CLI (agy) and IDE, the successor to Gemini CLI. Default: **Local**.
 
 Antigravity CLI and IDE read the same mcp_config.json. Gemini CLI users can import their servers once; Gemini CLI itself keeps working for Code Assist and API-key users.
 
@@ -34,7 +34,7 @@ The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends
 
 ### Local
 
-1. Open mcp_config.json: in the IDE use Manage MCP Servers > View raw config; in the CLI run agy and open the /mcp panel (the file is under ~/.gemini/, see the note).
+1. Open mcp_config.json: in the IDE use Manage MCP Servers > View raw config; in the CLI run agy and open the /mcp panel (usually ~/.gemini/antigravity/mcp_config.json; other versions use a different folder under ~/.gemini/).
 2. Add the polarion entry to mcpServers; replace YOUR-POLARION and YOUR_POLARION_PAT.
 3. Save, then restart agy or reload the IDE.
 4. Type /mcp in agy; polarion must show as connected.
@@ -57,7 +57,7 @@ The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends
 }
 ```
 
-Command, args and env stay the same as in every other local client. The key is mcpServers.
+Same command, args and env as other local clients; the top-level key is `mcpServers`.
 
 ### Server
 

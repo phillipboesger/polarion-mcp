@@ -100,6 +100,10 @@ function checker(root) {
           else for (const section of missingGuideSections(guide, ['Prerequisites', 'Check', 'If it fails'])) add('clients', file, 1, `guide is missing the "${section}" section`);
         }
         for (const client of manifest.clients) {
+          for (const [mode, proof] of Object.entries(client.verified || {})) {
+            const ageDays = (Date.now() - Date.parse(proof.date)) / 86_400_000;
+            if (!(ageDays <= 90)) add('clients', 'docs/clients.json', 1, `${client.id} / ${mode} verification from ${proof.date} is older than 90 days or in the future; rerun the end-to-end check`);
+          }
           if (!/^\d{4}-\d{2}-\d{2}$/.test(client.checked || '')) add('clients', 'docs/clients.json', 1, `${client.id} has no checked date`);
           for (const source of client.sources || []) if (!/^https:\/\/\S+$/.test(source)) add('clients', 'docs/clients.json', 1, `${client.id} has a source that is not a plain https URL: ${source}`);
           const supported = ['local', 'server'].filter(mode => !client[mode].reason);

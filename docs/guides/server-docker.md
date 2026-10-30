@@ -173,7 +173,6 @@ services:
       MCP_PUBLIC_URL: https://YOUR-MCP-HOST
       MCP_ALLOWED_HOSTS: YOUR-MCP-HOST
       MCP_TOKEN_SECRET: ${MCP_TOKEN_SECRET}
-      MCP_ALLOWED_REDIRECT_PRESETS: claude
       TRUST_PROXY: "1"
   caddy:
     image: caddy:2
@@ -194,7 +193,7 @@ What the settings mean:
 
 - `MCP_PUBLIC_URL`: the public address, origin only, no path.
 - `MCP_ALLOWED_HOSTS`: the hostname clients use. The server rejects other Host headers.
-- `MCP_ALLOWED_REDIRECT_PRESETS=claude`: lets claude.ai and Claude Desktop finish sign-in. For ChatGPT use `MCP_ALLOWED_REDIRECT_PREFIXES` instead (see the [ChatGPT guide](clients/chatgpt-apps.md)).
+- No redirect setting yet: pick the overlay for your client in the next step.
 - `TRUST_PROXY=1`: one proxy (Caddy) sits in front.
 - The `mcp` service publishes no port, so only Caddy can reach it.
 
@@ -227,6 +226,24 @@ Apache or nginx instead of Caddy: see [Deployment](../deployment.md).
 ## Behind a corporate proxy (optional)
 
 Add `-e HTTPS_PROXY=http://proxy.company.example:3128` and `-e NO_PROXY=.company.example` to `docker run`, or the same two lines under `environment:` in the Compose file. Only `https://` Polarion URLs go through the proxy. A `407` error in the log means the proxy credentials in the URL are wrong.
+
+### B5: Add the overlay for your client
+
+The base file starts a server that accepts personal access tokens. OAuth clients also need an overlay that sets the allowed sign-in callbacks. Copy the matching file from [docs/examples/overlays](../examples/overlays/) next to `compose.yaml` and start with both files, for example for Microsoft 365 Copilot:
+
+```bash
+docker compose -f compose.yaml -f m365.yaml up -d
+```
+
+| Overlay | For | Sets |
+|---|---|---|
+| `claude.yaml` | claude.ai, Claude Desktop | `MCP_ALLOWED_REDIRECT_PRESETS: claude` |
+| `m365.yaml` | Microsoft 365 Copilot, Teams | `MCP_ALLOWED_REDIRECT_PRESETS: m365` |
+| `chatgpt.yaml` | ChatGPT connector | `MCP_ALLOWED_REDIRECT_PREFIXES` with the callback ChatGPT shows (see the [ChatGPT guide](clients/chatgpt-apps.md)) |
+| `mistral.yaml` | Mistral Le Chat | `MCP_ALLOWED_REDIRECT_PREFIXES` with the callback from the server log |
+| `proxy.yaml` | Outbound proxy to Polarion | `HTTPS_PROXY`, `NO_PROXY` |
+
+Polarion answers `request_rejected 400` when it does not accept the host name in `API_BASE_URL`. For the Polarion Docker image add that name to `ALLOWED_HOSTS` on the Polarion container (the [troubleshooting entry](../troubleshooting.md#allowed_hosts-recipe) has the full recipe).
 
 ## Check that it works
 

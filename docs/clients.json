@@ -213,7 +213,7 @@
       "kind": "Local · JSON",
       "language": "json",
       "snippet": "{\n  \"servers\": {\n    \"polarion\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"polarion-mcp\"],\n      \"env\": {\n        \"API_BASE_URL\": \"https://YOUR-POLARION/polarion/rest/v1\",\n        \"BEARER_TOKEN\": \"YOUR_POLARION_PAT\"\n      }\n    }\n  }\n}",
-      "note": "Node.js 22+ is required. VS Code uses a servers object. Select the tools you need in chat; the full catalog can exceed the client tool budget."
+      "note": "The top-level key is `servers`, not `mcpServers`. Select the tools you need in chat; the full catalog can exceed the client tool budget."
     },
     {
       "id": "claude-api",
@@ -1174,7 +1174,7 @@
           "label": "VS Code",
           "minVersion": "VS Code 1.99+ with GitHub Copilot",
           "openSteps": [
-            "Run MCP: Open User Configuration from the Command Palette."
+            "Run MCP: Open User Configuration from the Command Palette, then continue with the steps below."
           ]
         },
         {
@@ -1225,16 +1225,16 @@
         "Environment variable substitution inside mcp_config.json is reported as not working, so the snippets put the PAT inline.",
         "Whether agy mcp add exists as a command is not documented; the CLI steps edit the file instead."
       ],
-      "summary": "Google Antigravity CLI (agy) and IDE; replaces Gemini CLI.",
+      "summary": "Google’s agent CLI (agy) and IDE, the successor to Gemini CLI.",
       "local": {
         "setup": "antigravity-json",
         "steps": [
-          "Open mcp_config.json: in the IDE use Manage MCP Servers > View raw config; in the CLI run agy and open the /mcp panel (the file is under ~/.gemini/, see the note).",
+          "Open mcp_config.json: in the IDE use Manage MCP Servers > View raw config; in the CLI run agy and open the /mcp panel (usually ~/.gemini/antigravity/mcp_config.json; other versions use a different folder under ~/.gemini/).",
           "Add the polarion entry to mcpServers; replace YOUR-POLARION and YOUR_POLARION_PAT.",
           "Save, then restart agy or reload the IDE.",
           "Type /mcp in agy; polarion must show as connected."
         ],
-        "note": "Command, args and env stay the same as in every other local client. The key is mcpServers.",
+        "note": "Same command, args and env as other local clients; the top-level key is `mcpServers`.",
         "needs": [
           "Antigravity CLI (agy) or IDE signed in",
           "Node.js 22+"
@@ -1890,7 +1890,7 @@
         "https://microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth"
       ],
       "checked": "2026-10-30",
-      "note": "A declarative agent calls the MCP server as an action. Sign-in uses Microsoft’s fixed OAuth callback, so the server only needs the m365 preset. Do not bind the OAuth registration to an existing Teams app ID for an MCP server.",
+      "note": "Microsoft uses one fixed OAuth callback, so set MCP_ALLOWED_REDIRECT_PRESETS=m365 on the server. Do not bind the OAuth registration to an existing Teams app ID for an MCP server.",
       "redirectUris": [
         {
           "uri": "https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect",
@@ -1910,13 +1910,13 @@
       "server": {
         "setup": "connector",
         "steps": [
-          "Set up the server with Docker and the m365 preset (the server example below), reachable at https://YOUR-SERVER/mcp.",
+          "Set up the server with Docker and the m365 preset (see the server example under Prerequisites), reachable at https://YOUR-SERVER/mcp.",
           "In VS Code, install Microsoft 365 Agents Toolkit and create a Declarative Agent with an action from an existing MCP server.",
           "Enter https://YOUR-SERVER/mcp as the server URL and choose OAuth with dynamic client registration; the toolkit creates the auth config.",
           "Select the polarion tools the agent should use (a subset is better than all).",
           "Provision the agent, then open it in Microsoft 365 Copilot Chat or Teams and sign in with your Polarion PAT on the server login page."
         ],
-        "note": "Teams publishing needs an admin to allow the app. Select only the tools the agent needs.",
+        "note": "Teams publishing needs an admin to allow the app.",
         "needs": [
           "Microsoft 365 tenant with a Copilot licence and custom app upload",
           "Microsoft 365 Agents Toolkit",
@@ -1954,7 +1954,7 @@
         "https://docs.bko.finologee.com/docs/mcp-mistral"
       ],
       "checked": "2026-10-30",
-      "note": "EU option: Le Chat is operated by Mistral AI in France. Le Chat registers via DCR and may send an empty client secret.",
+      "note": "Operated by Mistral AI in France. Le Chat registers itself (DCR) and may send an empty client secret.",
       "redirectUris": [],
       "defaultMode": "server",
       "unverified": [
@@ -1969,7 +1969,7 @@
       "server": {
         "setup": "connector",
         "steps": [
-          "Set up the server with Docker and OAuth (server example below), reachable at https://YOUR-SERVER/mcp.",
+          "Set up the server with Docker and OAuth (see the server example under Prerequisites), reachable at https://YOUR-SERVER/mcp.",
           "In Le Chat open Intelligence > Connectors > Add Connector > Custom MCP Connector (on Team plans an admin must do this).",
           "Enter name Polarion and the URL https://YOUR-SERVER/mcp; leave the client secret empty so Le Chat registers itself.",
           "Click Connect and enter your Polarion PAT on the server login page.",
@@ -1995,7 +1995,8 @@
           }
         ],
         "serverSetup": "docker-mistral"
-      }
+      },
+      "thirdPartySources": true
     },
     {
       "id": "self-hosted",
@@ -2008,7 +2009,7 @@
         "https://www.librechat.ai/docs/features/mcp"
       ],
       "checked": "2026-10-30",
-      "note": "Ollama, vLLM and OpenRouter are model backends, not MCP clients. Open WebUI is the MCP client and talks to any OpenAI-compatible backend, so only the model URL and key change per backend. The model must support tool calling.",
+      "note": "Open WebUI is the MCP client. Ollama, vLLM and OpenRouter only supply the model, so only the model URL and key change per backend. The model must support tool calling.",
       "redirectUris": [],
       "defaultMode": "server",
       "unverified": [
@@ -2022,7 +2023,7 @@
       "server": {
         "setup": "open-webui",
         "steps": [
-          "Start the server on the same Docker network as Open WebUI (server example below).",
+          "Start the server on the same Docker network as Open WebUI (see the server example under Prerequisites).",
           "In Open WebUI open Admin Settings > External Tools > Add and choose MCP (Streamable HTTP), not OpenAPI.",
           "Enter http://polarion-mcp:3000/mcp, choose Bearer and paste your Polarion PAT as key.",
           "Verify the connection; the tool list must appear. Save.",

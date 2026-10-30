@@ -47,11 +47,13 @@ export function renderClientGuide(manifest, client) {
   const active = modes.filter(mode => supported(client[mode]));
   const section = (title, part) => `## ${title}\n\n${active.map(mode => `### ${modeLabel[mode]}\n\n${renderConnection(manifest, client, mode, part)}`).join('\n\n')}`;
   const unsupported = modes.filter(mode => !supported(client[mode])).map(mode => `- **${modeLabel[mode]} is not supported:** ${client[mode].reason}`);
-  const sources = client.sources.map((source, i) => `- [${source.includes('github.com/phillipboesger') ? 'Server implementation' : 'Official documentation'}${client.sources.length > 1 ? ` ${i + 1}` : ''}](${source})`);
+  const sources = client.sources.map((source, i) => `- [${source.includes('github.com/phillipboesger') ? 'Server implementation' : client.thirdPartySources ? 'Third-party guide' : 'Official documentation'}${client.sources.length > 1 ? ` ${i + 1}` : ''}](${source})`);
   const unverified = client.unverified?.length ? `\n\nNot confirmed in the vendor documentation:\n\n${client.unverified.map(item => `- ${item}`).join('\n')}` : '';
+  const verifiedLines = modes.filter(mode => client.verified?.[mode]).map(mode => { const v = client.verified[mode]; return `- ${modeLabel[mode]}: verified on ${v.date} with ${v.client} ${v.clientVersion}, polarion-mcp ${v.mcpVersion}, Polarion ${v.polarion} (${v.evidence}).`; });
+  const verified = verifiedLines.length ? `\n\nVerified end to end:\n\n${verifiedLines.join('\n')}` : '';
   const notes = [client.note, client.referenceNote].filter(Boolean).join(' ');
   const variants = client.variants ? `\n\n## IDE variants\n\nThe snippets below are the same in every IDE. Only the way to open the configuration and the minimum version differ.\n\n${client.variants.map(variant => `### ${variant.label}\n\nNeeds: ${variant.minVersion}.\n\n${variant.openSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')}`).join('\n\n')}` : '';
-  return `# Connect ${client.name}\n\n${client.summary} Default: **${modeLabel[client.defaultMode]}**.${notes ? `\n\n${notes}` : ''}${unsupported.length ? `\n\n${unsupported.join('\n')}` : ''}${variants}\n\n${section('Prerequisites', 'prerequisites')}\n\n${section('Steps', 'steps')}\n\n${section('Check', 'check')}\n\n${section('If it fails', 'fails')}\n\n## Sources\n\nChecked against the vendor documentation on ${client.checked}.\n\n${sources.join('\n')}${unverified}\n\nBack to the [client index](../../clients.md).\n`;
+  return `# Connect ${client.name}\n\n${client.summary} Default: **${modeLabel[client.defaultMode]}**.${notes ? `\n\n${notes}` : ''}${unsupported.length ? `\n\n${unsupported.join('\n')}` : ''}${variants}\n\n${section('Prerequisites', 'prerequisites')}\n\n${section('Steps', 'steps')}\n\n${section('Check', 'check')}\n\n${section('If it fails', 'fails')}\n\n## Sources\n\n${client.thirdPartySources ? 'Checked against third-party guides' : 'Checked against the vendor documentation'} on ${client.checked}.\n\n${sources.join('\n')}${verified}${unverified}\n\nBack to the [client index](../../clients.md).\n`;
 }
 
 export function renderClientIndex(manifest) {
