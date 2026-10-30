@@ -122,7 +122,7 @@ If not: an `Unsupported engine` message means Node.js is older than 22. Go back 
 
 Expected: the client lists a `polarion` server without errors. If not: the JSON is invalid (a missing comma or brace is the usual cause).
 
-Keep the token out of Git. Use `polarion-mcp@latest` in the client config to receive updates, or `polarion-mcp@1.4.4` to pin a version.
+Keep the token out of Git. Use `polarion-mcp@latest` in the client config to receive updates, or `polarion-mcp@1.4.5` to pin a version.
 
 ## Check that it works
 

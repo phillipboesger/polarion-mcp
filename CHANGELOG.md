@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.5
+
+### Maintenance
+
+- Dependency updates: npm minor and patch group, `docker/login-action` 4. The Anthropic SDK 1.x bump is a dev dependency only and does not affect the shipped server.
+- Dependabot minor and patch updates now merge automatically once required checks pass; major updates stay manual.
+
 ## 1.4.4
 
 ### Improvements
