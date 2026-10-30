@@ -2,6 +2,10 @@
 
 Mistral’s chat assistant, EU-hosted. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 Operated by Mistral AI in France. Le Chat registers itself (DCR) and may send an empty client secret.
 
 - **Local is not supported:** Le Chat connects from Mistral’s cloud, so it needs a public HTTPS server.

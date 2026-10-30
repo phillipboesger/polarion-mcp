@@ -2,6 +2,11 @@
 
 Cursor editor. Default: **Local**.
 
+Verification status:
+
+- Local: verified by documentation only
+- Server: verified by documentation only
+
 ## Prerequisites
 
 ### Local

@@ -2,6 +2,10 @@
 
 n8n workflows calling the REST wrapper. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 Use the HTTP Request node as a workflow step or attach it as a tool to an AI Agent. This confirmed path uses REST. The MCP Client Tool documentation still describes an SSE Endpoint, so it is not used as evidence for a Streamable HTTP setup here.
 
 - **Local is not supported:** npx starts MCP stdio. This needs the separate REST wrapper.

@@ -2,6 +2,11 @@
 
 Windsurf editor. Default: **Local**.
 
+Verification status:
+
+- Local: verified by documentation only
+- Server: verified by documentation only
+
 The vendor now documents this as legacy Cascade in Devin Desktop. Its 100-tool budget requires selecting a subset of Polarion tools. This config does not apply to the Devin Local agent.
 
 ## Prerequisites

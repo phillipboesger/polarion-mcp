@@ -2,6 +2,10 @@
 
 Gemini Enterprise agents for your organization. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 An administrator may need to override the organization policy that blocks custom MCP data stores. Tools are disabled until you enable them.
 
 - **Local is not supported:** Cloud service; it cannot run npx. Use the Docker or Remote URL mode.

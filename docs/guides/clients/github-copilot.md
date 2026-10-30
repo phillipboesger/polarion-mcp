@@ -2,6 +2,11 @@
 
 GitHub Copilot agent mode in VS Code, Eclipse, JetBrains IDEs and Visual Studio. Default: **Local**.
 
+Verification status:
+
+- Local: verified by documentation only
+- Server: verified by documentation only
+
 MCP support is generally available in VS Code; Eclipse, JetBrains IDEs and Visual Studio are in public preview. On Copilot Business and Enterprise an organization policy ("MCP servers in Copilot") is off by default and an admin must enable it. JetBrains AI Assistant is a separate client.
 
 ## IDE variants

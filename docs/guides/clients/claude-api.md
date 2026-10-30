@@ -2,6 +2,10 @@
 
 Your own code calling the Claude Messages API. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 - **Local is not supported:** Only public HTTP servers work; local stdio cannot connect.
 
 ## Prerequisites

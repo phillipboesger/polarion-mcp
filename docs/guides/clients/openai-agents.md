@@ -2,6 +2,11 @@
 
 Python agents built with the OpenAI Agents SDK. Default: **Local**.
 
+Verification status:
+
+- Local: verified by documentation only
+- Server: verified by documentation only
+
 ## Prerequisites
 
 ### Local

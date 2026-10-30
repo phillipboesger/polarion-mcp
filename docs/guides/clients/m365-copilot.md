@@ -2,6 +2,10 @@
 
 Declarative agents in Microsoft 365 Copilot Chat and Teams. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 Microsoft uses one fixed OAuth callback, so set MCP_ALLOWED_REDIRECT_PRESETS=m365 on the server. Do not bind the OAuth registration to an existing Teams app ID for an MCP server.
 
 - **Local is not supported:** Microsoft 365 Copilot calls the MCP server from Microsoft’s cloud, so it needs a public HTTPS server.

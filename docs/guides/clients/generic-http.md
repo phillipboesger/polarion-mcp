@@ -2,6 +2,10 @@
 
 Any MCP client that connects to a URL. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 - **Local is not supported:** An HTTP-only client cannot launch a stdio subprocess.
 
 ## Prerequisites

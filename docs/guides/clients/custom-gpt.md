@@ -2,6 +2,10 @@
 
 Custom GPT with Actions over REST/OpenAPI. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 - **Local is not supported:** GPT Actions need a public REST wrapper, not the MCP server or npx.
 
 ## Prerequisites

@@ -2,6 +2,11 @@
 
 Any MCP client that starts local programs. Default: **Local**.
 
+Verification status:
+
+- Local: verified by documentation only
+- Server: verified by documentation only
+
 Your AI provider does not need a dedicated integration. Use any MCP-capable client. If it accepts OpenAPI instead, choose REST / OpenAPI below.
 
 ## Prerequisites

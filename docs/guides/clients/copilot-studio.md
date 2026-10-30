@@ -2,6 +2,10 @@
 
 Microsoft Copilot Studio agents for your team. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 Use generative orchestration. This path uses a PAT header and does not require an OAuth callback. Select only the tools your agent needs.
 
 - **Local is not supported:** Cloud service; it cannot run npx. Use the Docker or Remote URL mode.

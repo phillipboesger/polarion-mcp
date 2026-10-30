@@ -2,6 +2,11 @@
 
 Google’s agent CLI (agy) and IDE, the successor to Gemini CLI. Default: **Local**.
 
+Verification status:
+
+- Local: verified by documentation only
+- Server: verified by documentation only
+
 Antigravity CLI and IDE read the same mcp_config.json. Gemini CLI users can import their servers once; Gemini CLI itself keeps working for Code Assist and API-key users.
 
 ## Prerequisites

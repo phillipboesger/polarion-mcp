@@ -2,6 +2,10 @@
 
 Your own code calling the OpenAI Responses API. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 - **Local is not supported:** OpenAI's cloud cannot start npx. Use a public HTTPS server.
 
 ## Prerequisites

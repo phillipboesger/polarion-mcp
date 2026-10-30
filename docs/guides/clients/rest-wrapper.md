@@ -2,6 +2,10 @@
 
 REST/OpenAPI endpoint for clients without MCP. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 - **Local is not supported:** npx starts MCP stdio. This needs the separate REST wrapper.
 
 ## Prerequisites

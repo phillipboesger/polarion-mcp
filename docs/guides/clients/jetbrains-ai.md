@@ -2,6 +2,10 @@
 
 AI Assistant in JetBrains IDEs. Default: **Local**.
 
+Verification status:
+
+- Local: verified by documentation only
+
 The vendor documents Streamable HTTP but no authentication configuration matching this server. This guide therefore offers npx or Docker stdio; remote URL is disabled rather than inventing a PAT header field.
 
 - **Server is not supported:** JetBrains documents Streamable HTTP but no way to send an Authorization header, so a remote server cannot authenticate. Use Local (npm), or the Docker stdio alternative in the Local steps.

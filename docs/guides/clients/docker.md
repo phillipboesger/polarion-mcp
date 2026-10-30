@@ -2,6 +2,10 @@
 
 Host the server yourself in a container. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 - **Local is not supported:** This entry deploys a server. Pick your AI client for npx.
 
 ## Prerequisites

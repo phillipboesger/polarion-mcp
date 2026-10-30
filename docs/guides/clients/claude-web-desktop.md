@@ -2,6 +2,10 @@
 
 Claude in the browser, connects from the cloud. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 On Team / Enterprise, an owner adds the connector under Organization settings > Connectors > Add > Custom > Web; members then choose Connect.
 
 - **Local is not supported:** claude.ai connects from Anthropic's cloud, so it cannot start npx.

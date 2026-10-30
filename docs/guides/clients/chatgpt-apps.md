@@ -2,6 +2,10 @@
 
 ChatGPT connector, connects from the cloud. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 Custom MCP access depends on your ChatGPT workspace permissions. Use DCR for this server unless the administrator explicitly enabled CIMD. This guide covers the public HTTPS connector path. OpenAI also documents Secure MCP Tunnel for private servers; that requires its own tunnel runtime and permissions, so local npx is not a direct connector setup.
 
 - **Local is not supported:** ChatGPT's cloud cannot start npx. Use Remote or Docker mode.

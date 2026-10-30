@@ -81,30 +81,30 @@ Then open the guide for your client:
 <!-- clients:start -->
 | Client | Local | Server | Guide |
 |---|---|---|---|
-| Claude Desktop | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-desktop.md) |
-| claude.ai | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-web-desktop.md) |
-| Claude Code | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-code.md) |
-| Claude API | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-api.md) |
-| ChatGPT connector | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/chatgpt-apps.md) |
-| Custom GPT Actions | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/custom-gpt.md) |
-| OpenAI Responses API | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openai-api.md) |
-| OpenAI Agents SDK | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openai-agents.md) |
-| Codex | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/codex-cli.md) |
-| Microsoft Copilot Studio | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/copilot-studio.md) |
-| GitHub Copilot | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/github-copilot.md) |
-| Antigravity (CLI + IDE) | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/antigravity.md) |
-| Gemini Enterprise | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/gemini-enterprise.md) |
-| Cursor | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/cursor.md) |
-| Windsurf / Cascade | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/windsurf.md) |
-| JetBrains AI Assistant | Yes | No | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/jetbrains-ai.md) |
-| Docker team server | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/docker.md) |
-| Other AI provider / any MCP client | Yes | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-stdio.md) |
-| Generic HTTP client | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-http.md) |
-| REST wrapper / OpenAPI | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/rest-wrapper.md) |
-| n8n REST workflow | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/n8n.md) |
-| Microsoft 365 Copilot / Teams | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/m365-copilot.md) |
-| Mistral Le Chat | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/mistral-le-chat.md) |
-| Self-hosted models (Open WebUI) | No | Yes | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/self-hosted.md) |
+| Claude Desktop | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-desktop.md) |
+| claude.ai | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-web-desktop.md) |
+| Claude Code | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-code.md) |
+| Claude API | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/claude-api.md) |
+| ChatGPT connector | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/chatgpt-apps.md) |
+| Custom GPT Actions | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/custom-gpt.md) |
+| OpenAI Responses API | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openai-api.md) |
+| OpenAI Agents SDK | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openai-agents.md) |
+| Codex | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/codex-cli.md) |
+| Microsoft Copilot Studio | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/copilot-studio.md) |
+| GitHub Copilot | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/github-copilot.md) |
+| Antigravity (CLI + IDE) | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/antigravity.md) |
+| Gemini Enterprise | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/gemini-enterprise.md) |
+| Cursor | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/cursor.md) |
+| Windsurf / Cascade | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/windsurf.md) |
+| JetBrains AI Assistant | Yes (docs) | No | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/jetbrains-ai.md) |
+| Docker team server | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/docker.md) |
+| Other AI provider / any MCP client | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-stdio.md) |
+| Generic HTTP client | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-http.md) |
+| REST wrapper / OpenAPI | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/rest-wrapper.md) |
+| n8n REST workflow | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/n8n.md) |
+| Microsoft 365 Copilot / Teams | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/m365-copilot.md) |
+| Mistral Le Chat | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/mistral-le-chat.md) |
+| Self-hosted models (Open WebUI) | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/self-hosted.md) |
 <!-- clients:end -->
 
 For OpenAPI clients, Custom GPT Actions and n8n, run the separate REST wrapper (see the client guides). Keep credentials out of Git. There is no public Polarion relay. See also the [client index](docs/clients.md) and [deployment](docs/deployment.md).

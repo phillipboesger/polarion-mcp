@@ -2,6 +2,10 @@
 
 Open WebUI or LibreChat with Ollama, vLLM, OpenRouter or any OpenAI-compatible model. Default: **Server**.
 
+Verification status:
+
+- Server: verified by documentation only
+
 Open WebUI is the MCP client. Ollama, vLLM and OpenRouter only supply the model, so only the model URL and key change per backend. The model must support tool calling.
 
 - **Local is not supported:** The chat UI connects to the server by URL; use the Local setup of a desktop client instead if you only need stdio.

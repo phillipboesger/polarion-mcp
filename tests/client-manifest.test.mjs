@@ -282,3 +282,14 @@ test('T8.5: a verified block must be complete and the schema rejects partial one
   delete copy.clients[0].verified.local.evidence;
   assert.equal(validate(copy), false);
 });
+
+test('verification labels: docs by default, developer only with a verified block', async () => {
+  const { renderClientsBlock, renderClientGuide } = await import('../scripts/render-clients.mjs');
+  const copy = structuredClone(data);
+  const target = copy.clients.find(entry => entry.id === 'claude-code');
+  assert.match(renderClientsBlock(copy), new RegExp(`${target.name} \\| Yes \\(docs\\)`));
+  assert.match(renderClientGuide(copy, target), /Local: verified by documentation only/);
+  target.verified = { local: { date: '2026-10-30', mcpVersion: '1.4.5', polarion: '2606', client: 'Claude Code', clientVersion: '2.0', by: 'Phillip', evidence: 'log' } };
+  assert.match(renderClientsBlock(copy), new RegExp(`${target.name} \\| Yes \\(developer\\)`));
+  assert.match(renderClientGuide(copy, target), /Local: verified by developer/);
+});
