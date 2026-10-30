@@ -12,7 +12,8 @@ import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import { ProxyTunnelAgent, proxyFromEnv } from './proxy.js';
 
 // axios would send an HTTPS request to the proxy as a plain forward request. The agent tunnels instead.
-axios.defaults.proxy = false;
+// Only switched off when HTTPS_PROXY is set, so http:// Polarion URLs keep axios's own HTTP_PROXY handling otherwise.
+if (proxyFromEnv()) axios.defaults.proxy = false;
 
 export const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 

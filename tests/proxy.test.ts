@@ -107,3 +107,15 @@ test("an unreachable proxy fails with its address, not its credentials", async (
     return true
   })
 })
+
+test("malformed percent-encoding in proxy credentials is a clear error, not a crash", async () => {
+  await assert.rejects(get(1, { HTTPS_PROXY: "http://user:p%ss@127.0.0.1:9" }), (error: Error) => {
+    assert.match(error.message, /not valid percent-encoding/)
+    assert.doesNotMatch(error.message, /p%ss/)
+    return true
+  })
+})
+
+test("an empty HTTPS_PROXY falls back to the lowercase variable", () => {
+  assert.equal(proxyFromEnv({ HTTPS_PROXY: "", https_proxy: "http://p:3128" })?.url.host, "p:3128")
+})

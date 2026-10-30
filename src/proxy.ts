@@ -21,11 +21,11 @@ export interface ProxyConfig {
  * @returns The proxy to use, or undefined when none is configured or the URL is unusable.
  */
 export function proxyFromEnv(env: NodeJS.ProcessEnv = process.env): ProxyConfig | undefined {
-  const raw = (env.HTTPS_PROXY ?? env.https_proxy ?? '').trim();
+  const raw = (env.HTTPS_PROXY || env.https_proxy || '').trim();
   if (!raw || !URL.canParse(raw)) return undefined;
   const url = new URL(raw);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined;
-  const noProxy = (env.NO_PROXY ?? env.no_proxy ?? '').split(',').map(entry => entry.trim().toLowerCase()).filter(Boolean);
+  const noProxy = (env.NO_PROXY || env.no_proxy || '').split(',').map(entry => entry.trim().toLowerCase()).filter(Boolean);
   return { url, noProxy };
 }
 
@@ -51,6 +51,9 @@ function describeProxy(proxy: ProxyConfig): string {
   return `${proxy.url.protocol}//${proxy.url.host}`;
 }
 
+/** Longest wait for the proxy to answer CONNECT. */
+const CONNECT_TIMEOUT_MS = 30_000;
+
 /** https.Agent that reaches the target through an HTTP CONNECT tunnel. */
 export class ProxyTunnelAgent extends https.Agent {
   constructor(options: https.AgentOptions, private readonly proxy: ProxyConfig) {
@@ -59,32 +62,46 @@ export class ProxyTunnelAgent extends https.Agent {
 
   // Node's Agent calls createConnection(options, callback) and accepts the socket via the callback.
   createConnection(options: tls.ConnectionOptions & { host?: string; port?: number | string }, callback: (err: Error | null, socket?: Duplex) => void): undefined {
+    let done = false;
+    const finish = (error: Error | null, socket?: Duplex) => {
+      if (done) { socket?.destroy(); return; }
+      done = true;
+      callback(error, socket);
+    };
     const host = options.host ?? 'localhost';
     const port = Number(options.port ?? 443);
     if (bypassesProxy(host, port, this.proxy.noProxy)) {
-      callback(null, tls.connect({ ...options, host, port, servername: options.servername ?? host }));
+      finish(null, tls.connect({ ...options, host, port, servername: options.servername ?? host }));
       return undefined;
     }
     const { url } = this.proxy;
     const headers: Record<string, string> = { Host: `${host}:${port}` };
     if (url.username || url.password) {
-      headers['Proxy-Authorization'] = `Basic ${Buffer.from(`${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`).toString('base64')}`;
+      let credentials: string;
+      try {
+        credentials = `${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`;
+      } catch {
+        finish(new Error(`Proxy ${describeProxy(this.proxy)} credentials in HTTPS_PROXY are not valid percent-encoding; encode special characters such as % as %25`));
+        return undefined;
+      }
+      headers['Proxy-Authorization'] = `Basic ${Buffer.from(credentials).toString('base64')}`;
     }
     const transport = url.protocol === 'https:' ? https : http;
     const request = transport.request({
       host: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80), method: 'CONNECT', path: `${host}:${port}`, headers,
     });
+    request.setTimeout(CONNECT_TIMEOUT_MS, () => request.destroy(new Error(`timed out after ${CONNECT_TIMEOUT_MS / 1000}s`)));
     request.once('connect', (response, socket) => {
+      request.setTimeout(0);
       if (response.statusCode !== 200) {
         socket.destroy();
         const hint = response.statusCode === 407 ? ' (proxy authentication required; check the credentials in HTTPS_PROXY)' : '';
-        callback(new Error(`Proxy ${describeProxy(this.proxy)} refused the CONNECT tunnel: HTTP ${response.statusCode}${hint}`));
+        finish(new Error(`Proxy ${describeProxy(this.proxy)} refused the CONNECT tunnel: HTTP ${response.statusCode}${hint}`));
         return;
       }
-      const secure = tls.connect({ ...options, socket, servername: options.servername ?? host });
-      callback(null, secure);
+      finish(null, tls.connect({ ...options, socket, servername: options.servername ?? host }));
     });
-    request.once('error', error => callback(new Error(`Cannot reach proxy ${describeProxy(this.proxy)}: ${error.message}`)));
+    request.once('error', error => finish(new Error(`Cannot reach proxy ${describeProxy(this.proxy)}: ${error.message}`)));
     request.end();
     return undefined;
   }
