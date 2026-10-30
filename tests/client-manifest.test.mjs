@@ -217,9 +217,9 @@ test('K4/K5: self-hosted models and Mistral Le Chat have their own entries', () 
   assert.doesNotMatch(data.setups.find(setup => setup.id === clientById('mistral-le-chat').server.serverSetup).snippet, /PRESETS=mistral/, 'no undocumented callback may be presented as a preset');
 });
 
-test('K6: GitHub Copilot covers four IDEs with one shared snippet and keeps the old guide', () => {
+test('K6: GitHub Copilot covers five IDEs with one shared snippet and keeps the old guide', () => {
   const copilot = clientById('github-copilot');
-  assert.deepEqual(copilot.variants.map(variant => variant.id), ['vscode', 'eclipse', 'jetbrains', 'visual-studio']);
+  assert.deepEqual(copilot.variants.map(variant => variant.id), ['vscode', 'visual-studio', 'jetbrains', 'eclipse', 'xcode']);
   for (const variant of copilot.variants) assert.ok(variant.minVersion && variant.openSteps.length, variant.id);
   assert.deepEqual(copilot.legacyIds, ['vscode-copilot']);
   assert.match(fs.readFileSync('docs/guides/clients/vscode-copilot.md', 'utf8'), /github-copilot\.md/);

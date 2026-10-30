@@ -8,15 +8,15 @@ Verification status:
 
 Operated by Mistral AI in France. Le Chat registers itself (DCR) and may send an empty client secret.
 
-- **Local is not supported:** Le Chat connects from Mistral’s cloud, so it needs a public HTTPS server.
+- **Local is not supported:** Le Chat connects from Mistral's cloud, so it needs a public HTTPS server.
 
 ## Prerequisites
 
 ### Server
 
 - [Server (Docker) guide](../server-docker.md): start here if you have not set it up yet.
-- Le Chat account (admin role on Team plans)
-- Public HTTPS server address with OAuth
+- Le Chat account with the administrator role (account owner on Free, Pro, Student)
+- Public HTTPS server address with a valid certificate and OAuth
 
 Server example (HTTPS team server for Mistral Le Chat):
 
@@ -38,17 +38,17 @@ Mistral does not document the Le Chat callback URL, so there is no built-in mist
 
 ### Server
 
-1. Set up the server with Docker and OAuth (see the server example under Prerequisites), reachable at https://YOUR-SERVER/mcp.
-2. In Le Chat open Intelligence > Connectors > Add Connector > Custom MCP Connector (on Team plans an admin must do this).
-3. Enter name Polarion and the URL https://YOUR-SERVER/mcp; leave the client secret empty so Le Chat registers itself.
-4. Click Connect and enter your Polarion PAT on the server login page.
-5. Enable the connector in a new chat.
+1. Set up the server with Docker and OAuth (see the server example under Prerequisites), reachable over HTTPS with a valid certificate at https://YOUR-SERVER/mcp.
+2. In Le Chat open Connectors > + Add Connector and switch to the Custom MCP Connector tab. Only an administrator can do this: on Free, Pro and Student plans the account owner is the admin; on Team plans ask an admin.
+3. Enter the connector name Polarion (no spaces or special characters), the Server URL https://YOUR-SERVER/mcp and an optional description.
+4. Click Connect. Le Chat detects the auth method from the server (OAuth 2.1 with dynamic client registration) and opens the server login, where you enter your Polarion PAT.
+5. Under Connectors > My Connectors > Polarion > Functions, keep write functions on Ask each time (the default) and set read functions to Always allow if you want; then use the connector in a new chat.
 
 ```
 https://YOUR-SERVER/mcp
 ```
 
-If login fails with a redirect_uri error, copy the rejected URI from the server log into MCP_ALLOWED_REDIRECT_PREFIXES.
+Le Chat registers itself (DCR). If login fails with a redirect_uri error, copy the rejected URI from the server log into MCP_ALLOWED_REDIRECT_PREFIXES. Mistral does not review third-party MCP servers; connect only servers you trust. Custom connectors do not yet support dynamic tool discovery, resources or automatic prompt templates.
 
 ## Check
 
@@ -64,20 +64,23 @@ Expected: Le Chat calls getCurrentUser and shows your Polarion user.
 
 | Symptom | Fix |
 |---|---|
+| "MCP connection requires additional information or is invalid" | Check the endpoint path (/mcp), HTTPS with a valid certificate, that unauthenticated requests get 401 with a WWW-Authenticate header, and that the server answers the initialize call. Test with the MCP Inspector or curl. |
 | 401 "Polarion did not accept this token" | The PAT was cut off or expired. Create a new token and paste it unchanged. |
 | Sign-in ends with a redirect_uri error | Add the rejected callback from the server log to MCP_ALLOWED_REDIRECT_PREFIXES and restart. |
+| Add Connector or Custom MCP Connector not available | Only administrators can add custom connectors. Ask your Le Chat admin. |
 
 ## Sources
 
 Checked against third-party guides on 2026-10-30.
 
-- [Third-party guide 1](https://docs.civic.com/civic/quickstart/clients/mistral-lechat)
-- [Third-party guide 2](https://docs.bko.finologee.com/docs/mcp-mistral)
+- [Third-party guide 1](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors)
+- [Third-party guide 2](https://docs.mistral.ai/studio/connectors/management)
 
 Not confirmed in the vendor documentation:
 
-- Mistral’s own documentation for custom connectors was not available; steps come from two third-party guides.
-- The Le Chat callback URL is not documented, so no built-in preset exists.
+- Mistral does not document a fixed OAuth callback URL for Le Chat, so no built-in preset exists.
+- Mistral's docs do not say which menu group holds Connectors in every app version, or whether Team plans differ from Free/Pro/Student beyond 'administrator only'.
+- Mistral's docs mention no client secret field for custom connectors; they only say OAuth 2.1 uses dynamic client registration.
 - Not yet tested with a Le Chat account (T5.3).
 
 Back to the [client index](../../clients.md).

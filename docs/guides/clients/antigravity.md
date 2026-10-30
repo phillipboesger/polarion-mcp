@@ -7,20 +7,20 @@ Verification status:
 - Local: verified by documentation only
 - Server: verified by documentation only
 
-Antigravity CLI and IDE read the same mcp_config.json. Gemini CLI users can import their servers once; Gemini CLI itself keeps working for Code Assist and API-key users.
+Antigravity CLI, IDE and App read the same mcp_config.json schema. Gemini CLI users can import their servers once; Gemini CLI itself keeps working for Code Assist and API-key users.
 
 ## Prerequisites
 
 ### Local
 
 - [Local (npm / npx) guide](../local-npm.md): start here if you have not set it up yet.
-- Antigravity CLI (agy) or IDE signed in
+- Antigravity CLI (agy), IDE or App signed in
 - Node.js 22+
 
 ### Server
 
 - [Server (Docker) guide](../server-docker.md): start here if you have not set it up yet.
-- Antigravity CLI (agy) or IDE signed in
+- Antigravity CLI (agy), IDE or App signed in
 - The https://.../mcp address from your admin
 
 Server example (Docker team server):
@@ -39,10 +39,10 @@ The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends
 
 ### Local
 
-1. Open mcp_config.json: in the IDE use Manage MCP Servers > View raw config; in the CLI run agy and open the /mcp panel (usually ~/.gemini/antigravity/mcp_config.json; other versions use a different folder under ~/.gemini/).
+1. Open mcp_config.json. IDE: click the ellipsis at the top of the agent side panel, choose MCP Servers > Manage MCP Servers > View raw config. CLI: run agy and type /mcp. File: ~/.gemini/config/mcp_config.json (all projects) or <workspace>/.agents/mcp_config.json (this workspace only).
 2. Add the polarion entry to mcpServers; replace YOUR-POLARION and YOUR_POLARION_PAT.
-3. Save, then restart agy or reload the IDE.
-4. Type /mcp in agy; polarion must show as connected.
+3. Save, then reload the config: in agy use the /mcp overlay, in the IDE reload the window, in the App use the refresh button under Settings > Customizations > Installed MCP Servers.
+4. Type /mcp in agy; polarion must show as connected. Tools without a rule run in Ask mode, so approve each call or add an mcp(polarion/*) permission rule.
 
 ```json
 {
@@ -62,14 +62,14 @@ The image starts Streamable HTTP at http://localhost:3000/mcp. Each caller sends
 }
 ```
 
-Same command, args and env as other local clients; the top-level key is `mcpServers`.
+Same command, args and env as other local clients; the top-level key is `mcpServers`. Antigravity waits up to 300 seconds to connect and 180 seconds per tool call; set timeoutSeconds in the entry to change both (-1 turns the limits off).
 
 ### Server
 
-1. Open mcp_config.json as in the local steps.
-2. Add the polarion entry with serverUrl (not httpUrl or url) and the Authorization header; replace YOUR-SERVER and YOUR_POLARION_PAT.
-3. Save, then restart agy or reload the IDE.
-4. Type /mcp in agy; polarion must show as connected.
+1. Open mcp_config.json as in the local steps (~/.gemini/config/mcp_config.json or <workspace>/.agents/mcp_config.json).
+2. Add the polarion entry with serverUrl (url also works; httpUrl and the legacy SSE transport are not supported) and the Authorization header in headers; replace YOUR-SERVER and YOUR_POLARION_PAT.
+3. Save, then reload the config from the /mcp overlay, the IDE or the App refresh button.
+4. Type /mcp in agy; polarion must show as connected. Tools without a rule run in Ask mode.
 
 ```json
 {
@@ -84,7 +84,7 @@ Same command, args and env as other local clients; the top-level key is `mcpServ
 }
 ```
 
-Remote MCP uses per-user PATs. The client must be able to reach this URL.
+Remote MCP uses per-user PATs sent as a header. The client must be able to reach this URL over Streamable HTTP. Antigravity can also run OAuth with dynamic client registration on its own; the redirect URI for manual client credentials is https://antigravity.google/oauth-callback. This guide uses the PAT header instead.
 
 ## Check
 
@@ -106,27 +106,32 @@ Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 | Symptom | Fix |
 |---|---|
-| polarion missing in /mcp | Check the JSON for typos and the file path your version reads, then restart agy. |
+| polarion missing in /mcp | Check the JSON for typos. Edit ~/.gemini/config/mcp_config.json (or .agents/mcp_config.json in the workspace), save, then reload from the /mcp overlay or restart agy. |
+| Server shows disabled or no tools | Remove "disabled": true and check enabledTools or disabledTools in the entry. |
+| Connection or tool call times out | Defaults are 300 s to connect and 180 s per call. Set timeoutSeconds in the entry, or check that npx can start the server. |
 | 401 "Polarion did not accept this token" | The PAT was cut off or expired. Create a new token and paste it unchanged. |
 
 ### Server
 
 | Symptom | Fix |
 |---|---|
-| polarion missing or disconnected | Use serverUrl, not url or httpUrl. Check the URL ends in /mcp. |
+| polarion missing or disconnected | Use serverUrl (or url), not httpUrl. Check the URL ends in /mcp and uses Streamable HTTP. |
+| Connection or tool call times out | Defaults are 300 s to connect and 180 s per call. Set timeoutSeconds in the entry and check the server is reachable. |
 | 401 "Polarion did not accept this token" | The PAT was cut off or expired. Create a new token and paste it unchanged. |
 
 ## Sources
 
-Checked against the vendor documentation on 2026-10-24.
+Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://developers.google.com/workspace/guides/configure-mcp-servers)
-- [Official documentation 2](https://geminicli.com/docs/tools/mcp-server/)
+- [Official documentation 1](https://antigravity.google/docs/mcp)
+- [Official documentation 2](https://developers.google.com/workspace/guides/configure-mcp-servers)
+- [Official documentation 3](https://geminicli.com/docs/tools/mcp-server/)
 
 Not confirmed in the vendor documentation:
 
-- Config file location differs between sources: Google documents ~/.gemini/antigravity/mcp_config.json, a Google codelab shows ~/.gemini/config/mcp_config.json and a third-party guide ~/.gemini/antigravity-cli/mcp_config.json. The steps tell you to open it from the IDE or /mcp panel; check which path your version reads.
-- Environment variable substitution inside mcp_config.json is reported as not working, so the snippets put the PAT inline.
-- Whether agy mcp add exists as a command is not documented; the CLI steps edit the file instead.
+- Google's Antigravity page documents ~/.gemini/config/mcp_config.json (global, CLI) and <workspace>/.agents/mcp_config.json (workspace). Older Google material and third-party guides name ~/.gemini/antigravity/mcp_config.json or ~/.gemini/antigravity-cli/mcp_config.json. Which file the IDE reads is not stated; the steps open the file from the IDE or /mcp so you do not need the path.
+- Google does not document environment variable substitution inside mcp_config.json, so the snippets put the PAT inline.
+- Google does not document an agy mcp add command or per-OS config paths; the CLI steps edit the file instead.
+- Google lists no plan or licence requirement for MCP servers.
 
 Back to the [client index](../../clients.md).

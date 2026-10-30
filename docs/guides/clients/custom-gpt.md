@@ -13,7 +13,7 @@ Verification status:
 ### Server
 
 - [Server (Docker) guide](../server-docker.md): start here if you have not set it up yet.
-- ChatGPT plan with GPT Actions
+- ChatGPT plan that can create GPTs with Actions
 - REST wrapper URL and HTTP_API_KEY
 
 Server example (REST wrapper / OpenAPI):
@@ -37,17 +37,18 @@ All calls use the deployment PAT. Clients send Authorization: Bearer <HTTP_API_K
 ### Server
 
 1. Ask your admin for https://YOUR-SERVER/openapi-gpt.json and the HTTP_API_KEY.
-2. Open your GPT editor, go to Actions and add a new action.
-3. Import the schema from https://YOUR-SERVER/openapi-gpt.json.
-4. Set authentication to API Key with Bearer style and paste HTTP_API_KEY.
-5. Click Test and run getProject with your projectId.
-6. Save or update the GPT.
+2. Open your GPT editor. Enter a name, description and image for the GPT if you have not yet.
+3. Open the Action section and paste in the OpenAPI schema. To get it, open https://YOUR-SERVER/openapi-gpt.json in a browser and copy the content (the address needs no key). Note the action names, for example getProject, and their parameters.
+4. Open the authentication settings and choose API Key. Paste HTTP_API_KEY and select the Bearer style if the editor offers one. The key is stored encrypted.
+5. Click the Test button next to the action and run getProject with your projectId. It shows the detailed input and output.
+6. Back on the main page, add instructions with Context, Instructions and Additional Notes sections. Name the actions and their parameters there, for example getProject with projectId.
+7. Save or update the GPT, then check it with 5 to 10 typical questions and confirm it calls the right actions with the right parameters.
 
 ```
 https://YOUR-SERVER/openapi-gpt.json
 ```
 
-Calls run as one fixed Polarion user (the deployment PAT), not your own.
+Calls run as one fixed Polarion user (the deployment PAT), not your own. OpenAI recommends clear schema descriptions: ChatGPT reads the info section, especially description, to decide whether an action fits a question. OAuth, with a callback URL of the form https://chatgpt.com/aip/g-YOUR-GPT-ID/oauth/callback, is a vendor option but is not used by this server.
 
 ## Check
 
@@ -64,20 +65,21 @@ Expected: The GPT asks to allow the action, then shows the project with that ID.
 | Symptom | Fix |
 |---|---|
 | Test returns 401 or 403 | Re-enter HTTP_API_KEY, choose API Key with Bearer style, and avoid extra spaces. |
-| Schema import fails | The REST wrapper must be reachable over HTTPS. The schema address needs no key. |
+| Schema import fails | The REST wrapper must be reachable over HTTPS. The schema address needs no key. If import by URL is not offered, paste the schema content into the Action section. |
+| The GPT answers without calling the action, or picks the wrong one | Name the action and its parameters in the GPT instructions, and make the schema descriptions clear. Use the Test button to see the exact input and output. |
 
 ## Sources
 
-Checked against the vendor documentation on 2026-10-24.
+Checked against the vendor documentation on 2026-10-30.
 
 - [Official documentation 1](https://developers.openai.com/api/docs/actions/getting-started)
 - [Official documentation 2](https://developers.openai.com/api/docs/actions/authentication)
 
 Not confirmed in the vendor documentation:
 
-- Exact current GPT editor labels (Configure tab, 'Create new action', 'Import from URL', Auth Type 'Bearer'): OpenAI's developer pages describe only 'Action section', 'paste in your Open API schema', 'authentication settings' (None / API Key / OAuth) and the Test button. The steps use those and avoid other labels.
-- Which ChatGPT plans can create GPTs with Actions.
-- Schema import by URL and the Bearer sub-option of API Key: not stated in the pages checked (help.openai.com returned 403).
-- Behaviour: the openapi-gpt.json address must not require a key; the repo's http-server.ts lets /openapi-gpt.json bypass the key check, which is consistent.
+- Which ChatGPT plans can create GPTs with Actions: not stated on the Actions pages; help.openai.com returns 403 to our fetcher.
+- Current editor labels: the Actions pages only name the 'Action section', 'paste in the OpenAPI schema', authentication settings (None, API Key, OAuth) and the Test button. Labels such as Configure tab, Create new action or Import from URL are not documented there.
+- Sub-options of API Key (Basic, Bearer, Custom): the authentication page does not describe them. It only says the user's token is sent in the Authorization header as '[Bearer/Basic] [token]' for OAuth. Whether the Bearer choice exists for API Key is therefore unconfirmed.
+- Limits (schema size, timeouts, action count): not stated by OpenAI on these pages.
 
 Back to the [client index](../../clients.md).
