@@ -100,7 +100,7 @@ Checked against the vendor documentation on 2026-10-30.
 
 Not confirmed in the vendor documentation:
 
-- End-to-end run in an M365 tenant has not been done yet (planned in T3.4). Agents Toolkit labels come from Microsoft Learn (build-mcp-plugins, updated 2026-09-30) and the Microsoft lab and may change.
+- End-to-end run in an M365 tenant has not been done yet. Agents Toolkit labels come from Microsoft Learn (build-mcp-plugins, updated 2026-09-30) and the Microsoft lab and may change.
 - Microsoft states that dynamic client registration without a client secret is not supported yet and that the authorization server must issue a secret at registration. This server issues a secret for client_secret_post and client_secret_basic registrations and rejects a wrong one (covered by tests/dcr-client-compat.test.ts); only Microsoft's actual client behaviour is untested.
 - Microsoft documents the steps to publish to the whole organisation only per method (publish-plugin-organization was not read); this guide covers sideloading for development.
 - Microsoft documents no timeout or tool-count limit for MCP plugins in declarative agents; the 30 second tool-call limit and TLS 1.2 requirement appear only for the Work IQ Dev Tools connector route.

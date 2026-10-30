@@ -116,6 +116,6 @@ Not confirmed in the vendor documentation:
 - The Open WebUI Ollama page confirms http://host.docker.internal:11434; OLLAMA_BASE_URL and the OpenRouter base URL were not found on the pages read.
 - Ollama's tool-calling page does not list which models support tools; OpenRouter documents the supported_parameters=tools model filter.
 - The LibreChat MCP feature page does not say whether MCP tools need an agent; the YAML reference says agents can use servers and chatMenu controls the composer menu. The snippet follows the docs and was not run here.
-- Not tested with Ollama or OpenRouter chats (T4.3).
+- Not tested with Ollama or OpenRouter chats.
 
 Back to the [client index](../../clients.md).
