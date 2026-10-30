@@ -31,7 +31,7 @@ export function renderSiteClientsBlock(manifest) {
       icon: client.icon, summary: client.summary, guide: `clients/${client.id}.md`,
       satellite: node ? layout[node.id].satellites[client.id] : null,
       modes: Object.fromEntries(['local', 'server'].map(id => [id, {
-        supported: !client[id].reason, reason: client[id].reason ?? null, requirement: requirement(client[id]),
+        supported: !client[id].reason, reason: client[id].reason ?? null, requirement: requirement(client[id]), verifiedByDeveloper: Boolean(client.verified?.[id]),
       }])),
     };
   });

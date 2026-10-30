@@ -275,3 +275,4 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .galaxy.is-interactive .galaxy-sheet { display:none!important; }
 }
 @media(prefers-reduced-motion:reduce) { .galaxy *, .galaxy-sheet * { animation:none !important; transition:none !important; } }
+.galaxy .ver { margin:10px 0 0; font-size:12px; opacity:.75; }

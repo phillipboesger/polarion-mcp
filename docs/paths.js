@@ -152,7 +152,8 @@
         text('p', { class: 'lab' }, 'How do you want to connect?'),
         html('div', { class: 'envs' }, envButton('local'), envButton('server')),
         ...(why.length ? [text('p', { class: 'why' }, why.join(' '))] : []),
-        text('p', { class: 'lab' }, 'Requirements'), chips, flow, guide);
+        text('p', { class: 'lab' }, 'Requirements'), chips, flow,
+        ...(modes[state.env].supported ? [text('p', { class: 'ver' }, modes[state.env].verifiedByDeveloper ? 'Verified by developer' : 'Verified by documentation')] : []), guide);
       target.querySelector('.x').addEventListener('click', closeClient);
       target.querySelectorAll('.env').forEach(button => button.addEventListener('click', () => {
         if (button.getAttribute('aria-disabled') === 'true') return;
