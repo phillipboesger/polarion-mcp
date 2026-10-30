@@ -98,13 +98,13 @@ Then open the guide for your client:
 | Windsurf / Cascade | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/windsurf.md) |
 | JetBrains AI Assistant | Yes (docs) | No | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/jetbrains-ai.md) |
 | Docker team server | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/docker.md) |
-| Other AI provider / any MCP client | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-stdio.md) |
-| Generic HTTP client | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-http.md) |
+| Other MCP client (starts a local program) | Yes (docs) | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-stdio.md) |
+| Other MCP client (connects by URL) | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/generic-http.md) |
 | REST wrapper / OpenAPI | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/rest-wrapper.md) |
 | n8n REST workflow | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/n8n.md) |
 | Microsoft 365 Copilot / Teams | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/m365-copilot.md) |
 | Mistral Le Chat | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/mistral-le-chat.md) |
-| Self-hosted models (Open WebUI) | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/self-hosted.md) |
+| Open WebUI or LibreChat with your own models | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/self-hosted.md) |
 <!-- clients:end -->
 
 For OpenAPI clients, Custom GPT Actions and n8n, run the separate REST wrapper (see the client guides). Keep credentials out of Git. There is no public Polarion relay. See also the [client index](docs/clients.md) and [deployment](docs/deployment.md).

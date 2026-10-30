@@ -1967,8 +1967,8 @@
     },
     {
       "id": "generic-stdio",
-      "name": "Other AI provider / any MCP client",
-      "label": "Any client",
+      "name": "Other MCP client (starts a local program)",
+      "label": "MCP, local",
       "icon": "terminal",
       "provider": "custom",
       "sources": [
@@ -2043,8 +2043,8 @@
     },
     {
       "id": "generic-http",
-      "name": "Generic HTTP client",
-      "label": "HTTP",
+      "name": "Other MCP client (connects by URL)",
+      "label": "MCP, by URL",
       "icon": "plug",
       "provider": "custom",
       "sources": [
@@ -2372,8 +2372,8 @@
     },
     {
       "id": "self-hosted",
-      "name": "Self-hosted models (Open WebUI)",
-      "label": "Self-hosted",
+      "name": "Open WebUI or LibreChat with your own models",
+      "label": "Open WebUI",
       "icon": "server",
       "provider": "other",
       "sources": [

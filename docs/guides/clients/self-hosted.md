@@ -1,4 +1,4 @@
-# Connect Self-hosted models (Open WebUI)
+# Connect Open WebUI or LibreChat with your own models
 
 Open WebUI or LibreChat with Ollama, vLLM, OpenRouter or any OpenAI-compatible model. Default: **Server**.
 

@@ -1,4 +1,4 @@
-# Connect Other AI provider / any MCP client
+# Connect Other MCP client (starts a local program)
 
 Any MCP client that starts local programs. Default: **Local**.
 

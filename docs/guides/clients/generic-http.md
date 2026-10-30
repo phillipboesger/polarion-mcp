@@ -1,4 +1,4 @@
-# Connect Generic HTTP client
+# Connect Other MCP client (connects by URL)
 
 Any MCP client that connects to a URL. Default: **Server**.
 
