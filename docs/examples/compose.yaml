@@ -1,0 +1,23 @@
+services:
+  mcp:
+    image: ghcr.io/phillipboesger/polarion-mcp:1.4.5
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: https://YOUR-POLARION/polarion/rest/v1
+      MCP_PUBLIC_URL: https://YOUR-MCP-HOST
+      MCP_ALLOWED_HOSTS: YOUR-MCP-HOST
+      MCP_TOKEN_SECRET: ${MCP_TOKEN_SECRET}
+      TRUST_PROXY: "1"
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - mcp
+volumes:
+  caddy_data:

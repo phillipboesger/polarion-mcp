@@ -14,9 +14,10 @@ test('integration map covers every non-docker client and every client has an ico
   const mapped = data.map.flatMap(node => node.clients);
   const counts = new Map(mapped.map(id => [id, 0]));
   for (const id of mapped) counts.set(id, (counts.get(id) ?? 0) + 1);
-  assert.equal(data.map.length, 6);
-  assert.equal(new Set(data.map.map(node => node.id)).size, 6);
-  assert.equal(new Set(data.map.map(node => node.angle)).size, 6);
+  assert.equal(data.map.length, 8);
+  assert.equal(data.map.filter(node => node.site !== false).length, 7);
+  assert.equal(new Set(data.map.map(node => node.id)).size, 8);
+  assert.equal(new Set(data.map.map(node => node.angle)).size, 8);
   for (const id of mapped) assert.ok(clientIds.has(id), `unknown map client ${id}`);
   for (const client of data.clients) {
     assert.ok(client.icon, `${client.id} is missing an icon`);
@@ -162,4 +163,134 @@ test('HTML references resolve and the landing page keeps essential content inlin
   assert.doesNotMatch(fs.readFileSync('README.md', 'utf8'), /unverified/i);
   assert.doesNotMatch(html, /—/);
   assert.doesNotMatch(html, /github\.com[^"\s]+\/discussions/);
+});
+
+const connections = data.clients.flatMap(client => ['local', 'server'].filter(mode => !client[mode].reason).map(mode => ({ client, mode, connection: client[mode] })));
+const clientById = id => data.clients.find(client => client.id === id);
+
+test('K1: prompts that ask for getCurrentUser expect the user, not projects', () => {
+  for (const { client, mode, connection } of connections) {
+    if (!connection.verify.prompt.includes('getCurrentUser')) continue;
+    assert.match(connection.verify.expect, /user/i, `${client.id}/${mode}`);
+    assert.doesNotMatch(connection.verify.expect, /project/i, `${client.id}/${mode}`);
+  }
+});
+
+test('K10: every supported mode has steps, a prerequisite server, a check and failure fixes including 401', () => {
+  for (const { client, mode, connection } of connections) {
+    assert.ok(connection.steps.length >= 2, `${client.id}/${mode} steps`);
+    assert.ok(connection.verify.prompt && connection.verify.expect, `${client.id}/${mode} verify`);
+    assert.ok(connection.fails.length >= 2, `${client.id}/${mode} needs at least two failure fixes`);
+    assert.ok(connection.fails.some(fail => /401/.test(fail.symptom)), `${client.id}/${mode} needs a 401 fix`);
+    if (mode === 'server' && !connection.verify.prompt.startsWith('curl') && !['n8n', 'rest-wrapper', 'docker'].includes(client.id)) {
+      assert.ok(connection.serverSetup, `${client.id}/${mode} must show the server it needs`);
+    }
+  }
+});
+
+test('K2: every server example uses a known redirect preset and the image tag of this release', () => {
+  const presets = new Set(['claude', 'chatgpt', 'vscode', 'cursor', 'copilot-studio', 'gemini', 'm365', 'mistral', 'loopback']);
+  const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  for (const setup of data.setups) {
+    for (const [, value] of setup.snippet.matchAll(/MCP_ALLOWED_REDIRECT_PRESETS=([\w,-]+)/g)) {
+      for (const preset of value.split(',')) assert.ok(presets.has(preset), `${setup.id}: unknown preset ${preset}`);
+    }
+    for (const [, tag] of setup.snippet.matchAll(/ghcr\.io\/phillipboesger\/polarion-mcp:([\w.-]+)/g)) assert.equal(tag, version, `${setup.id} image tag`);
+  }
+});
+
+test('K3: Microsoft 365 Copilot sits under Microsoft, is server only and uses the m365 preset', () => {
+  const client = clientById('m365-copilot');
+  const microsoft = data.groups[0].cards.find(card => card.id === 'microsoft');
+  assert.ok(microsoft.clients.includes('m365-copilot'));
+  assert.ok(client.local.reason);
+  assert.match(data.setups.find(setup => setup.id === client.server.serverSetup).snippet, /MCP_ALLOWED_REDIRECT_PRESETS=m365/);
+  assert.deepEqual(client.redirectUris.map(entry => entry.uri), ['https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect']);
+});
+
+test('K4/K5: self-hosted models and Mistral Le Chat have their own entries', () => {
+  const selfHosted = clientById('self-hosted');
+  assert.match(selfHosted.note, /only supply the model/);
+  assert.match(selfHosted.note, /tool calling/);
+  assert.ok(selfHosted.server.alternative.snippet.includes('streamable-http'));
+  assert.ok(data.groups[0].cards.find(card => card.id === 'mistral').clients.includes('mistral-le-chat'));
+  assert.doesNotMatch(data.setups.find(setup => setup.id === clientById('mistral-le-chat').server.serverSetup).snippet, /PRESETS=mistral/, 'no undocumented callback may be presented as a preset');
+});
+
+test('K6: GitHub Copilot covers five IDEs with one shared snippet and keeps the old guide', () => {
+  const copilot = clientById('github-copilot');
+  assert.deepEqual(copilot.variants.map(variant => variant.id), ['vscode', 'visual-studio', 'jetbrains', 'eclipse', 'xcode']);
+  for (const variant of copilot.variants) assert.ok(variant.minVersion && variant.openSteps.length, variant.id);
+  assert.deepEqual(copilot.legacyIds, ['vscode-copilot']);
+  assert.match(fs.readFileSync('docs/guides/clients/vscode-copilot.md', 'utf8'), /github-copilot\.md/);
+  assert.match(copilot.note, /MCP servers in Copilot/);
+  assert.equal(clientById('vscode-copilot'), undefined);
+});
+
+test('K7: Antigravity uses serverUrl for remote servers and keeps the Gemini CLI link', () => {
+  const agy = clientById('antigravity');
+  const remote = data.setups.find(setup => setup.id === agy.server.setup).snippet;
+  assert.doesNotThrow(() => JSON.parse(remote));
+  assert.ok(JSON.parse(remote).mcpServers.polarion.serverUrl);
+  assert.doesNotMatch(remote, /httpUrl|"url"/);
+  assert.deepEqual(agy.legacyIds, ['gemini-cli']);
+  assert.match(fs.readFileSync('docs/guides/clients/gemini-cli.md', 'utf8'), /antigravity\.md/);
+});
+
+test('K12: FAQ entries are short, have ids and cover the required topics', () => {
+  const entries = [...data.faq, ...data.faqMore];
+  assert.equal(new Set(entries.map(entry => entry.id)).size, entries.length);
+  for (const entry of entries) assert.ok(entry.q.length + entry.a.length <= 500, `${entry.id} is ${entry.q.length + entry.a.length} characters`);
+  const required = ['rest-disabled-404', 'request-rejected-400', 'tool-limit', 'org-mcp-policy', 'corporate-proxy', 'pat-disabled-or-expired', 'self-hosted-no-tool-calls', 'pat-401', 'forbidden-403', 'unreachable-503', 'rate-limit-429', 'oauth-loop'];
+  for (const id of required) assert.ok(entries.some(entry => entry.id === id), `missing FAQ ${id}`);
+});
+
+test('K13: manifest and generated guides contain no em dashes or stock AI words', () => {
+  const stock = /\b(delve|tapestry|testament|seamless(ly)?|leverag(e|es|ing)|unlock(s|ing)?|pivotal|elevate|game-chang\w+)\b/i;
+  const files = ['docs/clients.json', 'docs/clients.md', 'docs/guides/local-npm.md', 'docs/guides/server-docker.md', ...fs.readdirSync('docs/guides/clients').map(file => `docs/guides/clients/${file}`)];
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8');
+    assert.ok(!text.includes('—'), `${file} contains an em dash`);
+    assert.doesNotMatch(text, stock, file);
+  }
+});
+
+test('K2: the compose file in the Server guide is the example file and every overlay uses a known preset', () => {
+  const guide = fs.readFileSync('docs/guides/server-docker.md', 'utf8');
+  const base = fs.readFileSync('docs/examples/compose.yaml', 'utf8').trimEnd();
+  assert.ok(guide.includes(`\`\`\`yaml\n${base}\n\`\`\``), 'guide compose block differs from docs/examples/compose.yaml');
+  assert.ok(guide.includes(fs.readFileSync('docs/examples/Caddyfile', 'utf8').trimEnd()));
+  const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  assert.ok(base.includes(`polarion-mcp:${version}`));
+  assert.doesNotMatch(base, /REDIRECT/, 'the base has no redirect setting; overlays add it');
+  const presets = new Set(['claude', 'chatgpt', 'vscode', 'cursor', 'copilot-studio', 'gemini', 'm365', 'mistral', 'loopback']);
+  const overlays = fs.readdirSync('docs/examples/overlays');
+  assert.deepEqual(overlays.sort(), ['chatgpt.yaml', 'claude.yaml', 'm365.yaml', 'mistral.yaml', 'proxy.yaml']);
+  for (const file of overlays) {
+    const text = fs.readFileSync(`docs/examples/overlays/${file}`, 'utf8');
+    assert.match(text, /^services:\n {2}mcp:\n {4}environment:\n/m, file);
+    for (const [, preset] of text.matchAll(/MCP_ALLOWED_REDIRECT_PRESETS: ([\w,-]+)/g)) assert.ok(presets.has(preset), `${file}: ${preset}`);
+    assert.ok(guide.includes(`\`${file}\``), `${file} is not in the guide table`);
+  }
+  assert.match(fs.readFileSync('docs/troubleshooting.md', 'utf8'), /ALLOWED_HOSTS recipe/);
+});
+
+test('T8.5: a verified block must be complete and the schema rejects partial ones', () => {
+  const validate = new Ajv2020({ allErrors: true }).compile(schema);
+  const copy = structuredClone(data);
+  copy.clients[0].verified = { local: { date: '2026-10-30', mcpVersion: '1.4.5', polarion: '2606', client: 'Claude Desktop', clientVersion: '1.0', by: 'Phillip', evidence: 'screenshot' } };
+  assert.ok(validate(copy), JSON.stringify(validate.errors));
+  delete copy.clients[0].verified.local.evidence;
+  assert.equal(validate(copy), false);
+});
+
+test('verification labels: docs by default, developer only with a verified block', async () => {
+  const { renderClientsBlock, renderClientGuide } = await import('../scripts/render-clients.mjs');
+  const copy = structuredClone(data);
+  const target = copy.clients.find(entry => entry.id === 'claude-code');
+  assert.match(renderClientsBlock(copy), new RegExp(`${target.name} \\| Yes \\(docs\\)`));
+  assert.match(renderClientGuide(copy, target), /Local: verified by documentation only/);
+  target.verified = { local: { date: '2026-10-30', mcpVersion: '1.4.5', polarion: '2606', client: 'Claude Code', clientVersion: '2.0', by: 'Phillip', evidence: 'log' } };
+  assert.match(renderClientsBlock(copy), new RegExp(`${target.name} \\| Yes \\(developer\\)`));
+  assert.match(renderClientGuide(copy, target), /Local: verified by developer/);
 });

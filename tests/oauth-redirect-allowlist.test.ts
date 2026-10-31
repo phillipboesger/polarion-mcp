@@ -37,10 +37,12 @@ test("redirect preset constants match verified literal callbacks in the client m
   const clientByPreset = {
     claude: "claude-web-desktop",
     chatgpt: "chatgpt-apps",
-    vscode: "vscode-copilot",
+    vscode: "github-copilot",
     cursor: "cursor",
     "copilot-studio": "copilot-studio",
-    gemini: "gemini-cli",
+    gemini: "antigravity",
+    m365: "m365-copilot",
+    mistral: "mistral-le-chat",
   } as const
   const expected = Object.fromEntries(Object.entries(clientByPreset).map(([preset, clientId]) => {
     const client = clients.clients.find(entry => entry.id === clientId)
@@ -53,13 +55,14 @@ test("each client preset permits only its verified callback URIs", () => {
   const cases = [
     ["claude", CLAUDE, ["https://claude.ai.evil.example/api/mcp/auth_callback", "https://attacker.example/api/mcp/auth_callback", "https://claude.ai/api/mcp/auth_callback/extra", "https://claude.ai@evil.example/api/mcp/auth_callback"]],
     ["cursor", "https://www.cursor.com/agents/mcp/oauth/callback", ["https://www.cursor.com.evil.example/agents/mcp/oauth/callback", "https://www.cursor.com/agents/mcp/oauth/callback/extra", "https://www.cursor.com@evil.example/agents/mcp/oauth/callback"]],
+    ["m365", "https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect", ["https://teams.microsoft.com.evil.example/api/platform/v1.0/oAuthRedirect", "https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect/extra", "https://teams.microsoft.com@evil.example/api/platform/v1.0/oAuthRedirect", "http://teams.microsoft.com/api/platform/v1.0/oAuthRedirect", "https://teams.microsoft.com/api/platform/v1.0/oauthredirect"]],
   ] as const
   for (const [preset, callback, lookalikes] of cases) {
     const allowlist = parseRedirectAllowlist(undefined, [preset])
     assert.equal(isRedirectAllowed(callback, allowlist), true, `${preset} callback`)
     for (const lookalike of lookalikes) assert.equal(isRedirectAllowed(lookalike, allowlist), false, `${preset}: ${lookalike}`)
   }
-  for (const preset of ["chatgpt", "vscode", "copilot-studio", "gemini"]) {
+  for (const preset of ["chatgpt", "vscode", "copilot-studio", "gemini", "mistral"]) {
     const allowlist = parseRedirectAllowlist(undefined, [preset])
     assert.equal(isRedirectAllowed("https://attacker.example/callback", allowlist), false, `${preset} has no verified fixed callback`)
   }

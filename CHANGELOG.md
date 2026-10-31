@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Improvements
+
+- Polarion 2506: the PAT check still tries `GET /metadata` first (2512+, no global REST GET needed). Only a 404 from it falls back to `GET /projects?page[size]=1`, which needs global REST GET, so HTTP and OAuth now work on 2506. 401 and 403 never fall back. The live suite also runs on 2512. Version matrix: `docs/polarion-versioning.md`.
+- Corporate proxy: `HTTPS_PROXY` and `NO_PROXY` are honored for calls to an `https://` Polarion (CONNECT tunnel, no new dependency). A proxy login is accepted as `http://user:pass@host`, a `407` gives a clear error, and credentials never appear in errors.
+- OAuth redirect presets: `m365` allows Microsoft's fixed Teams callback for Microsoft 365 Copilot. `mistral` is reserved and denies everything until Mistral documents the Le Chat callback.
+- Client guides: new Microsoft 365 Copilot / Teams, Mistral Le Chat and self-hosted models (Open WebUI, LibreChat; Ollama, vLLM, OpenRouter as backends). "VS Code / GitHub Copilot" is now "GitHub Copilot" with VS Code, Eclipse, JetBrains and Visual Studio variants. Gemini CLI is now "Antigravity (CLI + IDE)". The old guide URLs keep a pointer page.
+- Guides: the check step of every `getCurrentUser` prompt now expects the user instead of projects, and every mode lists a 401 fix.
+- FAQ: one source (`docs/clients.json`) feeds the README, `docs/clients.md` and `docs/troubleshooting.md`; every entry has an id and stays within 500 characters. New answers cover REST disabled (404), `request_rejected 400`, tool limits, the Copilot organization policy, corporate proxy, disabled or expired PATs and models without tool calling.
+
+### Tests
+
+- Guide-literal tests start the exact command from each local snippet against a stub Polarion and check the user, the request headers and the 401, 404 and 503 symptoms.
+- Manifest tests cover redirect presets, image tags, FAQ length and required topics, and a prose lint (no em dashes or stock AI words).
+
 ## 1.4.5
 
 ### Maintenance

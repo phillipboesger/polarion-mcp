@@ -1,0 +1,6 @@
+# Overlay: Outbound corporate proxy for Polarion calls
+services:
+  mcp:
+    environment:
+      HTTPS_PROXY: http://proxy.company.example:3128
+      NO_PROXY: .company.example

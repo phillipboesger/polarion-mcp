@@ -52,7 +52,7 @@
       layer.replaceChildren();
       satEdges = [];
       const node = nodes.get(state.provider);
-      if (!node) return;
+      if (!node || node.clients.length === 1) return;
       const origin = node.position;
       node.clients.forEach(id => {
         const client = clients.get(id);
@@ -142,6 +142,7 @@
       const badge = svg('svg', { viewBox: '-16 -16 32 32', width: 30, height: 30, style: `--c:${node.color}` }, icon(client.icon, 1.1));
       const close = text('button', { type: 'button', class: 'x', 'aria-label': 'Close details' }, '\u00d7');
       const guide = text('a', { class: 'go guide-link', href: data.guideBase + client.guide, target: '_blank', rel: 'noopener noreferrer' }, 'View setup guide \u2192');
+      const vendor = client.vendorDocs ? text('a', { class: 'go vendor-link', href: client.vendorDocs, target: '_blank', rel: 'noopener noreferrer' }, 'Official documentation \u2197') : null;
       const chips = html('ul', { class: 'chips' }, ...modes[state.env].requirement.split('; ').filter(Boolean).map(item => text('li', {}, item)));
       const flow = html('div', { class: 'flow' }, text('span', { class: 'p' }, client.label), html('span', { class: 'ln' }), text('span', { class: 'p m' }, flowMiddle(state.env)), html('span', { class: 'ln' }), text('span', { class: 'p' }, 'Polarion'));
       target.style.setProperty('--c', node.color);
@@ -152,7 +153,8 @@
         text('p', { class: 'lab' }, 'How do you want to connect?'),
         html('div', { class: 'envs' }, envButton('local'), envButton('server')),
         ...(why.length ? [text('p', { class: 'why' }, why.join(' '))] : []),
-        text('p', { class: 'lab' }, 'Requirements'), chips, flow, guide);
+        text('p', { class: 'lab' }, 'Requirements'), chips, flow,
+        ...(modes[state.env].supported ? [text('p', { class: 'ver' }, modes[state.env].verifiedByDeveloper ? 'Verified by developer' : 'Verified by documentation')] : []), guide, ...(vendor ? [vendor] : []));
       target.querySelector('.x').addEventListener('click', closeClient);
       target.querySelectorAll('.env').forEach(button => button.addEventListener('click', () => {
         if (button.getAttribute('aria-disabled') === 'true') return;
@@ -183,7 +185,7 @@
         el.setAttribute('aria-pressed', String(selected));
       });
       setView();
-      hint.textContent = !state.provider ? 'Select a provider to see its options' : state.client ? '' : 'Now pick your tool';
+      hint.textContent = !state.provider ? 'Select a product to see its options' : state.client ? '' : 'Now pick your tool';
       renderPanel();
     }
 
@@ -193,6 +195,8 @@
       state.provider = state.provider === id ? null : id;
       state.client = null;
       drawSatellites();
+      const only = state.provider ? nodes.get(state.provider).clients : [];
+      if (only.length === 1) { selectClient(only[0]); return; }
       sync();
       announce(state.provider ? `${nodes.get(state.provider).name}: ${nodes.get(state.provider).clients.length} clients` : 'Overview');
     }
@@ -210,6 +214,8 @@
     function closeClient() {
       const previous = state.client;
       state.client = null;
+      // A node with a single client opens its panel directly, so closing it closes the node too.
+      if (state.provider && nodes.get(state.provider).clients.length === 1) { const open = primaries.find(el => el.dataset.node === state.provider); state.provider = null; drawSatellites(); sync(); open?.focus(); return; }
       sync();
       const back = layer.querySelector(`.satellite[data-client="${previous}"]`);
       if (back) back.focus();

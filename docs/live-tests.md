@@ -4,7 +4,7 @@
 
 ## In CI
 
-The `.github/workflows/live-polarion.yml` workflow uses the private Polarion Docker image for versions 2506 and 2606. It activates a trial, provisions a token, then runs the suite. The workflow is triggered by qualifying pull requests and pushes, a nightly schedule at 05:00 UTC, or manual dispatch. Fork and Dependabot runs may not have permission to pull the private image.
+The `.github/workflows/live-polarion.yml` workflow uses the private Polarion Docker image for versions 2506, 2512 and 2606. It activates a trial, provisions a token, then runs the suite. The workflow is triggered by qualifying pull requests and pushes, a nightly schedule at 05:00 UTC, or manual dispatch. Fork and Dependabot runs may not have permission to pull the private image.
 
 The composite live cases assert job execution, document content, trace links, attachment uploads, and collection across more than 100 links. Test-owned jobs and data are cleaned up, and the workflow runs against disposable instances. The job scenario needs the `/jobs` endpoints, which Polarion 2506 does not expose (only `GET /jobs/{id}` and file download), so it is skipped there with a reason; it runs on 2606.
 
@@ -29,4 +29,8 @@ For the project-permission regression test, set `LIVE_PROJECT_PAT` to a separate
 
 `npm run verify:setup:docker` runs the full local gate (static checks, code tests, then the live suite). It refuses to start unless `LIVE_API_BASE_URL`, `LIVE_PAT` and `LIVE_PROJECT_PAT` are set, and it fails on any skipped live case, so a green run means every live case executed. Provision the scoped users with `node scripts/live/provision-users.mjs --container NAME --url URL --project ID --output PRIVATE_JSON`. Keep the output file private and delete it afterwards. `npm run verify:setup` runs the same gate without the live tests.
 
-The Streamable HTTP/OAuth live suite requires Polarion 2512+ because its PAT preflight uses `/metadata`. The suite skips HTTP/OAuth on older instances when that endpoint returns 404; stdio tests still run.
+The Streamable HTTP/OAuth live suite runs on every supported release. Its PAT preflight uses `/metadata` (2512+) and falls back to `GET /projects` when `/metadata` returns 404 (2506), so the live user needs global REST GET there.
+
+## Guide-literal tests (no Polarion needed)
+
+`tests/guide-literal.test.mjs` runs on every `npm test`. For each client with a local setup it reads the snippet from `docs/clients.json`, parses it in the client's own format (JSON `mcpServers` or `servers`, a `mcp add` command, Codex TOML, the Agents SDK Python dict), and starts exactly the documented command, args and env against a stub Polarion. The only substitutions are the placeholder URL and token, and `npx -y polarion-mcp` becomes this checkout's build. The suite asserts the `getCurrentUser` result, the `Authorization: Bearer` header and REST path the stub received, and the 401, 404 and 503 symptoms that the guides name. Because the snippets are read from the manifest, a guide cannot drift from what is tested.

@@ -24,7 +24,7 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_ALLOWED_HOSTS` | Empty, no Host allowlist | `src/mcp-http-server.ts` startup | No | Comma-separated allowlist for the inbound Host header of the MCP server (for example its public hostname); it does not control outbound access to Polarion. `ALLOWED_HOSTS` is a separate input for the Polarion Docker image, not this MCP server; see troubleshooting if Polarion answers `request_rejected HTTP 400`. |
 | `MCP_ALLOWED_ORIGINS` | Claude.ai and ChatGPT origins | `src/mcp-http-server.ts` startup | No | Comma-separated browser origin allowlist for MCP and OAuth routes. The `MCP_PUBLIC_URL` origin is always allowed. |
 | `MCP_ALLOWED_REDIRECT_PREFIXES` | Empty, registration allows redirect URIs | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Comma-separated exact redirect URI allowlist; entries ending in `/` are prefixes. Configure this or named presets for production OAuth. |
-| `MCP_ALLOWED_REDIRECT_PRESETS` | Empty | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Comma-separated built-in names: `claude`, `chatgpt`, `vscode`, `cursor`, `copilot-studio`, `gemini`, `loopback`. Verified callbacks currently exist for `claude` and `cursor`; `loopback` allows localhost callback ports. Unknown names are ignored. |
+| `MCP_ALLOWED_REDIRECT_PRESETS` | Empty | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Comma-separated built-in names: `claude`, `chatgpt`, `vscode`, `cursor`, `copilot-studio`, `gemini`, `m365`, `mistral`, `loopback`. Verified callbacks currently exist for `claude`, `cursor` and `m365`; `mistral` is reserved and denies everything until Mistral documents the callback; `loopback` allows localhost callback ports. Unknown names are ignored. |
 | `MCP_CIMD_ENABLED` | `false` | `src/mcp-http-server.ts` startup | No | Set to `true` to opt in to OAuth Client ID Metadata Documents. See Security. |
 | `MCP_UPLOAD_ROOTS` | Empty (local uploads off) | `src/composite-upload.ts` per call | No | Comma-separated absolute directories allowed for `upload_attachment.filePath`; file-path uploads are stdio-only. Each file is resolved and checked against these roots before reading. |
 | `MCP_UPLOAD_MAX_BYTES` | `26214400` (25 MiB) | `src/composite-upload.ts` per call | No | Maximum attachment size for local and URL uploads. Positive integer, checked before reading local files and while streaming URLs. |
@@ -68,6 +68,9 @@ The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Tool
 ## Network paths
 
 Cloud providers must reach the MCP server over public HTTPS. The MCP process separately connects to the Polarion URL in `API_BASE_URL`; Polarion can remain private when that network path exists. HTTPS is mandatory for the cloud-facing MCP endpoint, including when the MCP process runs on a laptop. For a company CA, configure Node.js with the additional PEM trust bundle before startup; normal TLS verification remains enabled.
+
+- HTTPS_PROXY: HTTP proxy URL for calls to an `https://` Polarion, tunnelled with CONNECT (lowercase `https_proxy` also works). Credentials may be given as `http://user:pass@host:3128` and never appear in errors. Plain `http://` Polarion URLs are not proxied. Default: direct.
+- NO_PROXY: Comma-separated hosts that skip the proxy: `host`, `.suffix`, `host:port` or `*` (lowercase `no_proxy` also works).
 
 ## Modes
 

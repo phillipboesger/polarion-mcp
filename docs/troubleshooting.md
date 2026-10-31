@@ -22,7 +22,7 @@ Polarion checks three things. A failure in one does not mean the others are wron
 What this means in practice:
 
 - `getCurrentUser` calls `GET /user`, a global endpoint. A project-only account can get a 403 there and still read its projects with `getProject(projectId)`. That 403 limits the endpoint; it is not a failed login.
-- Connecting does not need global GET. The login check uses `GET /metadata` on Polarion 2512+.
+- Connecting does not need global GET on Polarion 2512+: the login check uses `GET /metadata`. On 2506 there is no `/metadata`, so the check reads `GET /projects` and the user needs global REST GET. A log line `GET /projects failed: permission_denied` means exactly that.
 - Do not grant global write permissions to make onboarding pass.
 - Upgrading from 1.4.1 to 1.4.2 changes the login check to `/metadata`. Update the image or package and recreate the container; a restart keeps the old image.
 
@@ -30,24 +30,100 @@ What this means in practice:
 
 Direct PAT initialization, OAuth login, and refresh check authentication against Polarion (`GET <API_BASE_URL>/metadata`), and Polarion's answer decides. The server log shows it as `Polarion token probe GET /metadata failed: <category> HTTP <status> - <Polarion's message>`, for example `request_rejected HTTP 400`. The same category and status appear in the error shown to the user; Polarion's own message appears only in the log. A host-side curl can test the URL from that host, but it does not prove the Docker container can reach the same address. Use the container-side probe below for deployment diagnostics. Do not put a real PAT in a command argument, shell history, or logs.
 
-HTTP 200 with a usable metadata response allows connection. HTTP 401 rejects the PAT; HTTP 403 denies access. The probe requires Polarion 2512+ and does not require global REST GET permission.
+HTTP 200 with a usable metadata response allows connection. HTTP 401 rejects the PAT; HTTP 403 denies access. The probe reads `/metadata` (2512+, no global REST GET needed). On Polarion 2506 it falls back to `GET /projects`, which needs global REST GET.
 
-**Does HTTP/OAuth work with Polarion 2506 or older?**
-HTTP MCP initialization and OAuth login/refresh require Polarion 2512 or newer. They validate the PAT through GET /metadata, which is available from 2512 without global REST GET permission. Polarion 2506 and older return 404 on this endpoint, so HTTP/OAuth connections fail the preflight. Use stdio mode with API_BASE_URL and your own BEARER_TOKEN, or upgrade Polarion to 2512+. The server does not fall back to project/user listing or accept 403 as successful validation. Tool access still depends on your Polarion permissions.
+<!-- faq:start -->
+**It says 401 "Polarion did not accept this token".**
+The token was cut off, has expired, or belongs to another Polarion. Test the token with the `/metadata` request in the setup guide (docs/guides/local-npm.md or docs/troubleshooting.md) and create a new token.
 
-**I get 401, "Polarion did not accept this token".**
-Polarion does not know the token. Check that it was copied completely (no line break), has not expired or been revoked, and that API_BASE_URL points to the right Polarion instance.
+**It says 403 "Polarion denied access".**
+Polarion denied access. Check the user's license and REST or item permissions for the affected tool. On Polarion 2512+ the login check reads /metadata and needs no global REST GET permission. On 2506 it reads /projects, which does. A 403 during login is rejected.
 
-**I get 403, "Polarion denied access".**
-Polarion denied access. Check the user's license and REST endpoint or item permissions for the affected operation. See [Permissions: Three Separate Controls](#permissions-three-separate-controls). On Polarion 2512+, `/metadata` does not require global REST GET permission; a 403 during login is rejected rather than accepted as successful authentication.
+**The connector login in claude.ai or ChatGPT fails or loops.**
+Check `MCP_PUBLIC_URL` (exact https address, no path), the padlock, that the redirect preset or callback is allowed (`MCP_ALLOWED_REDIRECT_PRESETS=claude`; the log says `redirect_uri rejected`), and that `MCP_TOKEN_SECRET` did not change.
+
+**Does HTTP/OAuth work with Polarion 2506?**
+Yes. On 2512+ the login check calls GET /metadata and needs no global REST GET permission. 2506 has no /metadata, so the server reads GET /projects instead; that user must be allowed global REST GET. A 403 is never accepted. Tool access still follows your Polarion permissions.
+
+**What does Bearer mean in an Authorization header?**
+It is just the word Bearer, one space, then your token: `Bearer YOUR_POLARION_PAT`. Without the word Bearer the server answers 401.
+
+**Where do I keep my token safely?**
+In your personal client settings or an environment variable, never in a file inside a shared project or repository. Anyone who can read the file can act as you in Polarion. With the OAuth connectors you type the token only on the server's login page and the AI client never stores it.
+
+**Which Polarion versions work?**
+Live integration tests run against Polarion 2506, 2512 and 2606, including HTTP/OAuth. The full tool set is targeted at the newest release; 2506 and 2512 stay usable with the limits in Polarion versions. The tools are generated from a Polarion OpenAPI definition, which does not guarantee every operation on every release. Verify the operations you rely on against your own instance.
+
+**Which AI clients can I use?**
+Any client that supports MCP over stdio or Streamable HTTP. The setup guide above lists the tested paths for Claude, ChatGPT and Codex, Copilot Studio, VS Code, Gemini, Cursor, Windsurf and JetBrains. Other clients can use the generic stdio or HTTP entries, or the REST wrapper.
+
+**It says 503 "Polarion could not be reached".**
+The server got no usable answer from Polarion. Read the `Polarion token probe GET /metadata failed` line in `docker logs polarion-mcp`. Check that `API_BASE_URL` is the full `/polarion/rest/v1` URL and reachable from the MCP container (not `localhost` inside Docker). Use the container-side probe in docs/troubleshooting.md. `/health` only confirms the MCP server runs.
+
+**Can claude.ai or ChatGPT connect to a server on my own laptop?**
+The provider must reach the MCP endpoint over public HTTPS, so `http://localhost` does not work for claude.ai or ChatGPT. Polarion itself can stay private if the MCP container can reach it over your network or VPN. Desktop and command-line clients may use `http://localhost:3000/mcp`. Use a local stdio setup if you do not want to publish an endpoint.
+
+**What is the difference between the ChatGPT connector and a Custom GPT?**
+The ChatGPT connector speaks MCP and everyone signs in with their own Polarion token. A Custom GPT uses the separate REST wrapper with one shared key (`HTTP_API_KEY`), so every call runs as the one Polarion user whose token the wrapper holds.
+
+**Certificate errors: the public HTTPS address does not work.**
+For cloud connectors, ensure the MCP hostname resolves publicly, ports 80 and 443 reach the TLS proxy, and the certificate is valid for that hostname. Keep certificate verification enabled. A private Polarion hostname may still be used for the separate connection from the MCP container.
+
+**My Polarion uses a company or self-signed certificate.**
+Keep TLS verification enabled. Mount the company CA PEM into the MCP container and set `NODE_EXTRA_CA_CERTS=/certs/ca.pem` (for example `-v /path/ca.pem:/certs/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/ca.pem`). For npm mode, set `NODE_EXTRA_CA_CERTS` in the client environment. This adds trusted roots without disabling certificate checks.
+
+**Should I use polarion-mcp@latest or a pinned version?**
+The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.5` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client.
+
+**How do I update the Docker server?**
+Choose the new tag on the GitHub package page, then run `docker pull ghcr.io/phillipboesger/polarion-mcp:NEWTAG`, `docker rm -f polarion-mcp`, and the same `docker run` command with the new tag. Keep `MCP_TOKEN_SECRET` unchanged so users stay signed in. With a team URL the administrator updates the server and you only reconnect.
+
+**It says "Unsupported engine" or the Node version is too old.**
+The package needs Node.js 22 or newer: `node -v` must print v22 or higher. Install the LTS from nodejs.org and open a new terminal; with nvm run `nvm install 22 && nvm use 22`. Desktop apps can use a different Node than your terminal, so install Node system-wide and fully restart the app. Docker avoids this because the image bundles Node 22.
+
+**Windows: the client cannot start npx.**
+Typical symptoms are `spawn npx ENOENT` or a server that never starts. Use `cmd` as the command with the arguments `/c`, `npx`, `-y`, `polarion-mcp`, because npx is `npx.cmd` on Windows. Backslashes in JSON paths must be doubled (`C:\\path\\ca.pem`). Restart the app completely after every change.
+
+**Port 3000 is already in use.**
+Change only the left number of the port mapping: `-p 127.0.0.1:3100:3000`, then use `http://localhost:3100/mcp` and set `MCP_ALLOWED_HOSTS=localhost:3100,127.0.0.1:3100`. Remove an old container with `docker rm -f polarion-mcp`. On macOS and Linux `lsof -i :3000` shows who uses the port; on Windows use `netstat -ano | findstr :3000`.
+
+**It says 429 "Too many requests".**
+The server limits requests per address. Behind a proxy set `TRUST_PROXY=1`, otherwise all users share one counter, then wait 15 minutes for the window to reset. The REST wrapper has a fixed limit per 15 minutes.
+
+**Gemini CLI says it was replaced. Which tool should I use?**
+Google's page says Gemini CLI was replaced by Antigravity CLI on 18 June 2026 for no-cost-tier and Google One users. If your Gemini CLI still runs, for example with an API key or a company license, the steps in this guide work. Antigravity CLI has its own setup that this guide does not cover yet.
+
+**Windsurf now says Devin. Which steps do I follow?**
+The vendor docs moved to docs.devin.ai and describe this configuration only for the legacy Cascade agent. If your tab uses the Devin Local agent, MCP servers are set up in Devin CLI config files, which this guide does not cover yet.
 
 **The error says `request_rejected HTTP 400`.**
+Polarion or a proxy in front of it refused the hostname in `API_BASE_URL`. Use the address your users open in the browser. For the Polarion Docker image, add the name (for example `host.docker.internal`) to `ALLOWED_HOSTS` on the Polarion container and recreate it. See "ALLOWED_HOSTS recipe" in docs/troubleshooting.md. `MCP_ALLOWED_HOSTS` is a different setting.
+
+**Every call returns 404, or `/rest/v1` does not exist.**
+The REST API is not enabled or the path is wrong. Open `https://YOUR-POLARION/polarion/rest/v1/swagger-ui` in a browser; it must load. `API_BASE_URL` has to end in `/polarion/rest/v1`. Ask your Polarion administrator to enable the REST API if the page is missing.
+
+**The PAT page says token generation is not allowed, or my token stopped working.**
+An administrator must set `com.siemens.polarion.rest.security.restApiToken.enabled=true` and restart Polarion before PATs exist. A token also stops working when it expires or is revoked. Create a new one and replace it in your client; never paste it into a chat.
+
+**My client warns about too many tools (VS Code 128, Cursor, Windsurf 100).**
+The full catalog has 284 tools. Set `MCP_TOOLSETS` (for example `work-items,documents`) or `MCP_TOOLS` on the server, add `MCP_READ_ONLY=true`, or use `MCP_MODE=discover`. In VS Code you can also untick tools in the tools picker.
+
+**GitHub Copilot shows no MCP servers on Business or Enterprise.**
+The organization policy "MCP servers in Copilot" is off by default. An organization or enterprise owner must enable it in the Copilot policies. Free and Pro plans are not affected by this policy.
+
+**My network needs a proxy to reach Polarion.**
+Set `HTTPS_PROXY` (for example `http://proxy.corp:3128`, credentials as `user:pass@` are allowed) and `NO_PROXY` (for example `.corp.example,localhost`) in the environment of the local server or the container. Only https:// Polarion URLs go through the proxy, using CONNECT. A 407 means the proxy credentials are wrong.
+
+**My Ollama or other self-hosted model never calls the tools.**
+The model must support tool calling; many small models do not. Pick one that does, enable native function calling for it in Open WebUI, and make sure the MCP URL is reachable from the Open WebUI container (use the container name, not `localhost`).
+<!-- faq:end -->
+
+### ALLOWED_HOSTS recipe
+
 Polarion or a proxy in front of it refused the request itself, usually because it does not accept the hostname in `API_BASE_URL`. Use the address your users open in the browser (the hostname Polarion and its proxy are configured for), not an IP address or an internal alias. The log line shows Polarion's own message. If you run Polarion from the Polarion Docker image and reach it under a name that the image does not know (for example `host.docker.internal` in a local development setup), set `ALLOWED_HOSTS` on the **Polarion** container to include that name, for example `ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,host.docker.internal`, and recreate the Polarion container (its entrypoint rewrites the setting at start, so editing the properties file and restarting does not work). This is separate from `MCP_ALLOWED_HOSTS`, which only filters requests arriving at the MCP server.
 
-**I get 503, "Polarion could not be reached".**
-The server could not get a usable answer (the log shows why, e.g. `HTTP 404` or a connection error): wrong host, port or path in API_BASE_URL (it must end in `/polarion/rest/v1`), network or firewall between the MCP server and Polarion, Polarion down, or a TLS error (see below). The authentication probe does not follow redirects: configure API_BASE_URL with the final HTTPS host and REST path directly, rather than a redirecting alias. Test from inside the MCP container; a request from your laptop does not test the container network path.
+### The server answers on /health and /mcp, but tools fail
 
-**The server answers on /health and /mcp, but tools fail.**
 Both only prove that the MCP server runs. Polarion is only contacted when a token is checked or a tool is called, so look at the log line above.
 
 ## Probe Polarion from the MCP container
@@ -82,7 +158,7 @@ unset POLARION_PAT
 (exit "$probe_status")
 ```
 
-The PAT is not printed or placed in command arguments. An authenticated metadata response confirms the PAT on Polarion 2512+. HTTP 401 indicates a bad or expired PAT; 403 indicates denial; 400 may indicate an unacceptable hostname or request; 404 requires checking the REST URL and supported Polarion version. Redirects or HTML require checking SSO/proxy routing. For DNS, timeout, or TLS errors, check container network access and certificate trust. For a company CA, mount its PEM and set `NODE_EXTRA_CA_CERTS=/certs/company-ca.pem`; keep certificate verification enabled. `/health` checks MCP liveness only, not Polarion readiness.
+The PAT is not printed or placed in command arguments. An authenticated metadata response confirms the PAT on Polarion 2512+; on 2506 a project list from `GET /projects` does. HTTP 401 indicates a bad or expired PAT; 403 indicates denial; 400 may indicate an unacceptable hostname or request; 404 requires checking the REST URL and supported Polarion version. Redirects or HTML require checking SSO/proxy routing. For DNS, timeout, or TLS errors, check container network access and certificate trust. For a company CA, mount its PEM and set `NODE_EXTRA_CA_CERTS=/certs/company-ca.pem`; keep certificate verification enabled. `/health` checks MCP liveness only, not Polarion readiness.
 
 ## 403 Origin Rejected
 

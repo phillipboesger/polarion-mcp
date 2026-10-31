@@ -18,7 +18,6 @@
 
 import { randomBytes } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import https from 'node:https';
 import axios from 'axios';
 import type { Response } from 'express';
 import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js';
@@ -29,9 +28,10 @@ import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, Inv
 import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
+import { httpsAgent } from './httpClient.js';
 import { fetchClientMetadata, parseClientIdentifierUrl, type CimdClientMetadata, type CimdMetadataFetcher } from './cimd.js';
 import { Sealer, safeEqual } from './sealed.js';
-import { tokenDiagnostic, tokenNetworkDiagnostic, upstreamDetail, type TokenDiagnostic, type TokenProbeResult } from './token-diagnostics.js';
+import { tokenDiagnostic, tokenNetworkDiagnostic, upstreamDetail, type TokenDiagnostic, type TokenProbeEndpoint, type TokenProbeResult } from './token-diagnostics.js';
 export type { TokenDiagnostic, TokenDiagnosticCategory, TokenProbeResult } from './token-diagnostics.js';
 
 /** Scope advertised by this server; the PAT itself carries the real permissions. */
@@ -152,49 +152,72 @@ interface AccessPayload extends RefreshPayload {
 /** Client metadata sealed into a DCR client id. */
 type SealedClient = Omit<OAuthClientInformationFull, 'client_id' | 'client_secret' | 'client_secret_expires_at'>;
 
+let legacyProbeLogged = false;
+
 /**
- * Checks a PAT using REST metadata, available since Polarion 2512 without
- * global REST endpoint permissions. There is no fallback for older versions.
+ * Checks a PAT. Polarion 2512+ answers GET /metadata without global REST
+ * endpoint permissions, so that is always tried first. Older releases answer
+ * it with 404; only then does the check read GET /projects, which needs global
+ * REST GET permission. 401 and 403 from /metadata are final and never fall back.
  * Each tool must still obtain its own authorization from Polarion.
  *
  * @param token - The token to check.
- * @returns A strict metadata success or a safe diagnostic for the failed probe.
+ * @returns A strict success or a safe diagnostic for the failed probe.
  */
 export async function probePolarionToken(token: string): Promise<TokenProbeResult> {
-  const failed = (diagnostic: TokenDiagnostic, detail = ''): TokenProbeResult => {
+  const failed = (diagnostic: TokenDiagnostic, endpoint: TokenProbeEndpoint, detail = ''): TokenProbeResult => {
     const status = diagnostic.upstreamStatus === undefined ? '' : ` HTTP ${diagnostic.upstreamStatus}`;
     // Polarion's own wording (log only) is what tells a Host rejection from a permission problem.
-    console.error(`[WARN] Polarion token probe GET /metadata failed: ${diagnostic.category}${status}${detail ? ` - ${detail}` : ''}`);
+    console.error(`[WARN] Polarion token probe GET ${endpoint} failed: ${diagnostic.category}${status}${detail ? ` - ${detail}` : ''}`);
     return { valid: false, diagnostic };
   };
-  try {
-    const response = await axios.get(`${API_BASE_URL}/metadata`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      httpsAgent: new https.Agent({ rejectUnauthorized: shouldRejectUnauthorized() }),
-      timeout: 15_000,
-      maxRedirects: 0,
-      validateStatus: () => true,
-    });
+  const get = (path: string) => axios.get(`${API_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    httpsAgent: httpsAgent(shouldRejectUnauthorized()),
+    timeout: 15_000,
+    maxRedirects: 0,
+    validateStatus: () => true,
+  });
+  const isJson = (response: Awaited<ReturnType<typeof get>>) => {
     const contentType = response.headers['content-type'];
     const mediaType = typeof contentType === 'string' ? contentType.split(';', 1)[0].trim().toLowerCase() : '';
-    const isJson = mediaType === 'application/json' || mediaType === 'application/vnd.api+json';
-    const body = response.data;
-    const isObject = body !== null && typeof body === 'object' && !Array.isArray(body);
+    return mediaType === 'application/json' || mediaType === 'application/vnd.api+json';
+  };
+  const asObject = (body: unknown) => body !== null && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : undefined;
+  const classify = (status: number, endpoint: TokenProbeEndpoint) => tokenDiagnostic(
+    status === 401 ? 'invalid_pat'
+      : status === 403 ? 'permission_denied'
+        : status === 400 ? 'request_rejected'
+          : status === 404 ? 'endpoint_missing'
+            : status >= 300 && status < 400 ? 'redirect'
+              : status >= 500 ? 'server_error' : 'unexpected_status', status, endpoint);
+  let endpoint: TokenProbeEndpoint = '/metadata';
+  try {
+    const response = await get('/metadata');
+    const body = asObject(response.data);
     if (response.status >= 200 && response.status < 300) {
-      const metadata = isObject && !('errors' in body) ? body.data : undefined;
-      if (isJson && metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
-        && metadata.type === 'metadata' && metadata.id === 'metadata') return { valid: true };
-      return failed(tokenDiagnostic('unusable_response', response.status), upstreamDetail(response.data, token));
+      const metadata = body && !('errors' in body) ? asObject(body.data) : undefined;
+      if (isJson(response) && metadata?.type === 'metadata' && metadata.id === 'metadata') return { valid: true };
+      return failed(tokenDiagnostic('unusable_response', response.status), '/metadata', upstreamDetail(response.data, token));
     }
-    const category = response.status === 401 ? 'invalid_pat'
-      : response.status === 403 ? 'permission_denied'
-        : response.status === 400 ? 'request_rejected'
-          : response.status === 404 ? 'endpoint_missing'
-            : response.status >= 300 && response.status < 400 ? 'redirect'
-              : response.status >= 500 ? 'server_error' : 'unexpected_status';
-    return failed(tokenDiagnostic(category, response.status), upstreamDetail(response.data, token));
+    if (response.status !== 404) return failed(classify(response.status, '/metadata'), '/metadata', upstreamDetail(response.data, token));
+
+    endpoint = '/projects';
+    const fallback = await get('/projects?page%5Bsize%5D=1');
+    if (fallback.status >= 200 && fallback.status < 300) {
+      const list = asObject(fallback.data);
+      if (isJson(fallback) && list && !('errors' in list) && Array.isArray(list.data)) {
+        if (!legacyProbeLogged) {
+          legacyProbeLogged = true;
+          console.error('[INFO] GET /metadata returned 404 (Polarion before 2512, or a proxy path). Tokens are checked with GET /projects, which needs global REST GET permission for the user.');
+        }
+        return { valid: true };
+      }
+      return failed(tokenDiagnostic('unusable_response', fallback.status, '/projects'), '/projects', upstreamDetail(fallback.data, token));
+    }
+    return failed(classify(fallback.status, '/projects'), '/projects', upstreamDetail(fallback.data, token));
   } catch (error) {
-    return failed(tokenNetworkDiagnostic(error));
+    return failed(tokenNetworkDiagnostic(error), endpoint);
   }
 }
 
@@ -211,7 +234,7 @@ export async function validatePolarionToken(token: string): Promise<TokenCheck> 
 /** Hosts whose redirect URIs may use any port (RFC 8252 section 7.3). */
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-export type RedirectPresetName = 'claude' | 'chatgpt' | 'vscode' | 'cursor' | 'copilot-studio' | 'gemini' | 'loopback';
+export type RedirectPresetName = 'claude' | 'chatgpt' | 'vscode' | 'cursor' | 'copilot-studio' | 'gemini' | 'm365' | 'mistral' | 'loopback';
 
 /**
  * Verified literal callback URIs from docs/clients.json. Entries that are
@@ -224,6 +247,9 @@ export const REDIRECT_PRESET_URIS = {
   cursor: ['https://www.cursor.com/agents/mcp/oauth/callback', 'http://localhost:8787/callback'],
   'copilot-studio': [],
   gemini: [],
+  m365: ['https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect'],
+  // Mistral does not document the Le Chat callback; stays empty and fails closed.
+  mistral: [],
   loopback: [],
 } as const satisfies Readonly<Record<RedirectPresetName, readonly string[]>>;
 

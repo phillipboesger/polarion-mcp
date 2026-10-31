@@ -1,6 +1,12 @@
-# Connect Generic HTTP client
+# Connect Other MCP client (connects by URL)
 
 Any MCP client that connects to a URL. Default: **Server**.
+
+Official documentation: [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+
+Verification status:
+
+- Server: verified by documentation only
 
 - **Local is not supported:** An HTTP-only client cannot launch a stdio subprocess.
 

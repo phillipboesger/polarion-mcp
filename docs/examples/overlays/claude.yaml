@@ -1,0 +1,5 @@
+# Overlay: Claude (claude.ai and Claude Desktop connectors)
+services:
+  mcp:
+    environment:
+      MCP_ALLOWED_REDIRECT_PRESETS: claude

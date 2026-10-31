@@ -1,6 +1,13 @@
-# Connect Other AI provider / any MCP client
+# Connect Other MCP client (starts a local program)
 
 Any MCP client that starts local programs. Default: **Local**.
+
+Official documentation: [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+
+Verification status:
+
+- Local: verified by documentation only
+- Server: verified by documentation only
 
 Your AI provider does not need a dedicated integration. Use any MCP-capable client. If it accepts OpenAPI instead, choose REST / OpenAPI below.
 
@@ -83,13 +90,13 @@ Remote MCP uses per-user PATs. The client must be able to reach this URL.
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: The assistant calls a Polarion tool and lists project names.
+Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 ### Server
 
 Ask your assistant: `Which Polarion user am I? Use getCurrentUser.`
 
-Expected: The assistant calls a Polarion tool and lists project names.
+Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 ## If it fails
 
@@ -99,6 +106,7 @@ Expected: The assistant calls a Polarion tool and lists project names.
 |---|---|
 | Server disconnected or failed | Run npx -y polarion-mcp in a terminal (Node 22+). On Windows try command cmd, args /c npx. |
 | Server starts but no tools appear | Some clients limit tool count. Enable tools in the client or reduce them with MCP_TOOLSETS. |
+| 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ### Server
 

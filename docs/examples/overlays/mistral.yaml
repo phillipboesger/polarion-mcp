@@ -1,0 +1,5 @@
+# Overlay: Mistral Le Chat (callback from the server log)
+services:
+  mcp:
+    environment:
+      MCP_ALLOWED_REDIRECT_PREFIXES: https://YOUR-LE-CHAT-CALLBACK

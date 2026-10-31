@@ -66,7 +66,7 @@ Replace `YOUR-POLARION` and `YOUR_PAT`. macOS and Linux (on Windows PowerShell w
 curl -i -H "Authorization: Bearer YOUR_PAT" "https://YOUR-POLARION/polarion/rest/v1/metadata"
 ```
 
-Expected: `HTTP/1.1 200` and JSON that contains `metadata`. This needs Polarion 2512 or newer.
+Expected: `HTTP/1.1 200` and JSON that contains `metadata`. This needs Polarion 2512 or newer. On 2506 it returns 404; request `/projects?page[size]=1` instead (needs global REST GET).
 
 If not:
 
@@ -74,8 +74,19 @@ If not:
 |---|---|
 | 401 | The token is wrong, cut off or expired. Create a new one. |
 | 403 | Polarion denies access. Check your license and REST permissions. |
-| 404 | Wrong URL, or Polarion 2506 or older (no `/metadata`). Fix the URL, or upgrade to 2512+. |
+| 404 | Wrong URL, or Polarion 2506 (no `/metadata`). Check the URL; on 2506 test `/projects?page[size]=1` instead. |
 | Timeout or certificate error | Wrong address, VPN needed, or a company certificate. See [Troubleshooting](../troubleshooting.md). |
+
+## Behind a corporate proxy (optional)
+
+If your network reaches Polarion only through a proxy, add `HTTPS_PROXY` (and `NO_PROXY` for hosts that must skip it) to the `env` block of the server entry, next to `API_BASE_URL`:
+
+```json
+"HTTPS_PROXY": "http://proxy.company.example:3128",
+"NO_PROXY": ".company.example,localhost"
+```
+
+Only `https://` Polarion URLs go through the proxy. A proxy that needs a login takes it as `http://user:password@proxy.company.example:3128`. A `407` error means those credentials are wrong; the password never appears in the error.
 
 ## Start the server once (optional smoke test)
 

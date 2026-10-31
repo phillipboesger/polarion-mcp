@@ -300,6 +300,14 @@ jobs:
       - name: Check documentation
         run: npm run check:docs:strict
 
+      - name: Validate Docker Compose examples
+        run: |
+          MCP_TOKEN_SECRET="$(openssl rand -hex 32)"
+          export MCP_TOKEN_SECRET
+          cd docs/examples
+          docker compose -f compose.yaml config -q
+          for overlay in overlays/*.yaml; do docker compose -f compose.yaml -f "$overlay" config -q; done
+
       - name: Install documentation browser
         run: npx playwright install --with-deps chromium
 
