@@ -28,7 +28,7 @@ docker run -d --name polarion-rest \
   -e HTTP_API_KEY=YOUR_WRAPPER_API_KEY \
   -e PUBLIC_URL=https://YOUR-SERVER \
   -e TRUST_PROXY=1 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.5 \
+  ghcr.io/phillipboesger/polarion-mcp:1.5.0 \
   node build/http-server.js
 ```
 

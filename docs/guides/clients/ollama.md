@@ -28,7 +28,7 @@ docker network create chat
 docker run -d --name polarion-mcp --network chat \
   -e API_BASE_URL=https://polarion.company.example/polarion/rest/v1 \
   -e MCP_ALLOWED_HOSTS=polarion-mcp:3000,localhost:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.5
+  ghcr.io/phillipboesger/polarion-mcp:1.5.0
 ```
 
 Put Open WebUI on the same Docker network and use http://polarion-mcp:3000/mcp as the URL. localhost inside the Open WebUI container is the container itself, not your host. Each user sends their own PAT; for a shared instance use a service account PAT and restrict who can use the tool.

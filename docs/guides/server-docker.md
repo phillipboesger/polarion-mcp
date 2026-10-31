@@ -82,7 +82,7 @@ docker run -d --name polarion-mcp \
   -p 127.0.0.1:3000:3000 \
   -e API_BASE_URL=https://YOUR-POLARION/polarion/rest/v1 \
   -e MCP_ALLOWED_HOSTS=localhost:3000,127.0.0.1:3000 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.5
+  ghcr.io/phillipboesger/polarion-mcp:1.5.0
 ```
 
 Windows PowerShell: put the whole `docker run` command on one line and remove the `\` line endings.
@@ -166,7 +166,7 @@ YOUR-MCP-HOST {
 ```yaml
 services:
   mcp:
-    image: ghcr.io/phillipboesger/polarion-mcp:1.4.5
+    image: ghcr.io/phillipboesger/polarion-mcp:1.5.0
     restart: unless-stopped
     environment:
       API_BASE_URL: https://YOUR-POLARION/polarion/rest/v1
@@ -303,7 +303,7 @@ Stop everything:
 docker compose down
 ```
 
-Pin a version by changing the image tag (`1.4.5`).
+Pin a version by changing the image tag (`1.5.0`).
 
 ## Connect your client
 
