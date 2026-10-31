@@ -18,7 +18,7 @@ const httpsUrl = value => {
 
 export function renderSiteClientsBlock(manifest) {
   const mode = id => manifest.serverModes.find(mode => mode.id === id);
-  // Nodes flagged site:false (APIs & SDKs) stay in the repo docs; the site only points to them.
+  // Nodes flagged site:false (More setups) stay in the repo docs; the site only points to them.
   const siteMap = manifest.map.filter(node => node.site !== false);
   const layout = layoutForMap(siteMap);
   const clientsById = new Map(manifest.clients.map(client => [client.id, client]));
@@ -70,7 +70,7 @@ export function renderSiteClientsBlock(manifest) {
       <div class="galaxy-sheet" id="galaxy-sheet" role="dialog" aria-label="Setup details" hidden></div>
       <script type="application/json" id="galaxy-data">${json}</script>
       <p id="path-status" class="sr-only" role="status" aria-live="polite"></p>
-      <p class="galaxy-more">Building on an API or SDK instead (Claude API, OpenAI Responses API, OpenAI Agents SDK)? See <a href="${httpsUrl(`${repoBlob}/docs/clients.md`)}" target="_blank" rel="noopener noreferrer">all supported clients ↗</a>.</p>
+      <p class="galaxy-more">Building on an API or SDK, or using a generic MCP or REST client, Open WebUI or LibreChat directly? See <a href="${httpsUrl(`${repoBlob}/docs/clients.md`)}" target="_blank" rel="noopener noreferrer">all supported clients ↗</a>.</p>
       <div class="galaxy-list">${listGroups}
         <section><h3>Self-hosted server</h3><ul><li><a class="guide-link" href="${httpsUrl(guideUrl('docker'))}">${escapeHtml(docker.name)}</a> - ${escapeHtml(docker.summary)}</li></ul></section>
       </div>

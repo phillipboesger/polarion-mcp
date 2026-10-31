@@ -12,7 +12,7 @@ import {
 } from '../scripts/galaxy-layout.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../docs/clients.json', import.meta.url)));
-// APIs & SDKs (site:false) are not drawn on the site map.
+// More setups (site:false) are not drawn on the site map.
 const data = { ...manifest, map: manifest.map.filter((node) => node.site !== false) };
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);

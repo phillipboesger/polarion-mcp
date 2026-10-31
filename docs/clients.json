@@ -79,7 +79,10 @@
             "n8n",
             "openai-api",
             "openai-agents",
-            "self-hosted"
+            "self-hosted",
+            "ollama",
+            "vllm",
+            "openrouter"
           ]
         }
       ]
@@ -175,21 +178,20 @@
     },
     {
       "id": "selfhosted",
-      "name": "Self-hosted & own",
+      "name": "Self-hosted & automation",
       "logo": "selfhosted",
       "color": "#c4a0ff",
       "angle": 219,
       "clients": [
-        "self-hosted",
-        "generic-stdio",
-        "generic-http",
-        "rest-wrapper",
+        "ollama",
+        "vllm",
+        "openrouter",
         "n8n"
       ]
     },
     {
       "id": "advanced",
-      "name": "APIs & SDKs",
+      "name": "More setups",
       "logo": "api",
       "color": "#9aa7b4",
       "angle": 0,
@@ -197,7 +199,11 @@
       "clients": [
         "claude-api",
         "openai-api",
-        "openai-agents"
+        "openai-agents",
+        "self-hosted",
+        "generic-stdio",
+        "generic-http",
+        "rest-wrapper"
       ]
     }
   ],
@@ -2426,6 +2432,296 @@
           "note": "Type streamable-http (alias http) is the recommended transport for multi-user use. Instead of one shared PAT you can let each user enter their own: declare customUserVars with a title and sensitive: true and use '{{VARIABLE}}' in the Authorization header. Servers added through MCP Settings in the UI can only reach remote URLs and drop ${ENV_VAR} placeholders from headers."
         },
         "note": "Choose the model backend in Open WebUI under Settings > Admin > Connections (for Ollama use Manage Ollama API Connections; with Docker and Ollama on the host the URL is http://host.docker.internal:11434; OpenRouter and vLLM go through an OpenAI-compatible connection). The MCP setup is identical for all of them. Pick a model with tool calling: Ollama tool-capable models, or OpenRouter models filtered with supported_parameters=tools (openrouter.ai/models?supported_parameters=tools). Open WebUI recommends reliable native tool calling; small local models often produce malformed tool calls.",
+        "needs": [
+          "Open WebUI v0.6.31+ (or LibreChat) running in Docker",
+          "WEBUI_SECRET_KEY set on Open WebUI",
+          "A model with tool calling support"
+        ],
+        "verify": {
+          "prompt": "Which Polarion user am I? Use getCurrentUser.",
+          "expect": "The model calls getCurrentUser and shows your Polarion user."
+        },
+        "fails": [
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
+          },
+          {
+            "symptom": "Failed to connect to MCP server",
+            "fix": "Read the Open WebUI server log. Typical fixes: with Bearer the Key must not be empty (an empty Bearer sends an empty Authorization header); raise MCP_INITIALIZE_TIMEOUT (default 10 seconds) for a slow server; if the Function Name Filter List is empty, try a single comma."
+          },
+          {
+            "symptom": "External Tool Servers is greyed out or the Add Connection menu is missing",
+            "fix": "ENABLE_TOOL_SERVERS is False, or your account is not an administrator. Only admins can add MCP servers."
+          },
+          {
+            "symptom": "Endless loading spinner after saving",
+            "fix": "The MCP config was saved as an OpenAPI connection (console: Cannot convert undefined or null to object). Delete the connection, refresh and re-add it with Type MCP (Streamable HTTP)."
+          },
+          {
+            "symptom": "The model never calls the tool",
+            "fix": "The model does not support tool calling or handles it badly. Pick a tool-capable model; in Open WebUI check Model Settings > Advanced Params > Function Calling (Native is the documented default) and try a stronger model."
+          },
+          {
+            "symptom": "Connection refused to localhost:3000",
+            "fix": "localhost inside the Open WebUI container is that container. Use the polarion-mcp container name on a shared Docker network, or http://host.docker.internal:PORT for a server on the Docker host."
+          },
+          {
+            "symptom": "LibreChat shows Disconnected or blocks the URL",
+            "fix": "Add the host and port to mcpSettings.allowedAddresses (for example polarion-mcp:3000), restart LibreChat and reconnect. Error messages say whether the server was unreachable, needed variables or needed sign-in."
+          }
+        ],
+        "serverSetup": "docker-self-hosted"
+      }
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama with Open WebUI or LibreChat",
+      "label": "Ollama",
+      "icon": "server",
+      "provider": "other",
+      "sources": [
+        "https://docs.openwebui.com/features/extensibility/mcp",
+        "https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama",
+        "https://docs.ollama.com/capabilities/tool-calling",
+        "https://www.librechat.ai/docs/features/mcp",
+        "https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers",
+        "https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_settings"
+      ],
+      "checked": "2026-10-30",
+      "note": "Ollama runs the model; Open WebUI or LibreChat is the MCP client that talks to this server. The model must support tool calling.",
+      "redirectUris": [],
+      "defaultMode": "server",
+      "unverified": [
+        "Open WebUI docs describe the Integrations page and Save but do not describe a Verify connection button or a tool list preview for Bearer connections. Enable the tool in a chat to check it.",
+        "Open WebUI's MCP page does not name the native function calling setting; its location (Model Settings > Advanced Params > Function Calling) comes from other Open WebUI doc pages found via search, and the page naming it was not opened.",
+        "Ollama's tool-calling page does not list which models support tools.",
+        "The LibreChat MCP feature page does not say whether MCP tools need an agent. The snippet follows the YAML reference and was not run here.",
+        "Not tested with Ollama."
+      ],
+      "summary": "Chat with local Ollama models in Open WebUI or LibreChat and let them use Polarion.",
+      "local": {
+        "reason": "The chat UI connects to the server by URL; use the Local setup of a desktop client instead if you only need stdio."
+      },
+      "server": {
+        "setup": "open-webui",
+        "steps": [
+          "Connect Open WebUI to Ollama first: Settings > Admin > Connections > Manage Ollama API Connections. With Docker and Ollama on the host the URL is http://host.docker.internal:11434. Pull a model that supports tool calling.",
+          "Start the server on the same Docker network as Open WebUI (see the server example under Prerequisites). Open WebUI must be v0.6.31 or newer and started with WEBUI_SECRET_KEY set.",
+          "In Open WebUI open Settings > Admin > Integrations. Under External Tool Servers click + Add Connection and set Type to MCP (Streamable HTTP), not OpenAPI. Only administrators can add MCP servers.",
+          "Enter http://polarion-mcp:3000/mcp as Server URL, choose Auth Bearer and paste your Polarion PAT as Key.",
+          "Click Save (restart Open WebUI if it asks you to). Optionally use Access Control to limit the server to users or groups.",
+          "In a chat with a tool-calling model open + > Integrations > Tools and enable the polarion tool."
+        ],
+        "alternative": {
+          "title": "LibreChat",
+          "description": "Same connection in librechat.yaml.",
+          "needs": [
+            "LibreChat running (Docker), with an agent or chat model that supports tool calling"
+          ],
+          "steps": [
+            "Add the block below to librechat.yaml. mcpSettings.allowedAddresses is needed because LibreChat blocks private and Docker-internal hosts by default; entries must include the port.",
+            "Restart LibreChat; librechat.yaml servers load at startup.",
+            "Open the MCP Servers section of the chat composer (or select the server in an agent) and enable polarion; the status should read Connected."
+          ],
+          "language": "yaml",
+          "snippet": "mcpServers:\n  polarion:\n    type: streamable-http\n    url: http://polarion-mcp:3000/mcp\n    headers:\n      Authorization: \"Bearer YOUR_POLARION_PAT\"\n\nmcpSettings:\n  allowedAddresses:\n    - \"polarion-mcp:3000\"",
+          "note": "Type streamable-http (alias http) is the recommended transport for multi-user use. Instead of one shared PAT you can let each user enter their own: declare customUserVars with a title and sensitive: true and use '{{VARIABLE}}' in the Authorization header. Servers added through MCP Settings in the UI can only reach remote URLs and drop ${ENV_VAR} placeholders from headers."
+        },
+        "note": "Pick a model with tool calling. Open WebUI recommends reliable native tool calling; small models often produce malformed tool calls.",
+        "needs": [
+          "Open WebUI v0.6.31+ (or LibreChat) running in Docker",
+          "WEBUI_SECRET_KEY set on Open WebUI",
+          "A model with tool calling support"
+        ],
+        "verify": {
+          "prompt": "Which Polarion user am I? Use getCurrentUser.",
+          "expect": "The model calls getCurrentUser and shows your Polarion user."
+        },
+        "fails": [
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
+          },
+          {
+            "symptom": "Failed to connect to MCP server",
+            "fix": "Read the Open WebUI server log. Typical fixes: with Bearer the Key must not be empty (an empty Bearer sends an empty Authorization header); raise MCP_INITIALIZE_TIMEOUT (default 10 seconds) for a slow server; if the Function Name Filter List is empty, try a single comma."
+          },
+          {
+            "symptom": "External Tool Servers is greyed out or the Add Connection menu is missing",
+            "fix": "ENABLE_TOOL_SERVERS is False, or your account is not an administrator. Only admins can add MCP servers."
+          },
+          {
+            "symptom": "Endless loading spinner after saving",
+            "fix": "The MCP config was saved as an OpenAPI connection (console: Cannot convert undefined or null to object). Delete the connection, refresh and re-add it with Type MCP (Streamable HTTP)."
+          },
+          {
+            "symptom": "The model never calls the tool",
+            "fix": "The model does not support tool calling or handles it badly. Pick a tool-capable model; in Open WebUI check Model Settings > Advanced Params > Function Calling (Native is the documented default) and try a stronger model."
+          },
+          {
+            "symptom": "Connection refused to localhost:3000",
+            "fix": "localhost inside the Open WebUI container is that container. Use the polarion-mcp container name on a shared Docker network, or http://host.docker.internal:PORT for a server on the Docker host."
+          },
+          {
+            "symptom": "LibreChat shows Disconnected or blocks the URL",
+            "fix": "Add the host and port to mcpSettings.allowedAddresses (for example polarion-mcp:3000), restart LibreChat and reconnect. Error messages say whether the server was unreachable, needed variables or needed sign-in."
+          }
+        ],
+        "serverSetup": "docker-self-hosted"
+      }
+    },
+    {
+      "id": "vllm",
+      "name": "vLLM with Open WebUI or LibreChat",
+      "label": "vLLM",
+      "icon": "server",
+      "provider": "other",
+      "sources": [
+        "https://docs.openwebui.com/features/extensibility/mcp",
+        "https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-vllm",
+        "https://docs.vllm.ai/en/stable/features/tool_calling/",
+        "https://www.librechat.ai/docs/features/mcp",
+        "https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers",
+        "https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_settings"
+      ],
+      "checked": "2026-10-30",
+      "note": "vLLM runs the model through an OpenAI-compatible API; Open WebUI or LibreChat is the MCP client that talks to this server. vLLM needs --enable-auto-tool-choice and a tool-call parser that matches the model.",
+      "redirectUris": [],
+      "defaultMode": "server",
+      "unverified": [
+        "Open WebUI docs describe the Integrations page and Save but do not describe a Verify connection button or a tool list preview for Bearer connections (only Check OAuth Discovery for OAuth). The old 'tool list must appear' check is replaced by enabling the tool in a chat.",
+        "Open WebUI's MCP page does not name the native function calling setting; its location (Model Settings > Advanced Params > Function Calling) comes from other Open WebUI doc pages found via search, and the page naming it was not opened.",
+        "The Open WebUI vLLM page does not cover tool calling; the vLLM flags come from the vLLM tool-calling page (the parser list depends on the model).",
+        "The LibreChat MCP feature page does not say whether MCP tools need an agent; the YAML reference says agents can use servers and chatMenu controls the composer menu. The snippet follows the docs and was not run here.",
+        "Not tested with vLLM."
+      ],
+      "summary": "Chat with models served by vLLM in Open WebUI or LibreChat and let them use Polarion.",
+      "local": {
+        "reason": "The chat UI connects to the server by URL; use the Local setup of a desktop client instead if you only need stdio."
+      },
+      "server": {
+        "setup": "open-webui",
+        "steps": [
+          "Start vLLM with tool calling enabled: vllm serve <model> --enable-auto-tool-choice --tool-call-parser <parser for your model>. In Open WebUI add it under Settings > Admin > Connections > Manage OpenAI API Connections > Add Connection with http://host.docker.internal:8000/v1 (Open WebUI in Docker) or http://localhost:8000/v1; choose Auth None unless you configured a key.",
+          "Start the server on the same Docker network as Open WebUI (see the server example under Prerequisites). Open WebUI must be v0.6.31 or newer and started with WEBUI_SECRET_KEY set.",
+          "In Open WebUI open Settings > Admin > Integrations. Under External Tool Servers click + Add Connection and set Type to MCP (Streamable HTTP), not OpenAPI. Only administrators can add MCP servers.",
+          "Enter http://polarion-mcp:3000/mcp as Server URL, choose Auth Bearer and paste your Polarion PAT as Key.",
+          "Click Save (restart Open WebUI if it asks you to). Optionally use Access Control to limit the server to users or groups.",
+          "In a chat with a tool-calling model open + > Integrations > Tools and enable the polarion tool."
+        ],
+        "alternative": {
+          "title": "LibreChat",
+          "description": "Same connection in librechat.yaml.",
+          "needs": [
+            "LibreChat running (Docker), with an agent or chat model that supports tool calling"
+          ],
+          "steps": [
+            "Add the block below to librechat.yaml. mcpSettings.allowedAddresses is needed because LibreChat blocks private and Docker-internal hosts by default; entries must include the port.",
+            "Restart LibreChat; librechat.yaml servers load at startup.",
+            "Open the MCP Servers section of the chat composer (or select the server in an agent) and enable polarion; the status should read Connected."
+          ],
+          "language": "yaml",
+          "snippet": "mcpServers:\n  polarion:\n    type: streamable-http\n    url: http://polarion-mcp:3000/mcp\n    headers:\n      Authorization: \"Bearer YOUR_POLARION_PAT\"\n\nmcpSettings:\n  allowedAddresses:\n    - \"polarion-mcp:3000\"",
+          "note": "Type streamable-http (alias http) is the recommended transport for multi-user use. Instead of one shared PAT you can let each user enter their own: declare customUserVars with a title and sensitive: true and use '{{VARIABLE}}' in the Authorization header. Servers added through MCP Settings in the UI can only reach remote URLs and drop ${ENV_VAR} placeholders from headers."
+        },
+        "note": "Pick a model with tool calling. Open WebUI recommends reliable native tool calling; small models often produce malformed tool calls.",
+        "needs": [
+          "Open WebUI v0.6.31+ (or LibreChat) running in Docker",
+          "WEBUI_SECRET_KEY set on Open WebUI",
+          "A model with tool calling support"
+        ],
+        "verify": {
+          "prompt": "Which Polarion user am I? Use getCurrentUser.",
+          "expect": "The model calls getCurrentUser and shows your Polarion user."
+        },
+        "fails": [
+          {
+            "symptom": "401 \"Polarion did not accept this token\"",
+            "fix": "The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged."
+          },
+          {
+            "symptom": "Failed to connect to MCP server",
+            "fix": "Read the Open WebUI server log. Typical fixes: with Bearer the Key must not be empty (an empty Bearer sends an empty Authorization header); raise MCP_INITIALIZE_TIMEOUT (default 10 seconds) for a slow server; if the Function Name Filter List is empty, try a single comma."
+          },
+          {
+            "symptom": "External Tool Servers is greyed out or the Add Connection menu is missing",
+            "fix": "ENABLE_TOOL_SERVERS is False, or your account is not an administrator. Only admins can add MCP servers."
+          },
+          {
+            "symptom": "Endless loading spinner after saving",
+            "fix": "The MCP config was saved as an OpenAPI connection (console: Cannot convert undefined or null to object). Delete the connection, refresh and re-add it with Type MCP (Streamable HTTP)."
+          },
+          {
+            "symptom": "The model never calls the tool",
+            "fix": "The model does not support tool calling or handles it badly. Pick a tool-capable model; in Open WebUI check Model Settings > Advanced Params > Function Calling (Native is the documented default) and try a stronger model."
+          },
+          {
+            "symptom": "Connection refused to localhost:3000",
+            "fix": "localhost inside the Open WebUI container is that container. Use the polarion-mcp container name on a shared Docker network, or http://host.docker.internal:PORT for a server on the Docker host."
+          },
+          {
+            "symptom": "LibreChat shows Disconnected or blocks the URL",
+            "fix": "Add the host and port to mcpSettings.allowedAddresses (for example polarion-mcp:3000), restart LibreChat and reconnect. Error messages say whether the server was unreachable, needed variables or needed sign-in."
+          }
+        ],
+        "serverSetup": "docker-self-hosted"
+      }
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter with Open WebUI or LibreChat",
+      "label": "OpenRouter",
+      "icon": "server",
+      "provider": "other",
+      "sources": [
+        "https://docs.openwebui.com/features/extensibility/mcp",
+        "https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-openai-compatible",
+        "https://openrouter.ai/docs/features/tool-calling",
+        "https://www.librechat.ai/docs/features/mcp",
+        "https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers",
+        "https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_settings"
+      ],
+      "checked": "2026-10-30",
+      "note": "OpenRouter supplies the models through an OpenAI-compatible API; Open WebUI or LibreChat is the MCP client that talks to this server. Pick a model that supports tool calling.",
+      "redirectUris": [],
+      "defaultMode": "server",
+      "unverified": [
+        "Open WebUI docs describe the Integrations page and Save but do not describe a Verify connection button or a tool list preview for Bearer connections (only Check OAuth Discovery for OAuth). The old 'tool list must appear' check is replaced by enabling the tool in a chat.",
+        "Open WebUI's MCP page does not name the native function calling setting; its location (Model Settings > Advanced Params > Function Calling) comes from other Open WebUI doc pages found via search, and the page naming it was not opened.",
+        "The LibreChat MCP feature page does not say whether MCP tools need an agent; the YAML reference says agents can use servers and chatMenu controls the composer menu. The snippet follows the docs and was not run here.",
+        "Not tested with OpenRouter."
+      ],
+      "summary": "Chat with OpenRouter models in Open WebUI or LibreChat and let them use Polarion.",
+      "local": {
+        "reason": "The chat UI connects to the server by URL; use the Local setup of a desktop client instead if you only need stdio."
+      },
+      "server": {
+        "setup": "open-webui",
+        "steps": [
+          "Add OpenRouter in Open WebUI under Settings > Admin > Connections > Manage OpenAI API Connections: URL https://openrouter.ai/api/v1, API key from openrouter.ai/keys. Add only the model IDs you need to the Model IDs allowlist, and choose models that support tools (openrouter.ai/models?supported_parameters=tools).",
+          "Start the server on the same Docker network as Open WebUI (see the server example under Prerequisites). Open WebUI must be v0.6.31 or newer and started with WEBUI_SECRET_KEY set.",
+          "In Open WebUI open Settings > Admin > Integrations. Under External Tool Servers click + Add Connection and set Type to MCP (Streamable HTTP), not OpenAPI. Only administrators can add MCP servers.",
+          "Enter http://polarion-mcp:3000/mcp as Server URL, choose Auth Bearer and paste your Polarion PAT as Key.",
+          "Click Save (restart Open WebUI if it asks you to). Optionally use Access Control to limit the server to users or groups.",
+          "In a chat with a tool-calling model open + > Integrations > Tools and enable the polarion tool."
+        ],
+        "alternative": {
+          "title": "LibreChat",
+          "description": "Same connection in librechat.yaml.",
+          "needs": [
+            "LibreChat running (Docker), with an agent or chat model that supports tool calling"
+          ],
+          "steps": [
+            "Add the block below to librechat.yaml. mcpSettings.allowedAddresses is needed because LibreChat blocks private and Docker-internal hosts by default; entries must include the port.",
+            "Restart LibreChat; librechat.yaml servers load at startup.",
+            "Open the MCP Servers section of the chat composer (or select the server in an agent) and enable polarion; the status should read Connected."
+          ],
+          "language": "yaml",
+          "snippet": "mcpServers:\n  polarion:\n    type: streamable-http\n    url: http://polarion-mcp:3000/mcp\n    headers:\n      Authorization: \"Bearer YOUR_POLARION_PAT\"\n\nmcpSettings:\n  allowedAddresses:\n    - \"polarion-mcp:3000\"",
+          "note": "Type streamable-http (alias http) is the recommended transport for multi-user use. Instead of one shared PAT you can let each user enter their own: declare customUserVars with a title and sensitive: true and use '{{VARIABLE}}' in the Authorization header. Servers added through MCP Settings in the UI can only reach remote URLs and drop ${ENV_VAR} placeholders from headers."
+        },
+        "note": "Pick a model with tool calling. Open WebUI recommends reliable native tool calling; small models often produce malformed tool calls.",
         "needs": [
           "Open WebUI v0.6.31+ (or LibreChat) running in Docker",
           "WEBUI_SECRET_KEY set on Open WebUI",

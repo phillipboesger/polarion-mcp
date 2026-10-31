@@ -37,6 +37,9 @@ Connecting to a team's server URL is the client side of the Server setup: it nee
 | Microsoft 365 Copilot / Teams | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/m365-copilot.md) |
 | Mistral Le Chat | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/mistral-le-chat.md) |
 | Open WebUI or LibreChat with your own models | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/self-hosted.md) |
+| Ollama with Open WebUI or LibreChat | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/ollama.md) |
+| vLLM with Open WebUI or LibreChat | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/vllm.md) |
+| OpenRouter with Open WebUI or LibreChat | No | Yes (docs) | [Open guide](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/guides/clients/openrouter.md) |
 
 Guides record the vendor sources checked on 2026-10-24. In the table, **developer** means the maintainer ran the setup end to end and recorded it in a dated `verified` block in the guide. **docs** means the setup follows the vendor documentation but was not run by the maintainer. The source of truth is [clients.json](clients.json); run `npm run docs:clients` and `npm run docs:site` after editing it.
 
