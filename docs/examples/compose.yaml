@@ -1,6 +1,6 @@
 services:
   mcp:
-    image: ghcr.io/phillipboesger/polarion-mcp:1.4.5
+    image: ghcr.io/phillipboesger/polarion-mcp:1.5.0
     restart: unless-stopped
     environment:
       API_BASE_URL: https://YOUR-POLARION/polarion/rest/v1

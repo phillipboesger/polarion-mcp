@@ -31,7 +31,7 @@ docker run -d --name polarion-mcp \
   -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \
   -e MCP_ALLOWED_REDIRECT_PREFIXES=https://YOUR-LE-CHAT-CALLBACK \
   -e TRUST_PROXY=1 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.5
+  ghcr.io/phillipboesger/polarion-mcp:1.5.0
 ```
 
 Mistral does not document the Le Chat callback URL, so there is no built-in mistral preset (it stays empty and denies everything). Add the connector once, copy the redirect_uri that the server rejects from its log, put it in MCP_ALLOWED_REDIRECT_PREFIXES and restart. Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000. Generate a stable secret of at least 32 characters.

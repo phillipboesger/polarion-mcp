@@ -32,7 +32,7 @@ docker run -d --name polarion-mcp \
   -e MCP_TOKEN_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_CHARS \
   -e MCP_ALLOWED_REDIRECT_PRESETS=m365 \
   -e TRUST_PROXY=1 \
-  ghcr.io/phillipboesger/polarion-mcp:1.4.5
+  ghcr.io/phillipboesger/polarion-mcp:1.5.0
 ```
 
 Put a TLS reverse proxy at https://YOUR-SERVER in front of 127.0.0.1:3000 and forward the public Host. TRUST_PROXY=1 assumes exactly one trusted hop. The m365 preset allows only Microsoft’s fixed callback https://teams.microsoft.com/api/platform/v1.0/oAuthRedirect. Generate a stable secret of at least 32 characters.

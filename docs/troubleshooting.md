@@ -73,7 +73,7 @@ For cloud connectors, ensure the MCP hostname resolves publicly, ports 80 and 44
 Keep TLS verification enabled. Mount the company CA PEM into the MCP container and set `NODE_EXTRA_CA_CERTS=/certs/ca.pem` (for example `-v /path/ca.pem:/certs/ca.pem:ro -e NODE_EXTRA_CA_CERTS=/certs/ca.pem`). For npm mode, set `NODE_EXTRA_CA_CERTS` in the client environment. This adds trusted roots without disabling certificate checks.
 
 **Should I use polarion-mcp@latest or a pinned version?**
-The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.4.5` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client.
+The plain `npx -y polarion-mcp` can keep using an older copy from npm's cache. `polarion-mcp@latest` checks the registry at every start and picks up new releases, which can change the tool list without notice. `polarion-mcp@1.5.0` always runs exactly that release. Teams should pin and upgrade on purpose. To force a refresh, switch to `@latest` or a newer pinned version and restart the client.
 
 **How do I update the Docker server?**
 Choose the new tag on the GitHub package page, then run `docker pull ghcr.io/phillipboesger/polarion-mcp:NEWTAG`, `docker rm -f polarion-mcp`, and the same `docker run` command with the new tag. Keep `MCP_TOKEN_SECRET` unchanged so users stay signed in. With a team URL the administrator updates the server and you only reconnect.
