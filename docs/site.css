@@ -278,5 +278,6 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
 .galaxy .ver { margin:10px 0 0; font-size:12px; opacity:.75; }
 
 .galaxy-more { text-align:center; font-size:13px; opacity:.8; margin:14px 0 0; }
+@media(max-width:640px) { .galaxy-more { font-size:12px; line-height:1.5; } }
 .galaxy .go.vendor-link { background:transparent; color:#bdeeff; border:1px solid rgba(98,214,255,.45); margin-top:8px; }
 .galaxy .go.vendor-link:hover { background:rgba(98,214,255,.15); }
