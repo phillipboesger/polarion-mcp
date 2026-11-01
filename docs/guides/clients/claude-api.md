@@ -2,7 +2,7 @@
 
 Your own code calling the Claude Messages API. Default: **Server**.
 
-Official documentation: [platform.claude.com](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
+Documentation: [platform.claude.com/docs/en/agents-and-tools/mcp-connector](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
 
 Verification status:
 
@@ -91,7 +91,7 @@ Expected: Response has mcp_tool_use and mcp_tool_result blocks, then your Polari
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
+- [platform.claude.com/docs/en/agents-and-tools/mcp-connector](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
 
 Not confirmed in the vendor documentation:
 

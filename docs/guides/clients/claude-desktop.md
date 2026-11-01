@@ -2,7 +2,7 @@
 
 Claude app on your computer. Default: **Local**.
 
-Official documentation: [modelcontextprotocol.io](https://modelcontextprotocol.io/docs/develop/connect-local-servers), [support.claude.com](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp), [claude.com](https://claude.com/docs/connectors/custom/add-unlisted.md)
+Documentation: [modelcontextprotocol.io/docs/develop/connect-local-servers](https://modelcontextprotocol.io/docs/develop/connect-local-servers), [support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp), [claude.com/docs/connectors/custom/add-unlisted.md](https://claude.com/docs/connectors/custom/add-unlisted.md)
 
 Verification status:
 
@@ -126,13 +126,13 @@ Expected: Claude calls a Polarion tool and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://modelcontextprotocol.io/docs/develop/connect-local-servers)
-- [Official documentation 2](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
-- [Official documentation 3](https://claude.com/docs/connectors/custom/add-unlisted.md)
-- [Official documentation 4](https://claude.com/docs/connectors/building/authentication.md)
-- [Official documentation 5](https://claude.com/docs/connectors/building/troubleshooting.md)
-- [Official documentation 6](https://claude.com/docs/connectors/building/testing.md)
-- [Official documentation 7](https://claude.com/docs/connectors/mcp-tunnels/overview)
+- [modelcontextprotocol.io/docs/develop/connect-local-servers](https://modelcontextprotocol.io/docs/develop/connect-local-servers)
+- [support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+- [claude.com/docs/connectors/custom/add-unlisted.md](https://claude.com/docs/connectors/custom/add-unlisted.md)
+- [claude.com/docs/connectors/building/authentication.md](https://claude.com/docs/connectors/building/authentication.md)
+- [claude.com/docs/connectors/building/troubleshooting.md](https://claude.com/docs/connectors/building/troubleshooting.md)
+- [claude.com/docs/connectors/building/testing.md](https://claude.com/docs/connectors/building/testing.md)
+- [claude.com/docs/connectors/mcp-tunnels/overview](https://claude.com/docs/connectors/mcp-tunnels/overview)
 
 Not confirmed in the vendor documentation:
 

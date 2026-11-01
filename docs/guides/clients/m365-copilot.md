@@ -2,7 +2,7 @@
 
 Declarative agents in Microsoft 365 Copilot Chat and Teams. Default: **Server**.
 
-Official documentation: [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth), [microsoft.github.io](https://microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth), [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-mcp-plugins)
+Documentation: [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth), [microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth](https://microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth), [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-mcp-plugins](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-mcp-plugins)
 
 Verification status:
 
@@ -87,16 +87,16 @@ Expected: The agent calls getCurrentUser and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth)
-- [Official documentation 2](https://microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth)
-- [Official documentation 3](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-mcp-plugins)
-- [Official documentation 4](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication)
-- [Official documentation 5](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-dynamic-client-registration)
-- [Official documentation 6](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-dynamic-tool-discovery)
-- [Official documentation 7](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/prerequisites)
-- [Official documentation 8](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish)
-- [Official documentation 9](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/configure-plugin-mcp-servers)
-- [Official documentation 10](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-reuse-mcp-servers)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth)
+- [microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth](https://microsoft.github.io/copilot-camp/pages/extend-m365-copilot/10-mcp-auth)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-mcp-plugins](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-mcp-plugins)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-dynamic-client-registration](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-dynamic-client-registration)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-dynamic-tool-discovery](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-dynamic-tool-discovery)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/prerequisites](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/prerequisites)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/configure-plugin-mcp-servers](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/configure-plugin-mcp-servers)
+- [learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-reuse-mcp-servers](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/build-reuse-mcp-servers)
 
 Not confirmed in the vendor documentation:
 

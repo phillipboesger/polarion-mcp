@@ -2,7 +2,7 @@
 
 Any MCP client that connects to a URL. Default: **Server**.
 
-Official documentation: [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+Documentation: [modelcontextprotocol.io/specification/2025-11-25/basic/transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 
 Verification status:
 
@@ -68,6 +68,6 @@ Expected: HTTP 200 with "serverInfo" and an mcp-session-id header. No key gives 
 
 Checked against the vendor documentation on 2026-10-24.
 
-- [Official documentation](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+- [modelcontextprotocol.io/specification/2025-11-25/basic/transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 
 Back to the [client index](../../clients.md).

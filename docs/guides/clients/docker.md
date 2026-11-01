@@ -64,7 +64,7 @@ Expected: The client shows your Polarion user, or at least the tool list.
 
 Checked against the vendor documentation on 2026-10-24.
 
-- [Server implementation 1](https://github.com/phillipboesger/polarion-mcp/blob/main/Dockerfile)
-- [Server implementation 2](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/deployment.md)
+- [Server implementation](https://github.com/phillipboesger/polarion-mcp/blob/main/Dockerfile)
+- [Server implementation](https://github.com/phillipboesger/polarion-mcp/blob/main/docs/deployment.md)
 
 Back to the [client index](../../clients.md).

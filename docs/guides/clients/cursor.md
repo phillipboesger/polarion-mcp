@@ -2,7 +2,7 @@
 
 Cursor editor. Default: **Local**.
 
-Official documentation: [cursor.com](https://cursor.com/docs/mcp)
+Documentation: [cursor.com/docs/mcp](https://cursor.com/docs/mcp)
 
 Verification status:
 
@@ -129,7 +129,7 @@ Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation](https://cursor.com/docs/mcp)
+- [cursor.com/docs/mcp](https://cursor.com/docs/mcp)
 
 Not confirmed in the vendor documentation:
 

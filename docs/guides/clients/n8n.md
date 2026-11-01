@@ -2,7 +2,7 @@
 
 n8n workflows calling the REST wrapper. Default: **Server**.
 
-Official documentation: [docs.n8n.io](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/), [docs.n8n.io](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/common-issues/), [docs.n8n.io](https://docs.n8n.io/integrations/builtin/credentials/httprequest/)
+Documentation: [docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/), [docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/common-issues](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/common-issues/), [docs.n8n.io/integrations/builtin/credentials/httprequest](https://docs.n8n.io/integrations/builtin/credentials/httprequest/)
 
 Verification status:
 
@@ -79,10 +79,10 @@ Expected: Node output shows the Polarion projects as JSON.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/)
-- [Official documentation 2](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/common-issues/)
-- [Official documentation 3](https://docs.n8n.io/integrations/builtin/credentials/httprequest/)
-- [Official documentation 4](https://docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.toolmcp/)
+- [docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/)
+- [docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/common-issues](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/common-issues/)
+- [docs.n8n.io/integrations/builtin/credentials/httprequest](https://docs.n8n.io/integrations/builtin/credentials/httprequest/)
+- [docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.toolmcp](https://docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.toolmcp/)
 
 Not confirmed in the vendor documentation:
 

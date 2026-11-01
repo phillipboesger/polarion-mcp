@@ -2,7 +2,7 @@
 
 Your own code calling the OpenAI Responses API. Default: **Server**.
 
-Official documentation: [developers.openai.com](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
+Documentation: [developers.openai.com/api/docs/guides/tools-connectors-mcp](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
 
 Verification status:
 
@@ -89,7 +89,7 @@ Expected: mcp_list_tools, mcp_approval_request; after approval, mcp_call and you
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
+- [developers.openai.com/api/docs/guides/tools-connectors-mcp](https://developers.openai.com/api/docs/guides/tools-connectors-mcp)
 
 Not confirmed in the vendor documentation:
 

@@ -69,7 +69,7 @@ Expected: JSON with your Polarion user. Without the key, /api/tools answers 401.
 
 Checked against the vendor documentation on 2026-10-24.
 
-- [Server implementation 1](https://github.com/phillipboesger/polarion-mcp/blob/main/src/http-server.ts)
-- [Server implementation 2](https://github.com/phillipboesger/polarion-mcp/blob/main/src/rest-api.ts)
+- [Server implementation](https://github.com/phillipboesger/polarion-mcp/blob/main/src/http-server.ts)
+- [Server implementation](https://github.com/phillipboesger/polarion-mcp/blob/main/src/rest-api.ts)
 
 Back to the [client index](../../clients.md).

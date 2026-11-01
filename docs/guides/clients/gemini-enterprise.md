@@ -2,7 +2,7 @@
 
 Gemini Enterprise agents for your organization. Default: **Server**.
 
-Official documentation: [docs.cloud.google.com](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
+Documentation: [docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
 
 Verification status:
 
@@ -81,7 +81,7 @@ Expected: Gemini Enterprise calls a Polarion action and shows your Polarion user
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
+- [docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server](https://docs.cloud.google.com/gemini/enterprise/docs/connectors/custom-mcp-server/set-up-custom-mcp-server)
 
 Not confirmed in the vendor documentation:
 

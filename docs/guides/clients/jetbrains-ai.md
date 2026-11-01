@@ -2,7 +2,7 @@
 
 AI Assistant in JetBrains IDEs. Default: **Local**.
 
-Official documentation: [www.jetbrains.com](https://www.jetbrains.com/help/ai-assistant/mcp.html)
+Documentation: [jetbrains.com/help/ai-assistant/mcp.html](https://www.jetbrains.com/help/ai-assistant/mcp.html)
 
 Verification status:
 
@@ -107,7 +107,7 @@ Expected: The assistant calls getCurrentUser and shows your Polarion user. A 403
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation](https://www.jetbrains.com/help/ai-assistant/mcp.html)
+- [jetbrains.com/help/ai-assistant/mcp.html](https://www.jetbrains.com/help/ai-assistant/mcp.html)
 
 Not confirmed in the vendor documentation:
 
