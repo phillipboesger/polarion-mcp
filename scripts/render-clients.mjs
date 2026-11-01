@@ -54,7 +54,7 @@ export function renderClientGuide(manifest, client) {
   const unsupported = modes.filter(mode => !supported(client[mode])).map(mode => `- **${modeLabel[mode]} is not supported:** ${client[mode].reason}`);
   const vendorLinks = client.sources.filter(source => !source.includes('github.com/phillipboesger') && !/\/blob\/[0-9a-f]{40}\//.test(source)).slice(0, 3);
   const vendorLine = vendorLinks.length ? `\n\n${client.thirdPartySources ? 'Third-party guides' : 'Documentation'}: ${vendorLinks.map(source => `[${linkLabel(source)}](${source})`).join(', ')}` : '';
-  const sources = client.sources.map((source, i) => `- [${source.includes('github.com/phillipboesger') ? 'Server implementation' : linkLabel(source)}](${source})`);
+  const sources = client.sources.map(source => `- [${source.includes('github.com/phillipboesger') ? 'Server implementation' : linkLabel(source)}](${source})`);
   const unverified = client.unverified?.length ? `\n\nNot confirmed in the vendor documentation:\n\n${client.unverified.map(item => `- ${item}`).join('\n')}` : '';
   const verifiedLines = modes.filter(mode => client.verified?.[mode]).map(mode => { const v = client.verified[mode]; return `- ${modeLabel[mode]}: verified on ${v.date} with ${v.client} ${v.clientVersion}, polarion-mcp ${v.mcpVersion}, Polarion ${v.polarion} (${v.evidence}).`; });
   const statusLines = modes.filter(mode => supported(client[mode])).map(mode => `- ${modeLabel[mode]}: ${verifiedByDeveloper(client, mode) ? 'verified by developer' : 'verified by documentation only'}`);
