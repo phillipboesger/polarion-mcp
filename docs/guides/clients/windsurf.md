@@ -2,7 +2,7 @@
 
 Windsurf editor. Default: **Local**.
 
-Official documentation: [docs.windsurf.com](https://docs.windsurf.com/windsurf/cascade/mcp), [docs.windsurf.com](https://docs.windsurf.com/fr/windsurf/cascade/mcp), [docs.devin.ai](https://docs.devin.ai/desktop/cascade/mcp)
+Documentation: [docs.windsurf.com/windsurf/cascade/mcp](https://docs.windsurf.com/windsurf/cascade/mcp), [docs.windsurf.com/fr/windsurf/cascade/mcp](https://docs.windsurf.com/fr/windsurf/cascade/mcp), [docs.devin.ai/desktop/cascade/mcp](https://docs.devin.ai/desktop/cascade/mcp)
 
 Verification status:
 
@@ -183,10 +183,10 @@ Expected: The assistant calls getCurrentUser and shows your Polarion user. A 403
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://docs.windsurf.com/windsurf/cascade/mcp)
-- [Official documentation 2](https://docs.windsurf.com/fr/windsurf/cascade/mcp)
-- [Official documentation 3](https://docs.devin.ai/desktop/cascade/mcp)
-- [Official documentation 4](https://docs.devin.ai/cli/extensibility/mcp/configuration)
+- [docs.windsurf.com/windsurf/cascade/mcp](https://docs.windsurf.com/windsurf/cascade/mcp)
+- [docs.windsurf.com/fr/windsurf/cascade/mcp](https://docs.windsurf.com/fr/windsurf/cascade/mcp)
+- [docs.devin.ai/desktop/cascade/mcp](https://docs.devin.ai/desktop/cascade/mcp)
+- [docs.devin.ai/cli/extensibility/mcp/configuration](https://docs.devin.ai/cli/extensibility/mcp/configuration)
 
 Not confirmed in the vendor documentation:
 

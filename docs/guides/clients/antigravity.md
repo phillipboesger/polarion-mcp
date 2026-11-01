@@ -2,7 +2,7 @@
 
 Google’s agent CLI (agy) and IDE, the successor to Gemini CLI. Default: **Local**.
 
-Official documentation: [antigravity.google](https://antigravity.google/docs/mcp), [developers.google.com](https://developers.google.com/workspace/guides/configure-mcp-servers), [geminicli.com](https://geminicli.com/docs/tools/mcp-server/)
+Documentation: [antigravity.google/docs/mcp](https://antigravity.google/docs/mcp), [developers.google.com/workspace/guides/configure-mcp-servers](https://developers.google.com/workspace/guides/configure-mcp-servers), [geminicli.com/docs/tools/mcp-server](https://geminicli.com/docs/tools/mcp-server/)
 
 Verification status:
 
@@ -125,9 +125,9 @@ Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://antigravity.google/docs/mcp)
-- [Official documentation 2](https://developers.google.com/workspace/guides/configure-mcp-servers)
-- [Official documentation 3](https://geminicli.com/docs/tools/mcp-server/)
+- [antigravity.google/docs/mcp](https://antigravity.google/docs/mcp)
+- [developers.google.com/workspace/guides/configure-mcp-servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
+- [geminicli.com/docs/tools/mcp-server](https://geminicli.com/docs/tools/mcp-server/)
 
 Not confirmed in the vendor documentation:
 

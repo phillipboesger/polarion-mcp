@@ -2,7 +2,7 @@
 
 Claude in your terminal. Default: **Local**.
 
-Official documentation: [code.claude.com](https://code.claude.com/docs/en/mcp), [code.claude.com](https://code.claude.com/docs/en/mcp-quickstart), [claude.com](https://claude.com/docs/connectors/building/authentication.md)
+Documentation: [code.claude.com/docs/en/mcp](https://code.claude.com/docs/en/mcp), [code.claude.com/docs/en/mcp-quickstart](https://code.claude.com/docs/en/mcp-quickstart), [claude.com/docs/connectors/building/authentication.md](https://claude.com/docs/connectors/building/authentication.md)
 
 Verification status:
 
@@ -107,9 +107,9 @@ Expected: Claude shows your Polarion user. /mcp shows polarion as connected.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://code.claude.com/docs/en/mcp)
-- [Official documentation 2](https://code.claude.com/docs/en/mcp-quickstart)
-- [Official documentation 3](https://claude.com/docs/connectors/building/authentication.md)
+- [code.claude.com/docs/en/mcp](https://code.claude.com/docs/en/mcp)
+- [code.claude.com/docs/en/mcp-quickstart](https://code.claude.com/docs/en/mcp-quickstart)
+- [claude.com/docs/connectors/building/authentication.md](https://claude.com/docs/connectors/building/authentication.md)
 
 Not confirmed in the vendor documentation:
 

@@ -2,7 +2,7 @@
 
 Mistral’s chat assistant, EU-hosted. Default: **Server**.
 
-Official documentation: [docs.mistral.ai](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors), [docs.mistral.ai](https://docs.mistral.ai/studio/connectors/management)
+Documentation: [docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors), [docs.mistral.ai/studio/connectors/management](https://docs.mistral.ai/studio/connectors/management)
 
 Verification status:
 
@@ -75,8 +75,8 @@ Expected: Le Chat calls getCurrentUser and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors)
-- [Official documentation 2](https://docs.mistral.ai/studio/connectors/management)
+- [docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors)
+- [docs.mistral.ai/studio/connectors/management](https://docs.mistral.ai/studio/connectors/management)
 
 Not confirmed in the vendor documentation:
 

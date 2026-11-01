@@ -146,8 +146,7 @@ test('every client opens a panel with its guide, working modes and explained uns
     await expect(panel).toBeVisible();
     await expect(panel.locator('h3')).toHaveText(client.name);
     await expect(panel.locator('a.go').first()).toHaveAttribute('href', `${guideBase}clients/${client.id}.md`);
-    const vendorDocs = client.sources.find(source => !source.includes('github.com/phillipboesger') && !/\/blob\/[0-9a-f]{40}\//.test(source));
-    if (vendorDocs) await expect(panel.locator('a.vendor-link')).toHaveAttribute('href', vendorDocs);
+    await expect(panel.locator('a.vendor-link')).toHaveCount(0);
     for (const mode of ['local', 'server']) {
       const button = panel.locator(`.env[data-env="${mode}"]`);
       if (client[mode].reason) {

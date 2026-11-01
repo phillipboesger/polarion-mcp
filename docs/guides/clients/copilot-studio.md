@@ -2,7 +2,7 @@
 
 Microsoft Copilot Studio agents for your team. Default: **Server**.
 
-Official documentation: [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent), [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp), [learn.microsoft.com](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-components-to-agent)
+Documentation: [learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent), [learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp), [learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-components-to-agent](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-components-to-agent)
 
 Verification status:
 
@@ -83,12 +83,12 @@ Expected: The assistant calls getCurrentUser and shows your Polarion user. A 403
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent)
-- [Official documentation 2](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp)
-- [Official documentation 3](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-components-to-agent)
-- [Official documentation 4](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-troubleshooting)
-- [Official documentation 5](https://learn.microsoft.com/en-us/microsoft-copilot-studio/add-tools-custom-agent)
-- [Official documentation 6](https://learn.microsoft.com/en-us/microsoft-copilot-studio/requirements-licensing)
+- [learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent)
+- [learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp](https://learn.microsoft.com/en-us/microsoft-copilot-studio/agent-extend-action-mcp)
+- [learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-components-to-agent](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-components-to-agent)
+- [learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-troubleshooting](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-troubleshooting)
+- [learn.microsoft.com/en-us/microsoft-copilot-studio/add-tools-custom-agent](https://learn.microsoft.com/en-us/microsoft-copilot-studio/add-tools-custom-agent)
+- [learn.microsoft.com/en-us/microsoft-copilot-studio/requirements-licensing](https://learn.microsoft.com/en-us/microsoft-copilot-studio/requirements-licensing)
 
 Not confirmed in the vendor documentation:
 

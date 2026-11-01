@@ -2,7 +2,7 @@
 
 Open WebUI or LibreChat with Ollama, vLLM, OpenRouter or any OpenAI-compatible model. Default: **Server**.
 
-Official documentation: [docs.openwebui.com](https://docs.openwebui.com/features/extensibility/mcp), [docs.openwebui.com](https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama), [www.librechat.ai](https://www.librechat.ai/docs/features/mcp)
+Documentation: [docs.openwebui.com/features/extensibility/mcp](https://docs.openwebui.com/features/extensibility/mcp), [docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama](https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama), [librechat.ai/docs/features/mcp](https://www.librechat.ai/docs/features/mcp)
 
 Verification status:
 
@@ -101,13 +101,13 @@ Expected: The model calls getCurrentUser and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://docs.openwebui.com/features/extensibility/mcp)
-- [Official documentation 2](https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama)
-- [Official documentation 3](https://www.librechat.ai/docs/features/mcp)
-- [Official documentation 4](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers)
-- [Official documentation 5](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_settings)
-- [Official documentation 6](https://docs.ollama.com/capabilities/tool-calling)
-- [Official documentation 7](https://openrouter.ai/docs/features/tool-calling)
+- [docs.openwebui.com/features/extensibility/mcp](https://docs.openwebui.com/features/extensibility/mcp)
+- [docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama](https://docs.openwebui.com/getting-started/quick-start/connect-a-provider/starting-with-ollama)
+- [librechat.ai/docs/features/mcp](https://www.librechat.ai/docs/features/mcp)
+- [librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_servers)
+- [librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_settings](https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/mcp_settings)
+- [docs.ollama.com/capabilities/tool-calling](https://docs.ollama.com/capabilities/tool-calling)
+- [openrouter.ai/docs/features/tool-calling](https://openrouter.ai/docs/features/tool-calling)
 
 Not confirmed in the vendor documentation:
 

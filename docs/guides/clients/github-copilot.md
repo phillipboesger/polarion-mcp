@@ -2,7 +2,7 @@
 
 GitHub Copilot agent mode in VS Code, Visual Studio, JetBrains IDEs, Eclipse and Xcode. Default: **Local**.
 
-Official documentation: [code.visualstudio.com](https://code.visualstudio.com/docs/agents/reference/mcp-configuration), [code.visualstudio.com](https://code.visualstudio.com/docs/copilot/customization/mcp-servers), [code.visualstudio.com](https://code.visualstudio.com/docs/agents/run/manage-mcp-servers)
+Documentation: [code.visualstudio.com/docs/agents/reference/mcp-configuration](https://code.visualstudio.com/docs/agents/reference/mcp-configuration), [code.visualstudio.com/docs/copilot/customization/mcp-servers](https://code.visualstudio.com/docs/copilot/customization/mcp-servers), [code.visualstudio.com/docs/agents/run/manage-mcp-servers](https://code.visualstudio.com/docs/agents/run/manage-mcp-servers)
 
 Verification status:
 
@@ -195,13 +195,13 @@ Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://code.visualstudio.com/docs/agents/reference/mcp-configuration)
-- [Official documentation 2](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
-- [Official documentation 3](https://code.visualstudio.com/docs/agents/run/manage-mcp-servers)
-- [Official documentation 4](https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/extend-copilot-chat-with-mcp)
-- [Official documentation 5](https://docs.github.com/en/copilot/concepts/context/mcp)
-- [Official documentation 6](https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers)
-- [Official documentation 7](https://learn.microsoft.com/en-us/visualstudio/ide/visual-studio-github-copilot-troubleshoot)
+- [code.visualstudio.com/docs/agents/reference/mcp-configuration](https://code.visualstudio.com/docs/agents/reference/mcp-configuration)
+- [code.visualstudio.com/docs/copilot/customization/mcp-servers](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
+- [code.visualstudio.com/docs/agents/run/manage-mcp-servers](https://code.visualstudio.com/docs/agents/run/manage-mcp-servers)
+- [docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/extend-copilot-chat-with-mcp](https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp-in-your-ide/extend-copilot-chat-with-mcp)
+- [docs.github.com/en/copilot/concepts/context/mcp](https://docs.github.com/en/copilot/concepts/context/mcp)
+- [learn.microsoft.com/en-us/visualstudio/ide/mcp-servers](https://learn.microsoft.com/en-us/visualstudio/ide/mcp-servers)
+- [learn.microsoft.com/en-us/visualstudio/ide/visual-studio-github-copilot-troubleshoot](https://learn.microsoft.com/en-us/visualstudio/ide/visual-studio-github-copilot-troubleshoot)
 
 Not confirmed in the vendor documentation:
 

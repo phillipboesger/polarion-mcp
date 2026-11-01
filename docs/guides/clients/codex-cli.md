@@ -2,7 +2,7 @@
 
 OpenAI Codex in your terminal. Default: **Local**.
 
-Official documentation: [learn.chatgpt.com](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), [learn.chatgpt.com](https://learn.chatgpt.com/docs/extend/mcp?surface=ide), [learn.chatgpt.com](https://learn.chatgpt.com/docs/cli/reference)
+Documentation: [learn.chatgpt.com/docs/extend/mcp](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), [learn.chatgpt.com/docs/extend/mcp](https://learn.chatgpt.com/docs/extend/mcp?surface=ide), [learn.chatgpt.com/docs/cli/reference](https://learn.chatgpt.com/docs/cli/reference)
 
 Verification status:
 
@@ -116,10 +116,10 @@ Expected: Codex asks to call getCurrentUser; approve it. It shows your Polarion 
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
-- [Official documentation 2](https://learn.chatgpt.com/docs/extend/mcp?surface=ide)
-- [Official documentation 3](https://learn.chatgpt.com/docs/cli/reference)
-- [Official documentation 4](https://github.com/openai/codex/blob/f752c97f7d0be0cbef5cece327f52a16ad6fb1c6/codex-rs/cli/src/mcp_cmd.rs)
+- [learn.chatgpt.com/docs/extend/mcp](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
+- [learn.chatgpt.com/docs/extend/mcp](https://learn.chatgpt.com/docs/extend/mcp?surface=ide)
+- [learn.chatgpt.com/docs/cli/reference](https://learn.chatgpt.com/docs/cli/reference)
+- [github.com/openai/codex/blob/f752c97f7d0be0cbef5cece327f52a16ad6fb1c6/codex-rs/cli/src/mcp_cmd.rs](https://github.com/openai/codex/blob/f752c97f7d0be0cbef5cece327f52a16ad6fb1c6/codex-rs/cli/src/mcp_cmd.rs)
 
 Not confirmed in the vendor documentation:
 

@@ -2,7 +2,7 @@
 
 ChatGPT connector, connects from the cloud. Default: **Server**.
 
-Official documentation: [developers.openai.com](https://developers.openai.com/api/docs/guides/custom-mcp-server)
+Documentation: [developers.openai.com/api/docs/guides/custom-mcp-server](https://developers.openai.com/api/docs/guides/custom-mcp-server)
 
 Verification status:
 
@@ -78,7 +78,7 @@ Expected: ChatGPT calls a Polarion tool and shows your Polarion user. Expand the
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation](https://developers.openai.com/api/docs/guides/custom-mcp-server)
+- [developers.openai.com/api/docs/guides/custom-mcp-server](https://developers.openai.com/api/docs/guides/custom-mcp-server)
 
 Not confirmed in the vendor documentation:
 

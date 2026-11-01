@@ -2,7 +2,7 @@
 
 Custom GPT with Actions over REST/OpenAPI. Default: **Server**.
 
-Official documentation: [developers.openai.com](https://developers.openai.com/api/docs/actions/getting-started), [developers.openai.com](https://developers.openai.com/api/docs/actions/authentication)
+Documentation: [developers.openai.com/api/docs/actions/getting-started](https://developers.openai.com/api/docs/actions/getting-started), [developers.openai.com/api/docs/actions/authentication](https://developers.openai.com/api/docs/actions/authentication)
 
 Verification status:
 
@@ -74,8 +74,8 @@ Expected: The GPT asks to allow the action, then shows the project with that ID.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://developers.openai.com/api/docs/actions/getting-started)
-- [Official documentation 2](https://developers.openai.com/api/docs/actions/authentication)
+- [developers.openai.com/api/docs/actions/getting-started](https://developers.openai.com/api/docs/actions/getting-started)
+- [developers.openai.com/api/docs/actions/authentication](https://developers.openai.com/api/docs/actions/authentication)
 
 Not confirmed in the vendor documentation:
 

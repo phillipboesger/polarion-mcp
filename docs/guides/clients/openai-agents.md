@@ -2,7 +2,7 @@
 
 Python agents built with the OpenAI Agents SDK. Default: **Local**.
 
-Official documentation: [openai.github.io](https://openai.github.io/openai-agents-python/mcp/), [openai.github.io](https://openai.github.io/openai-agents-python/ref/mcp/server/), [openai.github.io](https://openai.github.io/openai-agents-python/quickstart/)
+Documentation: [openai.github.io/openai-agents-python/mcp](https://openai.github.io/openai-agents-python/mcp/), [openai.github.io/openai-agents-python/ref/mcp/server](https://openai.github.io/openai-agents-python/ref/mcp/server/), [openai.github.io/openai-agents-python/quickstart](https://openai.github.io/openai-agents-python/quickstart/)
 
 Verification status:
 
@@ -137,12 +137,12 @@ Expected: The printed final_output names your Polarion user.
 
 Checked against the vendor documentation on 2026-10-30.
 
-- [Official documentation 1](https://openai.github.io/openai-agents-python/mcp/)
-- [Official documentation 2](https://openai.github.io/openai-agents-python/ref/mcp/server/)
-- [Official documentation 3](https://openai.github.io/openai-agents-python/quickstart/)
-- [Official documentation 4](https://pypi.org/project/openai-agents/)
-- [Official documentation 5](https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/src/agents/mcp/server.py)
-- [Official documentation 6](https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/pyproject.toml)
+- [openai.github.io/openai-agents-python/mcp](https://openai.github.io/openai-agents-python/mcp/)
+- [openai.github.io/openai-agents-python/ref/mcp/server](https://openai.github.io/openai-agents-python/ref/mcp/server/)
+- [openai.github.io/openai-agents-python/quickstart](https://openai.github.io/openai-agents-python/quickstart/)
+- [pypi.org/project/openai-agents](https://pypi.org/project/openai-agents/)
+- [github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/src/agents/mcp/server.py](https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/src/agents/mcp/server.py)
+- [github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/pyproject.toml](https://github.com/openai/openai-agents-python/blob/cd26bbbc52847845fde73b9952b51e62e2bcbdc0/pyproject.toml)
 
 Not confirmed in the vendor documentation:
 

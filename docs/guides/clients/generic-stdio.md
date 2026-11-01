@@ -2,7 +2,7 @@
 
 Any MCP client that starts local programs. Default: **Local**.
 
-Official documentation: [modelcontextprotocol.io](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+Documentation: [modelcontextprotocol.io/specification/2025-11-25/basic/transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 
 Verification status:
 
@@ -119,6 +119,6 @@ Expected: The assistant calls a Polarion tool and shows your Polarion user.
 
 Checked against the vendor documentation on 2026-10-24.
 
-- [Official documentation](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+- [modelcontextprotocol.io/specification/2025-11-25/basic/transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 
 Back to the [client index](../../clients.md).
