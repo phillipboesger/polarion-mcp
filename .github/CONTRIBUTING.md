@@ -34,7 +34,7 @@ For a real Polarion integration run, see [docs/live-tests.md](../docs/live-tests
 
 ## Mutation testing
 
-Run `npm run test:mutation` to compile the tests and run the OAuth, sealing, guards, tool-filter and executor mutation projects. Configuration and module-specific test commands are in [`tests/stryker.config.mjs`](../tests/stryker.config.mjs).
+Run `npm run test:mutation` to compile the tests and run the OAuth, sealing, guards, tool-filter and executor mutation projects, or `MUTATION_MODULE=sealed npm run test:mutation:module` for one. The weekly workflow runs each project as its own matrix job. Configuration and module-specific test commands are in [`tests/stryker.config.mjs`](../tests/stryker.config.mjs).
 
 For one module:
 

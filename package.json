@@ -44,6 +44,7 @@
     "test:e2e": "rm -rf build-tests && tsc -p tests/tsconfig.json && node --test build-tests/tests/e2e/*.test.js",
     "test:coverage": "rm -rf build-tests coverage && tsc -p tests/tsconfig.json && c8 --reporter=text-summary --reporter=lcov --exclude-after-remap --exclude=src/tools.ts --exclude=tests/** node --test build-tests/tests/*.test.js tests/*.test.mjs && node scripts/check-coverage.mjs",
     "test:compile": "rm -rf build-tests && tsc -p tests/tsconfig.json",
+    "test:mutation:module": "npm run test:compile && mkdir -p reports/mutation && stryker run tests/stryker.config.mjs",
     "test:mutation": "npm run test:compile && mkdir -p reports/mutation && for module in oauth sealed guards tool-filter executor; do MUTATION_MODULE=\"$module\" stryker run tests/stryker.config.mjs > \"reports/mutation/$module.txt\" 2>&1 || exit $?; done",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
@@ -73,7 +74,8 @@
     "node": ">=22.0.0"
   },
   "overrides": {
-    "qs": "^6.17.0"
+    "qs": "^6.17.0",
+    "minimatch": "^11.0.1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
