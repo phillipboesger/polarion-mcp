@@ -16,8 +16,8 @@ const projects = {
     command: 'node --test --test-concurrency=1 build-tests/tests/tool-filter.test.js build-tests/tests/annotations.test.js build-tests/tests/guidance-filter.test.js build-tests/tests/mcp-http.test.js',
   },
   executor: {
-    // This compiled line range maps to guarded HTTP dispatch in src/executor.ts (lines 868-960).
-    mutate: ['build-tests/src/executor.js:784-869'],
+    // This compiled line range maps to guarded HTTP dispatch in src/executor.ts (lines 959-1052).
+    mutate: ['build-tests/src/executor.js:884-969'],
     command: 'node --test --test-concurrency=1 build-tests/tests/executor*.test.js build-tests/tests/http-client.test.js build-tests/tests/httpClient.test.js build-tests/tests/security-coverage.test.js',
   },
 };
