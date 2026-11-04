@@ -14,7 +14,12 @@ test("the server reports the package version", () => {
 
 test("server.json and its image tag carry the package version", () => {
   assert.equal(server.version, pkg.version)
-  for (const p of server.packages) assert.equal(p.version, pkg.version)
+  for (const p of server.packages) {
+    if (p.registryType === 'oci') {
+      assert.ok(p.identifier.endsWith(`:${pkg.version}`))
+      assert.equal(p.version, undefined)
+    } else assert.equal(p.version, pkg.version)
+  }
 })
 
 test("the Docker image is labelled with the registry name from server.json", () => {

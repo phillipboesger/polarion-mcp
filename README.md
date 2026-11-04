@@ -69,6 +69,8 @@ These are illustrative conversations using real tools, not recorded outputs. Pro
 
 ## Get connected
 
+Python users can use the [Python launcher](python/README.md) (`uvx polarion-alm-mcp` or `pip install polarion-alm-mcp`), which starts the matching npm release and requires Node.js 22+ and npm/npx. The PyPI package named `polarion-mcp` belongs to another project.
+
 Two setups, pick by where your client runs. You need a REST-enabled Polarion instance and a PAT. Every guide starts from nothing and ends with a check.
 
 | Setup | Use it when | Guide |
@@ -155,6 +157,8 @@ Built by [Phillip Bösger](https://github.com/phillipboesger), building on [@Jon
 ## Documentation
 
 [Docs index](docs/README.md) · [Configuration](docs/configuration.md) · [Deployment](docs/deployment.md) · [Security](docs/security.md) · [Usage](docs/usage.md) · [Architecture](docs/architecture.md) · [Extensions](docs/extensions.md) · [Releases](https://github.com/phillipboesger/polarion-mcp/releases)
+
+[Publishing and discovery](docs/publishing.md) · [Official MCP Registry](https://registry.modelcontextprotocol.io/?q=io.github.phillipboesger%2Fpolarion-mcp) · [Glama listing](https://glama.ai/mcp/servers/phillipboesger/polarion-mcp)
 
 ## License
 

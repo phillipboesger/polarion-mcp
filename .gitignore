@@ -67,7 +67,10 @@ web_modules/
 # OS specific
 .DS_Store
 Thumbs.db
-*py
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
 
 # Playwright MCP browser-automation scratch output (can contain live tokens/secrets)
 .playwright-mcp/
