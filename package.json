@@ -66,7 +66,7 @@
     "generate-tools": "node scripts/generate-tools.mjs .gen/src/index.ts src/tools.ts && node scripts/enrich-tool-metadata.mjs && node scripts/enrich-response-format.mjs && node scripts/enrich-output-schemas.mjs && node scripts/enrich-max-items.mjs",
     "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run generate-tools && npm run build && npm test",
     "update": "npm run regenerate",
-    "version": "node scripts/sync-server-json.mjs && git add server.json",
+    "version": "node scripts/sync-server-json.mjs && git add server.json python/polarion_alm_mcp/__init__.py python/README.md",
     "docs:site": "node scripts/render-site.mjs",
     "test:docs-ui": "playwright test --config tests/docs-ui/playwright.config.mjs"
   },
