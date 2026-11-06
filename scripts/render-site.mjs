@@ -152,7 +152,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     if (process.argv.includes('--refresh-stars')) {
       const response = await fetch('https://api.github.com/repos/phillipboesger/polarion-mcp');
-      const { stargazers_count: stars } = await response.json();
+      if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
+      // Rebuild the value as a plain integer so no raw network data reaches the file.
+      const stars = Number.parseInt(String((await response.json()).stargazers_count), 10);
+      if (!Number.isSafeInteger(stars) || stars < 0) throw new Error('GitHub API returned no valid star count');
       const manifestPath = path.join(root, 'docs/clients.json');
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       fs.writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, githubStars: stars }, null, 2)}\n`);
