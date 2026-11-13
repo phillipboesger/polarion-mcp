@@ -17,6 +17,11 @@ for (const pkg of server.packages ?? []) {
 }
 writeFileSync('server.json', `${JSON.stringify(server, null, 2)}\n`);
 
+const manifestPath = 'mcpb/manifest.json';
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+manifest.version = version;
+writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
 const launcher = 'python/polarion_alm_mcp/__init__.py';
 writeFileSync(launcher, readFileSync(launcher, 'utf8').replace(/__version__ = "[^"]+"/, `__version__ = "${version}"`));
 const pythonReadme = 'python/README.md';

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "polarion-mcp",
   "version": "1.5.0",
-  "description": "Model Context Protocol (MCP) server for the Polarion ALM REST API.",
+  "description": "Polarion ALM MCP server for requirements, LiveDocs, work items, traceability and test management.",
   "author": {
     "name": "Phillip Bösger"
   },

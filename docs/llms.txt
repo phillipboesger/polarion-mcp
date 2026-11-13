@@ -1,0 +1,20 @@
+# Polarion MCP Server
+
+> A self-hosted Model Context Protocol server for the Polarion ALM REST API.
+
+The server provides tools for work items, requirements, LiveDocs, traceability, test management, projects and other Polarion resources. It connects to the customer's own Polarion instance.
+
+## Install and connect
+
+- [Local npm setup](guides/local-npm.md): run with Node.js and npm.
+- [Server Docker setup](guides/server-docker.md): host the OCI image.
+- [Client guides](clients.md): choose a local or remote MCP client.
+- [Python package](https://pypi.org/project/polarion-alm-mcp/): launcher for the matching npm release.
+- [GitHub releases](https://github.com/phillipboesger/polarion-mcp/releases): Claude Desktop `.mcpb` bundle.
+
+## Reference
+
+- [Configuration](configuration.md)
+- [Security](security.md)
+- [Publishing and discovery](publishing.md)
+- [Source repository](https://github.com/phillipboesger/polarion-mcp)
