@@ -9,10 +9,9 @@ import type { LookupFunction } from 'node:net';
 import type { LookupAddress } from 'node:dns';
 import type { VirtualTool, VirtualToolContext } from './virtual-tools.js';
 import { registerVirtualTool } from './virtual-tools.js';
-import { mimeTypeForFile } from './utils.js';
+import { mimeTypeForFile, parseUploadMaxBytes } from './utils.js';
 import { resolvePublicHost, type SsrfResolver } from './ssrf.js';
 
-const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
 
@@ -31,13 +30,6 @@ export interface AttachmentFetchTestOptions {
 
 function envConfig(): UploadConfig {
   return { roots: process.env.MCP_UPLOAD_ROOTS, maxBytes: process.env.MCP_UPLOAD_MAX_BYTES, urlHosts: process.env.MCP_UPLOAD_URL_HOSTS, allowHttp: process.env.MCP_UPLOAD_ALLOW_HTTP };
-}
-
-function maxBytesFrom(value: string | undefined): number {
-  if (!value?.trim()) return DEFAULT_MAX_BYTES;
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error('MCP_UPLOAD_MAX_BYTES must be a positive integer');
-  return parsed;
 }
 
 function parseHostAllowlist(value: string | undefined): Set<string> {
@@ -135,7 +127,7 @@ export async function fetchAttachmentUrl(rawUrl: string, config: UploadConfig = 
   const allowedHosts = parseHostAllowlist(config.urlHosts);
   if (!allowedHosts.size) throw new Error('URL upload is disabled; configure MCP_UPLOAD_URL_HOSTS with allowed hostnames');
   const allowHttp = config.allowHttp?.trim().toLowerCase() === 'true';
-  const maxBytes = maxBytesFrom(config.maxBytes);
+  const maxBytes = parseUploadMaxBytes(config.maxBytes);
   let url: URL;
   try { url = new URL(rawUrl); } catch { throw new Error('url must be a valid absolute URL'); }
   const deadline = Date.now() + (testOptions.timeoutMs ?? FETCH_TIMEOUT_MS);
@@ -233,7 +225,7 @@ export function createUploadAttachmentTool(configProvider: () => UploadConfig = 
       validateUploadTarget(args.target);
       if (args.fileName !== undefined) safeFileName(args.fileName);
       const config = configProvider();
-      const maxBytes = maxBytesFrom(config.maxBytes);
+      const maxBytes = parseUploadMaxBytes(config.maxBytes);
       let file: { bytes: Buffer; defaultName: string };
       if (hasPath) {
         if (ctx.transport !== 'stdio') throw new Error('filePath uploads are available only on the stdio transport; remote servers cannot read your local disk');

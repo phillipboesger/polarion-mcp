@@ -24,6 +24,7 @@ import { logSafe, redact, sanitizeInputSchema } from './utils.js';
 import { API_BASE_URL, SERVER_VERSION } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import type { JsonObject, McpToolDefinition } from './types.js';
+import type { WriteLimits } from './write-verification.js';
 
 /**
  * Builds the `servers` URL for the REST wrapper's OpenAPI specs.
@@ -67,6 +68,7 @@ export function specServerUrl(env: NodeJS.ProcessEnv, port: number): (req: Reque
  */
 export interface RestToolsOptions {
   verifyWrites?: boolean;
+  writeLimits?: WriteLimits;
   /** Guards the tool routes; the OpenAPI specs stay public. */
   authenticate: RequestHandler;
   /** Base URL written into the specs' `servers` entry. */
@@ -248,7 +250,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       const result = options.callTool
         ? await options.callTool(toolName, toolArgs, aborted.signal)
         : await executeToolWithPagination(toolName, toolDefinition, toolArgs, securitySchemes, executeTool, {
-          apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars, signal: aborted.signal, verifyWrites: options.verifyWrites,
+          apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars, signal: aborted.signal, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
         });
 
       // Extract text content from MCP response format

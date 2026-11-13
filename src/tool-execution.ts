@@ -3,13 +3,14 @@ import { capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import type { SendWithRetryOpts } from './httpClient.js';
 import { MAX_AUTO_ITEMS, MAX_AUTO_PAGE_SIZE, paginate, pageNumberFromLink, type JsonApiPage } from './pagination.js';
 import type { McpToolDefinition } from './types.js';
+import type { WriteLimits } from './write-verification.js';
 
 /** Caller-supplied pagination arguments that are invalid (a client error, not a tool failure). */
 export class PaginationArgumentError extends Error {}
 
 export type SingleToolExecutor = (
   name: string, definition: McpToolDefinition, args: Record<string, unknown>, securitySchemes: Record<string, any>,
-  sendOpts?: SendWithRetryOpts, maxResponseChars?: number, apiBaseUrl?: string, verifyWrites?: boolean,
+  sendOpts?: SendWithRetryOpts, maxResponseChars?: number, apiBaseUrl?: string, verifyWrites?: boolean, writeLimits?: WriteLimits,
 ) => Promise<CallToolResult>;
 
 export interface ExecuteToolOptions {
@@ -18,6 +19,7 @@ export interface ExecuteToolOptions {
   signal?: AbortSignal;
   beforeNextPage?: () => void | Promise<void>;
   verifyWrites?: boolean;
+  writeLimits?: WriteLimits;
 }
 
 function capPagedStructuredContent(page: JsonApiPage, maxChars: number): JsonApiPage {
@@ -52,7 +54,7 @@ export async function executeTool(
   const sendOpts = options.signal ? { signal: options.signal } : undefined;
   const maxItems = args.max_items;
   if (maxItems === undefined || !paginatedList(definition)) {
-    return executor(name, definition, args, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl, options.verifyWrites);
+    return executor(name, definition, args, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl, options.verifyWrites, options.writeLimits);
   }
   if (!Number.isInteger(maxItems) || (maxItems as number) < 1 || (maxItems as number) > MAX_AUTO_ITEMS) {
     throw new PaginationArgumentError(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);

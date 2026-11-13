@@ -501,3 +501,24 @@ export function mimeTypeForFile(fileName: string): string {
   const types: Record<string, string> = { txt: 'text/plain', csv: 'text/csv', html: 'text/html', json: 'application/json', xml: 'application/xml', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', zip: 'application/zip' };
   return fileName.includes('.') && extension ? types[extension] ?? 'application/octet-stream' : 'application/octet-stream';
 }
+
+/** Default attachment size cap (25 MiB), shared by the upload tool and the multipart executor. */
+export const DEFAULT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Parses `MCP_UPLOAD_MAX_BYTES`: a positive integer, or the default when unset. */
+export function parseUploadMaxBytes(value: string | undefined): number {
+  if (!value?.trim()) return DEFAULT_UPLOAD_MAX_BYTES;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error('MCP_UPLOAD_MAX_BYTES must be a positive integer');
+  return parsed;
+}
+
+/** Startup variant of {@link parseUploadMaxBytes}: an invalid value falls back to the default instead of aborting. */
+export function parseUploadMaxBytesOrDefault(value: string | undefined): number {
+  try { return parseUploadMaxBytes(value); } catch { return DEFAULT_UPLOAD_MAX_BYTES; }
+}
+
+/** Human-readable size limit for error messages, e.g. "25 MiB" or "1000 bytes". */
+export function describeByteLimit(bytes: number): string {
+  return bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MiB` : `${bytes} bytes`;
+}

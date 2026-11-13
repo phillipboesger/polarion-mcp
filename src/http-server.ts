@@ -31,6 +31,7 @@ import { safeEqual } from './sealed.js';
 import { bearerCredential, parseTrustProxy, redact } from './utils.js';
 import type { Express } from 'express';
 import { parseMaxResponseChars } from './executor.js';
+import { writeLimitsFromEnv } from './write-verification.js';
 
 export interface HttpAppOptions {
   apiKey: string;
@@ -122,6 +123,7 @@ app.use(createRestToolsRouter({
   unauthorizedDescription: 'Authentication failed - invalid or missing API key',
   executeTool: options.executeTool,
   verifyWrites: options.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false',
+  writeLimits: writeLimitsFromEnv(options.env),
   maxResponseChars: parseMaxResponseChars(options.env.MCP_MAX_RESPONSE_CHARS),
 }));
 
