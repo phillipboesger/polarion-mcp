@@ -1,0 +1,5 @@
+[
+  { "version": "2506", "status": "guaranteed", "image": "ghcr.io/phillipboesger/polarion-docker:v2506" },
+  { "version": "2512", "status": "guaranteed", "image": "ghcr.io/phillipboesger/polarion-docker:v2512" },
+  { "version": "2606", "status": "latest", "image": "ghcr.io/phillipboesger/polarion-docker:v2606" }
+]

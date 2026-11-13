@@ -4,7 +4,7 @@
 
 ## In CI
 
-The `.github/workflows/live-polarion.yml` workflow uses the private Polarion Docker image for versions 2506, 2512 and 2606. It activates a trial, provisions a token, then runs the suite. The workflow is triggered by qualifying pull requests and pushes, a nightly schedule at 05:00 UTC, or manual dispatch. Fork and Dependabot runs may not have permission to pull the private image.
+The `.github/workflows/live-polarion.yml` workflow uses the private Polarion Docker image for versions 2506, 2512 and 2606, listed in [polarion-versions.json](./polarion-versions.json). The newest three releases are guaranteed usable; older releases are best-effort and remain in the matrix until they break. An entry with `allowFailure: true` runs without blocking the workflow while a release is being verified. The workflow activates a trial, provisions a token, then runs the suite. It is triggered by qualifying pull requests and pushes, a nightly schedule at 05:00 UTC, or manual dispatch. Fork and Dependabot runs may not have permission to pull the private image.
 
 The composite live cases assert job execution, document content, trace links, attachment uploads, and collection across more than 100 links. Test-owned jobs and data are cleaned up, and the workflow runs against disposable instances. The job scenario needs the `/jobs` endpoints, which Polarion 2506 does not expose (only `GET /jobs/{id}` and file download), so it is skipped there with a reason; it runs on 2606.
 
