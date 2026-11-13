@@ -81,3 +81,6 @@ __pycache__/
 # Documentation browser checks
 test-results/
 playwright-report/
+
+# Demo harness output (transcripts, screenshots, videos)
+scripts/demo/out/
