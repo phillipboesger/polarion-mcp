@@ -9,7 +9,7 @@ export class PaginationArgumentError extends Error {}
 
 export type SingleToolExecutor = (
   name: string, definition: McpToolDefinition, args: Record<string, unknown>, securitySchemes: Record<string, any>,
-  sendOpts?: SendWithRetryOpts, maxResponseChars?: number, apiBaseUrl?: string,
+  sendOpts?: SendWithRetryOpts, maxResponseChars?: number, apiBaseUrl?: string, verifyWrites?: boolean,
 ) => Promise<CallToolResult>;
 
 export interface ExecuteToolOptions {
@@ -17,6 +17,7 @@ export interface ExecuteToolOptions {
   maxResponseChars?: number;
   signal?: AbortSignal;
   beforeNextPage?: () => void | Promise<void>;
+  verifyWrites?: boolean;
 }
 
 function capPagedStructuredContent(page: JsonApiPage, maxChars: number): JsonApiPage {
@@ -51,7 +52,7 @@ export async function executeTool(
   const sendOpts = options.signal ? { signal: options.signal } : undefined;
   const maxItems = args.max_items;
   if (maxItems === undefined || !paginatedList(definition)) {
-    return executor(name, definition, args, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl);
+    return executor(name, definition, args, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl, options.verifyWrites);
   }
   if (!Number.isInteger(maxItems) || (maxItems as number) < 1 || (maxItems as number) > MAX_AUTO_ITEMS) {
     throw new PaginationArgumentError(`max_items must be an integer from 1 to ${MAX_AUTO_ITEMS}`);

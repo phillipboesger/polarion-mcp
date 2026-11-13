@@ -781,7 +781,7 @@ test("executeApiTool preserves a Work Item custom field through validation (GH f
         status: 200, statusText: "OK", headers: {}, config: {} as any,
       }
     }
-    sentBody = config.data
+    if (String(config.method).toLowerCase() === 'patch') sentBody = config.data
     return { data: {}, status: 204, statusText: "No Content", headers: {}, config: {} as any }
   }
 
@@ -850,7 +850,7 @@ test("executeApiTool skips the guard entirely for a patchWorkItem write with no 
     { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 }
   )
 
-  assert.ok(!getCalled, "no enum fields present -- the guard should not make any lookup call")
+  assert.ok(getCalled, "verification reads the written item")
   assert.ok(patchCalled)
 })
 

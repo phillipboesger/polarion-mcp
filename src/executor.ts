@@ -478,7 +478,7 @@ function decodeBase64File(value: string, label: string): Buffer {
   return Buffer.from(compact, compact.includes('-') || compact.includes('_') ? 'base64url' : 'base64');
 }
 
-function buildMultipartFormData(requestBody: unknown): FormData {
+function buildMultipartFormData(requestBody: unknown, attachment = false): FormData {
   let parsed: unknown = requestBody;
   if (typeof requestBody === 'string') {
     try {
@@ -492,6 +492,18 @@ function buildMultipartFormData(requestBody: unknown): FormData {
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('requestBody for a multipart/form-data tool must decode to a JSON object of form field names');
+  }
+
+  if (attachment) {
+    const body = parsed as JsonObject;
+    const files = body.files ?? body.file ?? body.content;
+    const values = Array.isArray(files) ? files : files === undefined ? [] : [files];
+    if (!values.length) throw new Error('Attachment upload requires a file part.');
+    for (const [index, value] of values.entries()) {
+      if (typeof value !== 'string') throw new Error(`requestBody.files[${index}] must be a base64-encoded string`);
+      if (!value.trim()) throw new Error('Attachment file must not be empty; provide base64 content.');
+      if (decodeBase64File(value, 'Attachment file').length > 25 * 1024 * 1024) throw new Error('Attachment file exceeds the 25 MiB limit.');
+    }
   }
 
   // Name each file part after its attachment, so Polarion never falls back to "file-0".
@@ -556,9 +568,9 @@ function summarizeMultipartForPreview(requestBody: unknown): unknown {
 
   const summary: JsonObject = {};
   for (const [key, value] of Object.entries(parsed as JsonObject)) {
-    if (key === 'files' && Array.isArray(value)) {
-      summary[key] = value.map((item) =>
-        typeof item === 'string' ? `<binary, ${Buffer.from(item, 'base64').length} bytes>` : item
+    if (key === 'files' && (Array.isArray(value) || typeof value === 'string')) {
+      summary[key] = (Array.isArray(value) ? value : [value]).map((item) =>
+        typeof item === 'string' ? `<binary, ${Buffer.from(item, 'base64').length} bytes>` : '<invalid file>'
       );
     } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
       summary[key] = `<binary, ${Buffer.from(value, 'base64').length} bytes>`;
@@ -568,6 +580,7 @@ function summarizeMultipartForPreview(requestBody: unknown): unknown {
   }
   return summary;
 }
+
 
 /**
  * Attributes also accept null (see nullableAttributes), which turns their type
@@ -580,6 +593,32 @@ function issueBranch(issue: ZodIssue): ZodIssue | undefined {
 }
 const issueCode = (issue: ZodIssue): string => issueBranch(issue)?.code ?? issue.code;
 const issueMessage = (issue: ZodIssue): string => issueBranch(issue)?.message ?? issue.message;
+
+function equivalentWriteValue(sent: unknown, actual: unknown): boolean {
+  if (sent && actual && typeof sent === 'object' && typeof actual === 'object') {
+    if (Array.isArray(sent) || Array.isArray(actual)) {
+      if (!Array.isArray(sent) || !Array.isArray(actual) || sent.length !== actual.length) return false;
+      const unmatched = [...actual];
+      return sent.every(value => {
+        const index = unmatched.findIndex(candidate => equivalentWriteValue(value, candidate));
+        if (index < 0) return false;
+        unmatched.splice(index, 1);
+        return true;
+      });
+    }
+    const left = sent as Record<string, unknown>;
+    const right = actual as Record<string, unknown>;
+    if (typeof left.type === 'string' && typeof left.value === 'string' && typeof right.value === 'string') return equivalentWriteValue(left.value, right.value);
+    const keys = Object.keys(left);
+    return keys.length === Object.keys(right).length && keys.every(key => Object.hasOwn(right, key) && equivalentWriteValue(left[key], right[key]));
+  }
+  if (typeof sent === 'string' && typeof actual === 'string') return sent.trim() === actual.trim();
+  if (typeof sent === 'number' && typeof actual === 'string' && actual.trim() !== '') return Number(actual) === sent;
+  if (typeof actual === 'number' && typeof sent === 'string' && sent.trim() !== '') return Number(sent) === actual;
+  return sent === actual;
+}
+
+const COMPUTED_ATTRIBUTES = new Set(['created', 'updated', 'author', 'updatedBy', 'revision']);
 
 /**
  * Execute an API tool (main entry point for API operations)
@@ -609,8 +648,10 @@ export async function executeApiTool(
   allSecuritySchemes: Record<string, any>,
   sendOpts?: SendWithRetryOpts,
   maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS,
-  apiBaseUrl = API_BASE_URL
+  apiBaseUrl = API_BASE_URL,
+  verifyWrites = true
 ): Promise<CallToolResult> {
+  let requestFacts = '';
   try {
     // ===== STEP 0: Strip dry_run before validation =====
     // Always stripped, regardless of whether the regenerated schema already
@@ -626,9 +667,14 @@ export async function executeApiTool(
     // fall through to the real (possibly irreversible) write.
     const rawDryRun = argsForValidation.dry_run;
     delete argsForValidation.dry_run;
+    const rawVerify = argsForValidation.verify;
+    delete argsForValidation.verify;
     let dryRun: boolean | undefined;
     try { dryRun = normalizeDryRun(rawDryRun); }
     catch { return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true }; }
+    let verify: boolean | undefined;
+    try { verify = normalizeDryRun(rawVerify); }
+    catch { return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': verify must be true or false` }], isError: true }; }
 
     // Validation runs against the original schema, whose keys are the
     // original names; a sanitized name would otherwise be stripped by Zod.
@@ -771,7 +817,7 @@ export async function executeApiTool(
         // JSON string with a bare "multipart/form-data" Content-Type (see #5) --
         // Polarion's parser can't make sense of that and rejects it with a
         // content-less 400 before any JSON:API validation runs.
-        const form = buildMultipartFormData(requestBody);
+        const form = buildMultipartFormData(requestBody, /attachments/i.test(definition.pathTemplate) && definition.method.toLowerCase() === 'post');
         // A buffer, not the one-shot form stream: a retry must send the whole body again.
         requestBodyData = form.getBuffer();
         Object.assign(headers, form.getHeaders());
@@ -969,6 +1015,10 @@ export async function executeApiTool(
       ...(download ? { responseType: 'arraybuffer' as const, maxContentLength: MAX_DOWNLOAD_BYTES + 1 } : {}),
       httpsAgent: httpsAgent(shouldRejectUnauthorized()),
     };
+    const parts = dryRunBodyPreview && definition.requestBodyContentType === 'multipart/form-data'
+      ? Object.entries(dryRunBodyPreview as Record<string, unknown>).map(([name, value]) => `${name}: ${name === 'files' || name === 'file' || name === 'content' ? JSON.stringify(value) : 'present'}`).join(', ')
+      : '';
+    requestFacts = `Method: ${definition.method.toUpperCase()}; path template: ${definition.pathTemplate}; content-type: ${definition.requestBodyContentType ?? 'none'}${parts ? `; multipart parts: ${parts}` : ''}`;
 
     // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
     // Three independent checks, in this order (first failure blocks the write):
@@ -981,6 +1031,7 @@ export async function executeApiTool(
     // See guards.ts for exactly what's validated and what's an explicit,
     // documented follow-up (categories, module/linkedRevisions existence).
     const guardRequestContext = { baseUrl: apiBaseUrl, headers, rejectUnauthorized: shouldRejectUnauthorized() };
+    const warnings: string[] = [];
 
     const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
     if (enumTargets) {
@@ -995,7 +1046,8 @@ export async function executeApiTool(
       for (const target of customFieldKeyTargets) {
         const fieldKeyResult = await checkResourceCustomFieldKeys(target, guardRequestContext, sendOpts);
         if (!fieldKeyResult.ok) {
-          return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }], isError: true };
+          if (dryRun) warnings.push(fieldKeyResult.reason);
+          else return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }], isError: true };
         }
       }
     }
@@ -1014,11 +1066,23 @@ export async function executeApiTool(
     if (dryRun && isMutating) {
       const redactedHeaders = { ...headers };
       if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
+      let diff: unknown;
+      if (definition.method.toLowerCase() === 'patch') {
+        try {
+          const before = await sendWithRetry({ ...config, method: 'GET', data: undefined, params: { fields: '@all' } }, sendOpts);
+          if (!before.data?.data?.attributes || typeof before.data.data.attributes !== 'object') throw new Error('Read response has no attributes');
+          diff = { before: before.data?.data?.attributes, after: requestBodyData?.data?.attributes };
+        } catch (error) {
+          diff = { status: 'unavailable', reason: axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error' };
+        }
+      }
       const preview = {
         method: config.method,
         url: axios.getUri({ url: config.url, params: config.params }),
         headers: redactedHeaders,
         body: dryRunBodyPreview,
+        warnings,
+        ...(diff ? { diff } : {}),
       };
       return {
         content: [
@@ -1043,6 +1107,70 @@ export async function executeApiTool(
     const response = await sendWithRetry(config, sendOpts);
     for (const target of enumTargets ?? []) {
       if (target.workItemId) invalidateWorkItemOptions(target.projectId, target.workItemId);
+    }
+
+    let verification: { status: 'verified' | 'mismatch' | 'skipped'; mismatches: Array<{ field: string; sent: unknown; actual: unknown }>; reason?: string } | undefined;
+    if (isMutating) {
+      verification = { status: 'skipped', mismatches: [], reason: 'This route cannot be verified automatically.' };
+      const route = definition.pathTemplate;
+      const supported = definition.method.toLowerCase() === 'patch' && (
+        route === '/projects/{projectId}/workitems/{workItemId}' ||
+        route === '/projects/{projectId}/spaces/{spaceId}/documents/{documentName}'
+      );
+      const attributes = requestBodyData?.data?.attributes;
+      if (!verifyWrites || verify === false) verification.reason = 'Verification disabled.';
+      else if (supported && attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
+        try {
+          const read = await sendWithRetry({ ...config, method: 'GET', data: undefined, params: { fields: '@all' } }, sendOpts);
+          const actual = read.data?.data?.attributes;
+          if (!actual || typeof actual !== 'object') throw new Error('Read-back response has no attributes');
+          const mismatches = Object.entries(attributes).filter(([field, sent]) => !COMPUTED_ATTRIBUTES.has(field) && !equivalentWriteValue(sent, actual[field]))
+            .map(([field, sent]) => ({ field, sent, actual: actual[field] ?? null }));
+          verification = { status: mismatches.length ? 'mismatch' : 'verified', mismatches };
+        } catch (error) {
+          verification.reason = `Read-back failed: ${axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error'}`;
+        }
+      } else if (definition.method.toLowerCase() === 'patch' && route === '/projects/{projectId}/workitems' && Array.isArray(requestBodyData?.data) && requestBodyData.data.length) {
+        try {
+          const mismatches: Array<{ field: string; sent: unknown; actual: unknown }> = [];
+          const fallbackProject = readArg(validatedArgs, 'projectId', nameMap);
+          for (const item of requestBodyData.data) {
+            const id = typeof item?.id === 'string' ? splitWorkItemId(item.id, typeof fallbackProject === 'string' ? fallbackProject : undefined) : null;
+            if (!id || !item?.attributes) throw new Error('Updated resource identity or attributes unavailable');
+            const url = `${apiBaseUrl}/projects/${encodeSegment(id.projectId)}/workitems/${encodeSegment(id.workItemId)}`;
+            const read = await sendWithRetry({ ...config, method: 'GET', url, data: undefined, params: { fields: '@all' } }, sendOpts);
+            const actual = read.data?.data?.attributes;
+            if (!actual || typeof actual !== 'object') throw new Error('Read-back response has no attributes');
+            for (const [field, sent] of Object.entries(item.attributes)) {
+              if (!COMPUTED_ATTRIBUTES.has(field) && !equivalentWriteValue(sent, actual[field])) mismatches.push({ field: `${item.id}.${field}`, sent, actual: actual[field] ?? null });
+            }
+          }
+          verification = { status: mismatches.length ? 'mismatch' : 'verified', mismatches };
+        } catch (error) {
+          verification.reason = `Read-back failed: ${axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error'}`;
+        }
+      } else if (definition.method.toLowerCase() === 'post' && route === '/projects/{projectId}/workitems'
+        && Array.isArray(requestBodyData?.data) && Array.isArray(response.data?.data)
+        && requestBodyData.data.length === response.data.data.length) {
+        try {
+          const mismatches: Array<{ field: string; sent: unknown; actual: unknown }> = [];
+          for (const [index, item] of requestBodyData.data.entries()) {
+            const id = response.data.data[index]?.id;
+            if (typeof id !== 'string' || !item?.attributes) throw new Error('Created resource identity or attributes unavailable');
+            const workItemId = id.split('/').at(-1);
+            if (!workItemId) throw new Error('Created resource identity unavailable');
+            const read = await sendWithRetry({ ...config, method: 'GET', url: `${requestUrl}/${encodeSegment(workItemId)}`, data: undefined, params: { fields: '@all' } }, sendOpts);
+            const actual = read.data?.data?.attributes;
+            if (!actual || typeof actual !== 'object') throw new Error('Read-back response has no attributes');
+            for (const [field, sent] of Object.entries(item.attributes)) {
+              if (!COMPUTED_ATTRIBUTES.has(field) && !equivalentWriteValue(sent, actual[field])) mismatches.push({ field: `${id}.${field}`, sent, actual: actual[field] ?? null });
+            }
+          }
+          verification = { status: mismatches.length ? 'mismatch' : 'verified', mismatches };
+        } catch (error) {
+          verification.reason = `Read-back failed: ${axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error'}`;
+        }
+      }
     }
 
     if (download) {
@@ -1116,7 +1244,9 @@ export async function executeApiTool(
     // non-JSON answer to a successful call has none to offer, so it gets an empty
     // object, which the advertised (lenient) schema accepts. isError would
     // report a write that worked as failed and invite a duplicating retry.
-    const fullResponseText = `API Response (Status: ${response.status}):\n${responseText}`;
+    const verificationMessage = verification?.status === 'mismatch' ? `The write was accepted by Polarion but not applied for fields: ${verification.mismatches.map(item => item.field).join(', ')}.` : undefined;
+    const resultBody = verification ? { ...(structuredContent ?? (responseText ? { response: responseText } : {})), verification, ...(verificationMessage ? { message: verificationMessage } : {}) } : undefined;
+    const fullResponseText = `API Response (Status: ${response.status}):\n${resultBody ? JSON.stringify(resultBody) : responseText}`;
     const boundedResponseText = capToolResponseText(fullResponseText, maxResponseChars, definition);
     return {
       content: [
@@ -1125,8 +1255,9 @@ export async function executeApiTool(
           text: boundedResponseText
         }
       ],
+      ...(verification?.status === 'mismatch' ? { isError: true } : {}),
       // MCP_MAX_RESPONSE_CHARS caps text content only; structuredContent stays unchanged by design.
-      ...(definition.outputSchema ? { structuredContent: structuredContent ?? {} } : {}),
+      ...(definition.outputSchema && verification?.status !== 'mismatch' ? { structuredContent: { ...(structuredContent ?? {}), ...(verification ? { verification } : {}) } } : {}),
     };
 
   } catch (error: unknown) {
@@ -1137,6 +1268,7 @@ export async function executeApiTool(
     // Format Axios errors specially (network errors, API errors, etc.)
     if (axios.isAxiosError(error)) {
       errorMessage = formatApiError(error);
+      if (error.response && (!error.response.data || (Buffer.isBuffer(error.response.data) && error.response.data.length === 0))) errorMessage += ` ${requestFacts}`;
     }
     // Handle standard JavaScript errors
     else if (error instanceof Error) {

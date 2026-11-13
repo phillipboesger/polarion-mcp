@@ -77,7 +77,7 @@ test("formatApiError renders response, network, and setup failures", () => {
 test("extractJsonApiErrorDetail joins Polarion's real {errors:[{detail}]} shape", () => {
   assert.equal(
     extractJsonApiErrorDetail({ errors: [{ status: "404", title: "Not Found", detail: "Work item 'X-1' not found" }] }),
-    "Work item 'X-1' not found",
+    "Not Found: Work item 'X-1' not found",
   )
   assert.equal(
     extractJsonApiErrorDetail({ errors: [{ status: "400", title: "Bad Request" }] }),
@@ -100,8 +100,15 @@ test("formatApiError prefers the JSON:API error detail over a raw JSON dump", ()
   } as any
 
   const message = formatApiError(responseError)
-  assert.match(message, /Detail: Work item 'X-1' not found/)
+  assert.match(message, /Detail: Not Found: Work item 'X-1' not found/)
   assert.doesNotMatch(message, /"errors":/, "should not fall back to the raw JSON dump when a JSON:API detail was found")
+})
+
+test("formatApiError includes JSON:API code and source and identifies empty bodies", () => {
+  const error = { response: { status: 400, statusText: 'Bad Request', data: { errors: [{ title: 'Invalid', detail: 'Bad value', code: 'bad', source: { pointer: '/data/attributes/title' } }] } } } as any
+  assert.match(formatApiError(error), /Invalid.*Bad value.*bad.*\/data\/attributes\/title/)
+  error.response.data = ''
+  assert.match(formatApiError(error), /No response body received/)
 })
 
 test("getZodSchemaFromJsonSchema returns a working schema for valid JSON schema", () => {

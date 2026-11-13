@@ -225,8 +225,8 @@ export function extractJsonApiErrorDetail(responseData: unknown): string | undef
   const parts = errors
     .map((e) => {
       if (!e || typeof e !== 'object') return '';
-      const entry = e as { detail?: unknown; title?: unknown; source?: { pointer?: unknown; parameter?: unknown } };
-      const text = String(entry.detail ?? entry.title ?? '');
+      const entry = e as { detail?: unknown; title?: unknown; code?: unknown; source?: { pointer?: unknown; parameter?: unknown } };
+      const text = [entry.title, entry.detail, entry.code === undefined ? undefined : `code: ${String(entry.code)}`].filter(value => value !== undefined && value !== '').map(String).join(': ');
       const at = entry.source?.pointer ?? entry.source?.parameter;
       return text && at ? `${text} (at ${String(at)})` : text;
     })
@@ -290,7 +290,7 @@ export function formatApiError(error: AxiosError): string {
       // surface the real detail instead of a truncated raw JSON dump.
       message += `Detail: ${jsonApiDetail.substring(0, MAX_DETAIL_LEN)}${jsonApiDetail.length > MAX_DETAIL_LEN ? '...' : ''}`;
     }
-    else if (typeof responseData === 'string') {
+    else if (typeof responseData === 'string' && responseData.length > 0) {
       // Truncate long error messages
       message += `Response: ${responseData.substring(0, MAX_LEN)}${responseData.length > MAX_LEN ? '...' : ''}`;
     }

@@ -66,6 +66,7 @@ export function specServerUrl(env: NodeJS.ProcessEnv, port: number): (req: Reque
  * Options for {@link createRestToolsRouter}.
  */
 export interface RestToolsOptions {
+  verifyWrites?: boolean;
   /** Guards the tool routes; the OpenAPI specs stay public. */
   authenticate: RequestHandler;
   /** Base URL written into the specs' `servers` entry. */
@@ -247,7 +248,7 @@ export function createRestToolsRouter(options: RestToolsOptions): express.Router
       const result = options.callTool
         ? await options.callTool(toolName, toolArgs, aborted.signal)
         : await executeToolWithPagination(toolName, toolDefinition, toolArgs, securitySchemes, executeTool, {
-          apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars, signal: aborted.signal,
+          apiBaseUrl: API_BASE_URL, maxResponseChars: options.maxResponseChars, signal: aborted.signal, verifyWrites: options.verifyWrites,
         });
 
       // Extract text content from MCP response format

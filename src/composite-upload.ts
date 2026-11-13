@@ -241,6 +241,7 @@ export function createUploadAttachmentTool(configProvider: () => UploadConfig = 
         file = await fetchAttachmentUrl(String(args.url), config, fetchOptions);
       }
       const fileName = safeFileName(args.fileName) ?? file.defaultName;
+      if (file.bytes.length === 0) throw new Error('Attachment file must not be empty.');
       const sha256 = createHash('sha256').update(file.bytes).digest('hex');
       const request = attachmentToolInput(args.target as Record<string, unknown>, fileName, args.title, file.bytes);
       if (args.dry_run === true) return { content: [{ type: 'text', text: JSON.stringify({ wouldUpload: true, fileName, size: file.bytes.length, sha256, target: args.target }) }] };

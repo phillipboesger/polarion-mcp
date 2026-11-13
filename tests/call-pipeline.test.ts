@@ -86,7 +86,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
     try {
       const actual = (await app.request(2, 'tools/list')).result.tools.map((tool: { name: string; inputSchema: unknown }) => ({ name: tool.name, inputSchema: tool.inputSchema }))
       const expected = [
-        ...[...enabledTools.values()].map(tool => ({ name: tool.name, inputSchema: sanitizeInputSchema(tool.inputSchema) })),
+        ...[...enabledTools.values()].map(tool => ({ name: tool.name, inputSchema: sanitizeInputSchema(tool.annotations?.readOnlyHint === false ? { ...tool.inputSchema, properties: { ...tool.inputSchema.properties, verify: { type: 'boolean', description: 'Set false to skip write verification.' } } } : tool.inputSchema) })),
         ...COMPOSITE_TOOLS.map(tool => ({ name: tool.name, inputSchema: tool.inputSchema })),
       ].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
       assert.equal(expected.length, enabledTools.size + COMPOSITE_TOOLS.length)

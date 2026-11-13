@@ -121,6 +121,7 @@ app.use(createRestToolsRouter({
   },
   unauthorizedDescription: 'Authentication failed - invalid or missing API key',
   executeTool: options.executeTool,
+  verifyWrites: options.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false',
   maxResponseChars: parseMaxResponseChars(options.env.MCP_MAX_RESPONSE_CHARS),
 }));
 
