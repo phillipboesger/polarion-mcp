@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { DEMO, assertLocalTarget, isLocalUrl, restBase } from '../scripts/demo/lib/common.mjs';
 import { REDACTED, assertNoSecrets, redact } from '../scripts/demo/lib/redact.mjs';
-import { buildReplayPage, summarizeToolStep, totalSeconds } from '../scripts/demo/lib/page.mjs';
+import { buildReplayPage, safeImageUri, summarizeToolStep, totalSeconds } from '../scripts/demo/lib/page.mjs';
 import { ffmpegArgs, writeReplayPage } from '../scripts/demo/render.mjs';
 import { runSeed } from '../scripts/demo/seed.mjs';
 import { recordTranscript, writeTranscript } from '../scripts/demo/record.mjs';
@@ -206,6 +207,44 @@ test('recordTranscript against the mock Polarion records a dry run and a verifie
   } finally {
     await mock.close();
   }
+});
+
+/** Runs the browser script against a minimal DOM stub and returns every value assigned to an element's `src`. */
+function runClientWithScreenshots(screenshots) {
+  const data = { ...JSON.parse(/id="demo-data">([\s\S]*?)<\/script>/.exec(buildReplayPage(fixture()))[1]), screenshots };
+  const assigned = [];
+  const makeEl = tag => {
+    const node = { tag, children: [], style: {}, dataset: {}, className: '', textContent: '' };
+    node.classList = { toggle() {} };
+    node.appendChild = child => { node.children.push(child); return child; };
+    node.replaceChildren = () => { node.children = []; };
+    node.querySelector = () => makeEl('div');
+    Object.defineProperty(node, 'src', { set: value => { assigned.push(value); }, get: () => '' });
+    return node;
+  };
+  const byId = {};
+  const document = {
+    body: makeEl('body'),
+    getElementById: id => (byId[id] ??= Object.assign(makeEl('div'), id === 'demo-data' ? { textContent: JSON.stringify(data) } : {})),
+    createElement: makeEl,
+    createTextNode: text => ({ text }),
+  };
+  const window = { location: { search: '?t=70' }, matchMedia: () => ({ matches: false }) };
+  vm.runInNewContext(fs.readFileSync('scripts/demo/lib/replay-client.js', 'utf8'), { document, window, URLSearchParams, performance, requestAnimationFrame() {} });
+  return assigned;
+}
+
+test('screenshot values that are not PNG/JPEG data URIs are never assigned to img.src', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  const jpeg = 'data:image/jpeg;base64,/9j/4AAQ';
+  assert.deepEqual(runClientWithScreenshots({ before: png, after: jpeg }), [png, jpeg]);
+  const bad = ['javascript:alert(1)', 'http://evil.example/x.png', 'https://evil.example/x.png', 'data:text/html;base64,PHNjcmlwdD4=', 'data:image/svg+xml;base64,PHN2Zz4=', 'data:image/png;base64,AAAA" onerror="alert(1)', '//evil.example/x.png', 42, {}];
+  for (const value of bad) assert.deepEqual(runClientWithScreenshots({ before: value, after: value }), [], String(value));
+  // The same values are already dropped when the page is built.
+  for (const value of bad) assert.equal(safeImageUri(value), null, String(value));
+  const html = buildReplayPage(fixture(), { screenshots: { before: 'javascript:alert(1)', after: 'http://evil.example/x.png' } });
+  assert.ok(!html.includes('javascript:alert'));
+  assert.ok(!html.includes('evil.example'));
 });
 
 test('record.mjs refuses a non-local live target before starting the server', () => {

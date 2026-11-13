@@ -7,6 +7,10 @@
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const frozenAt = params.has('t') ? Number(params.get('t')) : null;
 
+  const SAFE_IMAGE_URI = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/;
+  // Class names built from transcript values are restricted to known words.
+  const pick = (value, allowed, fallback) => (allowed.indexOf(value) >= 0 ? value : fallback);
+
   const el = (tag, cls, text) => {
     const node = document.createElement(tag);
     if (cls) node.className = cls;
@@ -37,7 +41,8 @@
     const box = el('div', 'shot');
     box.appendChild(el('h4', '', label));
     const frame = el('div', 'frame');
-    if (uri) {
+    // Only inline PNG/JPEG data URIs reach img.src; anything else (javascript:, http:, ...) falls back to the placeholder.
+    if (typeof uri === 'string' && SAFE_IMAGE_URI.test(uri)) {
       const img = el('img');
       img.src = uri;
       img.alt = 'Polarion LiveDoc ' + label.toLowerCase();
@@ -98,7 +103,7 @@
       const v = outcome.verification;
       const line = el('div');
       line.appendChild(document.createTextNode('verification: '));
-      line.appendChild(el('span', 'badge ' + v.status, v.status));
+      line.appendChild(el('span', 'badge ' + pick(v.status, ['verified', 'mismatch', 'uncertain', 'skipped'], 'skipped'), String(v.status)));
       result.appendChild(line);
       result.appendChild(el('div', 'muted', 'read back: ' + view.attributes.join(', ') + ' | mismatches ' + v.mismatches + ', uncertain ' + v.uncertain));
       if (v.skipped.length) result.appendChild(el('div', 'muted', 'not verified: ' + v.skipped.join('; ')));
@@ -125,7 +130,7 @@
       keys.chat = chatKey;
       chat.replaceChildren();
       chatItems.forEach(function (item) {
-        const bubble = el('div', 'bubble ' + item.kind);
+        const bubble = el('div', 'bubble ' + pick(item.kind, ['user', 'assistant'], 'assistant'));
         bubble.appendChild(el('small', '', item.kind === 'user' ? 'You' : 'Assistant (scripted)'));
         bubble.appendChild(document.createTextNode(item.text));
         chat.appendChild(bubble);

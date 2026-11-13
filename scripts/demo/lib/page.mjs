@@ -100,6 +100,11 @@ function placeholderRows(transcript) {
   return (write?.args?.requestBody?.data ?? []).map(item => String(item?.attributes?.title ?? ''));
 }
 
+const SAFE_IMAGE_URI = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/;
+
+/** Only inline PNG/JPEG data URIs are embedded; the browser script validates again before using one. */
+export const safeImageUri = value => (typeof value === 'string' && SAFE_IMAGE_URI.test(value) ? value : null);
+
 /** JSON safe inside a <script> block. */
 function jsonIsland(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
@@ -126,7 +131,7 @@ export function buildReplayPage(transcript, { screenshots = {} } = {}) {
     steps: transcript.steps.map(step => step.kind === 'tool'
       ? { kind: 'tool', holdSec: step.holdSec ?? 10, view: summarizeToolStep(step) }
       : { kind: step.kind, holdSec: step.holdSec ?? 5, text: String(step.text ?? '') }),
-    screenshots: { before: screenshots.before ?? null, after: screenshots.after ?? null },
+    screenshots: { before: safeImageUri(screenshots.before), after: safeImageUri(screenshots.after) },
     placeholderRows: placeholderRows(transcript),
   };
   const title = `polarion-mcp demo replay${mock ? ' (MOCK)' : ''}`;
