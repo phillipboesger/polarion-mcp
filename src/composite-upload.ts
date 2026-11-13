@@ -9,6 +9,7 @@ import type { LookupFunction } from 'node:net';
 import type { LookupAddress } from 'node:dns';
 import type { VirtualTool, VirtualToolContext } from './virtual-tools.js';
 import { registerVirtualTool } from './virtual-tools.js';
+import { mimeTypeForFile } from './utils.js';
 import { resolvePublicHost, type SsrfResolver } from './ssrf.js';
 
 const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
@@ -209,7 +210,7 @@ function validateUploadTarget(value: unknown): asserts value is Record<string, u
 export function createUploadAttachmentTool(configProvider: () => UploadConfig = envConfig, fetchOptions: AttachmentFetchTestOptions = {}): VirtualTool {
   return {
     name: 'upload_attachment', title: 'Upload attachment', toolset: 'composites',
-    description: 'Uploads one file as a Polarion attachment to a Work Item, Test Run, LiveDoc, or Rich Page and returns the attachment result. Choose exactly one source: an absolute local path on stdio with `MCP_UPLOAD_ROOTS`, or an HTTPS URL on an allowlisted host with `MCP_UPLOAD_URL_HOSTS`. The authenticated Polarion user must have attachment write permission. Use `dry_run` to validate and preview name, size, and SHA-256; use the resource-specific attachment tools when editing existing attachment metadata or content.',
+    description: 'Uploads one file as a Polarion attachment to a Work Item, Test Run, LiveDoc, or Rich Page and returns the attachment result. Choose exactly one source: an absolute local path on stdio with `MCP_UPLOAD_ROOTS`, or an HTTPS URL on an allowlisted host with `MCP_UPLOAD_URL_HOSTS`. The authenticated Polarion user must have attachment write permission. Use `dry_run` to validate and preview name, size, MIME type, multipart parts, and SHA-256; use the resource-specific attachment tools when editing existing attachment metadata or content.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {
     target: { type: 'object', additionalProperties: false, properties: {
       type: { type: 'string', enum: ['work_item', 'test_run', 'document', 'page'], description: 'Target resource family.' },
@@ -244,7 +245,7 @@ export function createUploadAttachmentTool(configProvider: () => UploadConfig = 
       if (file.bytes.length === 0) throw new Error('Attachment file must not be empty.');
       const sha256 = createHash('sha256').update(file.bytes).digest('hex');
       const request = attachmentToolInput(args.target as Record<string, unknown>, fileName, args.title, file.bytes);
-      if (args.dry_run === true) return { content: [{ type: 'text', text: JSON.stringify({ wouldUpload: true, fileName, size: file.bytes.length, sha256, target: args.target }) }] };
+      if (args.dry_run === true) return { content: [{ type: 'text', text: JSON.stringify({ wouldUpload: true, fileName, size: file.bytes.length, mimeType: mimeTypeForFile(fileName), multipartParts: ['resource', 'files'], sha256, target: args.target }) }] };
       return await ctx.callPolarionTool(request.tool, request.args);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Attachment upload failed';

@@ -54,7 +54,7 @@ test('dry_run returns name, byte length, and SHA-256 without calling Polarion', 
     const file = path.join(dir, 'a.txt'); await writeFile(file, 'hello');
     const calls: unknown[] = [];
     const result = await createUploadAttachmentTool(() => ({ roots: dir })).handler({ target, filePath: file, dry_run: true }, context('stdio', calls as never));
-    assert.equal(calls.length, 0); assert.match((result.content[0] as { text: string }).text, /"size":5/); assert.match((result.content[0] as { text: string }).text, /2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824/);
+    assert.equal(calls.length, 0); assert.match((result.content[0] as { text: string }).text, /text\/plain/); assert.match((result.content[0] as { text: string }).text, /multipartParts/); assert.match((result.content[0] as { text: string }).text, /"size":5/); assert.match((result.content[0] as { text: string }).text, /2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -160,4 +160,29 @@ test('URL responses require successful status and reject credential-bearing URLs
     await assert.rejects(fetchAttachmentUrl(fixture.url, cfg, { allowPrivateIps: true, resolver: async () => [{ address: '127.0.0.1', family: 4 }] }), /HTTP 404/);
     await assert.rejects(fetchAttachmentUrl('http://user:pass@localhost/a', cfg), /credentials/);
   } finally { await fixture.close(); }
+});
+
+
+test('upload size limits and empty files fail locally before the Polarion request', async () => {
+  const dir = await tempDir();
+  try {
+    const file = path.join(dir, 'large.bin');
+    await writeFile(file, Buffer.alloc(25 * 1024 * 1024 + 1));
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    for (const maxBytes of [undefined, '4']) {
+      const result = await createUploadAttachmentTool(() => ({ roots: dir, maxBytes })).handler({ target, filePath: file }, context('stdio', calls));
+      assert.equal(result.isError, true); assert.match(JSON.stringify(result), /exceeds.*upload limit/);
+    }
+    await writeFile(file, '');
+    const empty = await createUploadAttachmentTool(() => ({ roots: dir })).handler({ target, filePath: file }, context('stdio', calls));
+    assert.equal(empty.isError, true); assert.match(JSON.stringify(empty), /must not be empty/);
+    assert.equal(calls.length, 0);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('MIME inference is case insensitive and falls back for unknown extensions', async () => {
+  const { mimeTypeForFile } = await import('../src/utils.js');
+  assert.equal(mimeTypeForFile('report.PDF'), 'application/pdf');
+  assert.equal(mimeTypeForFile('report.unknown'), 'application/octet-stream');
+  assert.equal(mimeTypeForFile('report'), 'application/octet-stream');
 });

@@ -319,7 +319,9 @@ export function formatApiError(error: AxiosError): string {
     message += `API Request Setup Error: ${error.message}`;
   }
 
-  return message;
+  const authorization = error.config?.headers?.authorization;
+  const credential = typeof authorization === 'string' ? authorization.replace(/^(Bearer|Basic)\s+/i, '') : '';
+  return (credential ? message.split(credential).join('[REDACTED]') : message).replace(/\b(Bearer|Basic)\s+[^\s"'&,;]+/ig, '$1 [REDACTED]');
 }
 
 /**
@@ -491,4 +493,11 @@ export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z
     console.error("Failed to generate/evaluate Zod schema for '%s':", logSafe(toolName), err);
     return z.object({}).passthrough();
   }
+}
+
+/** Returns a common MIME type from a filename, with a safe fallback. */
+export function mimeTypeForFile(fileName: string): string {
+  const extension = fileName.toLowerCase().split('.').pop();
+  const types: Record<string, string> = { txt: 'text/plain', csv: 'text/csv', html: 'text/html', json: 'application/json', xml: 'application/xml', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', zip: 'application/zip' };
+  return fileName.includes('.') && extension ? types[extension] ?? 'application/octet-stream' : 'application/octet-stream';
 }

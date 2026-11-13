@@ -22,7 +22,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema } from "./utils.js";
+import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema, mimeTypeForFile } from "./utils.js";
 import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
@@ -567,13 +567,16 @@ function summarizeMultipartForPreview(requestBody: unknown): unknown {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return parsed;
 
   const summary: JsonObject = {};
+  const fileNames = Array.isArray((parsed as JsonObject).resource?.data) ? (parsed as JsonObject).resource.data.map((item: any) => item?.attributes?.fileName) : [];
+  const describe = (item: unknown, index: number, fallback: string) => {
+    const fileName = typeof fileNames[index] === 'string' ? fileNames[index] : fallback;
+    return typeof item === 'string' ? { fileName, size: Buffer.from(item, 'base64').length, mimeType: mimeTypeForFile(fileName) } : '<invalid file>';
+  };
   for (const [key, value] of Object.entries(parsed as JsonObject)) {
     if (key === 'files' && (Array.isArray(value) || typeof value === 'string')) {
-      summary[key] = (Array.isArray(value) ? value : [value]).map((item) =>
-        typeof item === 'string' ? `<binary, ${Buffer.from(item, 'base64').length} bytes>` : '<invalid file>'
-      );
+      summary[key] = (Array.isArray(value) ? value : [value]).map((item, index) => describe(item, index, `file-${index}`));
     } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
-      summary[key] = `<binary, ${Buffer.from(value, 'base64').length} bytes>`;
+      summary[key] = describe(value, 0, key);
     } else {
       summary[key] = value;
     }
@@ -1044,7 +1047,7 @@ export async function executeApiTool(
     const customFieldKeyTargets = buildCustomFieldKeyTargets(definition, validatedArgs, nameMap, requestBodyData, urlPath);
     if (customFieldKeyTargets) {
       for (const target of customFieldKeyTargets) {
-        const fieldKeyResult = await checkResourceCustomFieldKeys(target, guardRequestContext, sendOpts);
+        const fieldKeyResult = await checkResourceCustomFieldKeys(target, guardRequestContext, sendOpts, undefined, dryRun ? warnings : undefined);
         if (!fieldKeyResult.ok) {
           if (dryRun) warnings.push(fieldKeyResult.reason);
           else return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }], isError: true };
@@ -1065,7 +1068,7 @@ export async function executeApiTool(
     // ignore dry_run entirely and always execute live (nothing unsafe to preview).
     if (dryRun && isMutating) {
       const redactedHeaders = { ...headers };
-      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
+      for (const key of Object.keys(redactedHeaders)) if (!['accept', 'content-type'].includes(key.toLowerCase())) redactedHeaders[key] = '[REDACTED]';
       let diff: unknown;
       if (definition.method.toLowerCase() === 'patch') {
         try {
@@ -1084,17 +1087,25 @@ export async function executeApiTool(
         warnings,
         ...(diff ? { diff } : {}),
       };
+      const credentials = Object.entries(headers).filter(([key]) => !['accept', 'content-type'].includes(key.toLowerCase())).flatMap(([, value]) => [value, value.replace(/^(Bearer|Basic)\s+/i, '')]).filter(value => value.length > 3);
+      for (const schemeName of Object.keys(appliedSecurity ?? {})) {
+        const scheme = allSecuritySchemes[schemeName];
+        if (scheme?.type === 'apiKey' && scheme.in === 'query' && typeof queryParams[scheme.name] === 'string') credentials.push(queryParams[scheme.name]);
+      }
+      let serializedPreview = JSON.stringify(preview, null, 2);
+      for (const credential of credentials) serializedPreview = serializedPreview.split(credential).join('[REDACTED]');
+      const safePreview = JSON.parse(serializedPreview);
       return {
         content: [
           {
             type: 'text',
-            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
+            text: `Dry run: no mutating request was sent to Polarion. Preview:\n${serializedPreview}`
           }
         ],
         // SDK clients throw if a tool that declares an outputSchema returns a
         // non-error result without structuredContent; the advertised schema is
         // lenient, so the preview itself can serve as the structured content.
-        ...(definition.outputSchema ? { structuredContent: { dry_run: true, preview } } : {}),
+        ...(definition.outputSchema ? { structuredContent: { dry_run: true, preview: safePreview } } : {}),
       };
     }
 
@@ -1130,7 +1141,7 @@ export async function executeApiTool(
         } catch (error) {
           verification.reason = `Read-back failed: ${axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error'}`;
         }
-      } else if (definition.method.toLowerCase() === 'patch' && route === '/projects/{projectId}/workitems' && Array.isArray(requestBodyData?.data) && requestBodyData.data.length) {
+      } else if (definition.method.toLowerCase() === 'patch' && (route === '/projects/{projectId}/workitems' || route === '/all/workitems') && Array.isArray(requestBodyData?.data) && requestBodyData.data.length) {
         try {
           const mismatches: Array<{ field: string; sent: unknown; actual: unknown }> = [];
           const fallbackProject = readArg(validatedArgs, 'projectId', nameMap);
@@ -1149,6 +1160,9 @@ export async function executeApiTool(
         } catch (error) {
           verification.reason = `Read-back failed: ${axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error'}`;
         }
+      } else if (definition.method.toLowerCase() === 'post' && route === '/projects/{projectId}/workitems'
+        && (!Array.isArray(response.data?.data) || response.data.data.length !== requestBodyData?.data?.length || response.data.data.some((item: any) => typeof item?.id !== 'string' || !item.id))) {
+        verification.reason = 'Create response does not contain an ID for each created work item.';
       } else if (definition.method.toLowerCase() === 'post' && route === '/projects/{projectId}/workitems'
         && Array.isArray(requestBodyData?.data) && Array.isArray(response.data?.data)
         && requestBodyData.data.length === response.data.data.length) {

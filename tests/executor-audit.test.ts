@@ -336,3 +336,10 @@ test("validation errors name the advertised parameter (page_size_), not page[siz
   assert.match(text, /page_size_ /)
   assert.doesNotMatch(text, /page\[size\]/)
 })
+
+test('attachment missing, empty and oversized file parts fail before a request', async () => {
+  for (const [files, pattern] of [[undefined, /requires a file part/], [[''], /must not be empty/], [[Buffer.alloc(25 * 1024 * 1024 + 1).toString('base64')], /25 MiB limit/]] as const) {
+    const { result, requests } = await run('postWorkItemAttachments', { projectId: 'P', workItemId: 'W-1', requestBody: { resource: { data: [{ type: 'workitem_attachments', attributes: { fileName: 'a.txt' } }] }, ...(files ? { files } : {}) } });
+    assert.equal(result.isError, true); assert.match(JSON.stringify(result), pattern); assert.equal(requests.length, 0);
+  }
+});

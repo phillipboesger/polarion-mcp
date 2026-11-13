@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Supported writes read attributes back by default. Silently dropped values now produce a mismatch error; verification can be disabled per call or at startup. PATCH dry runs include a read-back diff and guard warnings.
+- Supported writes read attributes back by default. Silently dropped values now produce a mismatch error; verification can be disabled per call or at startup. PATCH dry runs include a read-back diff and guard warnings, including available custom-field writability metadata. Upload previews include file size, MIME type and multipart part names.
 
 ## 1.5.0
 

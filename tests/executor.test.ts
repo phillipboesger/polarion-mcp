@@ -1470,7 +1470,9 @@ test("executeApiTool dry_run on a multipart tool previews field names and byte l
   const message = result.content[0]
   assert.equal(message.type, "text")
   if (message.type === "text") {
-    assert.match(message.text, /binary, \d+ bytes/)
+    assert.match(message.text, /"size": \d+/)
+    assert.match(message.text, /image\/png/)
+    assert.match(message.text, /test\.png/)
     assert.doesNotMatch(message.text, new RegExp(pngBase64.replace(/[\\+/=]/g, "\\$&")))
   }
 })
