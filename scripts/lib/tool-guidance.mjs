@@ -146,7 +146,7 @@ export const TOOL_GUIDANCE = {
   patchCollectionsRelationships:
     'Replaces relationship linkage on one Collection with the supplied relationship data. Read existing links with `getCollectionsRelationship`; use `postCollectionsRelationships` to add links without replacing the full set.',
   patchDocument:
-    'Updates attributes of one LiveDoc using its JSON:API request body; only supplied attributes change. Rich text uses `{type: "text/html", value: "<p>…</p>"}`. Use `patchDocumentParts` for structured body parts or `patchRichPage` for a wiki page.',
+    'Updates attributes of one LiveDoc using its JSON:API request body; only supplied attributes change. Rich text uses `{type: "text/html", value: "<p>…</p>"}`. Set `verify: false` to skip read-back. Use `patchDocumentParts` for structured body parts or `patchRichPage` for a wiki page.',
   patchLicense:
     'Updates the server license configuration from the supplied request body. This is a global administrative change requiring license administration permission. Inspect capacity with `getLicense` and assignments with `getLicenseSlots` first.',
   patchPageRelationships:

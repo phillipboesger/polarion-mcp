@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Supported writes read attributes back by default. Silently dropped values now produce a mismatch error; verification can be disabled per call or at startup. PATCH dry runs include a read-back diff and guard warnings.
+
 ## 1.5.0
 
 ### Improvements
