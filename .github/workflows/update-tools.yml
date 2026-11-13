@@ -93,6 +93,7 @@ jobs:
 
             - Spec source: `${{ github.event.inputs.spec_url || 'public Polarion demo' }}`
             - Tool count: **${{ needs.regenerate.outputs.tools }}**
+            - OpenAPI `info.version` comparison is unavailable: the previous spec is not retained.
             - `npm run regenerate` (build + tests) passed before this PR was opened.
 
             CI does not run on bot PRs (GITHUB_TOKEN). Review the diff, then merge to ship the updated tool set.
