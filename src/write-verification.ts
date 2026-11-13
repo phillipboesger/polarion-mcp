@@ -9,7 +9,7 @@
  * `uncertain`, a warning that keeps the result successful.
  */
 
-import { parseUploadMaxBytesOrDefault } from './utils.js';
+import { parseUploadMaxBytes } from './utils.js';
 
 export const DEFAULT_VERIFY_MAX_ITEMS = 10;
 
@@ -27,9 +27,9 @@ export function parseVerifyMaxItems(value: string | undefined): number {
   return value?.trim() && Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : DEFAULT_VERIFY_MAX_ITEMS;
 }
 
-/** Reads the write limits from the entry-point environment. */
+/** Reads the write limits from the entry-point environment; an invalid `MCP_UPLOAD_MAX_BYTES` throws, as it does in `upload_attachment`. */
 export function writeLimitsFromEnv(env: NodeJS.ProcessEnv): WriteLimits {
-  return { verifyMaxItems: parseVerifyMaxItems(env.MCP_VERIFY_MAX_ITEMS), uploadMaxBytes: parseUploadMaxBytesOrDefault(env.MCP_UPLOAD_MAX_BYTES) };
+  return { verifyMaxItems: parseVerifyMaxItems(env.MCP_VERIFY_MAX_ITEMS), uploadMaxBytes: parseUploadMaxBytes(env.MCP_UPLOAD_MAX_BYTES) };
 }
 
 export type VerificationStatus = 'verified' | 'mismatch' | 'uncertain' | 'skipped';
@@ -94,7 +94,7 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 const isRichText = (value: unknown): value is RichText => isObject(value) && typeof value.type === 'string' && /^text\//i.test(value.type) && typeof value.value === 'string';
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
-const BLOCK_TAG = /<\/?(?:p|div|br|li|ul|ol|tr|td|th|table|h[1-6]|pre|blockquote)\b[^>]*>/gi;
+const BLOCK_TAGS = new Set(['p', 'div', 'br', 'li', 'ul', 'ol', 'tr', 'td', 'th', 'table', 'pre', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
 
 function decodeEntities(text: string): string {
   return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (match, decimal?: string, hex?: string, name?: string) => {
@@ -104,10 +104,33 @@ function decodeEntities(text: string): string {
   });
 }
 
-/** Text content of a rich text value: tags stripped and entities decoded for html, whitespace collapsed. */
-function richTextContent(value: string, type: string | undefined): string {
-  const text = type && /html/i.test(type) ? decodeEntities(value.replace(BLOCK_TAG, ' ').replace(/<[^>]*>/g, '')) : value;
-  return text.replace(/\s+/g, ' ').trim();
+/**
+ * Drops everything from a `<` to the next `>` in a single pass (a nested `<` stays inside the tag, an
+ * unclosed tag is dropped), and emits a space for block-level tags so words do not run together.
+ */
+function stripTags(text: string): string {
+  let out = '';
+  let tag: string | undefined;
+  for (const char of text) {
+    if (tag === undefined) {
+      if (char === '<') tag = '';
+      else out += char;
+    } else if (char === '>') {
+      if (BLOCK_TAGS.has(/^\/?\s*([a-z][a-z0-9]*)/i.exec(tag)?.[1]?.toLowerCase() ?? '')) out += ' ';
+      tag = undefined;
+    } else tag += char;
+  }
+  return out;
+}
+
+/**
+ * Text content of a rich text value, for comparison only: tags are stripped first and entities are decoded
+ * once afterwards, so encoded text is never re-parsed as markup. Remaining angle brackets (stray, nested or
+ * decoded from entities) are removed, so the result can never contain `<` or `>`.
+ */
+export function richTextContent(value: string, type: string | undefined): string {
+  const text = type && /html/i.test(type) ? decodeEntities(stripTags(value)) : value;
+  return text.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function textOf(value: unknown): string | undefined {
@@ -116,12 +139,12 @@ function textOf(value: unknown): string | undefined {
 }
 
 const DATE_LIKE = /^\d{4}-\d{2}-\d{2}(?:[T ].*)?$/;
+const DAY_MS = 86_400_000;
 
+/** Dates are equal when their date parts are at most one day apart, which absorbs time zone shifts. */
 function sameDate(left: string, right: string): boolean {
-  const a = Date.parse(left);
-  const b = Date.parse(right);
-  if (Number.isFinite(a) && Number.isFinite(b) && a === b) return true;
-  return (left.length === 10 || right.length === 10) && left.slice(0, 10) === right.slice(0, 10);
+  const day = (value: string) => Date.UTC(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10)));
+  return Math.abs(day(left) - day(right)) <= DAY_MS;
 }
 
 function isEmpty(value: unknown): boolean {
@@ -129,6 +152,17 @@ function isEmpty(value: unknown): boolean {
   if (Array.isArray(value)) return value.length === 0;
   return isRichText(value) && richTextContent(value.value, value.type) === '';
 }
+
+/** Enum values come back as `{id}` objects (or lists of them) while writes send the bare id. */
+function unwrap(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(unwrap);
+  if (isObject(value) && !isRichText(value) && (typeof value.id === 'string' || typeof value.id === 'number')) return value.id;
+  return value;
+}
+
+const isNumeric = (value: unknown): boolean => typeof value === 'number' ? Number.isFinite(value) : typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value));
+const isBooleanLike = (value: unknown): boolean => typeof value === 'boolean' || (typeof value === 'string' && /^(?:true|false)$/i.test(value.trim()));
+const collapse = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
 function equivalent(sent: unknown, actual: unknown): boolean {
   if (isRichText(sent) || isRichText(actual)) {
@@ -149,15 +183,14 @@ function equivalent(sent: unknown, actual: unknown): boolean {
   if (isObject(sent) && isObject(actual)) {
     return Object.keys(sent).every(key => Object.hasOwn(actual, key) && equivalent(sent[key], actual[key]));
   }
+  if (isNumeric(sent) && isNumeric(actual)) return Number(sent) === Number(actual);
   if (typeof sent === 'string' && typeof actual === 'string') {
-    const left = sent.replace(/\s+/g, ' ').trim();
-    const right = actual.replace(/\s+/g, ' ').trim();
+    const left = collapse(sent);
+    const right = collapse(actual);
     return left === right || (DATE_LIKE.test(left) && DATE_LIKE.test(right) && sameDate(left, right));
   }
-  if (typeof sent === 'number' && typeof actual === 'string') return actual.trim() !== '' && Number(actual) === sent;
-  if (typeof sent === 'string' && typeof actual === 'number') return sent.trim() !== '' && Number(sent) === actual;
-  if (typeof sent === 'boolean' && typeof actual === 'string') return actual.trim().toLowerCase() === String(sent);
-  if (typeof sent === 'string' && typeof actual === 'boolean') return sent.trim().toLowerCase() === String(actual);
+  if (typeof sent === 'boolean' && isBooleanLike(actual)) return String(actual).trim().toLowerCase() === String(sent);
+  if (typeof actual === 'boolean' && isBooleanLike(sent)) return String(sent).trim().toLowerCase() === String(actual);
   return sent === actual;
 }
 
@@ -167,12 +200,39 @@ function isPlainValue(value: unknown): boolean {
   return scalar(value) || (Array.isArray(value) && value.every(scalar));
 }
 
-/** Classifies one attribute: what was sent against what the read-back returned. */
-export function compareAttribute(field: string, sent: unknown, actual: unknown): Outcome {
+/**
+ * Classifies a difference that is present on both sides. Only two values of the same simple kind (string,
+ * number, boolean) that clearly differ are a mismatch; a changed type, case-only change, truncation or
+ * anything nested is uncertain.
+ */
+function classifyDifference(sent: unknown, actual: unknown): Outcome {
+  const scalar = (value: unknown) => ['string', 'number', 'boolean'].includes(typeof value);
+  if (!scalar(sent) || !scalar(actual)) return 'uncertain';
+  if (typeof sent === 'boolean' || typeof actual === 'boolean') return isBooleanLike(sent) && isBooleanLike(actual) ? 'mismatch' : 'uncertain';
+  if (isNumeric(sent) && isNumeric(actual)) return 'mismatch';
+  if (typeof sent === 'string' && typeof actual === 'string') {
+    const left = collapse(sent).toLowerCase();
+    const right = collapse(actual).toLowerCase();
+    if (left === right) return 'uncertain';
+    if (left && right && (left.startsWith(right) || right.startsWith(left))) return 'uncertain';
+    return 'mismatch';
+  }
+  return 'uncertain';
+}
+
+/**
+ * Classifies one attribute: what was sent against what the read-back returned.
+ * A hard mismatch needs either a non-empty plain value that is absent on read-back (the silent drop) or
+ * two values of the same simple kind that clearly differ.
+ */
+export function compareAttribute(field: string, rawSent: unknown, rawActual: unknown): Outcome {
+  const sent = unwrap(rawSent);
+  const actual = unwrap(rawActual);
   if (isEmpty(sent)) return isEmpty(actual) ? 'verified' : 'uncertain';
   if (equivalent(sent, actual)) return 'verified';
   if (SOFT_ATTRIBUTES.has(field) || isRichText(sent) || isRichText(actual)) return 'uncertain';
-  return isPlainValue(sent) ? 'mismatch' : 'uncertain';
+  if (actual === undefined || actual === null) return isPlainValue(sent) && sent !== false && sent !== 0 ? 'mismatch' : 'uncertain';
+  return classifyDifference(sent, actual);
 }
 
 // ---- Orchestration ----

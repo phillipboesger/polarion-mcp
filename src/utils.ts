@@ -513,11 +513,6 @@ export function parseUploadMaxBytes(value: string | undefined): number {
   return parsed;
 }
 
-/** Startup variant of {@link parseUploadMaxBytes}: an invalid value falls back to the default instead of aborting. */
-export function parseUploadMaxBytesOrDefault(value: string | undefined): number {
-  try { return parseUploadMaxBytes(value); } catch { return DEFAULT_UPLOAD_MAX_BYTES; }
-}
-
 /** Human-readable size limit for error messages, e.g. "25 MiB" or "1000 bytes". */
 export function describeByteLimit(bytes: number): string {
   return bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MiB` : `${bytes} bytes`;

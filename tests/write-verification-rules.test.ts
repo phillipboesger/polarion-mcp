@@ -4,8 +4,9 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { executeApiTool } from '../src/executor.js';
-import { isVerifiableRoute, parseVerifyMaxItems, writeLimitsFromEnv } from '../src/write-verification.js';
+import { compareAttribute, isVerifiableRoute, parseVerifyMaxItems, richTextContent, writeLimitsFromEnv } from '../src/write-verification.js';
 import { securitySchemes, toolDefinitionMap } from '../src/tools.js';
+import { parseUploadMaxBytes } from '../src/utils.js';
 import type { McpToolDefinition } from '../src/types.js';
 
 // A default-on check must never turn a successful write into an error unless an attribute was clearly dropped.
@@ -273,8 +274,81 @@ test('only routes with a read-back implementation advertise verify', () => {
   assert.equal(parseVerifyMaxItems('abc'), 10);
 });
 
-test('write limits are parsed once from the environment with safe defaults', () => {
+test('write limits are parsed once from the environment; the upload limit uses the one strict parser', () => {
   assert.deepEqual(writeLimitsFromEnv({}), { verifyMaxItems: 10, uploadMaxBytes: 25 * 1024 * 1024 });
   assert.deepEqual(writeLimitsFromEnv({ MCP_VERIFY_MAX_ITEMS: '4', MCP_UPLOAD_MAX_BYTES: '50000000' }), { verifyMaxItems: 4, uploadMaxBytes: 50_000_000 });
-  assert.deepEqual(writeLimitsFromEnv({ MCP_VERIFY_MAX_ITEMS: '-1', MCP_UPLOAD_MAX_BYTES: 'big' }), { verifyMaxItems: 10, uploadMaxBytes: 25 * 1024 * 1024 });
+  assert.equal(writeLimitsFromEnv({ MCP_VERIFY_MAX_ITEMS: '-1' }).verifyMaxItems, 10);
+  for (const invalid of ['big', '0', '-5', '1.5']) {
+    assert.throws(() => writeLimitsFromEnv({ MCP_UPLOAD_MAX_BYTES: invalid }), /MCP_UPLOAD_MAX_BYTES must be a positive integer/);
+    assert.throws(() => parseUploadMaxBytes(invalid), /MCP_UPLOAD_MAX_BYTES must be a positive integer/);
+  }
+});
+
+test('an empty upstream error on an attachment upload names method, route, content type and parts but no credential or file content', async () => {
+  const token = 'fake-upload-token-98765';
+  const previous = process.env.BEARER_TOKEN; process.env.BEARER_TOKEN = token;
+  const server = createServer((_req, res) => res.writeHead(400).end());
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const secretContent = 'SECRET-FILE-CONTENT-ABC';
+  try {
+    const result = await executeApiTool('postWorkItemAttachments', toolDefinitionMap.get('postWorkItemAttachments')!, { projectId: 'p', workItemId: 'W-1', requestBody: { resource: { data: [{ type: 'workitem_attachments', attributes: { fileName: 'a.txt' } }] }, files: [Buffer.from(secretContent).toString('base64')] } }, securitySchemes, FAST, undefined, base, true);
+    assert.equal(result.isError, true);
+    const text = JSON.stringify(result);
+    assert.match(text, /Method: POST/);
+    assert.match(text, /path template: \/projects\/\{projectId\}\/workitems\/\{workItemId\}\/attachments/);
+    assert.match(text, /content-type: multipart\/form-data/);
+    assert.match(text, /multipart parts: resource: present, files: /);
+    assert.match(text, /a\.txt/);
+    for (const forbidden of [token, 'Authorization', 'Bearer', secretContent, Buffer.from(secretContent).toString('base64')]) assert.ok(!text.includes(forbidden), `must not contain ${forbidden}`);
+  } finally { if (previous === undefined) delete process.env.BEARER_TOKEN; else process.env.BEARER_TOKEN = previous; server.close(); await once(server, 'close'); }
+});
+
+test('rich text normalization never leaves markup, even for nested, malformed or entity-encoded input', () => {
+  for (const [value, type] of [
+    ['<scr<script>ipt>alert(1)</scr</script>ipt>', 'text/html'], ['<<b>script>x', 'text/html'], ['&lt;script&gt;alert(1)&lt;/script&gt;', 'text/html'],
+    ['&amp;lt;script&amp;gt;', 'text/html'], ['a < b > c <i', 'text/html'], ['<script', 'text/html'], ['<script>x</script>', 'text/plain'],
+  ] as const) {
+    const normalized = richTextContent(value, type);
+    assert.doesNotMatch(normalized, /[<>]/, JSON.stringify(value));
+    assert.doesNotMatch(normalized, /<script/i);
+  }
+  assert.equal(richTextContent('<<b>script>x', 'text/html'), 'scriptx');
+  assert.equal(richTextContent('&lt;script&gt;', 'text/html'), 'script');
+});
+
+test('enum objects, enum lists and numeric strings compare by value', () => {
+  for (const [sent, actual] of [
+    ['open', { id: 'open' }], [{ id: 'open' }, 'open'], [['a', 'b'], [{ id: 'b' }, { id: 'a' }]],
+    ['1.0', '1'], ['50', '50.0'], [3, '3.00'], ['2024-05-01', '2024-04-30T22:00:00Z'], ['2024-05-01', '2024-05-02T01:00:00Z'], ['2024-05-01', '2024-05-01'],
+  ] as const) assert.equal(compareAttribute('myField', sent, actual), 'verified', JSON.stringify([sent, actual]));
+  assert.equal(compareAttribute('myField', ['a', 'b'], [{ id: 'a' }, { id: 'c' }]), 'uncertain');
+  assert.equal(compareAttribute('myField', 'a', { id: 'b' }), 'mismatch');
+});
+
+test('false and 0 against an omitted attribute are uncertain; a non-empty plain value that is absent is a mismatch', () => {
+  assert.equal(compareAttribute('flag', false, undefined), 'uncertain');
+  assert.equal(compareAttribute('count', 0, undefined), 'uncertain');
+  assert.equal(compareAttribute('flag', false, null), 'uncertain');
+  assert.equal(compareAttribute('flag', true, undefined), 'mismatch');
+  assert.equal(compareAttribute('count', 5, undefined), 'mismatch');
+  assert.equal(compareAttribute('name', 'x', undefined), 'mismatch');
+  assert.equal(compareAttribute('tags', ['a'], undefined), 'mismatch');
+});
+
+test('only clearly different values of the same simple kind are a mismatch', () => {
+  // Same kind, clearly different.
+  assert.equal(compareAttribute('f', 'alpha', 'omega'), 'mismatch');
+  assert.equal(compareAttribute('f', 5, 7), 'mismatch');
+  assert.equal(compareAttribute('f', '5', '7.5'), 'mismatch');
+  assert.equal(compareAttribute('f', true, false), 'mismatch');
+  assert.equal(compareAttribute('f', '2024-05-01', '2024-05-09'), 'mismatch');
+  // Type differs, nested, truncation, case-only: uncertain.
+  assert.equal(compareAttribute('f', 5, 'five'), 'uncertain');
+  assert.equal(compareAttribute('f', 'yes', true), 'uncertain');
+  assert.equal(compareAttribute('f', 'alpha', ['alpha', 'beta']), 'uncertain');
+  assert.equal(compareAttribute('f', { a: 1 }, { a: 2 }), 'uncertain');
+  assert.equal(compareAttribute('f', 'a long description', 'a long'), 'uncertain');
+  assert.equal(compareAttribute('f', 'Alpha', 'alpha'), 'uncertain');
+  assert.equal(compareAttribute('f', ['a', 'b'], ['a']), 'uncertain');
 });

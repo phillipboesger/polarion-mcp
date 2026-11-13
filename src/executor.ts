@@ -636,6 +636,7 @@ export async function executeApiTool(
   verifyWrites = true,
   limits: WriteLimits = {}
 ): Promise<CallToolResult> {
+  let requestFacts = '';
   try {
     // ===== STEP 0: Strip dry_run before validation =====
     // Always stripped, regardless of whether the regenerated schema already
@@ -999,6 +1000,12 @@ export async function executeApiTool(
       ...(download ? { responseType: 'arraybuffer' as const, maxContentLength: MAX_DOWNLOAD_BYTES + 1 } : {}),
       httpsAgent: httpsAgent(shouldRejectUnauthorized()),
     };
+    // Appended to upstream errors that carry no body, so an empty 400 stays diagnosable. Names and sizes only: no credentials, no file content.
+    const parts = dryRunBodyPreview && definition.requestBodyContentType === 'multipart/form-data'
+      ? Object.entries(dryRunBodyPreview as Record<string, unknown>).map(([name, value]) => `${name}: ${name === 'files' || name === 'file' || name === 'content' ? JSON.stringify(value) : 'present'}`).join(', ')
+      : '';
+    requestFacts = `Method: ${definition.method.toUpperCase()}; path template: ${definition.pathTemplate}; content-type: ${definition.requestBodyContentType ?? 'none'}${parts ? `; multipart parts: ${parts}` : ''}`;
+
     // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
     // Three independent checks, in this order (first failure blocks the write):
     // 1. Enum fields -- Work Item write tools only (patchWorkItem, postWorkItems,
@@ -1237,6 +1244,7 @@ export async function executeApiTool(
     // Format Axios errors specially (network errors, API errors, etc.)
     if (axios.isAxiosError(error)) {
       errorMessage = formatApiError(error);
+      if (error.response && (!error.response.data || (Buffer.isBuffer(error.response.data) && error.response.data.length === 0))) errorMessage += ` ${requestFacts}`;
     }
     // Handle standard JavaScript errors
     else if (error instanceof Error) {
