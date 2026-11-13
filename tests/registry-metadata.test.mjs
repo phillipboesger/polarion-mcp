@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, copyFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,6 +31,29 @@ test('package version comparison rejects mismatches', () => {
   assert.equal(versionMatches({ registryType: 'npm', version: '1.0.0' }, '1.0.1'), false);
   assert.equal(versionMatches({ registryType: 'oci', identifier: 'image:1.0.0' }, '1.0.1'), false);
   assert.equal(versionMatches({ registryType: 'oci', identifier: 'image:1.0.1', version: '1.0.1' }, '1.0.1'), false);
+});
+
+test('version sync preserves current files and rejects a missing manifest version', () => {
+  const temp = mkdtempSync(resolve(tmpdir(), 'registry-metadata-'));
+  const files = ['package.json', 'server.json', 'mcpb/manifest.json', 'python/polarion_alm_mcp/__init__.py', 'python/README.md'];
+  try {
+    for (const file of files) {
+      mkdirSync(dirname(resolve(temp, file)), { recursive: true });
+      copyFileSync(resolve(root, file), resolve(temp, file));
+    }
+    const before = files.map(file => readFileSync(resolve(temp, file)));
+    const run = () => spawnSync(process.execPath, [resolve(root, 'scripts/sync-server-json.mjs')], { cwd: temp, encoding: 'utf8' });
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    for (const [index, file] of files.entries()) assert.deepEqual(readFileSync(resolve(temp, file)), before[index], file);
+    const manifest = resolve(temp, 'mcpb/manifest.json');
+    writeFileSync(manifest, '{"name":"test"}\n');
+    const missing = run();
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /manifest version field not found/);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
 });
 
 test('site llms.txt relative links resolve', () => {

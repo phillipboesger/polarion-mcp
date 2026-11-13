@@ -18,9 +18,10 @@ for (const pkg of server.packages ?? []) {
 writeFileSync('server.json', `${JSON.stringify(server, null, 2)}\n`);
 
 const manifestPath = 'mcpb/manifest.json';
-const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-manifest.version = version;
-writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+const manifest = readFileSync(manifestPath, 'utf8');
+const manifestVersion = /^(\s*"version"\s*:\s*)"[^"]*"/m;
+if (!manifestVersion.test(manifest)) throw new Error('MCPB manifest version field not found');
+writeFileSync(manifestPath, manifest.replace(manifestVersion, (_, prefix) => `${prefix}${JSON.stringify(version)}`));
 
 const launcher = 'python/polarion_alm_mcp/__init__.py';
 writeFileSync(launcher, readFileSync(launcher, 'utf8').replace(/__version__ = "[^"]+"/, `__version__ = "${version}"`));
