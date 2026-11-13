@@ -216,7 +216,7 @@ test('the verify item limit is configurable', async () => {
 
 // ---- Read-back requests keep query-parameter authentication ----
 
-test('read-back and dry-run diff GETs merge fields=@all into existing query params such as an apiKey', async () => {
+test('read-back and dry-run diff GETs merge fields[workitems]=@all into existing query params such as an apiKey', async () => {
   const requests: Array<{ method: string; url: string }> = [];
   const server = createServer((req, res) => {
     requests.push({ method: req.method ?? '', url: req.url ?? '' });
@@ -235,9 +235,64 @@ test('read-back and dry-run diff GETs merge fields=@all into existing query para
       const get = requests.find(item => item.method === 'GET');
       assert.ok(get, `a read happened (dry_run=${dry_run})`);
       assert.match(get.url, /api_key=query-secret-value/);
-      assert.match(get.url, /fields=(%40|@)all/);
+      assert.match(get.url, /fields(%5B|\[)workitems(%5D|\])=(%40|@)all/);
+      assert.doesNotMatch(get.url, /[?&]fields=/);
     }
   } finally { if (previous === undefined) delete process.env.API_KEY_QUERYKEY; else process.env.API_KEY_QUERYKEY = previous; server.close(); await once(server, 'close'); }
+});
+
+test('a document read-back asks for fields[documents]=@all and never a bare fields parameter', async () => {
+  const urls: string[] = [];
+  const server = createServer((req, res) => {
+    urls.push(`${req.method} ${req.url}`);
+    if (req.method === 'PATCH') return res.writeHead(204).end();
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: { attributes: { title: 'new' } } }));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const def: McpToolDefinition = { ...documentDefinition, name: 'patchDoc', pathTemplate: '/projects/{projectId}/spaces/{spaceId}/documents/{documentName}', executionParameters: [{ name: 'projectId', in: 'path' }, { name: 'spaceId', in: 'path' }, { name: 'documentName', in: 'path' }], inputSchema: { type: 'object', properties: { projectId: { type: 'string' }, spaceId: { type: 'string' }, documentName: { type: 'string' }, requestBody: { type: 'object' } }, required: ['projectId', 'spaceId', 'documentName', 'requestBody'] } };
+    await executeApiTool('patchDoc', def, { projectId: 'p', spaceId: 's', documentName: 'd', requestBody: { data: { attributes: { title: 'new' } } } }, {}, FAST, undefined, base, true);
+    const get = urls.find(item => item.startsWith('GET'));
+    assert.ok(get);
+    assert.match(get, /fields(%5B|\[)documents(%5D|\])=(%40|@)all/);
+    assert.ok(urls.every(item => !/[?&]fields=/.test(item)));
+  } finally { server.close(); await once(server, 'close'); }
+});
+
+// ---- Dry-run diff only reads single resources ----
+
+test('dry-run on a bulk PATCH route does not GET the collection and says the diff is skipped', async () => {
+  const urls: string[] = [];
+  const server = createServer((req, res) => { urls.push(`${req.method} ${req.url}`); res.writeHead(200, { 'content-type': 'application/json' }).end('{"data":[]}'); });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const result = await executeApiTool('patchWorkItemsBulk', { ...bulkDefinition, method: 'patch' }, { projectId: 'P', dry_run: true, requestBody: { data: [{ type: 'workitems', id: 'P/WI-1', attributes: { title: 'new' } }] } }, {}, FAST, undefined, base, true);
+    assert.notEqual(result.isError, true);
+    assert.ok(!urls.some(item => item.startsWith('GET')), urls.join(', '));
+    const text = (result.content[0] as { text: string }).text;
+    assert.match(text, /diff skipped/);
+    assert.doesNotMatch(text, /"diff"/);
+  } finally { server.close(); await once(server, 'close'); }
+});
+
+// ---- A failed create names the created ids and warns against a retry ----
+
+test('a hard mismatch on a create names the created id and says not to retry the create', async () => {
+  const server = createServer((req, res) => {
+    if (req.method === 'POST') return res.writeHead(201, { 'content-type': 'application/json' }).end(JSON.stringify({ data: [{ type: 'workitems', id: 'P/WI-7' }] }));
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: { attributes: { title: 'x' } } }));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const result = await executeApiTool('patchWorkItemsBulk', { ...bulkDefinition, method: 'post' }, { projectId: 'P', requestBody: { data: [{ type: 'workitems', attributes: { title: 'wanted' } }] } }, {}, FAST, undefined, base, true);
+    assert.equal(result.isError, true);
+    const text = (result.content[0] as { text: string }).text;
+    assert.match(text, /Created as P\/WI-7: do not retry the create/);
+    assert.match(text, /patch the item/);
+  } finally { server.close(); await once(server, 'close'); }
 });
 
 // ---- Attachment limit shares MCP_UPLOAD_MAX_BYTES ----
@@ -339,8 +394,11 @@ test('false and 0 against an omitted attribute are uncertain; a non-empty plain 
 test('only clearly different values of the same simple kind are a mismatch', () => {
   // Same kind, clearly different.
   assert.equal(compareAttribute('f', 'alpha', 'omega'), 'mismatch');
-  assert.equal(compareAttribute('f', 5, 7), 'mismatch');
-  assert.equal(compareAttribute('f', '5', '7.5'), 'mismatch');
+  // Two numbers that differ may be rounding or reformatting, so they only warn.
+  assert.equal(compareAttribute('f', 5, 7), 'uncertain');
+  assert.equal(compareAttribute('f', '5', '7.5'), 'uncertain');
+  assert.equal(compareAttribute('f', 10.005, 10.01), 'uncertain');
+  assert.equal(compareAttribute('f', '2d', '2 d'), 'uncertain');
   assert.equal(compareAttribute('f', true, false), 'mismatch');
   assert.equal(compareAttribute('f', '2024-05-01', '2024-05-09'), 'mismatch');
   // Type differs, nested, truncation, case-only: uncertain.

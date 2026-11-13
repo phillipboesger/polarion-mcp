@@ -23,7 +23,7 @@ import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema, mimeTypeForFile, describeByteLimit, DEFAULT_UPLOAD_MAX_BYTES } from "./utils.js";
-import { DEFAULT_VERIFY_MAX_ITEMS, isVerifiableRoute, verificationMessage, verifyTargets, type VerifyTarget, type WriteLimits, type WriteVerification } from "./write-verification.js";
+import { DEFAULT_VERIFY_MAX_ITEMS, isSingleResourceRoute, isVerifiableRoute, readBackFields, verificationMessage, verifyTargets, type VerifyTarget, type WriteLimits, type WriteVerification } from "./write-verification.js";
 import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
@@ -1053,9 +1053,11 @@ export async function executeApiTool(
       const redactedHeaders = { ...headers };
       for (const key of Object.keys(redactedHeaders)) if (!['accept', 'content-type'].includes(key.toLowerCase())) redactedHeaders[key] = '[REDACTED]';
       let diff: unknown;
-      if (definition.method.toLowerCase() === 'patch') {
+      if (definition.method.toLowerCase() === 'patch' && !isSingleResourceRoute(definition)) {
+        warnings.push('Before/after diff skipped: this route addresses a collection, not a single resource.');
+      } else if (definition.method.toLowerCase() === 'patch') {
         try {
-          const before = await sendWithRetry({ ...config, method: 'GET', data: undefined, params: { ...config.params, fields: '@all' } }, sendOpts);
+          const before = await sendWithRetry({ ...config, method: 'GET', data: undefined, params: { ...config.params, ...readBackFields(definition) } }, sendOpts);
           if (!before.data?.data?.attributes || typeof before.data.data.attributes !== 'object') throw new Error('Read response has no attributes');
           diff = { before: before.data?.data?.attributes, after: requestBodyData?.data?.attributes };
         } catch (error) {
@@ -1113,7 +1115,7 @@ export async function executeApiTool(
         // Reads each written resource back; the original query params (apiKey auth) are kept.
         const read = async (target: VerifyTarget): Promise<Record<string, unknown>> => {
           try {
-            const response = await sendWithRetry({ ...config, method: 'GET', url: target.url ?? requestUrl, data: undefined, params: { ...config.params, fields: '@all' } }, sendOpts);
+            const response = await sendWithRetry({ ...config, method: 'GET', url: target.url ?? requestUrl, data: undefined, params: { ...config.params, ...readBackFields(definition) } }, sendOpts);
             const attributes = response.data?.data?.attributes;
             if (!attributes || typeof attributes !== 'object') throw new Error('Read-back response has no attributes');
             return attributes;
@@ -1219,7 +1221,8 @@ export async function executeApiTool(
     // non-JSON answer to a successful call has none to offer, so it gets an empty
     // object, which the advertised (lenient) schema accepts. isError would
     // report a write that worked as failed and invite a duplicating retry.
-    const note = verification && verificationMessage(verification);
+    const createdIds = definition.method.toLowerCase() === 'post' && Array.isArray(response.data?.data) ? response.data.data.map((item: any) => item?.id).filter((id: unknown): id is string => typeof id === 'string' && id !== '') : undefined;
+    const note = verification && verificationMessage(verification, createdIds);
     const resultBody = verification ? { ...(structuredContent ?? (responseText ? { response: responseText } : {})), verification, ...(note ? { message: note } : {}) } : undefined;
     const fullResponseText = `API Response (Status: ${response.status}):\n${resultBody ? JSON.stringify(resultBody) : responseText}`;
     const boundedResponseText = capToolResponseText(fullResponseText, maxResponseChars, definition);

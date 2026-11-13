@@ -74,6 +74,16 @@ export function isVerifiableRoute(definition: { method: string; pathTemplate: st
   return method === 'post' && route === '/projects/{projectId}/workitems';
 }
 
+/** Query parameter that makes Polarion return every attribute, in the bracketed per-type form the executor uses elsewhere. */
+export function readBackFields(definition: { pathTemplate: string }): Record<string, string> {
+  return { [`fields[${definition.pathTemplate.includes('/documents/') ? 'documents' : 'workitems'}]`]: '@all' };
+}
+
+/** True when the route addresses one resource (last segment is a path parameter and not a collection). */
+export function isSingleResourceRoute(definition: { pathTemplate: string }): boolean {
+  return /\/(workitems|documents)\/\{[^}/]+\}$/.test(definition.pathTemplate);
+}
+
 /** The tool's input schema, with the `verify` switch added only when its route has a read-back implementation. */
 export function withVerifyProperty(definition: { method: string; pathTemplate: string; inputSchema: any }): any {
   if (!isVerifiableRoute(definition)) return definition.inputSchema;
@@ -209,11 +219,12 @@ function classifyDifference(sent: unknown, actual: unknown): Outcome {
   const scalar = (value: unknown) => ['string', 'number', 'boolean'].includes(typeof value);
   if (!scalar(sent) || !scalar(actual)) return 'uncertain';
   if (typeof sent === 'boolean' || typeof actual === 'boolean') return isBooleanLike(sent) && isBooleanLike(actual) ? 'mismatch' : 'uncertain';
-  if (isNumeric(sent) && isNumeric(actual)) return 'mismatch';
+  // Rounding or a reformatted number (10.005 -> 10.01) is not a dropped value.
+  if (isNumeric(sent) && isNumeric(actual)) return 'uncertain';
   if (typeof sent === 'string' && typeof actual === 'string') {
     const left = collapse(sent).toLowerCase();
     const right = collapse(actual).toLowerCase();
-    if (left === right) return 'uncertain';
+    if (left === right || left.replace(/\s+/g, '') === right.replace(/\s+/g, '')) return 'uncertain';
     if (left && right && (left.startsWith(right) || right.startsWith(left))) return 'uncertain';
     return 'mismatch';
   }
@@ -284,9 +295,12 @@ export async function verifyTargets(
 }
 
 /** The sentence added to a result whose verification found something to report. */
-export function verificationMessage(verification: WriteVerification): string | undefined {
+export function verificationMessage(verification: WriteVerification, createdIds?: string[]): string | undefined {
   const list = (items: VerificationFinding[]) => items.map(item => item.field).join(', ');
-  if (verification.status === 'mismatch') return `The write was accepted by Polarion but not applied for fields: ${list(verification.mismatches)}.`;
+  if (verification.status === 'mismatch') {
+    const retry = createdIds?.length ? ` Created as ${createdIds.join(', ')}: do not retry the create (it would duplicate); fix the field and patch the item.` : '';
+    return `The write was accepted by Polarion but not applied for fields: ${list(verification.mismatches)}.${retry}`;
+  }
   if (verification.status === 'uncertain') return `The write succeeded, but these fields differ on read-back: ${list(verification.uncertain)}. ${UNCERTAIN_NOTE}`;
   return undefined;
 }

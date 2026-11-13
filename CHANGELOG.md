@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-- Work Item create, Work Item patch (single and bulk) and LiveDoc patch read attributes back by default and report `verified`, `mismatch`, `uncertain` or `skipped`. Only a non-empty plain value that is absent on read-back, or that clearly differs from a value of the same simple kind, is a `mismatch` error; rich text, workflow and computed fields that differ are `uncertain` warnings, clearing a field is `verified`, and relationships are `skipped`. A bulk write reads back at most 10 items (`MCP_VERIFY_MAX_ITEMS`). `verify: false` is advertised only on tools that support verification; `MCP_VERIFY_WRITES=false` disables it at startup. The read-back keeps query-parameter authentication.
+- Work Item create, Work Item patch (single and bulk) and LiveDoc patch read attributes back by default and report `verified`, `mismatch`, `uncertain` or `skipped`. Only a non-empty plain value that is absent on read-back, or that clearly differs from a plain string or boolean, is a `mismatch` error (differing numbers are `uncertain`); a mismatch on a create names the created ids and says not to retry; rich text, workflow and computed fields that differ are `uncertain` warnings, clearing a field is `verified`, and relationships are `skipped`. A bulk write reads back at most 10 items (`MCP_VERIFY_MAX_ITEMS`). `verify: false` is advertised only on tools that support verification; `MCP_VERIFY_WRITES=false` disables it at startup. The read-back requests `fields[workitems]=@all` (`fields[documents]=@all` for documents) and keeps query-parameter authentication.
 - Attachment tools and `upload_attachment` now share one size limit, `MCP_UPLOAD_MAX_BYTES`, so raising it also allows larger attachment tool calls.
-- PATCH dry runs include a read-back diff and guard warnings, including available custom-field writability metadata. Upload previews include file size, MIME type and multipart part names.
+- PATCH dry runs on single resources include a read-back diff (bulk PATCH routes skip it with a warning) and guard warnings, including available custom-field writability metadata. Upload previews include file size, MIME type and multipart part names.
 
 ## 1.5.0
 
