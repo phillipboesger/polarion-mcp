@@ -301,6 +301,7 @@ const STANDARD_ATTRIBUTE_KEYS: Record<string, Set<string>> = {
 
 interface FieldKeyCacheEntry {
   keys: Set<string>;
+  metadata: Record<string, any>;
   expiresAt: number;
 }
 
@@ -370,7 +371,8 @@ export async function checkResourceCustomFieldKeys(
   target: CustomFieldKeyCheckTarget,
   requestContext: EnumGuardRequestContext,
   sendOpts: SendWithRetryOpts = {},
-  cacheTtlMs = DEFAULT_CACHE_TTL_MS
+  cacheTtlMs = DEFAULT_CACHE_TTL_MS,
+  warnings?: string[]
 ): Promise<EnumGuardResult> {
   const standardKeys = STANDARD_ATTRIBUTE_KEYS[target.resourceType];
   if (!standardKeys) {
@@ -392,9 +394,11 @@ export async function checkResourceCustomFieldKeys(
     : `${callerCacheScope()}::${requestContext.baseUrl}::${target.projectId}::fields::${target.resourceType}::${target.type ?? "~"}`;
   const cached = _fieldKeyCache.get(cacheKey);
   let fieldIds: Set<string>;
+  let metadata: Record<string, any>;
 
   if (cached && cached.expiresAt > Date.now()) {
     fieldIds = cached.keys;
+    metadata = cached.metadata;
   } else {
     const config: AxiosRequestConfig = target.instancePath
       ? {
@@ -413,6 +417,7 @@ export async function checkResourceCustomFieldKeys(
     try {
       const response = await sendWithRetry(config, sendOpts);
       fieldIds = new Set(extractFieldIds(response.data));
+      metadata = response.data?.data?.attributes ?? {};
       if (fieldIds.size === 0) {
         return {
           ok: false,
@@ -422,7 +427,7 @@ export async function checkResourceCustomFieldKeys(
             `invisible to the UI. Ask the user to confirm these field ids exist for this type.`,
         };
       }
-      cacheSet(_fieldKeyCache, cacheKey, { keys: fieldIds, expiresAt: Date.now() + cacheTtlMs });
+      cacheSet(_fieldKeyCache, cacheKey, { keys: fieldIds, metadata, expiresAt: Date.now() + cacheTtlMs });
     } catch (error) {
       const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
       return {
@@ -435,6 +440,12 @@ export async function checkResourceCustomFieldKeys(
     }
   }
 
+  if (warnings) {
+    for (const key of candidateKeys) {
+      const field = metadata[key];
+      if (field?.readOnly === true || field?.readonly === true || field?.writable === false) warnings.push(`Field '${key}' is read-only or not writable for ${target.scopeLabel}.`);
+    }
+  }
   const unknownKeys = candidateKeys.filter((k) => !fieldIds.has(k));
   if (unknownKeys.length > 0) {
     // fieldIds includes every field getFieldsMetadata returns -- OOTB fields
@@ -444,7 +455,7 @@ export async function checkResourceCustomFieldKeys(
     return {
       ok: false,
       reason:
-        `Unknown field key(s) ${unknownKeys.join(', ')} for ${target.scopeLabel}. ` +
+        `Unknown field key(s) ${unknownKeys.join(', ')} for ${target.scopeLabel}, not defined for this type. ` +
         `Other field ids this type has: ${knownCustomFields.join(', ') || '(none)'}.`,
     };
   }

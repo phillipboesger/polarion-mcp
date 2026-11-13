@@ -9,9 +9,9 @@ import type { LookupFunction } from 'node:net';
 import type { LookupAddress } from 'node:dns';
 import type { VirtualTool, VirtualToolContext } from './virtual-tools.js';
 import { registerVirtualTool } from './virtual-tools.js';
+import { mimeTypeForFile, parseUploadMaxBytes } from './utils.js';
 import { resolvePublicHost, type SsrfResolver } from './ssrf.js';
 
-const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
 
@@ -30,13 +30,6 @@ export interface AttachmentFetchTestOptions {
 
 function envConfig(): UploadConfig {
   return { roots: process.env.MCP_UPLOAD_ROOTS, maxBytes: process.env.MCP_UPLOAD_MAX_BYTES, urlHosts: process.env.MCP_UPLOAD_URL_HOSTS, allowHttp: process.env.MCP_UPLOAD_ALLOW_HTTP };
-}
-
-function maxBytesFrom(value: string | undefined): number {
-  if (!value?.trim()) return DEFAULT_MAX_BYTES;
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error('MCP_UPLOAD_MAX_BYTES must be a positive integer');
-  return parsed;
 }
 
 function parseHostAllowlist(value: string | undefined): Set<string> {
@@ -134,7 +127,7 @@ export async function fetchAttachmentUrl(rawUrl: string, config: UploadConfig = 
   const allowedHosts = parseHostAllowlist(config.urlHosts);
   if (!allowedHosts.size) throw new Error('URL upload is disabled; configure MCP_UPLOAD_URL_HOSTS with allowed hostnames');
   const allowHttp = config.allowHttp?.trim().toLowerCase() === 'true';
-  const maxBytes = maxBytesFrom(config.maxBytes);
+  const maxBytes = parseUploadMaxBytes(config.maxBytes);
   let url: URL;
   try { url = new URL(rawUrl); } catch { throw new Error('url must be a valid absolute URL'); }
   const deadline = Date.now() + (testOptions.timeoutMs ?? FETCH_TIMEOUT_MS);
@@ -209,7 +202,7 @@ function validateUploadTarget(value: unknown): asserts value is Record<string, u
 export function createUploadAttachmentTool(configProvider: () => UploadConfig = envConfig, fetchOptions: AttachmentFetchTestOptions = {}): VirtualTool {
   return {
     name: 'upload_attachment', title: 'Upload attachment', toolset: 'composites',
-    description: 'Uploads one file as a Polarion attachment to a Work Item, Test Run, LiveDoc, or Rich Page and returns the attachment result. Choose exactly one source: an absolute local path on stdio with `MCP_UPLOAD_ROOTS`, or an HTTPS URL on an allowlisted host with `MCP_UPLOAD_URL_HOSTS`. The authenticated Polarion user must have attachment write permission. Use `dry_run` to validate and preview name, size, and SHA-256; use the resource-specific attachment tools when editing existing attachment metadata or content.',
+    description: 'Uploads one file as a Polarion attachment to a Work Item, Test Run, LiveDoc, or Rich Page and returns the attachment result. Choose exactly one source: an absolute local path on stdio with `MCP_UPLOAD_ROOTS`, or an HTTPS URL on an allowlisted host with `MCP_UPLOAD_URL_HOSTS`. The authenticated Polarion user must have attachment write permission. Use `dry_run` to validate and preview name, size, MIME type, multipart parts, and SHA-256; use the resource-specific attachment tools when editing existing attachment metadata or content.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {
     target: { type: 'object', additionalProperties: false, properties: {
       type: { type: 'string', enum: ['work_item', 'test_run', 'document', 'page'], description: 'Target resource family.' },
@@ -232,7 +225,7 @@ export function createUploadAttachmentTool(configProvider: () => UploadConfig = 
       validateUploadTarget(args.target);
       if (args.fileName !== undefined) safeFileName(args.fileName);
       const config = configProvider();
-      const maxBytes = maxBytesFrom(config.maxBytes);
+      const maxBytes = parseUploadMaxBytes(config.maxBytes);
       let file: { bytes: Buffer; defaultName: string };
       if (hasPath) {
         if (ctx.transport !== 'stdio') throw new Error('filePath uploads are available only on the stdio transport; remote servers cannot read your local disk');
@@ -241,9 +234,10 @@ export function createUploadAttachmentTool(configProvider: () => UploadConfig = 
         file = await fetchAttachmentUrl(String(args.url), config, fetchOptions);
       }
       const fileName = safeFileName(args.fileName) ?? file.defaultName;
+      if (file.bytes.length === 0) throw new Error('Attachment file must not be empty.');
       const sha256 = createHash('sha256').update(file.bytes).digest('hex');
       const request = attachmentToolInput(args.target as Record<string, unknown>, fileName, args.title, file.bytes);
-      if (args.dry_run === true) return { content: [{ type: 'text', text: JSON.stringify({ wouldUpload: true, fileName, size: file.bytes.length, sha256, target: args.target }) }] };
+      if (args.dry_run === true) return { content: [{ type: 'text', text: JSON.stringify({ wouldUpload: true, fileName, size: file.bytes.length, mimeType: mimeTypeForFile(fileName), multipartParts: ['resource', 'files'], sha256, target: args.target }) }] };
       return await ctx.callPolarionTool(request.tool, request.args);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Attachment upload failed';

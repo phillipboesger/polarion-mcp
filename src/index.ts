@@ -17,6 +17,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, configuredToolsets } from './config.js';
 import { createPolarionServer } from './server.js';
 import { parseMaxResponseChars } from './executor.js';
+import { writeLimitsFromEnv } from './write-verification.js';
 import type { LogFormat, LogLevel } from './logger.js';
 
 function parseToolRateLimit(value: string | undefined): number {
@@ -40,7 +41,7 @@ function logSettings(env: NodeJS.ProcessEnv): { logFormat: LogFormat; logLevel: 
 async function main(): Promise<void> {
   try {
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
-    const server = createPolarionServer({ ...logSettings(process.env), transport: 'stdio', maxResponseChars, rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true', confirmDestructive: process.env.MCP_CONFIRM_DESTRUCTIVE?.trim().toLowerCase() === 'true', apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
+    const server = createPolarionServer({ ...logSettings(process.env), transport: 'stdio', maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true', confirmDestructive: process.env.MCP_CONFIRM_DESTRUCTIVE?.trim().toLowerCase() === 'true', apiBaseUrl: API_BASE_URL, filter: { toolsets: configuredToolsets(process.env) } });
     const transport = new StdioServerTransport();
     await server.connect(transport);
 

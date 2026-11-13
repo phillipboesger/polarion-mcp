@@ -30,6 +30,7 @@ import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
 import { securitySchemes, toolDefinitionMap } from './tools.js';
 import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
+import { withVerifyProperty, type WriteLimits } from './write-verification.js';
 import { executeApiTool, capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
 import { listVirtualTools, discoverVirtualTools, type VirtualTool } from './virtual-tools.js';
@@ -63,7 +64,7 @@ function toolsForClient(tools: ReadonlyMap<string, import('./types.js').McpToolD
   return [...tools.values()].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0).map(def => ({
     name: def.name,
     description: def.description,
-    inputSchema: sanitizeInputSchema(def.inputSchema),
+    inputSchema: sanitizeInputSchema(withVerifyProperty(def)),
     ...(def.annotations ? { annotations: def.annotations } : {}),
     ...(def.outputSchema && !omitOutputSchema ? { outputSchema: lenientOutputSchema(def.outputSchema) } : {}),
   }));
@@ -80,6 +81,8 @@ interface ToolCallPipelineOptions {
   markUntrusted: boolean;
   telemetry: TelemetryHooks;
   transport: 'stdio' | 'http';
+  verifyWrites?: boolean;
+  writeLimits?: WriteLimits;
   correlationId?: string;
   server: Server;
   reportProgress?: (progress: { progress: number; total?: number; message?: string }) => Promise<void>;
@@ -153,7 +156,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             const definition = enabledTools.get(name);
             if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
             return executeToolWithPagination(name, definition, callArgs, securitySchemes, executeApiTool, {
-              apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal,
+              apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
               beforeNextPage: () => {
                 const retryAfter = options.rateLimiter.check(principal.id);
                 if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
@@ -172,7 +175,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       } else if (generated) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
         result = await executeToolWithPagination(toolName, generated, callArgs, securitySchemes, executeApiTool, {
-          apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal,
+          apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
           beforeNextPage: () => {
             const retryAfter = options.rateLimiter.check(principal.id);
             if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
@@ -287,6 +290,8 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
 }
 
 export interface PolarionServerOptions {
+  verifyWrites?: boolean;
+  writeLimits?: WriteLimits;
   maxResponseChars?: number;
   filter?: ToolFilter;
   extensions?: Partial<PolarionExtensions>;
@@ -328,7 +333,7 @@ export function createToolCaller(options: PolarionServerOptions & { tools: Reado
     clientTools: options.tools, virtualTools: [], extensions,
     maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
     logger, signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
-    telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: 'http', server: noClient,
+    telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: 'http', server: noClient, verifyWrites: options.verifyWrites ?? true, writeLimits: options.writeLimits,
   });
 }
 
@@ -415,6 +420,8 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
         logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
         telemetry: options.telemetry ?? NOOP_TELEMETRY,
         transport: options.transport ?? 'http',
+        verifyWrites: options.verifyWrites,
+        writeLimits: options.writeLimits,
         correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined), server,
         reportProgress: progressToken === undefined ? undefined : async progress => {
           await extra.sendNotification({

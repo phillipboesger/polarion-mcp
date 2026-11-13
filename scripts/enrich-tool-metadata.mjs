@@ -466,7 +466,7 @@ entries = entries.map((entry) => {
   const result = upsertNote(
     entry,
     TIP_MARKER,
-    'Tip: set \\`dry_run: true\\` first to validate the arguments and preview the exact request without sending it to Polarion. The executor returns this preview as normal text, and as structured content when the tool declares an output schema.',
+    'Tip: set \\`dry_run: true\\` first to validate the arguments and preview the request and available guard warnings without sending a mutating request to Polarion. The executor returns this preview as normal text, and as structured content when the tool declares an output schema.',
   );
   if (result.skipped) dryRunTipSkipped++;
   else if (result.entry !== before) dryRunTipCount++;

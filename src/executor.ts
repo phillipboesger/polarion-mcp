@@ -22,7 +22,8 @@ import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
-import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema } from "./utils.js";
+import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema, mimeTypeForFile, describeByteLimit, DEFAULT_UPLOAD_MAX_BYTES } from "./utils.js";
+import { DEFAULT_VERIFY_MAX_ITEMS, isSingleResourceRoute, isVerifiableRoute, readBackFields, verificationMessage, verifyTargets, type VerifyTarget, type WriteLimits, type WriteVerification } from "./write-verification.js";
 import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
 import { acquireOAuth2Token } from "./auth.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
@@ -478,7 +479,14 @@ function decodeBase64File(value: string, label: string): Buffer {
   return Buffer.from(compact, compact.includes('-') || compact.includes('_') ? 'base64url' : 'base64');
 }
 
-function buildMultipartFormData(requestBody: unknown): FormData {
+function buildMultipartFormData(requestBody: unknown, attachment = false, maxFileBytes = DEFAULT_UPLOAD_MAX_BYTES): FormData {
+  // Attachments are decoded for the size check and again for the form; decode each payload once.
+  const decoded = new Map<string, Buffer>();
+  const decode = (value: string, label: string): Buffer => {
+    let bytes = decoded.get(value);
+    if (!bytes) { bytes = decodeBase64File(value, label); decoded.set(value, bytes); }
+    return bytes;
+  };
   let parsed: unknown = requestBody;
   if (typeof requestBody === 'string') {
     try {
@@ -492,6 +500,18 @@ function buildMultipartFormData(requestBody: unknown): FormData {
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('requestBody for a multipart/form-data tool must decode to a JSON object of form field names');
+  }
+
+  if (attachment) {
+    const body = parsed as JsonObject;
+    const files = body.files ?? body.file ?? body.content;
+    const values = Array.isArray(files) ? files : files === undefined ? [] : [files];
+    if (!values.length) throw new Error('Attachment upload requires a file part.');
+    for (const [index, value] of values.entries()) {
+      if (typeof value !== 'string') throw new Error(`requestBody.files[${index}] must be a base64-encoded string`);
+      if (!value.trim()) throw new Error('Attachment file must not be empty; provide base64 content.');
+      if (decode(value, 'Attachment file').length > maxFileBytes) throw new Error(`Attachment file exceeds the ${describeByteLimit(maxFileBytes)} limit.`);
+    }
   }
 
   // Name each file part after its attachment, so Polarion never falls back to "file-0".
@@ -520,10 +540,10 @@ function buildMultipartFormData(requestBody: unknown): FormData {
         if (typeof item !== 'string') {
           throw new Error(`requestBody.files[${index}] must be a base64-encoded string, got ${typeof item}`);
         }
-        form.append('files', decodeBase64File(item, `requestBody.files[${index}]`), { filename: partName(index, `file-${index}`) });
+        form.append('files', decode(item, `requestBody.files[${index}]`), { filename: partName(index, `file-${index}`) });
       });
     } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
-      form.append(key, decodeBase64File(value, `requestBody.${key}`), { filename: partName(0, key) });
+      form.append(key, decode(value, `requestBody.${key}`), { filename: partName(0, key) });
     } else if (typeof value === 'string') {
       form.append(key, value);
     } else {
@@ -555,13 +575,16 @@ function summarizeMultipartForPreview(requestBody: unknown): unknown {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return parsed;
 
   const summary: JsonObject = {};
+  const fileNames = Array.isArray((parsed as JsonObject).resource?.data) ? (parsed as JsonObject).resource.data.map((item: any) => item?.attributes?.fileName) : [];
+  const describe = (item: unknown, index: number, fallback: string) => {
+    const fileName = typeof fileNames[index] === 'string' ? fileNames[index] : fallback;
+    return typeof item === 'string' ? { fileName, size: Buffer.from(item, 'base64').length, mimeType: mimeTypeForFile(fileName) } : '<invalid file>';
+  };
   for (const [key, value] of Object.entries(parsed as JsonObject)) {
-    if (key === 'files' && Array.isArray(value)) {
-      summary[key] = value.map((item) =>
-        typeof item === 'string' ? `<binary, ${Buffer.from(item, 'base64').length} bytes>` : item
-      );
+    if (key === 'files' && (Array.isArray(value) || typeof value === 'string')) {
+      summary[key] = (Array.isArray(value) ? value : [value]).map((item, index) => describe(item, index, `file-${index}`));
     } else if ((key === 'file' || key === 'content') && typeof value === 'string') {
-      summary[key] = `<binary, ${Buffer.from(value, 'base64').length} bytes>`;
+      summary[key] = describe(value, 0, key);
     } else {
       summary[key] = value;
     }
@@ -609,8 +632,11 @@ export async function executeApiTool(
   allSecuritySchemes: Record<string, any>,
   sendOpts?: SendWithRetryOpts,
   maxResponseChars = DEFAULT_MAX_RESPONSE_CHARS,
-  apiBaseUrl = API_BASE_URL
+  apiBaseUrl = API_BASE_URL,
+  verifyWrites = true,
+  limits: WriteLimits = {}
 ): Promise<CallToolResult> {
+  let requestFacts = '';
   try {
     // ===== STEP 0: Strip dry_run before validation =====
     // Always stripped, regardless of whether the regenerated schema already
@@ -626,9 +652,14 @@ export async function executeApiTool(
     // fall through to the real (possibly irreversible) write.
     const rawDryRun = argsForValidation.dry_run;
     delete argsForValidation.dry_run;
+    const rawVerify = argsForValidation.verify;
+    delete argsForValidation.verify;
     let dryRun: boolean | undefined;
     try { dryRun = normalizeDryRun(rawDryRun); }
     catch { return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': dry_run must be true or false` }], isError: true }; }
+    let verify: boolean | undefined;
+    try { verify = normalizeDryRun(rawVerify); }
+    catch { return { content: [{ type: 'text', text: `Invalid arguments for tool '${toolName}': verify must be true or false` }], isError: true }; }
 
     // Validation runs against the original schema, whose keys are the
     // original names; a sanitized name would otherwise be stripped by Zod.
@@ -771,7 +802,7 @@ export async function executeApiTool(
         // JSON string with a bare "multipart/form-data" Content-Type (see #5) --
         // Polarion's parser can't make sense of that and rejects it with a
         // content-less 400 before any JSON:API validation runs.
-        const form = buildMultipartFormData(requestBody);
+        const form = buildMultipartFormData(requestBody, /attachments/i.test(definition.pathTemplate) && definition.method.toLowerCase() === 'post', limits.uploadMaxBytes);
         // A buffer, not the one-shot form stream: a retry must send the whole body again.
         requestBodyData = form.getBuffer();
         Object.assign(headers, form.getHeaders());
@@ -969,6 +1000,11 @@ export async function executeApiTool(
       ...(download ? { responseType: 'arraybuffer' as const, maxContentLength: MAX_DOWNLOAD_BYTES + 1 } : {}),
       httpsAgent: httpsAgent(shouldRejectUnauthorized()),
     };
+    // Appended to upstream errors that carry no body, so an empty 400 stays diagnosable. Names and sizes only: no credentials, no file content.
+    const parts = dryRunBodyPreview && definition.requestBodyContentType === 'multipart/form-data'
+      ? Object.entries(dryRunBodyPreview as Record<string, unknown>).map(([name, value]) => `${name}: ${name === 'files' || name === 'file' || name === 'content' ? JSON.stringify(value) : 'present'}`).join(', ')
+      : '';
+    requestFacts = `Method: ${definition.method.toUpperCase()}; path template: ${definition.pathTemplate}; content-type: ${definition.requestBodyContentType ?? 'none'}${parts ? `; multipart parts: ${parts}` : ''}`;
 
     // ===== STEP 7a: Pre-write guards (fail-closed validation) =====
     // Three independent checks, in this order (first failure blocks the write):
@@ -981,6 +1017,7 @@ export async function executeApiTool(
     // See guards.ts for exactly what's validated and what's an explicit,
     // documented follow-up (categories, module/linkedRevisions existence).
     const guardRequestContext = { baseUrl: apiBaseUrl, headers, rejectUnauthorized: shouldRejectUnauthorized() };
+    const warnings: string[] = [];
 
     const enumTargets = buildWorkItemEnumTargets(definition, validatedArgs, nameMap, requestBodyData);
     if (enumTargets) {
@@ -993,9 +1030,10 @@ export async function executeApiTool(
     const customFieldKeyTargets = buildCustomFieldKeyTargets(definition, validatedArgs, nameMap, requestBodyData, urlPath);
     if (customFieldKeyTargets) {
       for (const target of customFieldKeyTargets) {
-        const fieldKeyResult = await checkResourceCustomFieldKeys(target, guardRequestContext, sendOpts);
+        const fieldKeyResult = await checkResourceCustomFieldKeys(target, guardRequestContext, sendOpts, undefined, dryRun ? warnings : undefined);
         if (!fieldKeyResult.ok) {
-          return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }], isError: true };
+          if (dryRun) warnings.push(fieldKeyResult.reason);
+          else return { content: [{ type: 'text', text: `Write refused: ${fieldKeyResult.reason}` }], isError: true };
         }
       }
     }
@@ -1013,24 +1051,46 @@ export async function executeApiTool(
     // ignore dry_run entirely and always execute live (nothing unsafe to preview).
     if (dryRun && isMutating) {
       const redactedHeaders = { ...headers };
-      if ('authorization' in redactedHeaders) redactedHeaders.authorization = '[REDACTED]';
+      for (const key of Object.keys(redactedHeaders)) if (!['accept', 'content-type'].includes(key.toLowerCase())) redactedHeaders[key] = '[REDACTED]';
+      let diff: unknown;
+      if (definition.method.toLowerCase() === 'patch' && !isSingleResourceRoute(definition)) {
+        warnings.push('Before/after diff skipped: this route addresses a collection, not a single resource.');
+      } else if (definition.method.toLowerCase() === 'patch') {
+        try {
+          const before = await sendWithRetry({ ...config, method: 'GET', data: undefined, params: { ...config.params, ...readBackFields(definition) } }, sendOpts);
+          if (!before.data?.data?.attributes || typeof before.data.data.attributes !== 'object') throw new Error('Read response has no attributes');
+          diff = { before: before.data?.data?.attributes, after: requestBodyData?.data?.attributes };
+        } catch (error) {
+          diff = { status: 'unavailable', reason: axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error' };
+        }
+      }
       const preview = {
         method: config.method,
         url: axios.getUri({ url: config.url, params: config.params }),
         headers: redactedHeaders,
         body: dryRunBodyPreview,
+        warnings,
+        ...(diff ? { diff } : {}),
       };
+      const credentials = Object.entries(headers).filter(([key]) => !['accept', 'content-type'].includes(key.toLowerCase())).flatMap(([, value]) => [value, value.replace(/^(Bearer|Basic)\s+/i, '')]).filter(value => value.length > 3);
+      for (const schemeName of Object.keys(appliedSecurity ?? {})) {
+        const scheme = allSecuritySchemes[schemeName];
+        if (scheme?.type === 'apiKey' && scheme.in === 'query' && typeof queryParams[scheme.name] === 'string') credentials.push(queryParams[scheme.name]);
+      }
+      let serializedPreview = JSON.stringify(preview, null, 2);
+      for (const credential of credentials) serializedPreview = serializedPreview.split(credential).join('[REDACTED]');
+      const safePreview = JSON.parse(serializedPreview);
       return {
         content: [
           {
             type: 'text',
-            text: `Dry run — no request was sent to Polarion. Preview:\n${JSON.stringify(preview, null, 2)}`
+            text: `Dry run: no mutating request was sent to Polarion. Preview:\n${serializedPreview}`
           }
         ],
         // SDK clients throw if a tool that declares an outputSchema returns a
         // non-error result without structuredContent; the advertised schema is
         // lenient, so the preview itself can serve as the structured content.
-        ...(definition.outputSchema ? { structuredContent: { dry_run: true, preview } } : {}),
+        ...(definition.outputSchema ? { structuredContent: { dry_run: true, preview: safePreview } } : {}),
       };
     }
 
@@ -1043,6 +1103,51 @@ export async function executeApiTool(
     const response = await sendWithRetry(config, sendOpts);
     for (const target of enumTargets ?? []) {
       if (target.workItemId) invalidateWorkItemOptions(target.projectId, target.workItemId);
+    }
+
+    let verification: WriteVerification | undefined;
+    if (isMutating) {
+      const skipped = (reason: string): WriteVerification => ({ status: 'skipped', mismatches: [], uncertain: [], reason });
+      const body = requestBodyData?.data;
+      if (!verifyWrites || verify === false) verification = skipped('Verification disabled.');
+      else if (!isVerifiableRoute(definition)) verification = skipped('This route cannot be verified automatically.');
+      else {
+        // Reads each written resource back; the original query params (apiKey auth) are kept.
+        const read = async (target: VerifyTarget): Promise<Record<string, unknown>> => {
+          try {
+            const response = await sendWithRetry({ ...config, method: 'GET', url: target.url ?? requestUrl, data: undefined, params: { ...config.params, ...readBackFields(definition) } }, sendOpts);
+            const attributes = response.data?.data?.attributes;
+            if (!attributes || typeof attributes !== 'object') throw new Error('Read-back response has no attributes');
+            return attributes;
+          } catch (error) {
+            throw new Error(axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : 'unknown error', { cause: error });
+          }
+        };
+        let targets: VerifyTarget[] | undefined;
+        let unavailable: string | undefined;
+        if (!Array.isArray(body) && definition.method.toLowerCase() === 'post') {
+          unavailable = 'Create request body is not a list of work items.';
+        } else if (!Array.isArray(body)) {
+          targets = [{ label: '', attributes: body?.attributes, hasRelationships: Boolean(body?.relationships) }];
+        } else if (definition.method.toLowerCase() === 'patch') {
+          const fallbackProject = readArg(validatedArgs, 'projectId', nameMap);
+          targets = body.map((item: any): VerifyTarget => {
+            const id = typeof item?.id === 'string' ? splitWorkItemId(item.id, typeof fallbackProject === 'string' ? fallbackProject : undefined) : null;
+            return {
+              label: String(item?.id ?? ''), attributes: item?.attributes, hasRelationships: Boolean(item?.relationships),
+              ...(id ? { url: `${apiBaseUrl}/projects/${encodeSegment(id.projectId)}/workitems/${encodeSegment(id.workItemId)}` } : { problem: 'Updated resource identity unavailable' }),
+            };
+          });
+        } else if (!Array.isArray(response.data?.data) || response.data.data.length !== body.length || response.data.data.some((item: any) => typeof item?.id !== 'string' || !item.id)) {
+          unavailable = 'Create response does not contain an ID for each created work item.';
+        } else {
+          targets = body.map((item: any, index: number): VerifyTarget => {
+            const id: string = response.data.data[index].id;
+            return { label: id, url: `${requestUrl}/${encodeSegment(id.split('/').at(-1) ?? '')}`, attributes: item?.attributes, hasRelationships: Boolean(item?.relationships) };
+          });
+        }
+        verification = targets?.length ? await verifyTargets(targets, read, limits.verifyMaxItems ?? DEFAULT_VERIFY_MAX_ITEMS) : skipped(unavailable ?? 'No resources to verify.');
+      }
     }
 
     if (download) {
@@ -1116,8 +1221,12 @@ export async function executeApiTool(
     // non-JSON answer to a successful call has none to offer, so it gets an empty
     // object, which the advertised (lenient) schema accepts. isError would
     // report a write that worked as failed and invite a duplicating retry.
-    const fullResponseText = `API Response (Status: ${response.status}):\n${responseText}`;
+    const createdIds = definition.method.toLowerCase() === 'post' && Array.isArray(response.data?.data) ? response.data.data.map((item: any) => item?.id).filter((id: unknown): id is string => typeof id === 'string' && id !== '') : undefined;
+    const note = verification && verificationMessage(verification, createdIds);
+    const resultBody = verification ? { ...(structuredContent ?? (responseText ? { response: responseText } : {})), verification, ...(note ? { message: note } : {}) } : undefined;
+    const fullResponseText = `API Response (Status: ${response.status}):\n${resultBody ? JSON.stringify(resultBody) : responseText}`;
     const boundedResponseText = capToolResponseText(fullResponseText, maxResponseChars, definition);
+    const hardMismatch = verification?.status === 'mismatch';
     return {
       content: [
         {
@@ -1125,8 +1234,9 @@ export async function executeApiTool(
           text: boundedResponseText
         }
       ],
+      ...(hardMismatch ? { isError: true } : {}),
       // MCP_MAX_RESPONSE_CHARS caps text content only; structuredContent stays unchanged by design.
-      ...(definition.outputSchema ? { structuredContent: structuredContent ?? {} } : {}),
+      ...(definition.outputSchema && !hardMismatch ? { structuredContent: { ...(structuredContent ?? {}), ...(verification ? { verification } : {}) } } : {}),
     };
 
   } catch (error: unknown) {
@@ -1137,6 +1247,7 @@ export async function executeApiTool(
     // Format Axios errors specially (network errors, API errors, etc.)
     if (axios.isAxiosError(error)) {
       errorMessage = formatApiError(error);
+      if (error.response && (!error.response.data || (Buffer.isBuffer(error.response.data) && error.response.data.length === 0))) errorMessage += ` ${requestFacts}`;
     }
     // Handle standard JavaScript errors
     else if (error instanceof Error) {

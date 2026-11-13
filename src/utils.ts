@@ -225,8 +225,8 @@ export function extractJsonApiErrorDetail(responseData: unknown): string | undef
   const parts = errors
     .map((e) => {
       if (!e || typeof e !== 'object') return '';
-      const entry = e as { detail?: unknown; title?: unknown; source?: { pointer?: unknown; parameter?: unknown } };
-      const text = String(entry.detail ?? entry.title ?? '');
+      const entry = e as { detail?: unknown; title?: unknown; code?: unknown; source?: { pointer?: unknown; parameter?: unknown } };
+      const text = [entry.title, entry.detail, entry.code === undefined ? undefined : `code: ${String(entry.code)}`].filter(value => value !== undefined && value !== '').map(String).join(': ');
       const at = entry.source?.pointer ?? entry.source?.parameter;
       return text && at ? `${text} (at ${String(at)})` : text;
     })
@@ -290,7 +290,7 @@ export function formatApiError(error: AxiosError): string {
       // surface the real detail instead of a truncated raw JSON dump.
       message += `Detail: ${jsonApiDetail.substring(0, MAX_DETAIL_LEN)}${jsonApiDetail.length > MAX_DETAIL_LEN ? '...' : ''}`;
     }
-    else if (typeof responseData === 'string') {
+    else if (typeof responseData === 'string' && responseData.length > 0) {
       // Truncate long error messages
       message += `Response: ${responseData.substring(0, MAX_LEN)}${responseData.length > MAX_LEN ? '...' : ''}`;
     }
@@ -319,7 +319,9 @@ export function formatApiError(error: AxiosError): string {
     message += `API Request Setup Error: ${error.message}`;
   }
 
-  return message;
+  const authorization = error.config?.headers?.authorization;
+  const credential = typeof authorization === 'string' ? authorization.replace(/^(Bearer|Basic)\s+/i, '') : '';
+  return (credential ? message.split(credential).join('[REDACTED]') : message).replace(/\b(Bearer|Basic)\s+[^\s"'&,;]+/ig, '$1 [REDACTED]');
 }
 
 /**
@@ -491,4 +493,27 @@ export function getZodSchemaFromJsonSchema(jsonSchema: any, toolName: string): z
     console.error("Failed to generate/evaluate Zod schema for '%s':", logSafe(toolName), err);
     return z.object({}).passthrough();
   }
+}
+
+/** Returns a common MIME type from a filename, with a safe fallback. */
+export function mimeTypeForFile(fileName: string): string {
+  const extension = fileName.toLowerCase().split('.').pop();
+  const types: Record<string, string> = { txt: 'text/plain', csv: 'text/csv', html: 'text/html', json: 'application/json', xml: 'application/xml', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', zip: 'application/zip' };
+  return fileName.includes('.') && extension ? types[extension] ?? 'application/octet-stream' : 'application/octet-stream';
+}
+
+/** Default attachment size cap (25 MiB), shared by the upload tool and the multipart executor. */
+export const DEFAULT_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Parses `MCP_UPLOAD_MAX_BYTES`: a positive integer, or the default when unset. */
+export function parseUploadMaxBytes(value: string | undefined): number {
+  if (!value?.trim()) return DEFAULT_UPLOAD_MAX_BYTES;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error('MCP_UPLOAD_MAX_BYTES must be a positive integer');
+  return parsed;
+}
+
+/** Human-readable size limit for error messages, e.g. "25 MiB" or "1000 bytes". */
+export function describeByteLimit(bytes: number): string {
+  return bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MiB` : `${bytes} bytes`;
 }

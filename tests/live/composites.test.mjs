@@ -238,6 +238,19 @@ describe("composite tools against disposable Polarion data", () => {
       `trace returned ${graph.edges.length} edges and ${graph.nodes.length} nodes with truncated=false; expected all 101 links or an honest truncation marker`);
   });
 
+  test("custom field patch is verified", async (t) => {
+    const field = process.env.LIVE_CUSTOM_FIELD;
+    if (!field) return t.skip("set LIVE_CUSTOM_FIELD to a writable text custom field");
+    const workItemId = await createItem(client, "task", `${tag}-verify-target`);
+    const value = `${tag}-value`;
+    const result = await call(client, "patchWorkItem", {
+      projectId: PROJECT, workItemId,
+      requestBody: { data: { type: "workitems", id: `${PROJECT}/${workItemId}`, attributes: { [field]: value } } },
+    });
+    assert.equal(result.isError, false, result.thrown ?? result.text);
+    assert.equal(json(result.text).verification.status, "verified");
+  });
+
   test("upload_attachment previews and rejects malformed calls without attachments, then preserves filename and bytes", async () => {
     const workItemId = await createItem(client, "task", `${tag}-upload-target`);
     const dir = await mkdtemp(path.join(os.tmpdir(), "polarion-mcp-upload-"));

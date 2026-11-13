@@ -7,6 +7,7 @@ import { createMcpHttpApp } from '../src/mcp-http-server.js'
 import { listVirtualTools, registerVirtualTool } from '../src/virtual-tools.js'
 import { enabledTools } from '../src/tool-filter.js'
 import { sanitizeInputSchema } from '../src/utils.js'
+import { isVerifiableRoute, withVerifyProperty } from '../src/write-verification.js'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createPolarionServer } from '../src/server.js'
@@ -86,10 +87,14 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
     try {
       const actual = (await app.request(2, 'tools/list')).result.tools.map((tool: { name: string; inputSchema: unknown }) => ({ name: tool.name, inputSchema: tool.inputSchema }))
       const expected = [
-        ...[...enabledTools.values()].map(tool => ({ name: tool.name, inputSchema: sanitizeInputSchema(tool.inputSchema) })),
+        ...[...enabledTools.values()].map(tool => ({ name: tool.name, inputSchema: sanitizeInputSchema(withVerifyProperty(tool)) })),
         ...COMPOSITE_TOOLS.map(tool => ({ name: tool.name, inputSchema: tool.inputSchema })),
       ].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
       assert.equal(expected.length, enabledTools.size + COMPOSITE_TOOLS.length)
+      // verify is advertised exactly where a read-back exists, never on other mutating tools.
+      const advertised = (actual as Array<{ name: string; inputSchema: { properties?: Record<string, unknown> } }>).filter(tool => tool.inputSchema.properties && 'verify' in tool.inputSchema.properties).map(tool => tool.name).sort()
+      assert.deepEqual(advertised, [...enabledTools.values()].filter(tool => isVerifiableRoute(tool)).map(tool => tool.name).sort())
+      assert.ok(advertised.length > 0 && advertised.length < [...enabledTools.values()].filter(tool => tool.annotations?.readOnlyHint === false).length)
       assert.equal(JSON.stringify(actual), JSON.stringify(expected))
     } finally { await app.stop() }
   })
