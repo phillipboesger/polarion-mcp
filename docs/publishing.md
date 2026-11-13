@@ -9,7 +9,7 @@
 
 `polarion-mcp` on PyPI belongs to a different project.
 
-Run `npm version` to synchronize the registry entry, Python launcher and Python client example. Publish the npm version before its corresponding Python launcher.
+Run `npm version` to synchronize the registry entry, MCPB manifest, Python launcher and Python client example. Publish the npm version before its corresponding Python launcher.
 
 ## PyPI
 
@@ -33,11 +33,28 @@ mcp-publisher publish server.json
 
 The registry description must be at most 100 characters. OCI package identifiers contain the image tag and have no separate `version` field.
 
-## Directory listings
+## Directories and connector listings
+
+Checked 2026-11-13. A customer-hosted server is not a shared public endpoint. Review times and any requirements not stated in the linked sources are unspecified here.
+
+| Directory | Path | Requirement | Fit |
+| --- | --- | --- | --- |
+| [Official MCP Registry](https://modelcontextprotocol.io/registry/quickstart) | Publish `server.json` with `mcp-publisher` | Verify namespace ownership and publish a package or remote endpoint; no hosted endpoint needed for packages. | Fit |
+| [Glama](https://glama.ai/mcp/servers/phillipboesger/polarion-mcp) | Repository indexing | Public repository; the listing names phillipboesger as author. | Fit |
+| [Smithery](https://smithery.ai/future) | Curated public directory | Current announcement describes verified servers with direct MCP URLs; submission criteria and review time are not stated. | Needs hosted endpoint for the described direct URL |
+| [PulseMCP](https://www.pulsemcp.com/submit) | Submission page | Submission page returned HTTP 403 during research; requirements and review time could not be verified. | Fit unverified |
+| [Claude remote connectors](https://claude.com/docs/connectors/building/submission) | Submit through developer portal; customer-specific URLs supported | Reachable HTTPS, OAuth for authenticated services, icon, privacy policy, documentation and reviewer access. Listings with customer-specific URLs can be published only with the Verified label. | Needs hosted endpoint for review |
+| [Claude desktop extensions](https://claude.com/docs/connectors/building/submission) | Submit a [plugin from a GitHub repository](https://claude.com/docs/plugins/submit); direct desktop extension listings deprecated | Local distribution supports `.mcpb`, but the directory no longer accepts MCPB listings. Local connectors must include privacy policies. | Fit for local distribution; plugin needed for listing |
+| [ChatGPT remote plugins](https://developers.openai.com/plugins/deploy/submission) | Upload plugin ZIP and submit for review | Public HTTPS endpoint, verified identity and domain, privacy policy and icon; authentication depends on the server. | Needs hosted endpoint |
+| [ChatGPT desktop-only plugins](https://developers.openai.com/plugins/deploy/desktop-only) | Upload plugin ZIP and submit for review | Local stdio submissions require approved partner allowlisting and identity verification; MCP review requires privacy policy and listing icon. | Fit if approved |
+
+Smithery's current announcement says its proxy, accounts, CLI and SDKs have stopped. It does not establish that `smithery.yaml` applies to this local stdio or container distribution, so this repository does not add one.
+
+## Other directory listings
 
 Existing public listings:
 
-- [Glama](https://glama.ai/mcp/servers/phillipboesger/polarion-mcp) — `glama.json` identifies the maintainer; Glama controls index refreshes.
+- [Glama](https://glama.ai/mcp/servers/phillipboesger/polarion-mcp) — lists phillipboesger as author; Glama controls index refreshes.
 - [MCP Repository](https://mcprepository.com/phillipboesger/polarion-mcp).
 - [AgentRank](https://agentrank-ai.com/tool/phillipboesger--polarion-mcp/).
 
