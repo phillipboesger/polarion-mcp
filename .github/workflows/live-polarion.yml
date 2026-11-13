@@ -22,6 +22,7 @@ on:
       - "scripts/live/**"
       - "package.json"
       - "package-lock.json"
+      - "docs/polarion-versions.json"
       - ".github/workflows/live-polarion.yml"
   schedule:
     # Nightly 05:00 UTC: catches a changed Polarion image without a code change.
@@ -40,20 +41,32 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  versions:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: matrix
+        run: echo "matrix=$(jq -c 'map(.allowFailure //= false)' docs/polarion-versions.json)" >> "$GITHUB_OUTPUT"
+
   live:
-    name: Polarion ${{ matrix.polarion }}
+    needs: versions
+    name: Polarion ${{ matrix.release.version }}
     # Fork and Dependabot PRs get a read-only token without package access.
     if: (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) && (github.event_name != 'push' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     # Playwright 1.52 used for PAT creation supports Ubuntu 24.04, not 26.04.
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    continue-on-error: ${{ matrix.release.allowFailure }}
     strategy:
       fail-fast: false
       matrix:
-        # Pin the tag: ":latest" follows the newest release and would change under us.
-        polarion: ["2506", "2512", "2606"]
+        release: ${{ fromJSON(needs.versions.outputs.matrix) }}
     env:
-      IMAGE: ghcr.io/phillipboesger/polarion-docker:v${{ matrix.polarion }}
+      IMAGE: ${{ matrix.release.image }}
       POLARION_URL: http://localhost:8080
     steps:
       - name: Checkout
