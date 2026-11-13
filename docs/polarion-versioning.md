@@ -33,6 +33,6 @@ Deviations on older releases:
 ## Adding a Polarion release
 
 1. Build and push the release's Polarion Docker image.
-2. Add the release to [polarion-versions.json](./polarion-versions.json) with `allowFailure: true` initially. This makes its live matrix job non-blocking while the image and compatibility are verified. Remove the flag when the job is ready to gate changes.
+2. Add the release to [polarion-versions.json](./polarion-versions.json) with `allowFailure: true` initially. This makes its live matrix job non-blocking while the image and compatibility are verified. `allowFailure: true` is allowed on any status for a not-yet-published image. Remove the flag when the job is ready to gate changes.
 3. Run the `Update Polarion tools` workflow with `spec_url` pointing to the new release's OpenAPI definition, then review the generated `src/tools.ts` diff.
-4. Update the support table above, then promote the new release to `latest` and demote prior statuses so the newest three releases are guaranteed. Keep older releases as `best-effort` in the matrix until they break.
+4. Update the support table above, then promote the new release to `latest` and demote prior statuses so the newest three releases are guaranteed. Set `allowFailure: true` on every release demoted to `best-effort`, and keep older releases in the matrix until they break.
