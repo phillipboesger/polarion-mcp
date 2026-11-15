@@ -23,10 +23,12 @@ The full tool surface targets the newest release (2606). The newest three releas
 | Global REST GET permission required for login | No | No | Yes |
 | `getCurrentUser` (`GET /user`) | Yes | Yes | No (404, use the other tools) |
 | Job execution (`/jobs`) | Yes | Yes | No (only `GET /jobs/{id}` and file download) |
+| Custom field writes (key and enum value check) | Yes | Yes (type-scoped field metadata) | No (refused: no field metadata endpoint) |
 
 Deviations on older releases:
 
 - **2506 login:** there is no `/metadata`, so the server reads `GET /projects?page[size]=1`. The Polarion user must be allowed global REST GET. If not, the log shows `GET /projects failed: permission_denied` and the diagnostic points at this requirement or an upgrade to 2512+.
+- **Field metadata:** the guards read a Work Item's field metadata per item on 2606. 2512 has no per-item endpoint, so they read the item's type and use the type-scoped lookup. 2506 has neither, so writes that set a custom field are refused there; standard fields still work.
 - **401 and 403 from `/metadata` never fall back.** A revoked token or a denied user stays rejected.
 - **Verify steps in the client guides:** `getCurrentUser` answers 404 on 2506. Ask for `getProjects` instead; the login itself still worked.
 
