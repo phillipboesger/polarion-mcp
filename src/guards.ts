@@ -1,11 +1,11 @@
 /**
- * Fail-closed pre-write validation ("guards") for Work Item writes.
+ * Fail-closed pre-write validation ("guards") for Work Item writes, with type-scoped fallback on Polarion 2506/2512.
  *
  * Three independent checks, run in sequence by `executor.ts` (first failure
  * blocks the write, remaining checks are skipped):
  *
  * 1. **Enum fields** (`checkWorkItemEnumFields`/`checkWorkItemsEnumFields`) --
- *    `status`/`severity`/`priority`/`resolution` against Polarion's
+ *    Standard and custom Work Item enumeration fields against Polarion's
  *    `getAvailableOptions` action. Two lookup modes, confirmed against the
  *    REST API User Guide's worked examples: instance-scoped for existing
  *    items (`patchWorkItem`, `patchWorkItems`, `patchAllWorkItems`), or
@@ -39,7 +39,7 @@
  * - `module` (the owning Document) and `linkedRevisions` -- existence is
  *   checkable in principle (`getDocument`/`getRevision` both exist), but
  *   their JSON:API ids need extra parsing this pass didn't build out.
- * - Custom field *values* (only *keys* are checked).
+ * - Custom enumeration values on resources other than Work Items.
  *
  * Fail-closed: if a check itself can't be completed (network error, auth
  * failure, unexpected response shape), the write is refused rather than
@@ -60,6 +60,7 @@ const DEFAULT_CACHE_TTL_MS = 60_000;
 
 interface CacheEntry {
   options: Set<string>;
+  names: Map<string, string>;
   expiresAt: number;
 }
 
@@ -141,21 +142,36 @@ export interface WorkItemEnumCheckTarget {
   unresolvedReason?: string;
 }
 
+const workItemTypeCache = new Map<string, { type: string; expiresAt: number }>();
+
+async function resolveWorkItemType(path: string, context: EnumGuardRequestContext, sendOpts: SendWithRetryOpts, ttl: number): Promise<string | undefined> {
+  const key = `${callerCacheScope()}::${context.baseUrl}::${path}`;
+  const cached = workItemTypeCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.type;
+  try {
+    const response = await sendWithRetry({ method: 'GET', url: `${context.baseUrl}${path}`, params: { 'fields[workitems]': 'type' }, headers: context.headers, httpsAgent: httpsAgent(context.rejectUnauthorized) }, sendOpts);
+    const type = response.data?.data?.attributes?.type;
+    if (typeof type !== 'string' || !type) return undefined;
+    cacheSet(workItemTypeCache, key, { type, expiresAt: Date.now() + ttl });
+    return type;
+  } catch { return undefined; }
+}
+
 async function fetchOptions(
   target: WorkItemEnumCheckTarget,
   field: string,
   requestContext: EnumGuardRequestContext,
   sendOpts: SendWithRetryOpts,
   cacheTtlMs: number
-): Promise<{ options: Set<string>; capped?: boolean } | { error: string }> {
+): Promise<{ options: Set<string>; names: Map<string, string>; capped?: boolean } | { error: string }> {
   const scope = target.workItemId ? `${target.projectId}/${target.workItemId}` : `${target.projectId}::type=${target.type}`;
   const cacheKey = `${callerCacheScope()}::${requestContext.baseUrl}::${scope}::${field}`;
   const cached = _optionsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return { options: cached.options };
+    return { options: cached.options, names: cached.names };
   }
 
-  const config: AxiosRequestConfig = target.workItemId
+  let config: AxiosRequestConfig = target.workItemId
     ? {
         method: 'GET',
         url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}/fields/${encodeSegment(field)}/actions/getAvailableOptions`,
@@ -173,19 +189,34 @@ async function fetchOptions(
   try {
     // Options are paged; a value on a later page must not be refused.
     const options = new Set<string>();
+    const names = new Map<string, string>();
     for (let page = 1; page <= MAX_OPTION_PAGES; page++) {
-      const response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
+      let response;
+      try {
+        response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
+      } catch (error) {
+        // Only a missing endpoint (404 on the first page) falls back; mixing two endpoints' pages would be wrong.
+        if (page !== 1 || !target.workItemId || !axios.isAxiosError(error) || error.response?.status !== 404 || config.params?.type) throw error;
+        const path = `/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}`;
+        const type = await resolveWorkItemType(path, requestContext, sendOpts, cacheTtlMs);
+        if (!type) throw error;
+        config = { ...config, url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/fields/${encodeSegment(field)}/actions/getAvailableOptions`, params: { type } };
+        response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
+      }
       for (const id of extractOptionIds(response.data)) options.add(id);
+      for (const entry of response.data?.data ?? []) {
+        if (typeof entry?.id === 'string' && typeof entry?.name === 'string') names.set(entry.id, entry.name);
+      }
       const hasNext = !!(response.data as { links?: { next?: unknown } } | undefined)?.links?.next;
       if (!hasNext) break;
       if (page === MAX_OPTION_PAGES) {
         // The lookup is incomplete; warn and fail open for this field rather than reject a valid option beyond the safety cap.
         console.warn(`[WARN] Enum options for '${field}' exceeded the ${MAX_OPTION_PAGES}-page lookup cap; skipping validation for this field.`);
-        return { options, capped: true };
+        return { options, names, capped: true };
       }
     }
-    cacheSet(_optionsCache, cacheKey, { options, expiresAt: Date.now() + cacheTtlMs });
-    return { options };
+    cacheSet(_optionsCache, cacheKey, { options, names, expiresAt: Date.now() + cacheTtlMs });
+    return { options, names };
   } catch (error) {
     const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
     return { error: detail };
@@ -201,29 +232,46 @@ async function checkOneTarget(
   const scopeLabel = target.workItemId ? `Work Item ${target.projectId}/${target.workItemId}` : `a new '${target.type}' Work Item in ${target.projectId}`;
   if (target.unresolvedReason) return { ok: false, reason: target.unresolvedReason };
 
+  const fields: Array<[string, string[]]> = [];
   for (const field of STANDARD_WORK_ITEM_ENUM_FIELDS) {
     const value = target.attributes[field];
-    if (typeof value !== 'string' || value === '') continue;
-
+    if (typeof value === 'string' && value !== '') fields.push([field, [value]]);
+  }
+  const customKeys = Object.keys(target.attributes).filter((key) => !STANDARD_ATTRIBUTE_KEYS.workitems.has(key));
+  if (customKeys.length) {
+    const metadataTarget: CustomFieldKeyCheckTarget = {
+      resourceType: 'workitems', attributes: target.attributes, scopeLabel,
+      ...(target.workItemId ? { instancePath: `/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}` } : { projectId: target.projectId, type: target.type }),
+    };
+    const metadataResult = await fetchFieldMetadata(metadataTarget, customKeys, requestContext, sendOpts, cacheTtlMs);
+    // Without metadata the custom-field key guard runs next and refuses the write (or warns on a dry run).
+    if (!('reason' in metadataResult)) {
+      for (const key of customKeys) {
+        if (metadataResult.metadata[key]?.type?.kind !== 'enumeration') continue;
+        const value = target.attributes[key];
+        if (typeof value === 'string' && value !== '') fields.push([key, [value]]);
+        else if (Array.isArray(value) && value.length && value.every((v) => typeof v === 'string')) fields.push([key, value]);
+      }
+    }
+  }
+  for (const [field, values] of fields) {
     const result = await fetchOptions(target, field, requestContext, sendOpts, cacheTtlMs);
     if ('error' in result) {
-      return {
-        ok: false,
-        reason:
-          `Cannot validate '${field}' options for ${scopeLabel}: ${result.error}. ` +
-          `Refusing the write -- an unvalidated enum value can persist as a silent, invisible ghost. ` +
-          `Retry once Polarion is reachable, or omit '${field}' from this write.`,
-      };
+      return { ok: false, reason: `Cannot validate '${field}' options for ${scopeLabel}: ${result.error}. ` +
+        `Refusing the write -- an unvalidated enum value can persist as a silent, invisible ghost. ` +
+        `Retry once Polarion is reachable, or omit '${field}' from this write.` };
     }
-
     if (result.capped) continue;
-
-    if (!result.options.has(value)) {
-      const optionList = result.options.size > 0 ? [...result.options].join(', ') : '(none returned -- this field may not be a validated enumeration)';
-      return {
-        ok: false,
-        reason: `'${field}' value '${value}' is not a valid option for ${scopeLabel}. Valid options: ${optionList}.`,
-      };
+    for (const value of values) {
+      if (!result.options.has(value)) {
+        const optionList = result.options.size > 0 ? [...result.options].join(', ') : '(none returned -- this field may not be a validated enumeration)';
+        const labelMatches = [...result.names].filter(([, name]) => name.trim().toLowerCase() === value.trim().toLowerCase());
+        // Two options sharing a label would make the hint a guess.
+        const labelId = labelMatches.length === 1 ? labelMatches[0][0] : undefined;
+        return { ok: false, reason: labelId !== undefined
+          ? `'${field}' value '${value}' is the label of option '${labelId}' for ${scopeLabel}; send the option id '${labelId}'. Valid options: ${optionList}.`
+          : `'${field}' value '${value}' is not a valid option for ${scopeLabel}. Valid options: ${optionList}.` };
+      }
     }
   }
 
@@ -355,6 +403,74 @@ export interface CustomFieldKeyCheckTarget {
   unresolvedReason?: string;
 }
 
+async function fetchFieldMetadata(
+  target: CustomFieldKeyCheckTarget, candidateKeys: string[], requestContext: EnumGuardRequestContext,
+  sendOpts: SendWithRetryOpts, cacheTtlMs: number
+): Promise<{ keys: Set<string>; metadata: Record<string, any> } | { reason: string }> {
+  const cacheKey = target.instancePath
+    ? `${callerCacheScope()}::${requestContext.baseUrl}::instance::${target.instancePath}`
+    : `${callerCacheScope()}::${requestContext.baseUrl}::${target.projectId}::fields::${target.resourceType}::${target.type ?? "~"}`;
+  const cached = _fieldKeyCache.get(cacheKey);
+  let fieldIds: Set<string>;
+  let metadata: Record<string, any>;
+
+  if (cached && cached.expiresAt > Date.now()) {
+    fieldIds = cached.keys;
+    metadata = cached.metadata;
+  } else {
+    const config: AxiosRequestConfig = target.instancePath
+      ? {
+          method: 'GET',
+          url: `${requestContext.baseUrl}${target.instancePath}/actions/getFieldsMetadata`,
+          headers: requestContext.headers,
+          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
+        }
+      : {
+          method: 'GET',
+          url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId!)}/actions/getFieldsMetadata`,
+          params: { resourceType: target.resourceType, targetType: target.type ?? '~' },
+          headers: requestContext.headers,
+          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
+        };
+    try {
+      let response;
+      try {
+        response = await sendWithRetry(config, sendOpts);
+      } catch (error) {
+        const match = target.resourceType === 'workitems' && target.instancePath?.match(/^\/projects\/([^/]+)\/workitems\/[^/]+$/);
+        if (!match || !axios.isAxiosError(error) || error.response?.status !== 404) throw error;
+        const type = await resolveWorkItemType(target.instancePath!, requestContext, sendOpts, cacheTtlMs);
+        if (!type) throw error;
+        response = await sendWithRetry({ ...config, url: `${requestContext.baseUrl}/projects/${match[1]}/actions/getFieldsMetadata`, params: { resourceType: 'workitems', targetType: type } }, sendOpts);
+      }
+      fieldIds = new Set(extractFieldIds(response.data));
+      metadata = response.data?.data?.attributes ?? {};
+      if (fieldIds.size === 0) {
+        return {
+          reason:
+            `Cannot verify custom field keys (${candidateKeys.join(', ')}) for ${target.scopeLabel}: ` +
+            `the field metadata lookup returned no fields. Refusing the write -- an unknown key persists silently, ` +
+            `invisible to the UI. Ask the user to confirm these field ids exist for this type.`,
+        };
+      }
+      cacheSet(_fieldKeyCache, cacheKey, { keys: fieldIds, metadata, expiresAt: Date.now() + cacheTtlMs });
+    } catch (error) {
+      const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
+      // Polarion 2506 has no field metadata endpoint at all; custom-field writes stay refused there by design.
+      const versionHint = axios.isAxiosError(error) && error.response?.status === 404
+        ? ` If the project and item exist, this Polarion has no field metadata endpoint (2506 and older): writes that set custom fields need Polarion 2512 or newer; standard fields still work.`
+        : ` Retry once Polarion is reachable.`;
+      return {
+        reason:
+          `Cannot validate custom field keys for ${target.scopeLabel}: ${detail}. ` +
+          `Refusing the write -- an unknown key persists silently, invisible to the UI.` + versionHint,
+      };
+    }
+  }
+
+  return { keys: fieldIds, metadata };
+}
+
 /**
  * Validates that every non-standard key in a target's `attributes` (i.e.
  * every candidate custom field) is a real field for that resource, per
@@ -389,56 +505,9 @@ export async function checkResourceCustomFieldKeys(
     return { ok: false, reason: target.unresolvedReason };
   }
 
-  const cacheKey = target.instancePath
-    ? `${callerCacheScope()}::${requestContext.baseUrl}::instance::${target.instancePath}`
-    : `${callerCacheScope()}::${requestContext.baseUrl}::${target.projectId}::fields::${target.resourceType}::${target.type ?? "~"}`;
-  const cached = _fieldKeyCache.get(cacheKey);
-  let fieldIds: Set<string>;
-  let metadata: Record<string, any>;
-
-  if (cached && cached.expiresAt > Date.now()) {
-    fieldIds = cached.keys;
-    metadata = cached.metadata;
-  } else {
-    const config: AxiosRequestConfig = target.instancePath
-      ? {
-          method: 'GET',
-          url: `${requestContext.baseUrl}${target.instancePath}/actions/getFieldsMetadata`,
-          headers: requestContext.headers,
-          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
-        }
-      : {
-          method: 'GET',
-          url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId!)}/actions/getFieldsMetadata`,
-          params: { resourceType: target.resourceType, targetType: target.type ?? '~' },
-          headers: requestContext.headers,
-          httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
-        };
-    try {
-      const response = await sendWithRetry(config, sendOpts);
-      fieldIds = new Set(extractFieldIds(response.data));
-      metadata = response.data?.data?.attributes ?? {};
-      if (fieldIds.size === 0) {
-        return {
-          ok: false,
-          reason:
-            `Cannot verify custom field keys (${candidateKeys.join(', ')}) for ${target.scopeLabel}: ` +
-            `the field metadata lookup returned no fields. Refusing the write -- an unknown key persists silently, ` +
-            `invisible to the UI. Ask the user to confirm these field ids exist for this type.`,
-        };
-      }
-      cacheSet(_fieldKeyCache, cacheKey, { keys: fieldIds, metadata, expiresAt: Date.now() + cacheTtlMs });
-    } catch (error) {
-      const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
-      return {
-        ok: false,
-        reason:
-          `Cannot validate custom field keys for ${target.scopeLabel}: ${detail}. ` +
-          `Refusing the write -- an unknown key persists silently, invisible to the UI. ` +
-          `Retry once Polarion is reachable.`,
-      };
-    }
-  }
+  const result = await fetchFieldMetadata(target, candidateKeys, requestContext, sendOpts, cacheTtlMs);
+  if ('reason' in result) return { ok: false, reason: result.reason };
+  const { keys: fieldIds, metadata } = result;
 
   if (warnings) {
     for (const key of candidateKeys) {

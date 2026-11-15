@@ -514,3 +514,99 @@ test("the options cache is not shared between two callers, so one user's authori
 
   assert.deepEqual(seenTokens, ["pat-of-alice", "pat-of-bob"], "Bob's write must be validated against Polarion with Bob's own token, not served from Alice's cached entry")
 })
+
+test("custom enum values use metadata and reject labels", async () => {
+  _optionsCache.clear(); _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => ({ data: String(config.url).includes("getFieldsMetadata") ? { data: { attributes: { asilLevel: { type: { kind: "enumeration" } } } } } : { data: [{ id: "asil_d", name: "ASIL D" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkWorkItemEnumFields("PROJ", "ENUM-1", { asilLevel: "ASIL D" }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.match(result.reason, /label of option 'asil_d'/)
+})
+
+test("custom enums validate ids, multi values, clearing and reuse metadata", async () => {
+  _optionsCache.clear(); _fieldKeyCache.clear()
+  let metadataCalls = 0, optionCalls = 0
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const metadata = String(config.url).includes("getFieldsMetadata")
+    if (metadata) metadataCalls++; else optionCalls++
+    return { data: metadata ? { data: { attributes: { asil: { type: { kind: "enumeration", multi: true } }, textField: { type: { kind: "string" } } } } } : { data: [{ id: "asil_a", name: "ASIL A" }, { id: "qm", name: "QM" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+  }
+  const opts = { ...sendOpts, httpClient }
+  for (const value of [null, "", [], "asil_a", ["asil_a", "qm"]]) assert.deepEqual(await checkWorkItemEnumFields("P", "E-2", { asil: value }, requestContext, opts), { ok: true })
+  assert.equal(optionCalls, 1)
+  assert.equal((await checkWorkItemEnumFields("P", "E-2", { asil: ["qm", "bad"] }, requestContext, opts)).ok, false)
+  assert.deepEqual(await checkWorkItemEnumFields("P", "E-2", { textField: "anything" }, requestContext, opts), { ok: true })
+  assert.deepEqual(await checkResourceCustomFieldKeys({ resourceType: "workitems", instancePath: "/projects/P/workitems/E-2", scopeLabel: "item", attributes: { asil: "qm" } }, requestContext, opts), { ok: true })
+  assert.equal(metadataCalls, 1)
+})
+
+test("custom metadata errors fail closed and create and bulk use scoped options", async () => {
+  _fieldKeyCache.clear(); _optionsCache.clear()
+  const fail = async (): Promise<AxiosResponse> => { throw new Error("metadata unavailable") }
+  // The enum guard leaves a failed metadata lookup to the key guard, which fails closed (and only warns on a dry run).
+  assert.equal((await checkWorkItemEnumFields("P", "E-3", { asil: "x" }, requestContext, { ...sendOpts, httpClient: fail })).ok, true)
+  const keyResult = await checkResourceCustomFieldKeys({ resourceType: "workitems", attributes: { asil: "x" }, scopeLabel: "Work Item P/E-3", instancePath: "/projects/P/workitems/E-3" }, requestContext, { ...sendOpts, httpClient: fail })
+  assert.equal(keyResult.ok, false)
+  if (!keyResult.ok) assert.match(keyResult.reason, /Refusing the write.*metadata unavailable|metadata unavailable.*Refusing the write/s)
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const metadata = String(config.url).includes("getFieldsMetadata")
+    if (!metadata && !String(config.url).includes("/workitems/E-")) assert.equal(config.params.type, "task")
+    return { data: metadata ? { data: { attributes: { asil: { type: { kind: "enumeration" } } } } } : { data: [{ id: "good" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+  }
+  const opts = { ...sendOpts, httpClient }
+  assert.deepEqual(await checkWorkItemsEnumFields([{ projectId: "P", type: "task", attributes: { asil: "good" } }], requestContext, opts), { ok: true })
+  const bad = await checkWorkItemsEnumFields([{ projectId: "P", workItemId: "E-4", attributes: { asil: "good" } }, { projectId: "P", workItemId: "E-5", attributes: { asil: "bad" } }], requestContext, opts)
+  assert.equal(bad.ok, false); if (!bad.ok) assert.match(bad.reason, /'asil' value 'bad' is not a valid option for Work Item P\/E-5\. Valid options: good\./)
+})
+
+test("standard enum label suggests its id", async () => {
+  _optionsCache.clear()
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: { data: [{ id: "open", name: "Open" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkWorkItemEnumFields("P", "E-6", { status: "Open" }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false); if (!result.ok) assert.match(result.reason, /label of option 'open'/)
+})
+
+test("a label shared by two options gives no id hint", async () => {
+  _optionsCache.clear()
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: { data: [{ id: "open", name: "Open" }, { id: "reopened", name: "open" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkWorkItemEnumFields("P", "E-7", { status: "Open" }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+  if (!result.ok) {
+    assert.doesNotMatch(result.reason, /label of option/)
+    assert.match(result.reason, /is not a valid option.*Valid options: open, reopened\./)
+  }
+})
+
+test("older Work Item endpoints fall back to type and cache results", async () => {
+  _fieldKeyCache.clear(); _optionsCache.clear()
+  const calls: string[] = []
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url); calls.push(url)
+    if (url.includes('/workitems/LEGACY-1/') ) throw new AxiosError('missing', undefined, undefined, undefined, { status: 404, statusText: 'Not Found', data: {}, headers: {}, config: {} as any })
+    const data = url.endsWith('/workitems/LEGACY-1') ? { data: { attributes: { type: 'task' } } } : url.includes('getFieldsMetadata') ? { data: { attributes: { asil: { type: { kind: 'enumeration' } } } } } : { data: [{ id: 'good', name: 'Good Label' }] }
+    return { data, status: 200, statusText: 'OK', headers: {}, config: {} as any }
+  }
+  const opts = { ...sendOpts, httpClient }
+  const target = { resourceType: 'workitems', instancePath: '/projects/P/workitems/LEGACY-1', scopeLabel: 'item', attributes: { asil: 'good' } }
+  const label = await checkWorkItemEnumFields('P', 'LEGACY-1', { asil: 'Good Label' }, requestContext, opts)
+  assert.equal(label.ok, false); if (!label.ok) assert.match(label.reason, /label of option/)
+  assert.deepEqual(await checkWorkItemEnumFields('P', 'LEGACY-1', { asil: 'good' }, requestContext, opts), { ok: true })
+  assert.deepEqual(await checkResourceCustomFieldKeys(target, requestContext, opts), { ok: true })
+  assert.equal((await checkResourceCustomFieldKeys({ ...target, attributes: { unknown: 'x' } }, requestContext, opts)).ok, false)
+  assert.equal(calls.length, 5)
+})
+
+test('metadata fallback preserves original 404 and does not run on 500', async () => {
+  for (const status of [404, 500]) {
+    const calls: string[] = []
+    const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+      calls.push(String(config.url))
+      throw new AxiosError('original failure', undefined, undefined, undefined, { status, statusText: 'failure', data: {}, headers: {}, config: {} as any })
+    }
+    const result = await checkResourceCustomFieldKeys({ resourceType: 'workitems', instancePath: `/projects/P/workitems/FAIL-${status}`, scopeLabel: 'item', attributes: { custom: 'x' } }, requestContext, { ...sendOpts, httpClient })
+    assert.equal(result.ok, false); if (!result.ok) assert.match(result.reason, new RegExp(String(status)))
+    if (status === 404) { assert.equal(calls.length, 2); if (!result.ok) assert.match(result.reason, /need Polarion 2512 or newer/) }
+    else if (!result.ok) assert.match(result.reason, /Retry once Polarion is reachable/)
+    else assert.ok(calls.every((url) => url.endsWith('/actions/getFieldsMetadata')))
+  }
+})

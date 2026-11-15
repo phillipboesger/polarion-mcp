@@ -42,6 +42,42 @@ describe("stdio server against Polarion", () => {
     await client.close();
   });
 
+  test("custom enumeration labels are refused without changing data", async (t) => {
+    const items = await call(client, "getWorkItems", { projectId: PROJECT, page_size_: 100, fields: { workitems: "type" } });
+    assert.equal(items.isError, false, `getWorkItems: ${items.thrown ?? items.text}`);
+    const byType = new Map();
+    for (const item of json(items.text).data ?? []) {
+      const workItemId = item.id.split("/").at(-1);
+      const type = item.attributes?.type;
+      if (!type) continue;
+      if (!byType.has(type)) {
+        const metadata = await call(client, "getProjectFieldsMetadata", { projectId: PROJECT, resourceType: "workitems", targetType: type });
+        // 2506 has neither field metadata endpoint, so the guards refuse custom-field writes there.
+        if (metadata.isError && /Status 404/.test(metadata.text)) return t.skip("This Polarion has no field metadata endpoint");
+        assert.equal(metadata.isError, false, `getProjectFieldsMetadata ${type}: ${metadata.thrown ?? metadata.text}`);
+        byType.set(type, { metadata, options: new Map() });
+      }
+      const { metadata, options: optionsByField } = byType.get(type);
+      for (const [fieldId, field] of Object.entries(json(metadata.text).data.attributes)) {
+        if (field.type?.kind !== "enumeration" || ["type", "status", "severity", "priority", "resolution"].includes(fieldId)) continue;
+        if (!optionsByField.has(fieldId)) optionsByField.set(fieldId, await call(client, "getAvailableEnumOptionsForWorkItemType", { projectId: PROJECT, fieldId, type }));
+        const options = optionsByField.get(fieldId);
+        assert.equal(options.isError, false, `getAvailableEnumOptionsForWorkItemType ${type}/${fieldId}: ${options.thrown ?? options.text}`);
+        const option = json(options.text).data.find((o) => o.name && o.name.toLowerCase() !== o.id.toLowerCase());
+        if (!option) continue;
+        const patch = (value, extra = {}) => call(client, "patchWorkItem", { projectId: PROJECT, workItemId, requestBody: { data: { type: "workitems", id: item.id, attributes: { [fieldId]: field.type.multi ? [value] : value } } }, ...extra });
+        const refused = await patch(option.name, { dry_run: true });
+        assert.equal(refused.isError, true, `label patch ${workItemId}/${fieldId}: ${refused.text}`);
+        assert.match(refused.text, /Write refused/);
+        assert.match(refused.text, /label of option/, `label patch ${workItemId}/${fieldId}`);
+        const dry = await patch(option.id, { dry_run: true });
+        assert.equal(dry.isError, false, `id dry run ${workItemId}/${fieldId}: ${dry.thrown ?? dry.text}`);
+        return;
+      }
+    }
+    t.skip("No existing Work Item with a custom enum and distinct option label");
+  });
+
   test("lists the generated tools", async () => {
     const { tools } = await client.listTools();
     assert.ok(tools.length > 250, `only ${tools.length} tools`);

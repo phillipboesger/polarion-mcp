@@ -11,7 +11,7 @@
 ## Polarion-specific behavior
 
 - MCP instructions, offline guides, and prompts for common Work Item tasks.
-- Fail-closed write guards for supported enumeration values, custom-field keys, and Work Item user references.
+- Fail-closed write guards for enumeration values (standard and custom Work Item fields; a label instead of an option id is refused with the id to use), custom-field keys, and Work Item user references.
 - Mutating generated and composite tools support validated `dry_run` previews. Boolean values and the compatibility inputs `"true"`, `"false"`, `1`, and `0` normalize to booleans; malformed values are rejected before side effects.
 - Composite tool arguments are validated against their declared schemas before handlers run. Intentionally open custom schemas keep their `additionalProperties` behavior.
 - Shared automatic pagination supports generated MCP calls, composite search, and REST tool entry points, with limits of 1000 items and 20 pages and an explicit truncation signal for incomplete collections.
