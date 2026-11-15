@@ -576,3 +576,36 @@ test("a label shared by two options gives no id hint", async () => {
     assert.match(result.reason, /is not a valid option.*Valid options: open, reopened\./)
   }
 })
+
+test("older Work Item endpoints fall back to type and cache results", async () => {
+  _fieldKeyCache.clear(); _optionsCache.clear()
+  const calls: string[] = []
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url); calls.push(url)
+    if (url.includes('/workitems/LEGACY-1/') ) throw new AxiosError('missing', undefined, undefined, undefined, { status: 404, statusText: 'Not Found', data: {}, headers: {}, config: {} as any })
+    const data = url.endsWith('/workitems/LEGACY-1') ? { data: { attributes: { type: 'task' } } } : url.includes('getFieldsMetadata') ? { data: { attributes: { asil: { type: { kind: 'enumeration' } } } } } : { data: [{ id: 'good', name: 'Good Label' }] }
+    return { data, status: 200, statusText: 'OK', headers: {}, config: {} as any }
+  }
+  const opts = { ...sendOpts, httpClient }
+  const target = { resourceType: 'workitems', instancePath: '/projects/P/workitems/LEGACY-1', scopeLabel: 'item', attributes: { asil: 'good' } }
+  const label = await checkWorkItemEnumFields('P', 'LEGACY-1', { asil: 'Good Label' }, requestContext, opts)
+  assert.equal(label.ok, false); if (!label.ok) assert.match(label.reason, /label of option/)
+  assert.deepEqual(await checkWorkItemEnumFields('P', 'LEGACY-1', { asil: 'good' }, requestContext, opts), { ok: true })
+  assert.deepEqual(await checkResourceCustomFieldKeys(target, requestContext, opts), { ok: true })
+  assert.equal((await checkResourceCustomFieldKeys({ ...target, attributes: { unknown: 'x' } }, requestContext, opts)).ok, false)
+  assert.equal(calls.length, 5)
+})
+
+test('metadata fallback preserves original 404 and does not run on 500', async () => {
+  for (const status of [404, 500]) {
+    const calls: string[] = []
+    const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+      calls.push(String(config.url))
+      throw new AxiosError('original failure', undefined, undefined, undefined, { status, statusText: 'failure', data: {}, headers: {}, config: {} as any })
+    }
+    const result = await checkResourceCustomFieldKeys({ resourceType: 'workitems', instancePath: `/projects/P/workitems/FAIL-${status}`, scopeLabel: 'item', attributes: { custom: 'x' } }, requestContext, { ...sendOpts, httpClient })
+    assert.equal(result.ok, false); if (!result.ok) assert.match(result.reason, new RegExp(String(status)))
+    if (status === 404) assert.equal(calls.length, 2)
+    else assert.ok(calls.every((url) => url.endsWith('/actions/getFieldsMetadata')))
+  }
+})

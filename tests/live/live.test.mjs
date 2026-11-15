@@ -45,14 +45,22 @@ describe("stdio server against Polarion", () => {
   test("custom enumeration labels are refused without changing data", async (t) => {
     const items = await call(client, "getWorkItems", { projectId: PROJECT, page_size_: 100, fields: { workitems: "type" } });
     assert.equal(items.isError, false, `getWorkItems: ${items.thrown ?? items.text}`);
+    const byType = new Map();
     for (const item of json(items.text).data ?? []) {
       const workItemId = item.id.split("/").at(-1);
-      const metadata = await call(client, "getFieldsMetadataForWorkItem", { projectId: PROJECT, workItemId });
-      assert.equal(metadata.isError, false, `getFieldsMetadataForWorkItem ${workItemId}: ${metadata.thrown ?? metadata.text}`);
+      const type = item.attributes?.type;
+      if (!type) continue;
+      if (!byType.has(type)) {
+        const metadata = await call(client, "getProjectFieldsMetadata", { projectId: PROJECT, resourceType: "workitems", targetType: type });
+        assert.equal(metadata.isError, false, `getProjectFieldsMetadata ${type}: ${metadata.thrown ?? metadata.text}`);
+        byType.set(type, { metadata, options: new Map() });
+      }
+      const { metadata, options: optionsByField } = byType.get(type);
       for (const [fieldId, field] of Object.entries(json(metadata.text).data.attributes)) {
         if (field.type?.kind !== "enumeration" || ["type", "status", "severity", "priority", "resolution"].includes(fieldId)) continue;
-        const options = await call(client, "getAvailableEnumOptionsForWorkItem", { projectId: PROJECT, workItemId, fieldId });
-        assert.equal(options.isError, false, `getAvailableEnumOptionsForWorkItem ${workItemId}/${fieldId}: ${options.thrown ?? options.text}`);
+        if (!optionsByField.has(fieldId)) optionsByField.set(fieldId, await call(client, "getAvailableEnumOptionsForWorkItemType", { projectId: PROJECT, fieldId, type }));
+        const options = optionsByField.get(fieldId);
+        assert.equal(options.isError, false, `getAvailableEnumOptionsForWorkItemType ${type}/${fieldId}: ${options.thrown ?? options.text}`);
         const option = json(options.text).data.find((o) => o.name && o.name.toLowerCase() !== o.id.toLowerCase());
         if (!option) continue;
         const patch = (value, extra = {}) => call(client, "patchWorkItem", { projectId: PROJECT, workItemId, requestBody: { data: { type: "workitems", id: item.id, attributes: { [fieldId]: field.type.multi ? [value] : value } } }, ...extra });

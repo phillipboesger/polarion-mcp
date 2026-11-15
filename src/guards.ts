@@ -1,5 +1,5 @@
 /**
- * Fail-closed pre-write validation ("guards") for Work Item writes.
+ * Fail-closed pre-write validation ("guards") for Work Item writes, with type-scoped fallback on Polarion 2506/2512.
  *
  * Three independent checks, run in sequence by `executor.ts` (first failure
  * blocks the write, remaining checks are skipped):
@@ -142,6 +142,21 @@ export interface WorkItemEnumCheckTarget {
   unresolvedReason?: string;
 }
 
+const workItemTypeCache = new Map<string, { type: string; expiresAt: number }>();
+
+async function resolveWorkItemType(path: string, context: EnumGuardRequestContext, sendOpts: SendWithRetryOpts, ttl: number): Promise<string | undefined> {
+  const key = `${callerCacheScope()}::${context.baseUrl}::${path}`;
+  const cached = workItemTypeCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.type;
+  try {
+    const response = await sendWithRetry({ method: 'GET', url: `${context.baseUrl}${path}`, params: { 'fields[workitems]': 'type' }, headers: context.headers, httpsAgent: httpsAgent(context.rejectUnauthorized) }, sendOpts);
+    const type = response.data?.data?.attributes?.type;
+    if (typeof type !== 'string' || !type) return undefined;
+    cacheSet(workItemTypeCache, key, { type, expiresAt: Date.now() + ttl });
+    return type;
+  } catch { return undefined; }
+}
+
 async function fetchOptions(
   target: WorkItemEnumCheckTarget,
   field: string,
@@ -156,7 +171,7 @@ async function fetchOptions(
     return { options: cached.options, names: cached.names };
   }
 
-  const config: AxiosRequestConfig = target.workItemId
+  let config: AxiosRequestConfig = target.workItemId
     ? {
         method: 'GET',
         url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}/fields/${encodeSegment(field)}/actions/getAvailableOptions`,
@@ -176,7 +191,17 @@ async function fetchOptions(
     const options = new Set<string>();
     const names = new Map<string, string>();
     for (let page = 1; page <= MAX_OPTION_PAGES; page++) {
-      const response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
+      let response;
+      try {
+        response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
+      } catch (error) {
+        if (!target.workItemId || !axios.isAxiosError(error) || error.response?.status !== 404 || config.params?.type) throw error;
+        const path = `/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}`;
+        const type = await resolveWorkItemType(path, requestContext, sendOpts, cacheTtlMs);
+        if (!type) throw error;
+        config = { ...config, url: `${requestContext.baseUrl}/projects/${encodeSegment(target.projectId)}/workitems/fields/${encodeSegment(field)}/actions/getAvailableOptions`, params: { type } };
+        response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
+      }
       for (const id of extractOptionIds(response.data)) options.add(id);
       for (const entry of response.data?.data ?? []) {
         if (typeof entry?.id === 'string' && typeof entry?.name === 'string') names.set(entry.id, entry.name);
@@ -407,7 +432,16 @@ async function fetchFieldMetadata(
           httpsAgent: httpsAgent(requestContext.rejectUnauthorized),
         };
     try {
-      const response = await sendWithRetry(config, sendOpts);
+      let response;
+      try {
+        response = await sendWithRetry(config, sendOpts);
+      } catch (error) {
+        const match = target.resourceType === 'workitems' && target.instancePath?.match(/^\/projects\/([^/]+)\/workitems\/[^/]+$/);
+        if (!match || !axios.isAxiosError(error) || error.response?.status !== 404) throw error;
+        const type = await resolveWorkItemType(target.instancePath!, requestContext, sendOpts, cacheTtlMs);
+        if (!type) throw error;
+        response = await sendWithRetry({ ...config, url: `${requestContext.baseUrl}/projects/${match[1]}/actions/getFieldsMetadata`, params: { resourceType: 'workitems', targetType: type } }, sendOpts);
+      }
       fieldIds = new Set(extractFieldIds(response.data));
       metadata = response.data?.data?.attributes ?? {};
       if (fieldIds.size === 0) {
