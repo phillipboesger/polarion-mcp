@@ -456,11 +456,14 @@ async function fetchFieldMetadata(
       cacheSet(_fieldKeyCache, cacheKey, { keys: fieldIds, metadata, expiresAt: Date.now() + cacheTtlMs });
     } catch (error) {
       const detail = axios.isAxiosError(error) ? formatApiError(error) : error instanceof Error ? error.message : String(error);
+      // Polarion 2506 has no field metadata endpoint at all; custom-field writes stay refused there by design.
+      const versionHint = axios.isAxiosError(error) && error.response?.status === 404
+        ? ` If the project and item exist, this Polarion has no field metadata endpoint (2506 and older): writes that set custom fields need Polarion 2512 or newer; standard fields still work.`
+        : ` Retry once Polarion is reachable.`;
       return {
         reason:
           `Cannot validate custom field keys for ${target.scopeLabel}: ${detail}. ` +
-          `Refusing the write -- an unknown key persists silently, invisible to the UI. ` +
-          `Retry once Polarion is reachable.`,
+          `Refusing the write -- an unknown key persists silently, invisible to the UI.` + versionHint,
       };
     }
   }

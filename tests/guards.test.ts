@@ -605,7 +605,8 @@ test('metadata fallback preserves original 404 and does not run on 500', async (
     }
     const result = await checkResourceCustomFieldKeys({ resourceType: 'workitems', instancePath: `/projects/P/workitems/FAIL-${status}`, scopeLabel: 'item', attributes: { custom: 'x' } }, requestContext, { ...sendOpts, httpClient })
     assert.equal(result.ok, false); if (!result.ok) assert.match(result.reason, new RegExp(String(status)))
-    if (status === 404) assert.equal(calls.length, 2)
+    if (status === 404) { assert.equal(calls.length, 2); if (!result.ok) assert.match(result.reason, /need Polarion 2512 or newer/) }
+    else if (!result.ok) assert.match(result.reason, /Retry once Polarion is reachable/)
     else assert.ok(calls.every((url) => url.endsWith('/actions/getFieldsMetadata')))
   }
 })
