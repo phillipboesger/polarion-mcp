@@ -52,6 +52,8 @@ describe("stdio server against Polarion", () => {
       if (!type) continue;
       if (!byType.has(type)) {
         const metadata = await call(client, "getProjectFieldsMetadata", { projectId: PROJECT, resourceType: "workitems", targetType: type });
+        // 2506 has neither field metadata endpoint, so the guards refuse custom-field writes there.
+        if (metadata.isError && /Status 404/.test(metadata.text)) return t.skip("This Polarion has no field metadata endpoint");
         assert.equal(metadata.isError, false, `getProjectFieldsMetadata ${type}: ${metadata.thrown ?? metadata.text}`);
         byType.set(type, { metadata, options: new Map() });
       }
