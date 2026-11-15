@@ -195,7 +195,8 @@ async function fetchOptions(
       try {
         response = await sendWithRetry({ ...config, params: { ...config.params, 'page[size]': 100, 'page[number]': page } }, sendOpts);
       } catch (error) {
-        if (!target.workItemId || !axios.isAxiosError(error) || error.response?.status !== 404 || config.params?.type) throw error;
+        // Only a missing endpoint (404 on the first page) falls back; mixing two endpoints' pages would be wrong.
+        if (page !== 1 || !target.workItemId || !axios.isAxiosError(error) || error.response?.status !== 404 || config.params?.type) throw error;
         const path = `/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}`;
         const type = await resolveWorkItemType(path, requestContext, sendOpts, cacheTtlMs);
         if (!type) throw error;
