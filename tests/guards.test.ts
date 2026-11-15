@@ -543,7 +543,11 @@ test("custom enums validate ids, multi values, clearing and reuse metadata", asy
 test("custom metadata errors fail closed and create and bulk use scoped options", async () => {
   _fieldKeyCache.clear(); _optionsCache.clear()
   const fail = async (): Promise<AxiosResponse> => { throw new Error("metadata unavailable") }
-  assert.equal((await checkWorkItemEnumFields("P", "E-3", { asil: "x" }, requestContext, { ...sendOpts, httpClient: fail })).ok, false)
+  // The enum guard leaves a failed metadata lookup to the key guard, which fails closed (and only warns on a dry run).
+  assert.equal((await checkWorkItemEnumFields("P", "E-3", { asil: "x" }, requestContext, { ...sendOpts, httpClient: fail })).ok, true)
+  const keyResult = await checkResourceCustomFieldKeys({ resourceType: "workitems", attributes: { asil: "x" }, scopeLabel: "Work Item P/E-3", instancePath: "/projects/P/workitems/E-3" }, requestContext, { ...sendOpts, httpClient: fail })
+  assert.equal(keyResult.ok, false)
+  if (!keyResult.ok) assert.match(keyResult.reason, /Refusing the write.*metadata unavailable|metadata unavailable.*Refusing the write/s)
   const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
     const metadata = String(config.url).includes("getFieldsMetadata")
     if (!metadata && !String(config.url).includes("/workitems/E-")) assert.equal(config.params.type, "task")

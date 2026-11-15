@@ -218,12 +218,14 @@ async function checkOneTarget(
       ...(target.workItemId ? { instancePath: `/projects/${encodeSegment(target.projectId)}/workitems/${encodeSegment(target.workItemId)}` } : { projectId: target.projectId, type: target.type }),
     };
     const metadataResult = await fetchFieldMetadata(metadataTarget, customKeys, requestContext, sendOpts, cacheTtlMs);
-    if ('reason' in metadataResult) return { ok: false, reason: metadataResult.reason };
-    for (const key of customKeys) {
-      if (metadataResult.metadata[key]?.type?.kind !== 'enumeration') continue;
-      const value = target.attributes[key];
-      if (typeof value === 'string' && value !== '') fields.push([key, [value]]);
-      else if (Array.isArray(value) && value.length && value.every((v) => typeof v === 'string')) fields.push([key, value]);
+    // Without metadata the custom-field key guard runs next and refuses the write (or warns on a dry run).
+    if (!('reason' in metadataResult)) {
+      for (const key of customKeys) {
+        if (metadataResult.metadata[key]?.type?.kind !== 'enumeration') continue;
+        const value = target.attributes[key];
+        if (typeof value === 'string' && value !== '') fields.push([key, [value]]);
+        else if (Array.isArray(value) && value.length && value.every((v) => typeof v === 'string')) fields.push([key, value]);
+      }
     }
   }
   for (const [field, values] of fields) {

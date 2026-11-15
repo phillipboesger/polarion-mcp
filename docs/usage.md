@@ -59,7 +59,7 @@ A bulk write reads back at most 10 items (`MCP_VERIFY_MAX_ITEMS`); the rest are 
 
 `MCP_MAX_RESPONSE_CHARS` caps generated and composite response text; the default is 100,000 characters. Ordinary, unpaged generated calls retain complete `structuredContent`. Automatically collected paginated results are also bounded by the response cap and may have items removed, with `truncated: true` when content is omitted. See [configuration.md](./configuration.md) for the setting.
 
-Read tools accept `response_format: "concise" | "detailed"`. It defaults to `detailed`, which preserves the complete response. `concise` drops rich-text HTML when a `value_markdown` sibling exists, removes JSON:API links and metadata except `links.next` and `meta.totalCount`, and applies a small default sparse fieldset to large list tools when `fields` is omitted. Any caller-supplied `fields` value is preserved. Successful responses add `value_markdown` for HTML rich-text fields. Write guards fail closed when supported enum, custom-field key, or Work Item user-reference validation cannot confirm a value. See [Features](./features.md) for coverage details.
+Read tools accept `response_format: "concise" | "detailed"`. It defaults to `detailed`, which preserves the complete response. `concise` drops rich-text HTML when a `value_markdown` sibling exists, removes JSON:API links and metadata except `links.next` and `meta.totalCount`, and applies a small default sparse fieldset to large list tools when `fields` is omitted. Any caller-supplied `fields` value is preserved. Successful responses add `value_markdown` for HTML rich-text fields. Write guards fail closed when supported enum, custom-field key, or Work Item user-reference validation cannot confirm a value. Work Item enum validation covers standard and custom enumeration fields; a label sent instead of an option id is refused with the id to use. See [Features](./features.md) for coverage details.
 
 ## Composite tools
 
@@ -82,5 +82,3 @@ Generated MCP list tools, composite search, and REST tool entry points that expo
 ## Quality checks
 
 Run `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as applicable. See [quality/e2e.md](./quality/e2e.md), [contribution guidelines](../.github/CONTRIBUTING.md#mutation-testing), [quality/static-analysis.md](./quality/static-analysis.md), and [quality/distribution.md](./quality/distribution.md).
-
-Work Item write guards validate standard and custom enumeration fields. If a label is sent instead of an option id, the write is refused with the id to use.
