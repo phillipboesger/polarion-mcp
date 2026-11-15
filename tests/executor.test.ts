@@ -979,6 +979,20 @@ test("executeApiTool refuses a patchWorkItem UPDATE with an unknown custom field
   }
 })
 
+test("executeApiTool refuses a custom enumeration label", async () => {
+  _optionsCache.clear(); _fieldKeyCache.clear()
+  const httpClient = async (config: AxiosRequestConfig): Promise<AxiosResponse> => {
+    const url = String(config.url)
+    if (url.includes("getFieldsMetadata")) return { data: { data: { attributes: { asil: { type: { kind: "enumeration" } } } } }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    if (url.includes("getAvailableOptions")) return { data: { data: [{ id: "asil_d", name: "ASIL D" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any }
+    throw new Error("PATCH must not be called")
+  }
+  const result = await executeApiTool("patchWorkItem", patchWorkItemDefinition, { projectId: "DEMO", workItemId: "DEMO-1", requestBody: { data: { type: "workitems", id: "DEMO/DEMO-1", attributes: { asil: "ASIL D" } } } }, {}, { httpClient, minIntervalMs: 0, postMutationDelayMs: 0 })
+  const message = result.content[0]
+  assert.equal(message.type, "text")
+  if (message.type === "text") assert.match(message.text, /Write refused.*label of option 'asil_d'/s)
+})
+
 test("executeApiTool accepts a postDocuments create with a real registered custom field, refuses a bogus one -- new resource-type coverage (Document, typed)", async () => {
   _optionsCache.clear()
   _fieldKeyCache.clear()

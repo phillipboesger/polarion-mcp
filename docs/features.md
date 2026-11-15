@@ -25,3 +25,5 @@
 - Runtime caches are in-memory and are not durable storage.
 - Guards cover only the validations described above; they do not validate arbitrary field values or every relationship type.
 - Local SDK PDFs are optional and are not included in the repository.
+
+Work Item write guards validate standard and custom enumeration fields. If a label is sent instead of an option id, the write is refused with the id to use.

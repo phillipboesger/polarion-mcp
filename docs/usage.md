@@ -82,3 +82,5 @@ Generated MCP list tools, composite search, and REST tool entry points that expo
 ## Quality checks
 
 Run `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:coverage`, `npm run test:mutation`, `npm run test:e2e`, `npm run check:docs`, and `npm run check:package` as applicable. See [quality/e2e.md](./quality/e2e.md), [contribution guidelines](../.github/CONTRIBUTING.md#mutation-testing), [quality/static-analysis.md](./quality/static-analysis.md), and [quality/distribution.md](./quality/distribution.md).
+
+Work Item write guards validate standard and custom enumeration fields. If a label is sent instead of an option id, the write is refused with the id to use.
