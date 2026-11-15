@@ -44,24 +44,24 @@ describe("stdio server against Polarion", () => {
 
   test("custom enumeration labels are refused without changing data", async (t) => {
     const items = await call(client, "getWorkItems", { projectId: PROJECT, page_size_: 100, fields: { workitems: "type" } });
-    assert.equal(items.isError, false, items.thrown ?? items.text);
+    assert.equal(items.isError, false, `getWorkItems: ${items.thrown ?? items.text}`);
     for (const item of json(items.text).data ?? []) {
       const workItemId = item.id.split("/").at(-1);
       const metadata = await call(client, "getFieldsMetadataForWorkItem", { projectId: PROJECT, workItemId });
-      assert.equal(metadata.isError, false, metadata.thrown ?? metadata.text);
+      assert.equal(metadata.isError, false, `getFieldsMetadataForWorkItem ${workItemId}: ${metadata.thrown ?? metadata.text}`);
       for (const [fieldId, field] of Object.entries(json(metadata.text).data.attributes)) {
         if (field.type?.kind !== "enumeration" || ["type", "status", "severity", "priority", "resolution"].includes(fieldId)) continue;
         const options = await call(client, "getAvailableEnumOptionsForWorkItem", { projectId: PROJECT, workItemId, fieldId });
-        assert.equal(options.isError, false, options.thrown ?? options.text);
+        assert.equal(options.isError, false, `getAvailableEnumOptionsForWorkItem ${workItemId}/${fieldId}: ${options.thrown ?? options.text}`);
         const option = json(options.text).data.find((o) => o.name && o.name.toLowerCase() !== o.id.toLowerCase());
         if (!option) continue;
         const patch = (value, extra = {}) => call(client, "patchWorkItem", { projectId: PROJECT, workItemId, requestBody: { data: { type: "workitems", id: item.id, attributes: { [fieldId]: field.type.multi ? [value] : value } } }, ...extra });
         const refused = await patch(option.name, { dry_run: true });
-        assert.equal(refused.isError, true);
+        assert.equal(refused.isError, true, `label patch ${workItemId}/${fieldId}: ${refused.text}`);
         assert.match(refused.text, /Write refused/);
-        assert.match(refused.text, /label of option/);
+        assert.match(refused.text, /label of option/, `label patch ${workItemId}/${fieldId}`);
         const dry = await patch(option.id, { dry_run: true });
-        assert.equal(dry.isError, false, dry.thrown ?? dry.text);
+        assert.equal(dry.isError, false, `id dry run ${workItemId}/${fieldId}: ${dry.thrown ?? dry.text}`);
         return;
       }
     }

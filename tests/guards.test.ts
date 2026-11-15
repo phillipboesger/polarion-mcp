@@ -556,7 +556,7 @@ test("custom metadata errors fail closed and create and bulk use scoped options"
   const opts = { ...sendOpts, httpClient }
   assert.deepEqual(await checkWorkItemsEnumFields([{ projectId: "P", type: "task", attributes: { asil: "good" } }], requestContext, opts), { ok: true })
   const bad = await checkWorkItemsEnumFields([{ projectId: "P", workItemId: "E-4", attributes: { asil: "good" } }, { projectId: "P", workItemId: "E-5", attributes: { asil: "bad" } }], requestContext, opts)
-  assert.equal(bad.ok, false); if (!bad.ok) assert.match(bad.reason, /good/)
+  assert.equal(bad.ok, false); if (!bad.ok) assert.match(bad.reason, /'asil' value 'bad' is not a valid option for Work Item P\/E-5\. Valid options: good\./)
 })
 
 test("standard enum label suggests its id", async () => {
@@ -564,4 +564,15 @@ test("standard enum label suggests its id", async () => {
   const httpClient = async (): Promise<AxiosResponse> => ({ data: { data: [{ id: "open", name: "Open" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
   const result = await checkWorkItemEnumFields("P", "E-6", { status: "Open" }, requestContext, { ...sendOpts, httpClient })
   assert.equal(result.ok, false); if (!result.ok) assert.match(result.reason, /label of option 'open'/)
+})
+
+test("a label shared by two options gives no id hint", async () => {
+  _optionsCache.clear()
+  const httpClient = async (): Promise<AxiosResponse> => ({ data: { data: [{ id: "open", name: "Open" }, { id: "reopened", name: "open" }] }, status: 200, statusText: "OK", headers: {}, config: {} as any })
+  const result = await checkWorkItemEnumFields("P", "E-7", { status: "Open" }, requestContext, { ...sendOpts, httpClient })
+  assert.equal(result.ok, false)
+  if (!result.ok) {
+    assert.doesNotMatch(result.reason, /label of option/)
+    assert.match(result.reason, /is not a valid option.*Valid options: open, reopened\./)
+  }
 })

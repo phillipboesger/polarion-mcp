@@ -239,7 +239,9 @@ async function checkOneTarget(
     for (const value of values) {
       if (!result.options.has(value)) {
         const optionList = result.options.size > 0 ? [...result.options].join(', ') : '(none returned -- this field may not be a validated enumeration)';
-        const labelId = [...result.names].find(([, name]) => name.trim().toLowerCase() === value.trim().toLowerCase())?.[0];
+        const labelMatches = [...result.names].filter(([, name]) => name.trim().toLowerCase() === value.trim().toLowerCase());
+        // Two options sharing a label would make the hint a guess.
+        const labelId = labelMatches.length === 1 ? labelMatches[0][0] : undefined;
         return { ok: false, reason: labelId !== undefined
           ? `'${field}' value '${value}' is the label of option '${labelId}' for ${scopeLabel}; send the option id '${labelId}'. Valid options: ${optionList}.`
           : `'${field}' value '${value}' is not a valid option for ${scopeLabel}. Valid options: ${optionList}.` };
