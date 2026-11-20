@@ -92,9 +92,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
+    "@anthropic-ai/sdk": "^1.9.0",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.1",
     "@stryker-mutator/core": "^10.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
@@ -102,9 +102,9 @@
     "@types/turndown": "^5.0.6",
     "ajv": "^8.20.0",
     "c8": "^12.0.0",
-    "eslint": "^10.13.0",
+    "eslint": "^10.15.0",
     "globals": "^17.13.0",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.72.0"
+    "typescript-eslint": "^8.73.0"
   }
 }
