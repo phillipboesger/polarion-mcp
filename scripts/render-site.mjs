@@ -115,10 +115,6 @@ ${cards}
 </div>`;
 }
 
-export function renderDailyUse(scenarios) {
-  return `<div class="daily-layout"><div class="day-tabs" role="tablist" aria-label="Daily workflows" aria-orientation="vertical">${scenarios.map((scenario, i) => `<button type="button" role="tab" id="tab-${scenario.id}" aria-controls="day-${scenario.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}"><span>${scenario.time}</span>${escapeHtml(scenario.label)}</button>`).join('')}</div><div class="day-panels">${scenarios.map(scenario => `<article class="day-chat" id="day-${scenario.id}" role="tabpanel" aria-labelledby="tab-${scenario.id}" tabindex="0"><h3>${escapeHtml(scenario.title)}</h3><div class="chat-message user"><span>You</span><p>${escapeHtml(scenario.prompt)}</p></div><div class="tool-trail"><p class="eyebrow">Tools called by your assistant</p><ol>${scenario.calls.map(call => `<li><code>${escapeHtml(call.tool)}</code><p>${escapeHtml(call.detail)}</p></li>`).join('')}</ol></div><div class="chat-message assistant"><span>Assistant · illustrative result</span><p>${escapeHtml(scenario.result)}</p></div><div class="approval"><span aria-hidden="true">⌁</span><p>${escapeHtml(scenario.guard)}</p></div></article>`).join('')}</div></div>`;
-}
-
 // Answers may carry `code` spans; everything else is escaped.
 export const renderFaq = manifest => manifest.faq.map(item => `<details><summary>${escapeHtml(item.q)}</summary><p>${escapeHtml(item.a).replace(/`([^`]+)`/g, '<code>$1</code>')}</p></details>`).join('\n      ');
 
@@ -137,7 +133,6 @@ export function renderSite(rootDir = root) {
   if (html.includes('<!-- faq:start -->')) html = replaceBlock(html, 'faq', renderFaq(manifest));
   // Minimal fixtures used by the docs checker may only contain the clients block.
   if (html.includes('<!-- domains:start -->')) html = replaceBlock(html, 'domains', renderDomains(toolsSource));
-  if (html.includes('<!-- daily:start -->')) html = replaceBlock(html, 'daily', renderDailyUse(JSON.parse(fs.readFileSync(path.join(rootDir, 'docs/daily-use.json'), 'utf8'))));
   html = html.replaceAll('{{TOOL_COUNT}}', countDomains(toolsSource).total);
   // The page makes no third-party requests (CSP connect-src 'none'), so the star count is rendered at build time.
   if (Number.isInteger(manifest.githubStars)) html = html.replace(/<strong id="gh-stars">[^<]*<\/strong>/, `<strong id="gh-stars">${manifest.githubStars} ${manifest.githubStars === 1 ? 'star' : 'stars'}</strong>`);
@@ -165,6 +160,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const current = fs.readFileSync(htmlPath, 'utf8');
     if (process.argv.includes('--check') && current !== expected) throw new Error('website blocks are stale; run npm run docs:site');
     if (!process.argv.includes('--check') && current !== expected) fs.writeFileSync(htmlPath, expected);
-    console.log('Website paths, domains and daily examples are up to date');
+    console.log('Website paths and domains are up to date');
   } catch (error) { console.error(`render-site: ${error.message}`); process.exitCode = 1; }
 }

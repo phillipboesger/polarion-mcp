@@ -107,31 +107,6 @@ footer div { display:flex; gap:20px; }
 .carousel-dots { display:flex; gap:8px; }
 .carousel-dot { width:9px; height:9px; padding:0; border:1px solid var(--accent); border-radius:50%; background:transparent; }
 .carousel-dot[aria-current="true"] { background:var(--accent); }
-.daily-section { border-top:1px solid var(--line); }
-.daily-layout { display:grid; grid-template-columns:240px minmax(0,1fr); gap:36px; align-items:start; }
-.day-tabs { display:flex; flex-direction:column; gap:8px; }
-.day-tabs button { display:flex; flex-direction:column; text-align:left; gap:7px; color:var(--sub); border:1px solid transparent; border-radius:8px; padding:17px 18px; cursor:pointer; background:transparent; font-size:14px; }
-.day-tabs button span { color:var(--accent); font:10px var(--mono); }
-.day-tabs button:hover { border-color:var(--line); color:white; }
-.day-tabs button[aria-selected=true] { color:white; border-color:rgba(98,214,255,.5); background:#0c2c4c; }
-.day-panels { display:grid; min-width:0; }
-.day-chat { grid-area:1/1; min-width:0; padding:24px 26px; border:1px solid var(--line); border-radius:14px; background:#0c2c4c; }
-/* Reserve the tallest conversation's space so changing tabs never moves setup. */
-.day-chat[hidden] { display:block!important; visibility:hidden; pointer-events:none; }
-.day-chat h3 { font-size:21px; margin-bottom:16px; }
-.chat-message { padding:12px 16px; border-radius:10px; font-size:13px; }
-.chat-message>span { display:block; margin-bottom:4px; font:10px var(--mono); letter-spacing:.05em; color:var(--accent); }
-.chat-message.user { background:#1c4a70; margin-left:24px; border:1px solid rgba(98,214,255,.22); }
-.chat-message.assistant { background:#153b5e; border-left:2px solid var(--accent); }
-.chat-message p { line-height:1.55; }
-.tool-trail { margin:16px 0; padding-left:16px; border-left:1px dashed rgba(98,214,255,.4); }
-.tool-trail .eyebrow { color:#a8c2d8; font-size:9px; }
-.tool-trail ol { list-style:none; margin-top:10px; display:grid; gap:8px; }
-.tool-trail code { color:var(--accent); font-size:12px; overflow-wrap:anywhere; }
-.tool-trail li p { color:var(--sub); font-size:12px; margin-top:2px; }
-.approval { display:flex; gap:10px; padding:12px 0 0; color:#f8d8a5; font-size:12px; }
-.approval>span { font:25px/1 var(--mono); color:var(--warm); }
-.daily-note { color:var(--sub); font-size:12px; text-align:right; margin-top:18px; }
 .setup-section { border-top:1px solid var(--line); padding-top:80px; }
 .faq-section { border-top:1px solid var(--line); }
 .community-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr); gap:72px; }
@@ -156,7 +131,6 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .domain-card { flex-basis:calc((100% - 16px) / 2); }
   .flow { padding:20px 12px; grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr) 28px minmax(0,1fr); }
   .flow-node h3 { font-size:20px; }
-  .daily-layout { grid-template-columns:190px minmax(0,1fr); gap:20px; }
   .community-layout { gap:32px; }
 }
 @media(max-width:700px) {
@@ -171,19 +145,6 @@ footer div { flex-wrap:wrap; gap:12px 20px; justify-content:end; }
   .coverage { margin-top:44px; text-align:left; }
   .domain-card { flex-basis:82%; padding:18px; }
   .domain-icon svg { width:23px; height:23px; }
-  .daily-layout { grid-template-columns:minmax(0,1fr); }
-  .day-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
-  .day-tabs button { padding:12px; gap:4px; font-size:12px; border-color:var(--line); }
-  .day-tabs button:last-child { grid-column:1/-1; flex-direction:row; align-items:center; gap:12px; }
-  .day-chat { padding:20px 16px; }
-  .day-chat h3 { font-size:23px; margin-bottom:20px; }
-  .chat-message { padding:14px; font-size:13px; }
-  .chat-message.user { margin-left:14px; }
-  .tool-trail { padding-left:14px; }
-  .tool-trail code { font-size:11px; }
-  .tool-trail li p { font-size:11px; }
-  .approval { font-size:11px; }
-  .daily-note { text-align:left; font-size:11px; }
   .path-entries { grid-template-columns:minmax(0,1fr); gap:18px; }
   .path-entries p { font-size:12px; }
   .community-layout { grid-template-columns:minmax(0,1fr); gap:32px; }
