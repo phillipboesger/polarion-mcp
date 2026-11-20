@@ -12,7 +12,7 @@ An open-source [Model Context Protocol](https://modelcontextprotocol.io) server 
 [![Docker image](https://img.shields.io/badge/ghcr.io-polarion--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/phillipboesger/polarion-mcp/pkgs/container/polarion-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[**Connect your assistant**](https://polarion-mcp.boesger.com/#clients) · [Daily workflows](https://polarion-mcp.boesger.com/#daily-use) · [Tool catalog](src/tools.ts)
+[**Connect your assistant**](https://polarion-mcp.boesger.com/#clients) · [Tool catalog](src/tools.ts)
 
 <img src="docs/assets/site-hero.png" alt="Polarion MCP works with Claude, ChatGPT, Gemini, VS Code, Copilot, Cursor and Codex." width="900" />
 
@@ -25,7 +25,6 @@ An open-source [Model Context Protocol](https://modelcontextprotocol.io) server 
 On this page:
 
 - [What the connector does for you](#what-the-connector-does-for-you)
-- [A day with Polarion MCP](#a-day-with-polarion-mcp)
 - [Get connected](#get-connected)
 - [FAQ](#faq)
 - [Feedback and community](#feedback-and-community)
@@ -54,22 +53,6 @@ On this page:
 | Projects, people and configuration | Discover accessible projects, users, allowed field values and metadata. |
 
 The [landing page](https://polarion-mcp.boesger.com/#features) shows counts by domain, computed from `src/tools.ts`. The **284 tools** count covers generated REST operations; configured toolsets and additional helpers change the exposed catalog. Selected Work Item writes validate enumeration values, custom-field keys and user references. [Features and limits](docs/features.md) describe the scope.
-
-## A day with Polarion MCP
-
-![Five example conversations: release triage, document review, test preparation, release status and traceability gaps](docs/assets/site-daily.png)
-
-These are illustrative conversations using real tools, not recorded outputs. Project types, link roles and permissions vary.
-
-| Ask your assistant | Tools and result | Your control |
-|---|---|---|
-| “Which open defects could block this release?” | `getWorkItems`, `getWorkItem`: a scoped list of severity, owners and missing information. | Read-only triage; approve any later reassignment. |
-| “Review this LiveDoc and propose clearer acceptance criteria for REQ-17.” | `getDocument`, `getDocumentParts`, `getWorkItem`, `patchWorkItem`: a rewrite of the requirement’s description. | Preview with `dry_run: true`; approve before saving. |
-| “Draft tests from these requirements, then record the results I provide.” | `getWorkItems`, `postWorkItems`, `postTestRuns`, `postTestRecords`: proposed cases and a run, then supplied outcomes. | Check existing tests, preview each write and approve. The connector does not execute product tests. |
-| “Summarize this release plan and its latest test runs.” | `getPlan`, `getWorkItems`, `getTestRuns`: a draft status update with source IDs and missing data. | You decide release readiness. |
-| “Find requirements without a verifies link to a test case.” | `getWorkItems`, `getLinkedWorkItems`: a scoped gap list and existing candidate tests. | Confirm link roles and scope before creating anything. |
-
-[Explore the chat-style walkthroughs](https://polarion-mcp.boesger.com/#daily-use).
 
 ## Get connected
 

@@ -123,20 +123,6 @@ test('domain counts cover every generated tool once and match runtime toolset cl
   assert.throws(() => countDomains('["unknown", {\npathTemplate: "/unknown"'), /Unclassified/);
 });
 
-test('daily scenarios cite actual tools and preview only mutating operations', () => {
-  const scenarios = JSON.parse(fs.readFileSync('docs/daily-use.json', 'utf8'));
-  assert.equal(scenarios.length, 5);
-  for (const scenario of scenarios) {
-    assert.ok(scenario.prompt && scenario.result && scenario.guard);
-    for (const call of scenario.calls) {
-      const definition = toolDefinitionMap.get(call.tool);
-      assert.ok(definition, `unknown scenario tool ${call.tool}`);
-      if (call.detail.includes('dry_run')) assert.ok(definition.inputSchema.properties.dry_run, call.tool);
-    }
-  }
-  assert.equal(fs.readFileSync('docs/index.html', 'utf8'), renderSite());
-});
-
 test('schema rejects unsafe source URLs and the site escapes manifest content', () => {
   const validate = new Ajv2020({ allErrors: true }).compile(schema);
   for (const source of ['javascript:alert(1)', 'http://example.com', 'data:text/html,test', 'not a URL']) {

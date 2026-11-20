@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const manifest = JSON.parse(fs.readFileSync('docs/clients.json', 'utf8'));
-const scenarios = JSON.parse(fs.readFileSync('docs/daily-use.json', 'utf8'));
 const screenshotDir = process.env.DOCS_SCREENSHOT_DIR || '/tmp/sol-docs3';
 
 async function noOverflow(page) {
@@ -25,12 +24,12 @@ test('hero breathes and the landing page follows the complete user journey', asy
   await expect(page.locator('.hero .outcomes')).toHaveCount(0);
   await expect(page.locator('.hero .button')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText(/unverified|Web connector/i);
-  expect(await page.locator('main > section').evaluateAll(sections => sections.map(section => section.id || section.className))).toEqual(['hero', 'demo', 'features', 'daily-use', 'clients', 'faq']);
+  expect(await page.locator('main > section').evaluateAll(sections => sections.map(section => section.id || section.className))).toEqual(['hero', 'demo', 'features', 'clients', 'faq']);
   await expect(page.locator('#demo video')).toHaveAttribute('poster', /demo-poster\.jpg/);
   expect(await page.locator('#demo video').evaluate(video => ({ muted: video.muted, playsInline: video.playsInline }))).toEqual({ muted: true, playsInline: true });
   await noOverflow(page);
   await screenshot(page, `after-${info.project.name}.png`);
-  for (const section of ['demo', 'features', 'daily-use', 'clients', 'faq']) {
+  for (const section of ['demo', 'features', 'clients', 'faq']) {
     await page.locator(`#${section}`).scrollIntoViewIfNeeded();
     await noOverflow(page);
     await screenshot(page, `after-${info.project.name}-${section}.png`);
@@ -240,28 +239,6 @@ test('the hero has one CTA to the chooser and shows the star count; old #setup l
   await expect(page.locator('#gh-stars')).toHaveText(/^\d+ stars?$/);
   await page.goto('/#setup/claude-code');
   await expect(page).toHaveURL(/#clients$/);
-});
-
-test('daily conversations support keyboard tabs without shifting the next section', async ({ page }, info) => {
-  await page.goto('/');
-  const setupTop = () => page.locator('#clients').evaluate(element => element.getBoundingClientRect().top + globalThis.scrollY);
-  const before = await setupTop();
-  for (const scenario of scenarios) {
-    await page.locator(`#tab-${scenario.id}`).click();
-    await expect(page.locator(`#tab-${scenario.id}`)).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('tabpanel')).toHaveCount(1);
-    await expect(page.getByRole('tabpanel')).toContainText(scenario.prompt);
-    await expect(page.getByRole('tabpanel').locator('.approval')).toContainText(scenario.guard);
-    expect(await setupTop()).toBe(before);
-    await noOverflow(page);
-  }
-  await page.locator('#tab-trace').press('Home');
-  await expect(page.locator('#tab-triage')).toBeFocused();
-  await page.locator('#tab-triage').press('ArrowDown');
-  await expect(page.locator('#tab-review')).toHaveAttribute('aria-selected', 'true');
-  await screenshot(page, `after-${info.project.name}-daily-review.png`);
-  await page.locator('#tab-review').press('End');
-  await expect(page.locator('#tab-trace')).toBeFocused();
 });
 
 test('FAQ is usable inline and community links match enabled repository features', async ({ page }, info) => {

@@ -1,4 +1,4 @@
-/* Integration map: provider -> client -> Local/Server details. Without JavaScript the plain guide list stays visible; also the daily-use tabs. */
+/* Integration map: provider -> client -> Local/Server details. Without JavaScript the plain guide list stays visible. */
 (() => {
   const root = document.getElementById('galaxy');
   const dataEl = document.getElementById('galaxy-data');
@@ -257,26 +257,4 @@
   const legacyHash = () => { if (location.hash.startsWith('#setup')) location.replace('#clients'); };
   window.addEventListener('hashchange', legacyHash);
   legacyHash();
-
-  const tabs = [...document.querySelectorAll('.day-tabs [role="tab"]')];
-  function showDay(tab) {
-    tabs.forEach(item => {
-      const active = item === tab;
-      item.setAttribute('aria-selected', String(active));
-      item.tabIndex = active ? 0 : -1;
-      document.getElementById(item.getAttribute('aria-controls')).hidden = !active;
-    });
-  }
-  tabs.forEach((tab, index) => {
-    tab.addEventListener('click', () => showDay(tab));
-    tab.addEventListener('keydown', event => {
-      let next;
-      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (index + 1) % tabs.length;
-      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
-      if (event.key === 'Home') next = 0;
-      if (event.key === 'End') next = tabs.length - 1;
-      if (next !== undefined) { event.preventDefault(); showDay(tabs[next]); tabs[next].focus(); }
-    });
-  });
-  if (tabs.length) showDay(tabs[0]);
 })();
