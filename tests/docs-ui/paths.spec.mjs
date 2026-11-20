@@ -25,10 +25,12 @@ test('hero breathes and the landing page follows the complete user journey', asy
   await expect(page.locator('.hero .outcomes')).toHaveCount(0);
   await expect(page.locator('.hero .button')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText(/unverified|Web connector/i);
-  expect(await page.locator('main > section').evaluateAll(sections => sections.map(section => section.id || section.className))).toEqual(['hero', 'features', 'daily-use', 'clients', 'faq']);
+  expect(await page.locator('main > section').evaluateAll(sections => sections.map(section => section.id || section.className))).toEqual(['hero', 'demo', 'features', 'daily-use', 'clients', 'faq']);
+  await expect(page.locator('#demo video')).toHaveAttribute('poster', /demo-poster\.jpg/);
+  expect(await page.locator('#demo video').evaluate(video => ({ muted: video.muted, playsInline: video.playsInline }))).toEqual({ muted: true, playsInline: true });
   await noOverflow(page);
   await screenshot(page, `after-${info.project.name}.png`);
-  for (const section of ['features', 'daily-use', 'clients', 'faq']) {
+  for (const section of ['demo', 'features', 'daily-use', 'clients', 'faq']) {
     await page.locator(`#${section}`).scrollIntoViewIfNeeded();
     await noOverflow(page);
     await screenshot(page, `after-${info.project.name}-${section}.png`);

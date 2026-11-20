@@ -16,6 +16,10 @@ An open-source [Model Context Protocol](https://modelcontextprotocol.io) server 
 
 <img src="docs/assets/site-hero.png" alt="Polarion MCP works with Claude, ChatGPT, Gemini, VS Code, Copilot, Cursor and Codex." width="900" />
 
+<a href="https://polarion-mcp.boesger.com/#demo"><img src="https://raw.githubusercontent.com/phillipboesger/polarion-mcp/main/docs/assets/demo-loop.gif" alt="Claude links new test cases to Polarion requirements, then reads them back to verify." width="900" /></a>
+
+<sub>Real claude.ai session, sped up. <a href="https://polarion-mcp.boesger.com/#demo">Watch the 60-second demo</a></sub>
+
 </div>
 
 On this page:

@@ -43,6 +43,7 @@ h1 span { color:var(--accent); }
 .proof a:hover { text-decoration:underline; }
 .section { max-width:1264px; margin:auto; padding:80px 32px; }
 .section-heading { margin-bottom:32px; }
+.demo-video { display:block; width:100%; height:auto; aspect-ratio:16/9; border-radius:14px; border:1px solid var(--line); background:#08233d; box-shadow:0 24px 60px rgba(0,0,0,.35); }
 h2 { font-weight:550; font-size:clamp(31px,3.5vw,46px); letter-spacing:-.045em; line-height:1.14; margin-top:10px; }
 .section-heading>p { color:var(--sub); margin-top:16px; font-size:14px; }
 .setup-section { padding-top:60px; }
