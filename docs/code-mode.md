@@ -16,6 +16,15 @@ The model searches first, then writes one script for the whole task: loop, filte
 | `discover` | `search_tools`, `describe_tool`, `call_tool` | Large catalogs, one call at a time |
 | `code` | `search`, `execute` | Large catalogs, multi-step and bulk work |
 
+## Client compatibility
+
+Code Mode uses two ordinary MCP tools, so any client with MCP tool support can call them. It was exercised end to end with Claude (this project's development sessions) and with OpenAI Codex CLI (a GPT model) against a Polarion 2612 server: the model called `search`, then wrote one `execute` script, and the read results matched the REST API.
+
+Two things to know:
+
+- `execute` is annotated as able to write, so clients that ask for approval per tool call will ask before running it. A client that cannot ask (for example `codex exec` with approval policy `never`) refuses the call, even with `dry_run: true`. For read-only use, set `MCP_CODE_MODE_WRITES=false` (or `MCP_READ_ONLY=true`): `execute` is then annotated read-only and runs without a prompt. For writes, approve the tool in the client's settings.
+- Models differ in how well they write the script. Check your model on a real task before relying on it for bulk changes; `MCP_MODE=full` or `discover` remain available.
+
 ## Token cost
 
 Measured with `node scripts/bench-tokens.mjs` (after `npm run build`) against a local Polarion stub that returns 100 work items per query. Tokens are estimated as characters / 4 for the tool list plus every call and result the model sees.
