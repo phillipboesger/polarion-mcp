@@ -47,7 +47,7 @@ export async function runCoverage({ args = process.argv.slice(2), env = process.
   const specs = new Map()
   const committed = `${cwd}/openapi.json`
   if (existsSync(committed)) specs.set('committed', await readSpec(committed))
-  for (const version of ['2506', '2606']) {
+  for (const version of ['2506', '2606', '2612']) {
     const flagIndex = args.indexOf(`--spec-${version}`)
     const file = env[`SPEC_${version}`] ?? (flagIndex >= 0 ? args[flagIndex + 1] : undefined)
     if (file) specs.set(version, await readSpec(file))

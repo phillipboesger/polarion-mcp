@@ -37,7 +37,7 @@ test("the full tool catalog keeps its baseline names and input schema shape", ()
   const baseline = JSON.parse(readFileSync("tests/fixtures/tool-surface-baseline.json", "utf8")) as Record<string, unknown>
   const tools = [...toolDefinitionMap.values(), ...COMPOSITE_TOOLS]
   const current = Object.fromEntries(tools.map(tool => [tool.name, schemaShape(tool.inputSchema as Record<string, unknown>)]).sort(([a], [b]) => String(a).localeCompare(String(b))))
-  assert.equal(tools.length, 293)
+  assert.equal(tools.length, 313)
   assert.deepEqual(current, baseline)
 })
 
@@ -60,7 +60,7 @@ test("tool descriptions and serialized list stay within size budgets", () => {
   const tools = [...toolDefinitionMap.values(), ...COMPOSITE_TOOLS]
   for (const tool of tools) assert.ok(tool.description.length <= 1200, `${tool.name}: ${tool.description.length} characters`)
   const bytes = Buffer.byteLength(JSON.stringify(tools))
-  assert.ok(bytes <= 1_200_000, `tools/list payload is ${bytes} bytes`)
+  assert.ok(bytes <= 1_300_000, `tools/list payload is ${bytes} bytes`)
 })
 
 test("no tool description leads with a generic generated summary", () => {

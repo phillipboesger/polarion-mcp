@@ -2,7 +2,7 @@
 
 ## How versioning works
 
-The tool surface in `src/tools.ts` is generated from a Polarion OpenAPI definition. The committed file currently contains 284 tool definitions. That count describes the generated operations, not a guarantee that every operation works identically on every Polarion release or instance. Runtime behavior also depends on Polarion configuration and permissions.
+The tool surface in `src/tools.ts` is generated from a Polarion OpenAPI definition. The committed file currently contains 304 tool definitions. That count describes the generated operations, not a guarantee that every operation works identically on every Polarion release or instance. Runtime behavior also depends on Polarion configuration and permissions.
 
 The default regeneration source is the public Polarion demo definition. To target another published definition, set `SPEC_URL`; an authenticated instance may also require `BEARER_TOKEN`. See [OpenAPI and generation](./openapi-and-generation.md).
 
@@ -14,21 +14,23 @@ Regeneration updates the generated `src/tools.ts`; handwritten runtime modules a
 
 ## Supported Polarion releases
 
-The full tool surface targets the newest release (2606). The newest three releases are guaranteed usable: 2606, 2512 and 2506. When a newer release ships, the oldest of those becomes best-effort and stays in the live matrix until it breaks. The live suite runs against the releases in [polarion-versions.json](./polarion-versions.json) (see [live tests](./live-tests.md)). The 2512 cells were confirmed by the live run of PR #111.
+The full tool surface targets the newest release (2612). The newest three releases are guaranteed usable: 2612, 2606 and 2512. 2506 is best-effort now. When a newer release ships, the oldest of those becomes best-effort and stays in the live matrix until it breaks. The live suite runs against the releases in [polarion-versions.json](./polarion-versions.json) (see [live tests](./live-tests.md)). The 2512 cells were confirmed by the live run of PR #111.
 
-| Area | 2606 | 2512 | 2506 |
-|---|---|---|---|
-| Local (stdio) setup | Yes | Yes | Yes |
-| HTTP/OAuth login check | `GET /metadata` | `GET /metadata` | Fallback `GET /projects` |
-| Global REST GET permission required for login | No | No | Yes |
-| `getCurrentUser` (`GET /user`) | Yes | Yes | No (404, use the other tools) |
-| Job execution (`/jobs`) | Yes | Yes | No (only `GET /jobs/{id}` and file download) |
-| Custom field writes (key and enum value check) | Yes | Yes (type-scoped field metadata) | No (refused: no field metadata endpoint) |
+| Area | 2612 | 2606 | 2512 | 2506 |
+|---|---|---|---|---|
+| Local (stdio) setup | Yes | Yes | Yes | Yes |
+| HTTP/OAuth login check | `GET /metadata` | `GET /metadata` | `GET /metadata` | Fallback `GET /projects` |
+| Global REST GET permission required for login | No | No | No | Yes |
+| `getCurrentUser` (`GET /user`) | Yes | Yes | Yes | No (404, use the other tools) |
+| Job execution (`/jobs`) | Yes | Yes | Yes | No (only `GET /jobs/{id}` and file download) |
+| Custom field writes (key and enum value check) | Yes | Yes | Yes (type-scoped field metadata) | No (refused: no field metadata endpoint) |
+| Spaces, license types, user field metadata (new in 2612) | Yes | No (404) | No (404) | No (404) |
 
 Deviations on older releases are listed below. When an older release lacks an endpoint that a write safety check needs, the server refuses the affected writes instead of skipping the check; upgrading Polarion lifts the limit.
 
 - **2506 login:** there is no `/metadata`, so the server reads `GET /projects?page[size]=1`. The Polarion user must be allowed global REST GET. If not, the log shows `GET /projects failed: permission_denied` and the diagnostic points at this requirement or an upgrade to 2512+.
 - **Field metadata:** the guards read a Work Item's field metadata per item on 2606. 2512 has no per-item endpoint, so they read the item's type and use the type-scoped lookup. 2506 has neither, so writes that set a custom field are refused there and the message asks for Polarion 2512 or newer; standard fields still work.
+- **2612:** adds the Spaces endpoints (`getProjectSpaces`, `getRepositorySpaces`, and create, patch, delete), license types and slot relationships, per-user field metadata and `patchDocumentParts`; the generated tools for them answer 404 on older releases. Three behaviors seen on 2612 (Early Access) in live runs: `getDocumentParts` answers 500 for a LiveDoc with `homePageContent`, so use `read_document_markdown` there; a timestamp such as `2026-11-21T10:00:00Z` inside a Lucene `query` answers 500, so query by date only; `DELETE` of a document answers 405. These come from Polarion, not from the server.
 - **401 and 403 from `/metadata` never fall back.** A revoked token or a denied user stays rejected.
 - **Verify steps in the client guides:** `getCurrentUser` answers 404 on 2506. Ask for `getProjects` instead; the login itself still worked.
 

@@ -2,7 +2,7 @@
 
 ## Core capabilities
 
-- 284 generated Polarion REST tools from the committed OpenAPI-derived map.
+- 304 generated Polarion REST tools from the committed OpenAPI-derived map.
 - MCP over stdio and Streamable HTTP, plus an optional REST HTTP wrapper.
 - Runtime input validation, OpenAPI authentication schemes, and output schemas where the operation defines a JSON response.
 - Tool filtering by name and read-only status; HTTP MCP also supports named toolsets.

@@ -12,7 +12,7 @@ test("every generated tool belongs to exactly one domain toolset", () => {
     assert.ok(TOOLSET_NAMES.includes(sets[0] as typeof TOOLSET_NAMES[number]), `${def.name} has unknown toolset ${sets[0]}`)
     assignments.set(def.name, sets)
   }
-  assert.equal(assignments.size, 284)
+  assert.equal(assignments.size, 304)
   assert.equal(new Set([...assignments.keys()]).size, toolDefinitionMap.size)
 })
 
@@ -55,5 +55,5 @@ test("stdio server default exposes all deployment-enabled tools when MCP_TOOLSET
     encoding: "utf8",
   })
   assert.equal(result.status, 0, result.stderr)
-  assert.equal(Number(result.stdout.trim()), 293)
+  assert.equal(Number(result.stdout.trim()), 313)
 })
