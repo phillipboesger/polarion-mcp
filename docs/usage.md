@@ -23,7 +23,7 @@ Start with `npm run start:mcp-http`. The MCP endpoint is `/mcp`; `/health` is un
 
 The HTTP MCP transport supports toolsets. `MCP_TOOLSETS` limits the deployment's available domains; clients may further narrow a request with the supported toolset selectors. `MCP_READ_ONLY` restricts the available tools to read-only operations.
 
-Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` over the tools left enabled by deployment and request filters. The default `full` mode preserves the normal catalog. Set `MCP_COMPLETIONS=true` to advertise metadata-backed prompt argument completions.
+Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` over the tools left enabled by deployment and request filters. The default `auto` mode selects Code Mode for the full catalog and the normal tool list once `MCP_TOOLSETS` or `MCP_TOOLS` narrow it to a hundred tools or fewer; set `MCP_MODE=full` to always list every tool. Set `MCP_MODE=code` for two tools, `search` and `execute`, where the agent writes a short script against typed operations; see [Code Mode](code-mode.md). Set `MCP_COMPLETIONS=true` to advertise metadata-backed prompt argument completions.
 
 ## REST HTTP mode
 
@@ -31,7 +31,7 @@ Start with `npm run start:http`. Set `HTTP_API_KEY`; requests use that key to ac
 
 ## Tool calls and results
 
-The generated map in `src/tools.ts` contains 284 tools. Use `GET /api/tools` or MCP `tools/list` to discover the enabled set. For field metadata, use `getProjectFieldsMetadata` or a resource-specific `getFieldsMetadataFor…` tool. For enumeration options, use the corresponding `getAvailableEnumOptionsFor…` tool, such as `getAvailableEnumOptionsForWorkItemType`.
+The generated map in `src/tools.ts` contains 304 tools. Use `GET /api/tools` or MCP `tools/list` to discover the enabled set. For field metadata, use `getProjectFieldsMetadata` or a resource-specific `getFieldsMetadataFor…` tool. For enumeration options, use the corresponding `getAvailableEnumOptionsFor…` tool, such as `getAvailableEnumOptionsForWorkItemType`.
 
 ### Choosing a resource scope
 

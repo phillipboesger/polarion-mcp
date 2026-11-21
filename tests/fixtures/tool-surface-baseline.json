@@ -809,6 +809,70 @@
       }
     }
   },
+  "deleteLicenseSlotsRelationship": {
+    "type": "object",
+    "required": [
+      "group",
+      "model",
+      "relationshipId",
+      "requestBody",
+      "typeId"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "group": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "model": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "relationshipId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "array",
+            "required": [],
+            "properties": {},
+            "items": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                },
+                "type": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                }
+              }
+            }
+          }
+        }
+      },
+      "typeId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
   "deleteLinkedWorkItem": {
     "type": "object",
     "required": [
@@ -1297,6 +1361,76 @@
       }
     }
   },
+  "deleteProjectSpace": {
+    "type": "object",
+    "required": [
+      "projectId",
+      "spaceId"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "spaceId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "deleteProjectSpaces": {
+    "type": "object",
+    "required": [
+      "projectId",
+      "requestBody"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "array",
+            "required": [],
+            "properties": {},
+            "items": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                },
+                "type": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   "deleteProjectTestParameterDefinition": {
     "type": "object",
     "required": [
@@ -1335,6 +1469,64 @@
       },
       "projectId": {
         "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "array",
+            "required": [],
+            "properties": {},
+            "items": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                },
+                "type": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "deleteRepositorySpace": {
+    "type": "object",
+    "required": [
+      "spaceId"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "spaceId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "deleteRepositorySpaces": {
+    "type": "object",
+    "required": [
+      "requestBody"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
         "required": [],
         "properties": {}
       },
@@ -2544,6 +2736,42 @@
         "properties": {}
       },
       "sort": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "getAllSpaces": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "fields": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "include": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "max_items": {
+        "type": "integer",
+        "required": [],
+        "properties": {}
+      },
+      "page[number]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "page[size]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "response_format": {
         "type": "string",
         "required": [],
         "properties": {}
@@ -4182,6 +4410,24 @@
       }
     }
   },
+  "getFieldsMetadataForUser": {
+    "type": "object",
+    "required": [
+      "userId"
+    ],
+    "properties": {
+      "response_format": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "userId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
   "getFieldsMetadataForWorkItem": {
     "type": "object",
     "required": [
@@ -4717,6 +4963,93 @@
         "properties": {}
       },
       "typeId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "getLicenseSlotsRelationship": {
+    "type": "object",
+    "required": [
+      "group",
+      "model",
+      "relationshipId",
+      "typeId"
+    ],
+    "properties": {
+      "fields": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "group": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "include": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "model": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "page[number]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "page[size]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "relationshipId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "response_format": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "revision": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "typeId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "getLicenseTypes": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "fields": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "page[number]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "page[size]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "response_format": {
         "type": "string",
         "required": [],
         "properties": {}
@@ -5823,6 +6156,83 @@
       }
     }
   },
+  "getProjectSpace": {
+    "type": "object",
+    "required": [
+      "projectId",
+      "spaceId"
+    ],
+    "properties": {
+      "fields": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "include": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "response_format": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "spaceId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "getProjectSpaces": {
+    "type": "object",
+    "required": [
+      "projectId"
+    ],
+    "properties": {
+      "fields": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "include": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "max_items": {
+        "type": "integer",
+        "required": [],
+        "properties": {}
+      },
+      "page[number]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "page[size]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "response_format": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
   "getProjectTemplates": {
     "type": "object",
     "required": [],
@@ -5936,6 +6346,34 @@
       }
     }
   },
+  "getRepositorySpace": {
+    "type": "object",
+    "required": [
+      "spaceId"
+    ],
+    "properties": {
+      "fields": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "include": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "response_format": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "spaceId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
   "getRepositorySpacePages": {
     "type": "object",
     "required": [
@@ -5988,6 +6426,42 @@
         "properties": {}
       },
       "spaceId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "getRepositorySpaces": {
+    "type": "object",
+    "required": [],
+    "properties": {
+      "fields": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "include": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "max_items": {
+        "type": "integer",
+        "required": [],
+        "properties": {}
+      },
+      "page[number]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "page[size]": {
+        "type": "number",
+        "required": [],
+        "properties": {}
+      },
+      "response_format": {
         "type": "string",
         "required": [],
         "properties": {}
@@ -9787,6 +10261,11 @@
                     "required": [],
                     "properties": {}
                   },
+                  "teamcenterMappingData": {
+                    "type": "string",
+                    "required": [],
+                    "properties": {}
+                  },
                   "title": {
                     "type": "string",
                     "required": [],
@@ -9929,6 +10408,182 @@
                 "type": "string",
                 "required": [],
                 "properties": {}
+              }
+            }
+          }
+        }
+      },
+      "spaceId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "patchDocumentParts": {
+    "type": "object",
+    "required": [
+      "documentName",
+      "projectId",
+      "requestBody",
+      "spaceId"
+    ],
+    "properties": {
+      "documentName": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "array",
+            "required": [],
+            "properties": {},
+            "items": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "attributes": {
+                  "type": "object",
+                  "required": [],
+                  "properties": {
+                    "content": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "headingText": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "landscape": {
+                      "type": "boolean",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "layout": {
+                      "type": "number",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "level": {
+                      "type": "number",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "sequence": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "wikiText": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    }
+                  }
+                },
+                "id": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                },
+                "relationships": {
+                  "type": "object",
+                  "required": [],
+                  "properties": {
+                    "nextPart": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            },
+                            "type": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "previousPart": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            },
+                            "type": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "workItem": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            },
+                            "revision": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            },
+                            "type": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "type": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                }
               }
             }
           }
@@ -10536,6 +11191,48 @@
             }
           }
         }
+      }
+    }
+  },
+  "patchLicenseSlotsRelationship": {
+    "type": "object",
+    "required": [
+      "group",
+      "model",
+      "relationshipId",
+      "requestBody",
+      "typeId"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "group": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "model": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "relationshipId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "typeId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
       }
     }
   },
@@ -11383,6 +12080,116 @@
         }
       },
       "targetType": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "patchProjectSpace": {
+    "type": "object",
+    "required": [
+      "projectId",
+      "requestBody",
+      "spaceId"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [],
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "required": [],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "required": [],
+                    "properties": {}
+                  }
+                }
+              },
+              "id": {
+                "type": "string",
+                "required": [],
+                "properties": {}
+              },
+              "type": {
+                "type": "string",
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        }
+      },
+      "spaceId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "patchRepositorySpace": {
+    "type": "object",
+    "required": [
+      "requestBody",
+      "spaceId"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [],
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "required": [],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "required": [],
+                    "properties": {}
+                  }
+                }
+              },
+              "id": {
+                "type": "string",
+                "required": [],
+                "properties": {}
+              },
+              "type": {
+                "type": "string",
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        }
+      },
+      "spaceId": {
         "type": "string",
         "required": [],
         "properties": {}
@@ -14739,6 +15546,11 @@
                       "required": [],
                       "properties": {}
                     },
+                    "teamcenterMappingData": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    },
                     "title": {
                       "type": "string",
                       "required": [],
@@ -15215,6 +16027,48 @@
             }
           }
         }
+      },
+      "typeId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "postLicenseSlotsRelationship": {
+    "type": "object",
+    "required": [
+      "group",
+      "model",
+      "relationshipId",
+      "requestBody",
+      "typeId"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "group": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "model": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "relationshipId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {}
       },
       "typeId": {
         "type": "string",
@@ -16364,6 +17218,91 @@
       }
     }
   },
+  "postProjectSpaces": {
+    "type": "object",
+    "required": [
+      "projectId",
+      "requestBody"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "array",
+            "required": [],
+            "properties": {},
+            "items": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "attributes": {
+                  "type": "object",
+                  "required": [],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "title": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    }
+                  }
+                },
+                "relationships": {
+                  "type": "object",
+                  "required": [],
+                  "properties": {
+                    "parentSpace": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            },
+                            "type": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "type": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   "postProjectTestParameterDefinitions": {
     "type": "object",
     "required": [
@@ -16401,6 +17340,85 @@
                       "type": "string",
                       "required": [],
                       "properties": {}
+                    }
+                  }
+                },
+                "type": {
+                  "type": "string",
+                  "required": [],
+                  "properties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "postRepositorySpaces": {
+    "type": "object",
+    "required": [
+      "requestBody"
+    ],
+    "properties": {
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "requestBody": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "data": {
+            "type": "array",
+            "required": [],
+            "properties": {},
+            "items": {
+              "type": "object",
+              "required": [],
+              "properties": {
+                "attributes": {
+                  "type": "object",
+                  "required": [],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    },
+                    "title": {
+                      "type": "string",
+                      "required": [],
+                      "properties": {}
+                    }
+                  }
+                },
+                "relationships": {
+                  "type": "object",
+                  "required": [],
+                  "properties": {
+                    "parentSpace": {
+                      "type": "object",
+                      "required": [],
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            },
+                            "type": {
+                              "type": "string",
+                              "required": [],
+                              "properties": {}
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 },

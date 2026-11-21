@@ -11,9 +11,19 @@ The model searches first, then writes one script for the whole task: loop, filte
 
 | Mode | Tool list | Best for |
 |---|---|---|
-| `full` (default) | Every enabled tool | Small catalogs (see `MCP_TOOLSETS`), clients that need every tool visible |
+| `auto` (default) | `code` above a hundred enabled tools, otherwise `full` | Works for most deployments without configuration |
+| `full` | Every enabled tool | Small catalogs (see `MCP_TOOLSETS`), clients that need every tool visible |
 | `discover` | `search_tools`, `describe_tool`, `call_tool` | Large catalogs, one call at a time |
 | `code` | `search`, `execute` | Large catalogs, multi-step and bulk work |
+
+## Client compatibility
+
+Code Mode uses two ordinary MCP tools, so any client with MCP tool support can call them. It was exercised end to end with Claude (this project's development sessions) and with OpenAI Codex CLI (a GPT model) against a Polarion 2612 server: the model called `search`, then wrote one `execute` script, and the read results matched the REST API.
+
+Two things to know:
+
+- `execute` is annotated as able to write, so clients that ask for approval per tool call will ask before running it. A client that cannot ask (for example `codex exec` with approval policy `never`) refuses the call, even with `dry_run: true`. For read-only use, set `MCP_CODE_MODE_WRITES=false` (or `MCP_READ_ONLY=true`): `execute` is then annotated read-only and runs without a prompt. For writes, approve the tool in the client's settings.
+- Models differ in how well they write the script. Check your model on a real task before relying on it for bulk changes; `MCP_MODE=full` or `discover` remain available.
 
 ## Token cost
 
@@ -55,6 +65,8 @@ Every `polarion.<operation>` call goes through the same pipeline as a direct too
 | Write calls | 20 |
 | Result size | 256 KB, then truncated |
 | `console.log` output | 8 KB |
+
+The write cap counts operations, not items: one bulk operation is one write, and each `execute` call gets its own budget (the per-user rate limit still applies). Operations a script starts without awaiting are finished before `execute` returns. A single operation result above 256 KB is refused inside the sandbox; request fewer fields or a smaller page.
 
 `execute` with `dry_run: true` turns every write into a preview. A write operation that cannot preview is refused in that run. `MCP_CODE_MODE_WRITES=false` removes writes from Code Mode entirely.
 

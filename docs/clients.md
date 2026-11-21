@@ -157,7 +157,7 @@ An administrator must set `com.siemens.polarion.rest.security.restApiToken.enabl
 
 ### My client warns about too many tools (VS Code 128, Cursor, Windsurf 100).
 
-The full catalog has 284 tools. Set `MCP_TOOLSETS` (for example `work-items,documents`) or `MCP_TOOLS` on the server, add `MCP_READ_ONLY=true`, or use `MCP_MODE=discover`. In VS Code you can also untick tools in the tools picker.
+The full catalog has 304 tools. Set `MCP_TOOLSETS` (for example `work-items,documents`) or `MCP_TOOLS` on the server, add `MCP_READ_ONLY=true`, or use `MCP_MODE=discover`. In VS Code you can also untick tools in the tools picker.
 
 ### GitHub Copilot shows no MCP servers on Business or Enterprise.
 

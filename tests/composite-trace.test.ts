@@ -99,3 +99,22 @@ test('trace_links includes root at depth zero and collects every link page withi
   assert.equal(graph.edges.length, 101);
   assert.equal(graph.truncated, false);
 });
+
+test('trace_links up resolves backlinks when Polarion 2612 puts the queried item in sourceWorkItem', async () => {
+  // Live 2612 shape: GET .../EL-145/backlinkedworkitems returns workItem = the linking child and sourceWorkItem = the queried item.
+  const backlink = (child: string, queried: string) => ({
+    id: `${child}/parent/${queried}`,
+    attributes: { role: 'parent' },
+    relationships: { workItem: { data: { id: child } }, sourceWorkItem: { data: { id: queried } } },
+  });
+  const result = await traceLinks.handler({ projectId: 'P', workItemId: 'EL-145', direction: 'up', depth: 1 }, context(async (name, args) => {
+    const id = `${String(args.projectId)}/${String(args.workItemId)}`;
+    if (name === 'getBacklinkedWorkItems') return response(id === 'P/EL-145' ? [backlink('P/EL-101', 'P/EL-145'), backlink('P/EL-147', 'P/EL-145')] : []);
+    if (name === 'getWorkItem') return response({ id, attributes: { title: id, type: 'requirement', status: 'open' } });
+    throw new Error(name);
+  }));
+  const parsed = JSON.parse(text(result));
+  assert.deepEqual(parsed.nodes.map((n: { id: string }) => n.id).sort(), ['P/EL-101', 'P/EL-145', 'P/EL-147']);
+  assert.deepEqual(parsed.edges.map((e: { from: string; to: string }) => `${e.from}>${e.to}`).sort(), ['P/EL-101>P/EL-145', 'P/EL-147>P/EL-145']);
+  assert.ok(parsed.edges.every((e: { from: string; to: string }) => e.from !== e.to));
+});

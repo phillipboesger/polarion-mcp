@@ -190,3 +190,8 @@ export function getPolarionBaseUrl(): string {
   // Remove /rest/v1 from the end of API_BASE_URL
   return API_BASE_URL.replace(/\/rest\/v1\/?$/, '');
 }
+
+/** Parses an on/off environment value. `1`, `true`, `yes` and `on` (any case) are on; anything else, including unset, is off. */
+export function flagOn(value: string | undefined): boolean {
+  return /^(1|true|yes|on)$/i.test(value?.trim() ?? '');
+}

@@ -4,6 +4,9 @@ import assert from "node:assert/strict"
 import { toolDefinitionMap } from "../src/tools.js"
 import { TOOLSET_NAMES, toolsetsForDefinition } from "../src/toolsets.js"
 
+// These tests exercise the full tool catalogue; the unset default resolves to Code Mode for catalogues this large.
+process.env.MCP_MODE = 'full'
+
 test("every generated tool belongs to exactly one domain toolset", () => {
   const assignments = new Map<string, string[]>()
   for (const def of toolDefinitionMap.values()) {
@@ -12,7 +15,7 @@ test("every generated tool belongs to exactly one domain toolset", () => {
     assert.ok(TOOLSET_NAMES.includes(sets[0] as typeof TOOLSET_NAMES[number]), `${def.name} has unknown toolset ${sets[0]}`)
     assignments.set(def.name, sets)
   }
-  assert.equal(assignments.size, 284)
+  assert.equal(assignments.size, 304)
   assert.equal(new Set([...assignments.keys()]).size, toolDefinitionMap.size)
 })
 
@@ -55,5 +58,5 @@ test("stdio server default exposes all deployment-enabled tools when MCP_TOOLSET
     encoding: "utf8",
   })
   assert.equal(result.status, 0, result.stderr)
-  assert.equal(Number(result.stdout.trim()), 295)
+  assert.equal(Number(result.stdout.trim()), 315)
 })

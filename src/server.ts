@@ -72,6 +72,9 @@ function toolsForClient(tools: ReadonlyMap<string, import('./types.js').McpToolD
   }));
 }
 
+/** Above this many exposed operations, MCP_MODE=auto selects Code Mode. */
+export const AUTO_CODE_MODE_MIN_TOOLS = 100;
+
 interface ToolCallPipelineOptions {
   clientTools: ReadonlyMap<string, import('./types.js').McpToolDefinition>;
   virtualTools: readonly VirtualTool[];
@@ -360,9 +363,11 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     toolsets: options.filter?.toolsets,
   };
   const clientTools = filterTools(enabledTools, options.filter ?? {}).tools;
-  const mode = process.env.MCP_MODE ?? 'full';
-  if (mode !== 'full' && mode !== 'discover' && mode !== 'code') throw new Error('MCP_MODE must be full, discover or code');
+  const configuredMode = process.env.MCP_MODE?.trim() || 'auto';
+  if (configuredMode !== 'auto' && configuredMode !== 'full' && configuredMode !== 'discover' && configuredMode !== 'code') throw new Error('MCP_MODE must be auto, full, discover or code');
   const composites = listVirtualTools(filter);
+  // auto: a catalog this large costs tens of thousands of tokens per conversation, so offer Code Mode; a narrowed catalog (toolsets, MCP_TOOLS) stays a plain tool list.
+  const mode = configuredMode === 'auto' ? (clientTools.size + composites.length > AUTO_CODE_MODE_MIN_TOOLS ? 'code' : 'full') : configuredMode;
   const codeConfig: CodeModeConfig = {
     writes: !/^(0|false|no|off)$/i.test(process.env.MCP_CODE_MODE_WRITES ?? '') && !filter.readOnly,
     maxWriteCalls: 20,

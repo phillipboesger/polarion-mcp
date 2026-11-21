@@ -5,6 +5,9 @@ import { createServer as createHttpServer } from "node:http"
 
 import { createMcpHttpApp, type McpHttpAppOptions } from "../src/mcp-http-server.js"
 
+// These tests exercise the full tool catalogue; the unset default resolves to Code Mode for catalogues this large.
+process.env.MCP_MODE = 'full'
+
 const HEADERS = { "content-type": "application/json", accept: "application/json, text/event-stream" }
 const INIT = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } } })
 const LIST = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} })

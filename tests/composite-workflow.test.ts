@@ -35,6 +35,7 @@ test('resolves id and name, sends required values in one patch and verifies stat
     const patches = calls.filter(c => c.name === 'patchWorkItem');
     assert.equal(patches.length, 1); assert.equal(patches[0]!.args.workflowAction, 'start');
     assert.equal((patches[0]!.args.requestBody as any).data.attributes.resolution, 'fixed');
+    assert.equal((patches[0]!.args.requestBody as any).data.id, 'P/W-1');
   }
 });
 test('rejects ambiguous, unknown, unavailable and missing fields before writing', async () => {
@@ -59,7 +60,7 @@ test('status mismatch fails and read-only filtering excludes transition', async 
 
 test('resolves an unambiguous target and translates assignee into a relationship', async () => {
   const { ctx, calls } = setup('done');
-  const original = ctx.callPolarionTool;
+  const original = ctx.callPolarionTool.bind(ctx);
   ctx.callPolarionTool = async (name, args) => name === 'getWorkflowActionsForWorkItem' ? { content: [], structuredContent: { data: [{ nativeActionId: 'finish', name: 'Finish', targetStatus: 'done', available: true, requiredFields: ['assignee'] }] } } : original(name, args);
   const result = await transitionWorkitemStatus.handler({ ...args, target_status: 'done', values: { assignee: 'alice' } }, ctx);
   assert.equal(parsed(result).status_verified, true);
