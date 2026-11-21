@@ -15,7 +15,7 @@ The two do not conflict. Both act as the signed-in Polarion user, so permissions
 |---|---|---|
 | Setup | Nothing to deploy. Switch it on in `polarion.properties`. | Run `npx`, a container or the `.mcpb` bundle, then connect a client. |
 | Polarion releases | 2612 and newer | 2506, 2512, 2606 and 2612; features that need a newer release say so instead of failing silently |
-| Tool list size | Small (about 196 KB, roughly 49k tokens) | The full catalog is large (about 290 tools). Toolsets, `discover` and Code Mode bring it down, see [Code Mode](code-mode.md) |
+| Tool list size | Small (about 196 KB, roughly 49k tokens) | The full catalog is large (284 generated tools plus helpers). Toolsets, `discover` and Code Mode bring it down, see [Code Mode](code-mode.md) |
 | Workflow transitions | Built in | `get_workitem_actions` and `transition_workitem_status`: resolve by action name or target status, check required fields first, verify the new status afterwards |
 | Write checks | The REST API's own validation | Enum labels and custom-field keys are checked before the call; a custom-enum label sent instead of an id is refused with the id to use |
 | Preview | | `dry_run` on writes shows the request and a read-back diff |
