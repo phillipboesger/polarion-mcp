@@ -4,6 +4,9 @@ import type { AddressInfo } from "node:net"
 
 import { createMcpHttpApp } from "../src/mcp-http-server.js"
 
+// These tests exercise the full tool catalogue; the unset default resolves to Code Mode for catalogues this large.
+process.env.MCP_MODE = 'full'
+
 // Any value is accepted at the transport: it is the caller's Polarion PAT,
 // validated by Polarion on the upstream call, not by this server.
 const TOKEN = "pat-of-the-calling-user"

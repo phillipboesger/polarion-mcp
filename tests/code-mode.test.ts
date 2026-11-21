@@ -52,7 +52,7 @@ test('code mode lists only search and execute', async () => {
 test('invalid MCP_MODE message names code', () => {
   const saved = process.env.MCP_MODE
   process.env.MCP_MODE = 'bogus'
-  try { assert.throws(() => createPolarionServer(), /full, discover or code/) } finally { if (saved === undefined) delete process.env.MCP_MODE; else process.env.MCP_MODE = saved }
+  try { assert.throws(() => createPolarionServer(), /auto, full, discover or code/) } finally { if (saved === undefined) delete process.env.MCP_MODE; else process.env.MCP_MODE = saved }
 })
 
 test('search returns typed declarations, composites rank first', async () => {
@@ -172,5 +172,18 @@ test('writes started but not awaited are counted and finished before execute ret
     const result = await run(client, 'polarion.postWorkItems({ projectId: "P", requestBody: { data: [{ type: "workitems", attributes: { title: "x", type: "task" } }] } }); return 1', { dry_run: true })
     assert.equal(result.isError, undefined)
     assert.equal(JSON.parse(text(result)).write_calls, 1)
+  })
+})
+
+test('unset MCP_MODE resolves to code for the full catalogue and to full for a narrowed one', async () => {
+  await withCodeMode({ env: { MCP_MODE: '' } }, async client => {
+    assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), ['execute', 'search'])
+  })
+  await withCodeMode({ env: { MCP_MODE: 'auto' }, filter: { allow: ['getProjects', 'getProject'] } }, async client => {
+    const names = (await client.listTools()).tools.map(t => t.name)
+    assert.ok(names.includes('getProjects') && !names.includes('execute'))
+  })
+  await withCodeMode({ env: { MCP_MODE: 'full' } }, async client => {
+    assert.ok((await client.listTools()).tools.length > 100)
   })
 })

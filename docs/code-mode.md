@@ -11,7 +11,8 @@ The model searches first, then writes one script for the whole task: loop, filte
 
 | Mode | Tool list | Best for |
 |---|---|---|
-| `full` (default) | Every enabled tool | Small catalogs (see `MCP_TOOLSETS`), clients that need every tool visible |
+| `auto` (default) | `code` above a hundred enabled tools, otherwise `full` | Works for most deployments without configuration |
+| `full` | Every enabled tool | Small catalogs (see `MCP_TOOLSETS`), clients that need every tool visible |
 | `discover` | `search_tools`, `describe_tool`, `call_tool` | Large catalogs, one call at a time |
 | `code` | `search`, `execute` | Large catalogs, multi-step and bulk work |
 

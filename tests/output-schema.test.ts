@@ -9,6 +9,9 @@ import { createPolarionServer } from "../src/server.js"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 
+// These tests exercise the full tool catalogue; the unset default resolves to Code Mode for catalogues this large.
+process.env.MCP_MODE = 'full'
+
 // The validator the SDK client uses on structuredContent.
 const validate = (schema: unknown, value: unknown) => new AjvJsonSchemaValidator().getValidator(schema as any)(value)
 

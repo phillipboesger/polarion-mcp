@@ -84,7 +84,7 @@ export async function run(entryConfig, baseUrl, pat = PAT, entry = path.resolve(
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'guide-literal-'));
   const transport = new StdioClientTransport({
     command: process.execPath, args: [entry],
-    env: { PATH: process.env.PATH ?? '', HOME: home, ...entryConfig.env, API_BASE_URL: baseUrl, BEARER_TOKEN: pat },
+    env: { PATH: process.env.PATH ?? '', HOME: home, MCP_MODE: 'full', ...entryConfig.env, API_BASE_URL: baseUrl, BEARER_TOKEN: pat },
     stderr: 'pipe',
   });
   const client = new Client({ name: 'guide-literal', version: '1' }, { capabilities: {} });
