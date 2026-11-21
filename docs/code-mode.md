@@ -15,6 +15,19 @@ The model searches first, then writes one script for the whole task: loop, filte
 | `discover` | `search_tools`, `describe_tool`, `call_tool` | Large catalogs, one call at a time |
 | `code` | `search`, `execute` | Large catalogs, multi-step and bulk work |
 
+## Token cost
+
+Measured with `node scripts/bench-tokens.mjs` (after `npm run build`) against a local Polarion stub that returns 100 work items per query. Tokens are estimated as characters / 4 for the tool list plus every call and result the model sees.
+
+| Mode | tools/list | A: list open requirements | B: set a field on 20 items | C: count in 5 projects |
+|---|---|---|---|---|
+| `full`, all tools | 270,139 | 286,462 | 287,808 | 351,759 |
+| `full`, `MCP_TOOLSETS=work-items,documents` | 105,532 | 121,855 | 123,201 | 187,152 |
+| `discover` | 224 | 18,020 | 20,078 | 83,348 |
+| `code` | 311 | 1,864 | 1,331 | 1,240 |
+
+The gain on multi-step tasks comes from two places: one script replaces many round trips, and the script returns only what the model needs instead of every raw result. The numbers compare modes against a stub; they say nothing about answer quality. `full` stays the default until quality is compared on real prompts.
+
 ## What the sandbox is
 
 Each `execute` runs in a fresh QuickJS interpreter compiled to WebAssembly (`quickjs-emscripten`). It has no file system, network, process, timers or modules. The only host function is `polarion.<operation>(args)`, and values cross as JSON copies, never as live objects.
