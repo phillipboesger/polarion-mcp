@@ -59,6 +59,8 @@ async function attachmentsFor(client, workItemId, fileName) {
   return data.filter((attachment) => attachment.attributes?.fileName === fileName);
 }
 
+const LIVE_ASSIGNEE = process.env.LIVE_ASSIGNEE || "admin";
+
 describe("composite tools against disposable Polarion data", () => {
   let client;
 
@@ -79,6 +81,32 @@ describe("composite tools against disposable Polarion data", () => {
     }
     await client.close();
     assert.deepEqual(cleanupErrors, [], "failed to remove test-owned Work Items");
+  });
+
+  test("workflow transitions a disposable work item", async () => {
+    const workItemId = await createItem(client, "task", `[MCPTEST] workflow ${randomUUID()}`);
+    const scope = { projectId: PROJECT, workItemId };
+    const listing = await call(client, "get_workitem_actions", scope);
+    assert.equal(listing.isError, false, listing.text);
+    const data = parseComposite(listing);
+    // Workflows usually demand fields; pick an available action whose only requirement is the assignee and supply it.
+    const action = data.actions.find(a => a.available !== false && !a.signatureRequired && a.requiredFields.every(f => f === "assignee"));
+    assert.ok(action, "fixture must have an available action that needs at most an assignee");
+    const values = action.requiredFields.length ? { assignee: LIVE_ASSIGNEE } : undefined;
+    if (values) {
+      const missing = await call(client, "transition_workitem_status", { ...scope, action: action.actionId, dry_run: true });
+      assert.deepEqual(parseComposite(missing).missingRequiredFields, ["assignee"]);
+      const refused = await call(client, "transition_workitem_status", { ...scope, action: action.actionId });
+      assert.equal(refused.isError, true);
+      assert.match(refused.text, /Missing required fields: assignee/);
+    }
+    const wrong = await call(client, "transition_workitem_status", { ...scope, action: "unknown-action" });
+    assert.equal(wrong.isError, true);
+    const result = await call(client, "transition_workitem_status", { ...scope, action: action.actionId, values });
+    assert.equal(result.isError, false, result.text);
+    assert.equal(parseComposite(result).status_verified, true);
+    const repeated = await call(client, "transition_workitem_status", { ...scope, action: action.actionId });
+    assert.equal(repeated.isError, true);
   });
 
   test("run_job_and_wait previews and rejects malformed inputs without creating jobs, then executes once", async (t) => {
@@ -170,6 +198,17 @@ describe("composite tools against disposable Polarion data", () => {
     assert.equal(parentNode.title, parentTitle);
     assert.equal(parentNode.type, "requirement");
     assert.ok(typeof parentNode.status === "string" && parentNode.status.length > 0, "trace node omitted the selected status field");
+
+    // Backlinks: the child must be found from the parent, with no self-loop (regression: Polarion 2612 backlink row shape).
+    const upTrace = await call(client, "trace_links", { projectId: PROJECT, workItemId: parentId, direction: "up", depth: 1, node_cap: 20 });
+    // Polarion 2506 has no backlinkedworkitems endpoint, so an upward trace answers 404 there.
+    if (!(upTrace.isError && /Not Found/.test(upTrace.text))) {
+      assert.equal(upTrace.isError, false, upTrace.thrown ?? upTrace.text);
+      const upGraph = parseComposite(upTrace);
+      assert.ok(upGraph.edges.some((edge) => edge.from === `${PROJECT}/${rootId}` && edge.to === `${PROJECT}/${parentId}` && edge.role === "parent"),
+        "trace up omitted the linking child");
+      assert.ok(upGraph.edges.every((edge) => edge.from !== edge.to), "trace up produced a self-loop");
+    }
 
     const zeroDepth = await call(client, "trace_links", { projectId: PROJECT, workItemId: rootId, direction: "down", depth: 0 });
     assert.equal(zeroDepth.isError, false, zeroDepth.thrown ?? zeroDepth.text);

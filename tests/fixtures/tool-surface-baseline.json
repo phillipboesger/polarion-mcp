@@ -2621,6 +2621,25 @@
       }
     }
   },
+  "get_workitem_actions": {
+    "type": "object",
+    "required": [
+      "projectId",
+      "workItemId"
+    ],
+    "properties": {
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "workItemId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
   "getAllDocuments": {
     "type": "object",
     "required": [],
@@ -19536,6 +19555,45 @@
           "required": [],
           "properties": {}
         }
+      },
+      "workItemId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      }
+    }
+  },
+  "transition_workitem_status": {
+    "type": "object",
+    "required": [
+      "projectId",
+      "workItemId"
+    ],
+    "properties": {
+      "action": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "dry_run": {
+        "type": "boolean",
+        "required": [],
+        "properties": {}
+      },
+      "projectId": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "target_status": {
+        "type": "string",
+        "required": [],
+        "properties": {}
+      },
+      "values": {
+        "type": "object",
+        "required": [],
+        "properties": {}
       },
       "workItemId": {
         "type": "string",
