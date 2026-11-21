@@ -33,6 +33,7 @@ async function polarion() {
 }
 
 const POLARION = await polarion()
+process.env.MCP_MODE = "full"
 process.env.API_BASE_URL = POLARION.base
 const { createMcpHttpApp } = await import("../../src/mcp-http-server.js")
 
