@@ -4,6 +4,7 @@
 
 - Added work item workflow action discovery and verified status transition composites with dry-run support.
 
+- `trace_links` with `direction: "up"` (and `both`) found only a self-loop on Polarion 2612, because 2612 backlink rows put the queried item in `sourceWorkItem`. The other end is now taken from whichever link end is not the current item, so linking children are found on 2506 through 2612, and self-loop edges are never returned.
 - `MCP_MARK_UNTRUSTED` and `MCP_CONFIRM_DESTRUCTIVE` accept `1`, `true`, `yes` and `on` (any case), like the other on/off settings. Before, only the exact word `true` turned them on, so `MCP_MARK_UNTRUSTED=1` silently did nothing.
 - Work Item write guards validate custom enumeration values (single and multi-select), not only `status`, `severity`, `priority` and `resolution`. A label sent instead of an option id (`"ASIL D"` for `asil_d`) is refused and the message names the id to send.
 - Polarion 2512: Work Item updates that set a custom field are no longer refused. 2512 has no per-item field metadata endpoint, so the guards read the item's type and use the type-scoped field metadata and option lookups. 2506 has neither endpoint and still refuses custom-field writes; the refusal now says that Polarion 2512 or newer is needed (see `docs/polarion-versioning.md`).
