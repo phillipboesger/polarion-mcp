@@ -41,7 +41,7 @@ import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets, flagOn } from './config.js';
 import { createPolarionServer, createToolCaller } from './server.js';
 import { writeLimitsFromEnv, type WriteLimits } from './write-verification.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
@@ -1053,11 +1053,11 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
   const configuredToolRateLimit = Number(process.env.MCP_RATE_LIMIT_TOOLS ?? 0);
   const rateLimitTools = Number.isSafeInteger(configuredToolRateLimit) && configuredToolRateLimit >= 0 ? configuredToolRateLimit : 0;
-  const markUntrusted = process.env.MCP_MARK_UNTRUSTED?.trim().toLowerCase() === 'true';
+  const markUntrusted = flagOn(process.env.MCP_MARK_UNTRUSTED);
   const logFormat = process.env.MCP_LOG_FORMAT?.trim().toLowerCase() === 'json' ? 'json' : 'text';
   const configuredLogLevel = process.env.MCP_LOG_LEVEL?.trim().toLowerCase();
   const logLevel = ['debug', 'info', 'warn', 'error'].includes(configuredLogLevel ?? '') ? configuredLogLevel as LogLevel : 'info';
-  const confirmDestructive = process.env.MCP_CONFIRM_DESTRUCTIVE?.trim().toLowerCase() === 'true';
+  const confirmDestructive = flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE);
 
   const { app, closeAllSessions } = createMcpHttpApp({
     allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
