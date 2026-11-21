@@ -171,6 +171,14 @@ describe("composite tools against disposable Polarion data", () => {
     assert.equal(parentNode.type, "requirement");
     assert.ok(typeof parentNode.status === "string" && parentNode.status.length > 0, "trace node omitted the selected status field");
 
+    // Backlinks: the child must be found from the parent, with no self-loop (regression: Polarion 2612 backlink row shape).
+    const upTrace = await call(client, "trace_links", { projectId: PROJECT, workItemId: parentId, direction: "up", depth: 1, node_cap: 20 });
+    assert.equal(upTrace.isError, false, upTrace.thrown ?? upTrace.text);
+    const upGraph = parseComposite(upTrace);
+    assert.ok(upGraph.edges.some((edge) => edge.from === `${PROJECT}/${rootId}` && edge.to === `${PROJECT}/${parentId}` && edge.role === "parent"),
+      "trace up omitted the linking child");
+    assert.ok(upGraph.edges.every((edge) => edge.from !== edge.to), "trace up produced a self-loop");
+
     const zeroDepth = await call(client, "trace_links", { projectId: PROJECT, workItemId: rootId, direction: "down", depth: 0 });
     assert.equal(zeroDepth.isError, false, zeroDepth.thrown ?? zeroDepth.text);
     const rootOnly = parseComposite(zeroDepth);
