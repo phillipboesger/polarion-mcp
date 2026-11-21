@@ -157,9 +157,16 @@ export async function runExecute(
   if (!code.trim()) return { content: [{ type: 'text', text: 'Error: code is required' }], isError: true };
   const dryRun = args.dry_run === true;
   let writeCalls = 0;
+  const inFlight = new Set<Promise<unknown>>();
   const host: Record<string, HostFunction> = {};
   for (const op of ops) {
-    host[op.name] = async (callArgs) => {
+    host[op.name] = (callArgs) => {
+      const running = hostCall(op, callArgs);
+      inFlight.add(running);
+      void running.finally(() => inFlight.delete(running)).catch(() => undefined);
+      return running;
+    };
+    const hostCall = async (op: SdkOperation, callArgs: unknown): Promise<unknown> => {
       const input = { ...(callArgs as Record<string, unknown>) };
       // Confirmation is the human's decision (elicitation); code can not grant it.
       delete input.confirm;
@@ -179,10 +186,17 @@ export async function runExecute(
     };
   }
   const outcome = await runInSandbox(code, host, { limits: config.limits, signal });
+  // Calls the script started but did not await keep running in the pipeline; wait for them so the counts and the result are final.
+  if (inFlight.size > 0) {
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([Promise.allSettled([...inFlight]), new Promise(resolve => { timer = setTimeout(resolve, 15_000); })]);
+    clearTimeout(timer);
+  }
   const payload = {
     ...(outcome.ok ? { result: outcome.value === undefined ? null : outcome.value } : { error: outcome.error?.message ?? 'Execution failed' }),
     ...(outcome.logs ? { logs: outcome.logs } : {}),
     host_calls: outcome.hostCalls,
+    ...(inFlight.size > 0 ? { pending_calls: inFlight.size } : {}),
     write_calls: writeCalls,
     ...(dryRun ? { dry_run: true } : {}),
     ...(outcome.truncated ? { truncated: true } : {}),

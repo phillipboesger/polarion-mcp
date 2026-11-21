@@ -143,3 +143,17 @@ test('each run is isolated and syntax errors are reported', async () => {
   assert.equal(syntax.ok, false);
   assert.ok(syntax.error!.message.length > 0);
 });
+
+test('wrapper breakout cannot return a non-string or hide a timeout', async () => {
+  const breakout = await runInSandbox('}); return {a:1}; (async()=>{', {})
+  assert.equal(breakout.ok, false)
+  assert.match(breakout.error?.message ?? '', /not JSON-serializable/)
+  const loop = await runInSandbox('}); return {toString(){ while(true){} }}; (async()=>{', {}, { limits: { timeoutMs: 300 } })
+  assert.equal(loop.ok, false)
+})
+
+test('an oversized host reply is rejected instead of crossing the bridge', async () => {
+  const result = await runInSandbox('return await polarion.big({})', { big: async () => 'x'.repeat(2000) }, { limits: { maxResultBytes: 1000 } })
+  assert.equal(result.ok, false)
+  assert.match(result.error?.message ?? '', /too large/)
+})

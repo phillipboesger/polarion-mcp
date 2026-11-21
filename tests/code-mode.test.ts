@@ -166,3 +166,11 @@ test('schemaToType renders objects, enums, arrays and degrades deep nesting', ()
   assert.equal(schemaToType({ type: 'object', properties: { a: { type: 'object', properties: { b: { type: 'object', properties: { c: { type: 'object', properties: { d: { type: 'string' } } } } } } } } }), '{ a?: { b?: { c?: Record<string, unknown> } } }')
   assert.equal(schemaToType(undefined), 'unknown')
 })
+
+test('writes started but not awaited are counted and finished before execute returns', async () => {
+  await withCodeMode({}, async client => {
+    const result = await run(client, 'polarion.postWorkItems({ projectId: "P", requestBody: { data: [{ type: "workitems", attributes: { title: "x", type: "task" } }] } }); return 1', { dry_run: true })
+    assert.equal(result.isError, undefined)
+    assert.equal(JSON.parse(text(result)).write_calls, 1)
+  })
+})

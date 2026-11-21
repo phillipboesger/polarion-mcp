@@ -56,6 +56,8 @@ Every `polarion.<operation>` call goes through the same pipeline as a direct too
 | Result size | 256 KB, then truncated |
 | `console.log` output | 8 KB |
 
+The write cap counts operations, not items: one bulk operation is one write, and each `execute` call gets its own budget (the per-user rate limit still applies). Operations a script starts without awaiting are finished before `execute` returns. A single operation result above 256 KB is refused inside the sandbox; request fewer fields or a smaller page.
+
 `execute` with `dry_run: true` turns every write into a preview. A write operation that cannot preview is refused in that run. `MCP_CODE_MODE_WRITES=false` removes writes from Code Mode entirely.
 
 Errors returned to the model are one line: no stack traces and no host paths.

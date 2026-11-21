@@ -122,6 +122,7 @@ export async function runInSandbox(
           Promise.resolve().then(() => fn(parsed)).then(value => {
             if (!deferred.alive) return;
             const text = value === undefined ? '' : JSON.stringify(value);
+            if ((text?.length ?? 0) > limits.maxResultBytes) { reject(`Host result too large (${text.length} characters, limit ${limits.maxResultBytes}); request fewer fields or a smaller page`); return; }
             const handle = vm.newString(text ?? '');
             deferred.resolve(handle);
             handle.dispose();
@@ -150,7 +151,11 @@ export async function runInSandbox(
     const promiseHandle = started.value;
     void vm.resolvePromise(promiseHandle).then(outcome => {
       if (outcome.error) { settled = { error: dumpError(vm, outcome.error) }; outcome.error.dispose(); }
-      else { settled = { text: String(vm.getString(outcome.value)) }; outcome.value.dispose(); }
+      else {
+        // User code can return from the wrapper early; only a string is a valid serialized result.
+        settled = vm.typeof(outcome.value) === 'string' ? { text: vm.getString(outcome.value) } : { error: 'Result is not JSON-serializable' };
+        outcome.value.dispose();
+      }
     });
     promiseHandle.dispose();
 
@@ -163,6 +168,7 @@ export async function runInSandbox(
       if (!settled) await new Promise(resolve => setImmediate(resolve));
     }
 
+    if (settled.error === undefined && Date.now() > deadline) settled = { error: 'Execution timed out' };
     if (settled.error !== undefined) {
       result.error = { message: /interrupted/i.test(settled.error) ? 'Execution timed out' : settled.error };
     } else {
