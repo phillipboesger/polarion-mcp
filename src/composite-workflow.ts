@@ -61,7 +61,7 @@ export const transitionWorkitemStatus: VirtualTool = {
       relationships.assignee = { data: users.map(user => ({ type: 'users', id: user })) };
       delete attributes.assignee;
     }
-    const write = await ctx.callPolarionTool('patchWorkItem', { projectId: args.projectId, workItemId: args.workItemId, workflowAction: action.nativeActionId, requestBody: { data: { type: 'workitems', id: String(args.workItemId).includes('/') ? args.workItemId : `${args.projectId}/${args.workItemId}`, attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } } });
+    const write = await ctx.callPolarionTool('patchWorkItem', { projectId: args.projectId, workItemId: args.workItemId, workflowAction: action.nativeActionId, requestBody: { data: { type: 'workitems', id: String(args.workItemId).includes('/') ? args.workItemId : `${String(args.projectId)}/${String(args.workItemId)}`, attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } } });
     if (resultFailed(write)) return write;
     const after = await ctx.callPolarionTool('getWorkItem', { projectId: args.projectId, workItemId: args.workItemId, fields: { workitems: 'status' } });
     if (resultFailed(after)) return after;
