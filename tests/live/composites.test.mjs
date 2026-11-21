@@ -81,6 +81,23 @@ describe("composite tools against disposable Polarion data", () => {
     assert.deepEqual(cleanupErrors, [], "failed to remove test-owned Work Items");
   });
 
+  test("workflow transitions a disposable work item", async () => {
+    const workItemId = await createItem(client, "task", `[MCPTEST] workflow ${randomUUID()}`);
+    const scope = { projectId: PROJECT, workItemId };
+    const listing = await call(client, "get_workitem_actions", scope);
+    assert.equal(listing.isError, false, listing.text);
+    const data = parseComposite(listing);
+    const action = data.actions.find(a => a.available !== false && a.requiredFields.length === 0 && !a.signatureRequired);
+    assert.ok(action, "fixture must have an available action without required fields");
+    const wrong = await call(client, "transition_workitem_status", { ...scope, action: "unknown-action" });
+    assert.equal(wrong.isError, true);
+    const result = await call(client, "transition_workitem_status", { ...scope, action: action.actionId });
+    assert.equal(result.isError, false, result.text);
+    assert.equal(parseComposite(result).status_verified, true);
+    const repeated = await call(client, "transition_workitem_status", { ...scope, action: action.actionId });
+    assert.equal(repeated.isError, true);
+  });
+
   test("run_job_and_wait previews and rejects malformed inputs without creating jobs, then executes once", async (t) => {
     // Polarion 2506 exposes only GET /jobs/{id} and file download, with no job list, execute or log routes.
     const jobCollection = await call(client, "getJobs", { page_size_: 1, page_number_: 1 });

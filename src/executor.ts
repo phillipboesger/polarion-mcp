@@ -1100,6 +1100,16 @@ export async function executeApiTool(
     console.error('[INFO] Executing tool "%s": %s %s', logSafe(toolName), logSafe(config.method), logSafe(config.url));
 
     // Execute the request with pacing + retry-with-backoff on 429/5xx
+    let workflowTarget: string | undefined;
+    const workflowAction = readArg(validatedArgs, 'workflowAction', nameMap);
+    if (verifyWrites && verify !== false && typeof workflowAction === 'string' && definition.pathTemplate === '/projects/{projectId}/workitems/{workItemId}' && definition.method.toLowerCase() === 'patch') {
+      try {
+        const lookup = await sendWithRetry({ ...config, method: 'GET', url: `${requestUrl}/actions/getWorkflowActions`, data: undefined, params: { ...config.params, workflowAction: undefined, changeTypeTo: undefined, 'page[size]': 1000 } }, sendOpts);
+        const actions = lookup.data?.data;
+        const match = Array.isArray(actions) ? actions.find((action: any) => action.nativeActionId === workflowAction) : undefined;
+        if (typeof match?.targetStatus === 'string') workflowTarget = match.targetStatus;
+      } catch { /* A failed lookup leaves the result uncertain, but must not block the write. */ }
+    }
     const response = await sendWithRetry(config, sendOpts);
     for (const target of enumTargets ?? []) {
       if (target.workItemId) invalidateWorkItemOptions(target.projectId, target.workItemId);
@@ -1128,7 +1138,7 @@ export async function executeApiTool(
         if (!Array.isArray(body) && definition.method.toLowerCase() === 'post') {
           unavailable = 'Create request body is not a list of work items.';
         } else if (!Array.isArray(body)) {
-          targets = [{ label: '', attributes: body?.attributes, hasRelationships: Boolean(body?.relationships) }];
+          targets = [{ label: '', attributes: body?.attributes, hasRelationships: Boolean(body?.relationships), ...(typeof workflowAction === 'string' ? { workflowAction, expectedStatus: workflowTarget } : {}) }];
         } else if (definition.method.toLowerCase() === 'patch') {
           const fallbackProject = readArg(validatedArgs, 'projectId', nameMap);
           targets = body.map((item: any): VerifyTarget => {

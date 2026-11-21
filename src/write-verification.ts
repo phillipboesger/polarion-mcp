@@ -57,6 +57,8 @@ export interface VerifyTarget {
   url?: string;
   attributes?: unknown;
   hasRelationships?: boolean;
+  workflowAction?: string;
+  expectedStatus?: string;
   /** Why this target cannot be read back, when its identity could not be resolved. */
   problem?: string;
 }
@@ -270,7 +272,7 @@ export async function verifyTargets(
     if (target.hasRelationships) skip(target, RELATIONSHIPS_REASON);
     if (target.problem) { skip(target, target.problem); continue; }
     const sent = isObject(target.attributes) ? Object.entries(target.attributes) : [];
-    if (!sent.length) {
+    if (!sent.length && !target.workflowAction) {
       if (!target.hasRelationships) skip(target, 'no attributes to verify');
       continue;
     }
@@ -278,6 +280,12 @@ export async function verifyTargets(
     try { actual = await read(target); }
     catch (error) { skip(target, `Read-back failed: ${error instanceof Error ? error.message : 'unknown error'}`); continue; }
     checked++;
+    if (target.workflowAction) {
+      const actualStatus = unwrap(actual.status);
+      const finding = { field: target.label ? `${target.label}.status` : 'status', sent: target.expectedStatus ?? target.workflowAction, actual: actualStatus ?? null };
+      if (!target.expectedStatus || actualStatus == null) uncertain.push(finding);
+      else if (actualStatus !== target.expectedStatus) mismatches.push(finding);
+    }
     for (const [field, value] of sent) {
       const outcome = compareAttribute(field, value, actual[field]);
       if (outcome === 'verified') continue;

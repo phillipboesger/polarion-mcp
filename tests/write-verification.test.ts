@@ -116,3 +116,11 @@ test('credentials are redacted from previews and upstream error details', async 
     }
   } finally { if (previous === undefined) delete process.env.BEARER_TOKEN; else process.env.BEARER_TOKEN = previous; server.close(); await once(server, 'close'); }
 });
+
+test('workflow verification reads status and compares known target', async () => {
+  const { verifyTargets } = await import('../src/write-verification.js');
+  const target = { label: '', attributes: {}, workflowAction: 'start', expectedStatus: 'active' };
+  assert.equal((await verifyTargets([target], async () => ({ status: 'active' }), 10)).status, 'verified');
+  assert.equal((await verifyTargets([target], async () => ({ status: 'open' }), 10)).status, 'mismatch');
+  assert.equal((await verifyTargets([{ ...target, expectedStatus: undefined }], async () => ({ status: 'open' }), 10)).status, 'uncertain');
+});
