@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Polarion 2612 support: the generated tool map is regenerated from the 2612 REST definition and grows from 284 to 304 tools (Spaces, license types and slot relationships, per-user field metadata, `patchDocumentParts`). On older releases these answer 404. 2612 joins the release matrix as `latest` (non-blocking until its image is verified), 2606 and 2512 are guaranteed, 2506 is best-effort. `docs/polarion-versioning.md` lists the 2612 behaviors seen live.
 - Added work item workflow action discovery and verified status transition composites with dry-run support.
 
 - `trace_links` with `direction: "up"` (and `both`) found only a self-loop on Polarion 2612, because 2612 backlink rows put the queried item in `sourceWorkItem`. The other end is now taken from whichever link end is not the current item, so linking children are found on 2506 through 2612, and self-loop edges are never returned.

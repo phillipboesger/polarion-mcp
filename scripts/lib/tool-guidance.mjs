@@ -218,6 +218,7 @@ export const TOOL_GUIDANCE = {
   getFieldsMetadataForWorkItem: fieldsMetadata('Work Item', ' For the allowed values of one enum field, follow up with `getAvailableEnumOptionsForWorkItem`.'),
   getFieldsMetadataForDocument: fieldsMetadata('Document', ' For the allowed values of one enum field, follow up with `getAvailableEnumOptionsForDocument`.'),
   getFieldsMetadataForPlan: fieldsMetadata('Plan'),
+  getFieldsMetadataForUser: fieldsMetadata('User'),
   getFieldsMetadataForCollection: fieldsMetadata('Collection'),
   getFieldsMetadataForTestRun: fieldsMetadata('Test Run'),
   getFieldsMetadataForTestRecord: fieldsMetadata('Test Record (one test case execution within a Test Run iteration)'),
@@ -297,6 +298,8 @@ export const TOOL_GUIDANCE = {
     'Returns one work record (time-tracking entry) on a Work Item by its ID: date, time spent, type, comment, and the user who logged it. To remove it use `deleteWorkRecord`.',
 
   // --- Server / admin ------------------------------------------------------
+  getLicenseSlotsRelationship:
+    'Returns the identifiers linked to one license slot through a single named relationship, as JSON:API linkage without attributes. Needs Polarion 2612 or newer. Read the slot itself with `getLicenseSlot`; change the link with `postLicenseSlotsRelationship`, `patchLicenseSlotsRelationship` or `deleteLicenseSlotsRelationship`. License administration permission is required.',
   getLicense:
     'Returns the server-wide license limits as current count vs. maximum for Work Items, Documents/Pages, and projects, plus links to the default license slots. Use it to check remaining capacity before bulk-creating items or projects; for which user holds which license use `getLicenseAssignments`, and for the slot details `getLicenseSlots`.',
   getLlms:

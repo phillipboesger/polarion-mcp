@@ -76,7 +76,7 @@
   function heroMcp(canvas) {
     var clients = [["Claude", C.warm], ["ChatGPT", C.mint], ["Gemini", C.cyan], ["VS Code", C.blue], ["Copilot", C.coral], ["Cursor", C.ice]];
     var R = rng(5);
-    var N = 284;
+    var N = 304;
     var ring = [];
     for (var i = 0; i < N; i++) {
       var a = (i / N) * TAU + (R() - 0.5) * 0.02;
