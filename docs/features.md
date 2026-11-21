@@ -25,3 +25,7 @@
 - Runtime caches are in-memory and are not durable storage.
 - Guards cover only the validations described above; they do not validate arbitrary field values or every relationship type.
 - Local SDK PDFs are optional and are not included in the repository.
+
+### Work item workflow
+
+Use `get_workitem_actions` to inspect available transitions and requirements. `transition_workitem_status` resolves an action or target status, applies required values in the same write, and verifies the resulting status. Set `dry_run: true` to preview.

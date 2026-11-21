@@ -37,7 +37,7 @@ test("the full tool catalog keeps its baseline names and input schema shape", ()
   const baseline = JSON.parse(readFileSync("tests/fixtures/tool-surface-baseline.json", "utf8")) as Record<string, unknown>
   const tools = [...toolDefinitionMap.values(), ...COMPOSITE_TOOLS]
   const current = Object.fromEntries(tools.map(tool => [tool.name, schemaShape(tool.inputSchema as Record<string, unknown>)]).sort(([a], [b]) => String(a).localeCompare(String(b))))
-  assert.equal(tools.length, 293)
+  assert.equal(tools.length, 295)
   assert.deepEqual(current, baseline)
 })
 

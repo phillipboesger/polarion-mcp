@@ -59,6 +59,8 @@ async function attachmentsFor(client, workItemId, fileName) {
   return data.filter((attachment) => attachment.attributes?.fileName === fileName);
 }
 
+const LIVE_ASSIGNEE = process.env.LIVE_ASSIGNEE || "admin";
+
 describe("composite tools against disposable Polarion data", () => {
   let client;
 
@@ -79,6 +81,32 @@ describe("composite tools against disposable Polarion data", () => {
     }
     await client.close();
     assert.deepEqual(cleanupErrors, [], "failed to remove test-owned Work Items");
+  });
+
+  test("workflow transitions a disposable work item", async () => {
+    const workItemId = await createItem(client, "task", `[MCPTEST] workflow ${randomUUID()}`);
+    const scope = { projectId: PROJECT, workItemId };
+    const listing = await call(client, "get_workitem_actions", scope);
+    assert.equal(listing.isError, false, listing.text);
+    const data = parseComposite(listing);
+    // Workflows usually demand fields; pick an available action whose only requirement is the assignee and supply it.
+    const action = data.actions.find(a => a.available !== false && !a.signatureRequired && a.requiredFields.every(f => f === "assignee"));
+    assert.ok(action, "fixture must have an available action that needs at most an assignee");
+    const values = action.requiredFields.length ? { assignee: LIVE_ASSIGNEE } : undefined;
+    if (values) {
+      const missing = await call(client, "transition_workitem_status", { ...scope, action: action.actionId, dry_run: true });
+      assert.deepEqual(parseComposite(missing).missingRequiredFields, ["assignee"]);
+      const refused = await call(client, "transition_workitem_status", { ...scope, action: action.actionId });
+      assert.equal(refused.isError, true);
+      assert.match(refused.text, /Missing required fields: assignee/);
+    }
+    const wrong = await call(client, "transition_workitem_status", { ...scope, action: "unknown-action" });
+    assert.equal(wrong.isError, true);
+    const result = await call(client, "transition_workitem_status", { ...scope, action: action.actionId, values });
+    assert.equal(result.isError, false, result.text);
+    assert.equal(parseComposite(result).status_verified, true);
+    const repeated = await call(client, "transition_workitem_status", { ...scope, action: action.actionId });
+    assert.equal(repeated.isError, true);
   });
 
   test("run_job_and_wait previews and rejects malformed inputs without creating jobs, then executes once", async (t) => {
