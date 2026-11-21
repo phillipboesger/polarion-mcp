@@ -13,12 +13,15 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return result;
 }
 function relationEdges(rows: JsonObject[], current: string, direction: 'up' | 'down'): TraceEdge[] {
+  // Which end is the queried item differs by release: on 2612 a backlink row has sourceWorkItem = queried item
+  // and workItem = linking item; older releases put the linking item in sourceWorkItem. Take the end that is not `current`.
+  const otherEnd = (source: string, target: string): string => direction === 'down'
+    ? (target || source)
+    : (source && source !== current ? source : target);
   return rows.map(row => {
-    const source = relData(row, 'sourceWorkItem').id;
-    const target = relData(row, 'workItem').id;
-    const related = direction === 'down' ? target : source;
-    return { from: direction === 'down' ? current : String(related ?? ''), to: direction === 'down' ? String(related ?? '') : current, role: String(attrs(row).role ?? '') };
-  }).filter(edge => edge.from && edge.to);
+    const related = otherEnd(String(relData(row, 'sourceWorkItem').id ?? ''), String(relData(row, 'workItem').id ?? ''));
+    return { from: direction === 'down' ? current : related, to: direction === 'down' ? related : current, role: String(attrs(row).role ?? '') };
+  }).filter(edge => edge.from && edge.to && edge.from !== edge.to);
 }
 export const traceLinks: VirtualTool = {
   name: 'trace_links', title: 'Trace work item links', toolset: 'composites',

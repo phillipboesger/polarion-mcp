@@ -15,9 +15,9 @@ test("Polarion release manifest is valid and documented", () => {
   const list = versioning.match(/The newest three releases are guaranteed usable: ([^.]+)\./)?.[1]
   const matrix = live.match(/workflow uses the private Polarion Docker image for versions ([^,]+(?:, [^,]+)*?), listed in/)?.[1]
   assert.ok(header && list && matrix, "Release documentation sections missing")
-  for (const { version } of versions) {
+  for (const { version, status } of versions) {
     assert.ok(header.split("|").map((cell) => cell.trim()).includes(version), `${version} missing from support table`)
-    assert.ok(list.split(/, | and /).includes(version), `${version} missing from support list`)
+    if (status !== "best-effort") assert.ok(list.split(/, | and /).includes(version), `${version} missing from support list`)
     assert.ok(matrix.split(/, | and /).includes(version), `${version} missing from live matrix`)
   }
 })
@@ -37,7 +37,7 @@ test("Polarion release validator enforces rolling support and non-blocking older
   const older = { version: "2501", status: "best-effort", image: "ghcr.io/phillipboesger/polarion-docker:v2501", allowFailure: true }
   const four = [older, ...versions]
   assert.doesNotThrow(() => validatePolarionVersions(four))
-  assert.throws(() => validatePolarionVersions(four.map((entry) => entry.version === "2506" ? { ...entry, status: "best-effort", allowFailure: true } : entry)), /guaranteed/)
+  assert.throws(() => validatePolarionVersions(four.map((entry) => entry.version === "2512" ? { ...entry, status: "best-effort", allowFailure: true } : entry)), /guaranteed/)
   assert.throws(() => validatePolarionVersions(four.map((entry) => entry.version === "2501" ? { ...entry, status: "guaranteed" } : entry)), /best-effort/)
   assert.throws(() => validatePolarionVersions(versions.map((entry) => ({ ...entry, status: entry.version === "2512" ? "latest" : "guaranteed" }))), /latest/)
   assert.throws(() => validatePolarionVersions(versions.map((entry) => entry.status === "guaranteed" ? { ...entry, status: "best-effort", allowFailure: true } : entry)), /guaranteed/)
@@ -61,7 +61,7 @@ test("live matrix jq output supplies boolean allowFailure values", (t) => {
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /^[^\n]+\n$/)
   const releases = JSON.parse(result.stdout)
-  assert.equal(releases.length, 3)
+  assert.equal(releases.length, versions.length)
   assert.deepEqual(releases.map((entry) => entry.version), versions.map((entry) => entry.version))
   assert.ok(releases.every((entry) => typeof entry.allowFailure === "boolean"))
 })

@@ -27,7 +27,7 @@ export function toolsetsForDefinition(definition: McpToolDefinition): ToolsetNam
   if (segments.includes('enumerations')) return ['enumerations'];
   if (segments.includes('jobs')) return ['jobs'];
   if (segments.some(segment => ['users', 'user', 'usergroups', 'roles'].includes(segment))) return ['users'];
-  if (segments[0] === 'projects' || segments[0] === 'projecttemplates' || segments[0] === 'spaces') return ['projects'];
+  if (segments[0] === 'projects' || segments[0] === 'projecttemplates' || segments[0] === 'spaces' || segments.includes('spaces')) return ['projects'];
   if (segments.some(segment => ['actions', 'customfields', 'license', 'llms', 'metadata'].includes(segment))) return ['admin'];
   return [];
 }
