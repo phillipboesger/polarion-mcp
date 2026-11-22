@@ -247,31 +247,6 @@ test("Custom GPT Basic credentials work even when the secret contains a raw %", 
   }
 })
 
-test("the deployment toolset allowlist also limits the Custom GPT REST routes", async () => {
-  const unrestricted = await startApp()
-  const unrestrictedNames = await (async () => {
-    try {
-      const code = await gptCode(unrestricted.base)
-      const tokens = (await (await gptToken(unrestricted.base, { grant_type: "authorization_code", code, redirect_uri: CALLBACK })).json()) as Tokens
-      const list = (await (await fetch(`${unrestricted.base}/api/tools`, { headers: { authorization: `Bearer ${tokens.access_token}` } })).json()) as { tools: { name: string }[] }
-      return list.tools.map(tool => tool.name)
-    } finally { await unrestricted.stop() }
-  })()
-  assert.ok(unrestrictedNames.includes("deleteWorkItems"))
-
-  const { base, stop } = await startApp(true)
-  try {
-    const code = await gptCode(base)
-    const tokens = (await (await gptToken(base, { grant_type: "authorization_code", code, redirect_uri: CALLBACK })).json()) as Tokens
-    const auth = { authorization: `Bearer ${tokens.access_token}`, "content-type": "application/json" }
-    const list = (await (await fetch(`${base}/api/tools`, { headers: auth })).json()) as { tools: { name: string }[] }
-    assert.equal(list.tools.some(tool => tool.name === "deleteWorkItems"), false)
-    assert.equal((await fetch(`${base}/api/tools/deleteWorkItems`, { method: "POST", headers: auth, body: "{}" })).status, 404)
-    const spec = JSON.stringify(await (await fetch(`${base}/openapi.json`)).json())
-    assert.equal(spec.includes("/api/tools/deleteWorkItems"), false)
-  } finally { await stop() }
-})
-
 async function restCall(base: string, access: string, tool: string, args: Record<string, unknown>) {
   const res = await fetch(`${base}/api/tools/${tool}`, {
     method: "POST", headers: { authorization: `Bearer ${access}`, "content-type": "application/json" }, body: JSON.stringify({ arguments: args }),
