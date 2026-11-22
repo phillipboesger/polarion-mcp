@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.0
 
 - Per-request toolset selectors removed: the `X-MCP-Toolsets` header and the `/mcp/<toolsets>` paths are gone (`/mcp/<anything>` now returns 404, and the header is ignored). `X-MCP-Readonly` stays.
 - **Breaking:** Code Mode is the default and the only normal mode. The server lists `search` and `execute`; the same operations are `polarion.<operation>()` inside `execute` and direct calls to generated tools are refused (see `docs/code-mode.md`). `MCP_MODE=full` stays as an escape hatch for clients that cannot approve `execute` (for example `codex exec`). `MCP_MODE=auto` and `discover` run as `code` with a startup warning; `discover` mode is removed.
