@@ -92,7 +92,7 @@ test('generated list tool max_items paginates through a five-page stub and omiss
   const { createPolarionServer } = await import('../src/server.js');
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
   const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
-  const server = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 220, filter: { toolsets: ['work-items'] } });
+  const server = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 220 });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'pagination-test', version: '1' });
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
@@ -122,7 +122,7 @@ test('generated list tool max_items paginates through a five-page stub and omiss
 
     const { Client: McpClient } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { InMemoryTransport: PairTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
-    const compositeServer = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 4000, filter: { toolsets: ['work-items', 'composites'] } });
+    const compositeServer = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 4000 });
     const [compositeClientTransport, compositeServerTransport] = PairTransport.createLinkedPair();
     const compositeClient = new McpClient({ name: 'pagination-composite-test', version: '1' });
     await Promise.all([compositeServer.connect(compositeServerTransport), compositeClient.connect(compositeClientTransport)]);
@@ -139,7 +139,7 @@ test('generated list tool max_items paginates through a five-page stub and omiss
     largeCollection = true;
     requests = 0;
     observedPages.length = 0;
-    const wideServer = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 50_000, filter: { toolsets: ['work-items'] } });
+    const wideServer = createPolarionServer({ apiBaseUrl: baseUrl, maxResponseChars: 50_000 });
     const [wideClientTransport, wideServerTransport] = PairTransport.createLinkedPair();
     const wideClient = new McpClient({ name: 'pagination-page-size-test', version: '1' });
     await Promise.all([wideServer.connect(wideServerTransport), wideClient.connect(wideClientTransport)]);
@@ -172,7 +172,7 @@ test('generated list tool max_items paginates through a five-page stub and omiss
     nextBehavior = 'normal';
     requests = 0;
     const limiter = { checks: 0, check() { return ++this.checks === 3 ? 1 : undefined; } };
-    const limitedServer = createPolarionServer({ apiBaseUrl: baseUrl, rateLimiter: limiter as any, filter: { toolsets: ['work-items'] } });
+    const limitedServer = createPolarionServer({ apiBaseUrl: baseUrl, rateLimiter: limiter as any });
     const [limitedClientTransport, limitedServerTransport] = InMemoryTransport.createLinkedPair();
     const limitedClient = new Client({ name: 'pagination-rate-test', version: '1' });
     await Promise.all([limitedServer.connect(limitedServerTransport), limitedClient.connect(limitedClientTransport)]);

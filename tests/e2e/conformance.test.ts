@@ -183,14 +183,14 @@ test("CIMD client metadata and loopback preset authorize by exact random-port ca
   }
 })
 
-test("GPT REST route, work-items path toolset, and REST wrapper expose expected tools", async () => {
+test("GPT REST route and REST wrapper expose expected tools", async () => {
   const mcp = await app({ validateToken: async () => true })
   try {
-    const pair = await rpcClient(mcp.base, PAT, "/mcp/work-items")
-    const workItemTools = (await pair.client.listTools()).tools.map(tool => tool.name)
-    assert.ok(workItemTools.includes("getWorkItem") && workItemTools.includes("getWorkItems"))
-    assert.ok(!workItemTools.includes("getProjects"))
-    await pair.transport.close()
+    const pair = await rpcClient(mcp.base, PAT, "/mcp")
+    try {
+      const tools = (await pair.client.listTools()).tools.map(tool => tool.name)
+      assert.ok(tools.includes("getWorkItem") && tools.includes("getWorkItems"))
+    } finally { await pair.transport.close() }
   } finally { await mcp.close() }
 
   const gpt = await app({ publicUrl: new URL("http://127.0.0.1"), gptClient: { clientId: "e2e-gpt", clientSecret: "e2e-gpt-secret-long-enough-123456" } })

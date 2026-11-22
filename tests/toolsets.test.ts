@@ -2,17 +2,19 @@ import test from "node:test"
 import assert from "node:assert/strict"
 
 import { toolDefinitionMap } from "../src/tools.js"
-import { TOOLSET_NAMES, toolsetsForDefinition } from "../src/toolsets.js"
+import { toolsetsForDefinition } from "../src/toolsets.js"
 
 // These tests exercise the full tool catalogue; the unset default resolves to Code Mode for catalogues this large.
 process.env.MCP_MODE = 'full'
 
-test("every generated tool belongs to exactly one domain toolset", () => {
+const DOMAINS = ["work-items", "documents", "test-management", "plans", "collections", "projects", "users", "admin", "jobs", "pages", "enumerations"]
+
+test("every generated tool belongs to exactly one domain label", () => {
   const assignments = new Map<string, string[]>()
   for (const def of toolDefinitionMap.values()) {
     const sets = toolsetsForDefinition(def)
     assert.equal(sets.length, 1, `${def.name} should be assigned exactly once`)
-    assert.ok(TOOLSET_NAMES.includes(sets[0] as typeof TOOLSET_NAMES[number]), `${def.name} has unknown toolset ${sets[0]}`)
+    assert.ok(DOMAINS.includes(sets[0]), `${def.name} has unknown domain ${sets[0]}`)
     assignments.set(def.name, sets)
   }
   assert.equal(assignments.size, 304)

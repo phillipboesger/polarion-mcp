@@ -47,10 +47,10 @@ test("an unlisted Origin is refused on /mcp", async () => {
   }
 })
 
-test("an unlisted Origin is refused on a toolset-specific MCP path", async () => {
+test("an unlisted Origin is refused on the MCP path", async () => {
   const { base, stop } = await startApp(["https://trusted.example"])
   try {
-    const res = await fetch(`${base}/mcp/work-items`, {
+    const res = await fetch(`${base}/mcp`, {
       method: "POST",
       headers: { origin: "https://evil.example", authorization: "Bearer pat", "content-type": "application/json", accept: "application/json, text/event-stream" },
       body: JSON.stringify(INIT_BODY),

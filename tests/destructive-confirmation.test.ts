@@ -16,7 +16,7 @@ async function invoke(options: { confirmDestructive?: boolean; capabilities?: Re
     name, title: name, description: 'test', inputSchema: { type: 'object' }, annotations: options.annotations,
     toolset: 'composites', handler: args => { calls++; assert.equal('confirm' in args, false); return { content: [{ type: 'text', text: 'executed' }] }; },
   });
-  const server = createPolarionServer({ filter: { toolsets: ['composites'] }, confirmDestructive: options.confirmDestructive });
+  const server = createPolarionServer({ confirmDestructive: options.confirmDestructive });
   const client = new Client({ name: 'confirmation-test', version: '1' }, { capabilities: options.capabilities as never });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   if (options.capabilities?.elicitation) {

@@ -343,15 +343,10 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   const logger: PipelineLogger = options.logger ?? createLogger({ format: options.logFormat, level: options.logLevel });
   registerCompositeTools();
   const deploymentFilter = parseToolFilter(process.env);
-  const intersect = (left?: readonly string[], right?: readonly string[]) => left && right
-    ? left.filter(value => right.includes(value))
-    : left ?? right;
   const filter: ToolFilter = {
-    allow: intersect(deploymentFilter.allow, options.filter?.allow) ? [...intersect(deploymentFilter.allow, options.filter?.allow)!] : undefined,
     readOnly: deploymentFilter.readOnly || options.filter?.readOnly,
-    toolsets: options.filter?.toolsets,
   };
-  const clientTools = filterTools(enabledTools, options.filter ?? {}).tools;
+  const clientTools = filterTools(enabledTools, options.filter ?? {});
   // `auto` and `discover` were removed; configurationWarnings tells the operator, the server behaves as `code`.
   const requestedMode = process.env.MCP_MODE?.trim() || 'code';
   if (!['code', 'full', 'auto', 'discover'].includes(requestedMode)) throw new Error('MCP_MODE must be code or full');

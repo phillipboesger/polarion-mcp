@@ -5,7 +5,7 @@
 - 304 generated Polarion REST tools from the committed OpenAPI-derived map.
 - MCP over stdio and Streamable HTTP, plus an optional REST HTTP wrapper.
 - Runtime input validation, OpenAPI authentication schemes, and output schemas where the operation defines a JSON response.
-- Tool filtering by name and read-only status; HTTP MCP also supports named toolsets.
+- Read-only filtering: `MCP_READ_ONLY` for the deployment, and `X-MCP-Readonly` per HTTP session.
 - Response text cap controlled by `MCP_MAX_RESPONSE_CHARS` (default 100,000 characters) for generated and composite output. Ordinary unpaged generated `structuredContent` remains complete; auto-collected paginated content is bounded by the cap and signals omitted results with `truncated: true`.
 
 ## Polarion-specific behavior

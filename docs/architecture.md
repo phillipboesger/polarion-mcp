@@ -12,7 +12,7 @@ Three entry points share the Polarion execution core:
 
 ## Tool surface
 
-`src/tools.ts` is generated from Polarion OpenAPI. `src/tool-filter.ts` and `src/toolsets.ts` control tool availability. `src/gpt-tools.ts` selects operations for the Custom GPT schema. See [generation](openapi-and-generation.md) and [extensions](extensions.md) for maintenance and extension interfaces.
+`src/tools.ts` is generated from Polarion OpenAPI. `src/tool-filter.ts` controls read-only availability, and `src/toolsets.ts` labels tools for Code Mode search. `src/gpt-tools.ts` selects operations for the Custom GPT schema. See [generation](openapi-and-generation.md) and [extensions](extensions.md) for maintenance and extension interfaces.
 
 `src/polarion.ts` supplies MCP resources, prompts and server instructions. Authentication is implemented in `src/auth.ts`, `src/oauth.ts` and the HTTP transport.
 

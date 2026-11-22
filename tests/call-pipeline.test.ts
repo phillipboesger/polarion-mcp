@@ -29,13 +29,13 @@ function parseRpc(body: string): any {
   return JSON.parse(line ? line.slice(5).trim() : body)
 }
 
-async function start(options: Parameters<typeof createMcpHttpApp>[0] = {}, toolsets?: string, readOnly = false) {
+async function start(options: Parameters<typeof createMcpHttpApp>[0] = {}, readOnly = false) {
   const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true, ...options })
   const server = app.listen(0, "127.0.0.1")
   await new Promise<void>(resolve => server.once('listening', resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const init = await fetch(`${base}/mcp`, {
-    method: 'POST', headers: { ...HEADERS, authorization: `Bearer ${TOKEN}`, ...(toolsets ? { 'X-MCP-Toolsets': toolsets } : {}), ...(readOnly ? { 'X-MCP-Readonly': 'true' } : {}) }, body: JSON.stringify(INIT),
+    method: 'POST', headers: { ...HEADERS, authorization: `Bearer ${TOKEN}`, ...(readOnly ? { 'X-MCP-Readonly': 'true' } : {}) }, body: JSON.stringify(INIT),
   })
   const sessionId = init.headers.get('mcp-session-id')
   assert.equal(init.status, 200)
@@ -55,13 +55,11 @@ async function start(options: Parameters<typeof createMcpHttpApp>[0] = {}, tools
 }
 
 test('call pipeline preserves generated catalogue and gates synthetic/generated calls', async t => {
-  await t.test('virtual registry applies allow, read-only, and toolset filters', () => {
+  await t.test('virtual registry applies the read-only filter', () => {
     const tool = { name: 'registry_probe', title: 'Probe', description: 'Probe', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true }, toolset: 'composites' as const, handler: () => ({ content: [] }) }
     const unregister = registerVirtualTool(tool)
     assert.throws(() => registerVirtualTool(tool), /already registered/)
-    assert.deepEqual(listVirtualTools({ allow: ['registry_probe'], readOnly: true, toolsets: ['composites'] }).map(item => item.name), ['registry_probe'])
-    assert.deepEqual(listVirtualTools({ allow: ['elsewhere'] }), [])
-    assert.deepEqual(listVirtualTools({ readOnly: true, toolsets: ['admin'] }), [])
+    assert.equal(listVirtualTools({ readOnly: true }).some(item => item.name === 'registry_probe'), true)
     unregister()
     const replacementUnregister = registerVirtualTool({ ...tool })
     unregister()
@@ -75,7 +73,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
       const { registerVirtualTool } = await import('./build-tests/src/virtual-tools.js');
       registerVirtualTool({ name: 'only_virtual', title: 'Only virtual', description: 'test', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true }, toolset: 'composites', handler: () => ({ content: [] }) });
       const { createPolarionServer } = await import('./build-tests/src/server.js');
-      createPolarionServer({ filter: { toolsets: ['composites'] } });
+      createPolarionServer();
       console.log('virtual-enabled');
     `
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
@@ -102,7 +100,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
     } finally { await app.stop() }
   })
 
-  await t.test('virtual tools are listed and callable, with request toolset/read-only narrowing', async () => {
+  await t.test('virtual tools are listed and callable, with request read-only narrowing', async () => {
     let handlerCalls = 0
     const unregisterPing = registerVirtualTool({
       name: 'test_ping', title: 'Test ping', description: 'Test-only virtual tool',
@@ -116,7 +114,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
       handler: () => { handlerCalls++; return { content: [{ type: 'text', text: 'unexpected' }] } },
     })
     try {
-      const app = await start({ allowedToolsets: ['composites'] }, 'composites', true)
+      const app = await start({}, true)
       try {
         const listed = (await app.request(2, 'tools/list')).result.tools
         const names = listed.map((tool: { name: string }) => tool.name)
@@ -138,7 +136,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
       handler: () => ({ isError: true, content: [{ type: 'text', text: 'e'.repeat(300_000) }] }),
     })
     try {
-      const app = await start({ allowedToolsets: ['composites'] }, 'composites', true)
+      const app = await start({}, true)
       try {
         const text = (await app.request(7, 'tools/call', { name: 'test_oversized_error', arguments: {} })).result.content[0].text
         assert.ok(text.length <= DEFAULT_MAX_RESPONSE_CHARS, `error result was ${text.length} characters`)
@@ -153,7 +151,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
       handler: () => ({ content: [{ type: 'text', text: 'z'.repeat(300_000) }] }),
     })
     try {
-      const app = await start({ allowedToolsets: ['composites'] }, 'composites', true)
+      const app = await start({}, true)
       try {
         const text = (await app.request(6, 'tools/call', { name: 'test_oversized', arguments: {} })).result.content[0].text
         assert.ok(text.length <= DEFAULT_MAX_RESPONSE_CHARS, `virtual result was ${text.length} characters`)
@@ -170,12 +168,11 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
     const events: unknown[] = []
     const app = await start({
       apiBaseUrl: upstreamUrl,
-      allowedToolsets: ['admin'],
       extensions: {
         policyHook: { beforeCall: ({ tool }) => tool === 'getLicense' ? { action: 'deny', reason: 'blocked by test policy' } : { action: 'allow' } },
         auditSink: { record: event => { events.push(event) } },
       },
-    }, 'admin')
+    })
     try {
       const args = { secretLikeValue: 'do-not-store' }
       const reply = await app.request(2, 'tools/call', { name: 'getLicense', arguments: args })
@@ -205,7 +202,7 @@ test('progress notifications reach an SDK client only when the request sends a p
       return { content: [{ type: 'text', text: 'done' }] }
     },
   })
-  const server = createPolarionServer({ filter: { toolsets: ['composites'] } })
+  const server = createPolarionServer()
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const client = new Client({ name: 'progress-test', version: '1' })
   await server.connect(serverTransport)
@@ -266,7 +263,7 @@ test('composite previews and invalid inputs make no upstream writes; explicit jo
   })
   await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve))
   const base = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/polarion/rest/v1`
-  const server = createPolarionServer({ apiBaseUrl: base, filter: { toolsets: ['composites'] }, transport: 'stdio' })
+  const server = createPolarionServer({ apiBaseUrl: base, transport: 'stdio' })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const client = new Client({ name: 'composite-pipeline-test', version: '1' })
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
@@ -314,7 +311,7 @@ test('composite previews and invalid inputs make no upstream writes; explicit jo
 })
 
 test('dry_run is ignored, not rejected, by strict read-only virtual tools', async () => {
-  const server = createPolarionServer({ apiBaseUrl: 'http://127.0.0.1:9/polarion/rest/v1', filter: { toolsets: ['composites'] }, transport: 'stdio' })
+  const server = createPolarionServer({ apiBaseUrl: 'http://127.0.0.1:9/polarion/rest/v1', transport: 'stdio' })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const client = new Client({ name: 'dry-run-readonly-test', version: '1' })
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])

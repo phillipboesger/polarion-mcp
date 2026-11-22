@@ -41,11 +41,7 @@ export function registerVirtualTool(tool: VirtualTool): () => void {
   return () => { if (registry.get(tool.name) === tool) registry.delete(tool.name); };
 }
 
-/** Lists registered tools after applying the same allowlist/read-only/toolset constraints as generated tools. */
+/** Lists registered tools after applying the same read-only constraint as generated tools. */
 export function listVirtualTools(filter: ToolFilter = {}): VirtualTool[] {
-  const allow = filter.allow ? new Set(filter.allow) : undefined;
-  const toolsets = filter.toolsets ? new Set(filter.toolsets) : undefined;
-  return [...registry.values()].filter(tool => (!allow || allow.has(tool.name))
-    && (!filter.readOnly || tool.annotations?.readOnlyHint === true)
-    && (!toolsets || toolsets.has(tool.toolset)));
+  return [...registry.values()].filter(tool => !filter.readOnly || tool.annotations?.readOnlyHint === true);
 }
