@@ -24,7 +24,7 @@ Configure a [PyPI Trusted Publisher](https://docs.pypi.org/trusted-publishers/cr
 
 ## Official MCP Registry
 
-Version 1.5.0 is published. After publishing a new npm release and container image, use the [official publisher](https://github.com/modelcontextprotocol/registry):
+Version 1.6.0 is published. After publishing a new npm release and container image, use the [official publisher](https://github.com/modelcontextprotocol/registry):
 
 ```sh
 mcp-publisher login github
