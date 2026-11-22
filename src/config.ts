@@ -87,6 +87,14 @@ const REMOVED_SETTINGS: Record<string, string> = {
   MCP_COMPLETIONS: 'argument completions were removed.',
   MCP_RESOURCE_LINKS: 'resource links were removed.',
   MCP_VERSION_CHECK: 'the Polarion version check was removed.',
+  MCP_VERIFY_MAX_ITEMS: 'the value is fixed at 10 items read back per bulk write.',
+  MCP_RATE_LIMIT_REGISTER: 'the value is fixed at 100 registrations per IP per hour.',
+  MCP_RATE_LIMIT_TOKEN_IP: 'the value is fixed at 500 failed token requests per IP per 15 minutes.',
+  MCP_SESSION_IDLE_MINUTES: 'the value is fixed at 60 minutes.',
+  MCP_MAX_SESSIONS: 'the value is fixed at 1000 sessions.',
+  MCP_REFRESH_TOKEN_TTL: 'the value is fixed at 14 days.',
+  MCP_LOG_FORMAT: 'use MCP_LOG, for example MCP_LOG=json,debug.',
+  MCP_LOG_LEVEL: 'use MCP_LOG, for example MCP_LOG=json,debug.',
   MCP_CODE_MODE_WRITES: 'use MCP_READ_ONLY=true to make Code Mode read-only.',
 };
 
@@ -98,6 +106,8 @@ export function deprecatedConfigWarnings(env: NodeJS.ProcessEnv): string[] {
   const warnings = Object.entries(REMOVED_SETTINGS)
     .filter(([name]) => env[name]?.trim())
     .map(([name, hint]) => `${name} is no longer supported and is ignored: ${hint}`);
+  const schemeVars = Object.keys(env).filter(name => /^(API_KEY|BEARER_TOKEN|BASIC_USERNAME|BASIC_PASSWORD|OAUTH_CLIENT_ID|OAUTH_CLIENT_SECRET|OAUTH_SCOPES|OAUTH_TOKEN|OPENID_TOKEN)_.+/.test(name) && env[name]?.trim());
+  for (const name of schemeVars) warnings.push(`${name} is no longer supported and is ignored: Polarion uses one token, set BEARER_TOKEN (stdio, REST wrapper) or send it as a Bearer header (HTTP).`);
   const mode = env.MCP_MODE?.trim();
   if (mode === 'auto' || mode === 'discover') warnings.push(`MCP_MODE=${mode} is no longer supported and runs as "code" (the default). Set MCP_MODE=full only if your client cannot approve the execute tool.`);
   return warnings;
@@ -129,25 +139,6 @@ export const requestBearerToken = new AsyncLocalStorage<string>();
  */
 export function getBearerToken(): string | undefined {
   return requestBearerToken.getStore() ?? process.env.BEARER_TOKEN;
-}
-
-/**
- * Get the Bearer token for a named OpenAPI security scheme.
- *
- * The token of the current request always wins: a `BEARER_TOKEN_<SCHEME>`
- * variable left in the environment must never silently take over an HTTP
- * request and make it act as somebody else in Polarion's audit trail. The
- * scheme-specific variable is a fallback for credential-holding modes (stdio,
- * REST wrapper) only.
- *
- * @param schemeName - Security scheme name from the OpenAPI document.
- * @returns The bearer token if available, undefined otherwise
- */
-export function getBearerTokenForScheme(schemeName: string): string | undefined {
-  const requestToken = requestBearerToken.getStore();
-  if (requestToken) return requestToken;
-  const envName = `BEARER_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`;
-  return process.env[envName] || process.env.BEARER_TOKEN;
 }
 
 /**

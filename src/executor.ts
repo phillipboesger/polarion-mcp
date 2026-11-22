@@ -24,8 +24,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema, mimeTypeForFile, describeByteLimit, DEFAULT_UPLOAD_MAX_BYTES } from "./utils.js";
 import { DEFAULT_VERIFY_MAX_ITEMS, isSingleResourceRoute, isVerifiableRoute, readBackFields, verificationMessage, verifyTargets, type VerifyTarget, type WriteLimits, type WriteVerification } from "./write-verification.js";
-import { API_BASE_URL, getBearerTokenForScheme, shouldRejectUnauthorized } from "./config.js";
-import { acquireOAuth2Token } from "./auth.js";
+import { API_BASE_URL, getBearerToken, shouldRejectUnauthorized } from "./config.js";
 import { MUTATING_METHODS, sendWithRetry, httpsAgent, type SendWithRetryOpts } from "./httpClient.js";
 import {
   checkWorkItemsEnumFields,
@@ -826,49 +825,9 @@ export async function executeApiTool(
         const scheme = allSecuritySchemes[schemeName];
         if (!scheme) return false;
 
-        // API Key security (can be in header, query, or cookie)
-        if (scheme.type === 'apiKey') {
-          return !!process.env[`API_KEY_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-        }
-
-        // HTTP security (Basic or Bearer authentication)
-        if (scheme.type === 'http') {
-          if (scheme.scheme?.toLowerCase() === 'bearer') {
-            // Bearer Token: the current request's token, else the env fallbacks
-            // BEARER_TOKEN_SCHEMENAME or BEARER_TOKEN
-            return !!getBearerTokenForScheme(schemeName);
-          }
-          else if (scheme.scheme?.toLowerCase() === 'basic') {
-            // Basic Auth: Requires both username and password
-            // Env vars: BASIC_USERNAME_SCHEMENAME and BASIC_PASSWORD_SCHEMENAME
-            return !!process.env[`BASIC_USERNAME_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`] &&
-              !!process.env[`BASIC_PASSWORD_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-          }
-        }
-
-        // OAuth2 security (more complex, supports auto token acquisition)
-        if (scheme.type === 'oauth2') {
-          // Check for pre-existing token
-          if (process.env[`OAUTH_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`]) {
-            return true;
-          }
-
-          // Check for client credentials for auto-acquisition
-          // If we have client ID and secret, we can automatically get a token
-          if (process.env[`OAUTH_CLIENT_ID_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`] &&
-            process.env[`OAUTH_CLIENT_SECRET_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`]) {
-            // Verify we have a supported flow (client credentials or password)
-            if (scheme.flows?.clientCredentials || scheme.flows?.password) {
-              return true;
-            }
-          }
-
-          return false;
-        }
-
-        // OpenID Connect security
-        if (scheme.type === 'openIdConnect') {
-          return !!process.env[`OPENID_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
+        // Polarion authenticates with a Bearer token only.
+        if (scheme.type === 'http' && scheme.scheme?.toLowerCase() === 'bearer') {
+          return !!getBearerToken();
         }
 
         return false;
@@ -879,82 +838,13 @@ export async function executeApiTool(
     // If we found matching security scheme(s), apply them to the request
     if (appliedSecurity) {
       // Apply each security scheme from this requirement (combined with AND)
-      for (const [schemeName, scopesArray] of Object.entries(appliedSecurity)) {
+      for (const [schemeName] of Object.entries(appliedSecurity)) {
         const scheme = allSecuritySchemes[schemeName];
-
-        // API Key security
-        if (scheme?.type === 'apiKey') {
-          const apiKey = process.env[`API_KEY_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-          if (apiKey) {
-            if (scheme.in === 'header') {
-              headers[scheme.name.toLowerCase()] = apiKey;
-              console.error(`[INFO] Applied API key '${schemeName}' in header '${scheme.name}'`);
-            }
-            else if (scheme.in === 'query') {
-              queryParams[scheme.name] = apiKey;
-              console.error(`[INFO] Applied API key '${schemeName}' in query parameter '${scheme.name}'`);
-            }
-            else if (scheme.in === 'cookie') {
-              // Add the cookie, preserving other cookies if they exist
-              headers['cookie'] = `${scheme.name}=${apiKey}${headers['cookie'] ? `; ${headers['cookie']}` : ''}`;
-              console.error(`[INFO] Applied API key '${schemeName}' in cookie '${scheme.name}'`);
-            }
-          }
-        }
-        // HTTP security (Bearer or Basic)
-        else if (scheme?.type === 'http') {
-          if (scheme.scheme?.toLowerCase() === 'bearer') {
-            // Check for scheme-specific token first, then fall back to generic BEARER_TOKEN
-            const token = getBearerTokenForScheme(schemeName);
-            if (token) {
-              headers['authorization'] = `Bearer ${token}`;
-              console.error(`[INFO] Applied Bearer token for '${schemeName}'`);
-            }
-          }
-          else if (scheme.scheme?.toLowerCase() === 'basic') {
-            const username = process.env[`BASIC_USERNAME_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-            const password = process.env[`BASIC_PASSWORD_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-            if (username && password) {
-              headers['authorization'] = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
-              console.error(`[INFO] Applied Basic authentication for '${schemeName}'`);
-            }
-          }
-        }
-        // OAuth2 security
-        else if (scheme?.type === 'oauth2') {
-          // First try to use a pre-provided token
-          let token = process.env[`OAUTH_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-
-          // If no token but we have client credentials, try to acquire a token
-          if (!token && (scheme.flows?.clientCredentials || scheme.flows?.password)) {
-            console.error(`[INFO] Attempting to acquire OAuth token for '${schemeName}'`);
-            token = (await acquireOAuth2Token(schemeName, scheme)) ?? '';
-          }
-
-          // Apply token if available
+        if (scheme?.type === 'http' && scheme.scheme?.toLowerCase() === 'bearer') {
+          const token = getBearerToken();
           if (token) {
             headers['authorization'] = `Bearer ${token}`;
-            console.error(`[INFO] Applied OAuth2 token for '${schemeName}'`);
-
-            // List the scopes that were requested, if any
-            const scopes = scopesArray as string[];
-            if (scopes && scopes.length > 0) {
-              console.error(`[INFO] Requested scopes: ${scopes.join(', ')}`);
-            }
-          }
-        }
-        // OpenID Connect
-        else if (scheme?.type === 'openIdConnect') {
-          const token = process.env[`OPENID_TOKEN_${schemeName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}`];
-          if (token) {
-            headers['authorization'] = `Bearer ${token}`;
-            console.error(`[INFO] Applied OpenID Connect token for '${schemeName}'`);
-
-            // List the scopes that were requested, if any
-            const scopes = scopesArray as string[];
-            if (scopes && scopes.length > 0) {
-              console.error(`[INFO] Requested scopes: ${scopes.join(', ')}`);
-            }
+            console.error(`[INFO] Applied Bearer token for '${schemeName}'`);
           }
         }
       }

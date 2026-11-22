@@ -21,15 +21,9 @@ export interface WriteLimits {
   uploadMaxBytes?: number;
 }
 
-/** Parses `MCP_VERIFY_MAX_ITEMS`: a positive integer, otherwise the default. */
-export function parseVerifyMaxItems(value: string | undefined): number {
-  const parsed = Number(value);
-  return value?.trim() && Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : DEFAULT_VERIFY_MAX_ITEMS;
-}
-
 /** Reads the write limits from the entry-point environment; an invalid `MCP_UPLOAD_MAX_BYTES` throws, as it does in `upload_attachment`. */
 export function writeLimitsFromEnv(env: NodeJS.ProcessEnv): WriteLimits {
-  return { verifyMaxItems: parseVerifyMaxItems(env.MCP_VERIFY_MAX_ITEMS), uploadMaxBytes: parseUploadMaxBytes(env.MCP_UPLOAD_MAX_BYTES) };
+  return { verifyMaxItems: DEFAULT_VERIFY_MAX_ITEMS, uploadMaxBytes: parseUploadMaxBytes(env.MCP_UPLOAD_MAX_BYTES) };
 }
 
 export type VerificationStatus = 'verified' | 'mismatch' | 'uncertain' | 'skipped';
@@ -298,7 +292,7 @@ export async function verifyTargets(
   const beyond = skipped.filter(item => item.reason === BEYOND_LIMIT_REASON).length;
   const reason = status === 'skipped'
     ? [...new Set(skipped.map(item => item.reason))].join('; ')
-    : beyond ? `Verified ${checked} of ${targets.length} items; the rest are ${BEYOND_LIMIT_REASON} (MCP_VERIFY_MAX_ITEMS).` : undefined;
+    : beyond ? `Verified ${checked} of ${targets.length} items; the rest are ${BEYOND_LIMIT_REASON}.` : undefined;
   return { status, mismatches, uncertain, ...(skipped.length ? { skipped } : {}), ...(reason ? { reason } : {}) };
 }
 

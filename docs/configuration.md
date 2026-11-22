@@ -30,30 +30,16 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_UPLOAD_MAX_BYTES` | `26214400` (25 MiB) | `src/composite-upload.ts` per call, executor at startup | No | Maximum attachment size, one limit for `upload_attachment` and the attachment tools. Positive integer, checked before reading local files, while streaming URLs and before a base64 attachment is sent. An invalid value stops startup with an error. |
 | `MCP_UPLOAD_URL_HOSTS` | Empty (URL uploads off) | `src/composite-upload.ts` per call | No | Comma-separated exact host allowlist for `upload_attachment.url`; each redirect host and DNS result is checked. |
 | `MCP_UPLOAD_ALLOW_HTTP` | `false` | `src/composite-upload.ts` per call | No | Set to `true` to permit HTTP URLs. HTTPS is otherwise required. |
-| `MCP_REFRESH_TOKEN_TTL` | `1209600` seconds (14 days) | `src/mcp-http-server.ts`, `src/oauth.ts` | No | Sliding refresh-token lifetime in seconds, capped by a 90-day token-family lifetime. Must be a positive integer. |
-| `MCP_RATE_LIMIT_REGISTER` | `100` | `src/mcp-http-server.ts` | No | Successful or failed dynamic OAuth registrations allowed per IP per hour. Positive integer. |
-| `MCP_RATE_LIMIT_TOKEN_IP` | `500` | `src/mcp-http-server.ts` | No | Failed OAuth token requests allowed per IP per 15 minutes. Successful requests do not count. Positive integer. |
-| `MCP_SESSION_IDLE_MINUTES` | `60` minutes | `src/mcp-http-server.ts` | No | Idle Streamable HTTP session lifetime. Positive integer overrides default. |
-| `MCP_MAX_SESSIONS` | `1000` | `src/mcp-http-server.ts` | No | Maximum in-memory MCP sessions; excess sessions evict the least recently used. Positive integer overrides default. |
 | `MCP_VERIFY_WRITES` | `true` | All server entry points | No | Set to `false` to disable supported write read-back verification. |
-| `MCP_VERIFY_MAX_ITEMS` | `10` | All server entry points | No | Maximum items read back for one bulk Work Item write; the remaining items are reported as skipped. Positive integer. |
 | `MCP_MAX_RESPONSE_CHARS` | `100000` characters | `src/index.ts`, `src/http-server.ts`, `src/mcp-http-server.ts` | No | Maximum generated and composite response text size. Positive integer overrides default. Ordinary unpaged generated structured content remains complete; automatically collected pages may be trimmed to the cap and signal truncation. |
 | `MCP_RATE_LIMIT_TOOLS` | `0` (off) | `src/index.ts`, `src/mcp-http-server.ts` | No | Maximum tool calls per user in a rolling minute. Non-negative integer; over-limit calls return an MCP error with a retry hint. |
 | `MCP_MARK_UNTRUSTED` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Wrap likely user-authored Polarion text fields in `<polarion-untrusted>` markers after neutralizing embedded closing markers. The response then also carries a top-level `_notice` telling the model to treat Polarion content as data. With the default (`false`) results are returned unchanged. Accepts `1`, `true`, `yes` or `on`. |
-| `MCP_LOG_FORMAT` | `text` | `src/index.ts`, `src/mcp-http-server.ts` | No | Tool-call log format: `text` preserves current output; `json` writes structured JSON lines to stderr. |
-| `MCP_LOG_LEVEL` | `info` | `src/index.ts`, `src/mcp-http-server.ts` | No | Minimum tool-call log level: `debug`, `info`, `warn`, or `error`. |
+| `MCP_LOG` | `text,info` | `src/index.ts`, `src/mcp-http-server.ts` | No | Tool-call logging as comma-separated words: a format (`text` or `json`, structured JSON lines on stderr) and a minimum level (`debug`, `info`, `warn`, `error`), for example `json,debug`. |
 | `MCP_CONFIRM_DESTRUCTIVE` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Set to `true` (or `1`, `yes`, `on`) to require confirmation for destructive, delete, `patchAll*`, and bulk tools. Elicitation-capable clients receive a confirmation prompt; other clients may provide `confirm: true` on the first call. Previewing with `dry_run: true` is recommended, not enforced. |
 | `MCP_MODE` | `code` | `src/server.ts` | No | `code` (default) lists two tools, `search` and `execute`, and reaches every Polarion operation through them. `full` lists the whole catalogue; use it only for a client that cannot approve `execute` (for example `codex exec` with approval policy "never"). `auto` and `discover` are removed and run as `code` with a startup warning. |
 | `MCP_READ_ONLY` | `false` | `src/tool-filter.ts` | No | Keep only tools annotated read-only. Accepts true/1/yes/on or false/0/no/off. |
 | `TRUST_PROXY` | Unset | `src/http-server.ts`, `src/mcp-http-server.ts` | No | Express trusted proxy setting (for example `loopback`, hop count `1`, or proxy addresses). Required behind a proxy for client IP rate limiting. `true` is rejected. |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | TLS verification enabled | `src/config.ts` | No | Set to `0` to disable certificate verification. Use only with trusted internal TLS endpoints. |
-| `API_KEY_<SCHEME>` | Unset | `src/executor.ts` | Yes | API key for an OpenAPI security scheme. Replace `<SCHEME>` with the uppercased scheme name, replacing non-alphanumeric characters with `_`. |
-| `BEARER_TOKEN_<SCHEME>` | Falls back to `BEARER_TOKEN` | `src/config.ts` | Yes | Scheme-specific bearer credential using the same `<SCHEME>` conversion. |
-| `BASIC_USERNAME_<SCHEME>` / `BASIC_PASSWORD_<SCHEME>` | Unset | `src/executor.ts` | Yes | Basic credentials for an OpenAPI security scheme. |
-| `OAUTH_CLIENT_ID_<SCHEME>` / `OAUTH_CLIENT_SECRET_<SCHEME>` | Unset | `src/auth.ts`, `src/executor.ts` | Yes | OAuth client credentials for an OpenAPI security scheme. |
-| `OAUTH_SCOPES_<SCHEME>` | Unset | `src/auth.ts` | No | Optional OAuth scopes for the security scheme. |
-| `OAUTH_TOKEN_<SCHEME>` | Unset | `src/executor.ts` | Yes | Pre-supplied OAuth token for the scheme. |
-| `OPENID_TOKEN_<SCHEME>` | Unset | `src/executor.ts` | Yes | Pre-supplied OpenID token for the scheme. |
 
 Mutating generated and composite tools accept `dry_run` as a boolean or the compatibility values `"true"`, `"false"`, `1`, and `0`. These normalize to canonical booleans; malformed values are rejected before side effects. Composite inputs are validated against their declared schemas before handlers run.
 
@@ -61,7 +47,7 @@ The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Tool
 
 `MCP_ALLOWED_ORIGINS` protects MCP and OAuth routes from browser-origin abuse and DNS rebinding. The request path is matched case-insensitively. The public origin in `MCP_PUBLIC_URL` is always accepted; otherwise configure trusted origins. Requests without an Origin header are not rejected. The REST wrapper uses the separate `HTTP_CORS_ORIGINS` setting.
 
-Settings that narrowed the tool list or toggled single features in older versions are removed. They are ignored, and the startup log names each one that is still set. Code Mode makes them unnecessary; use `MCP_READ_ONLY=true` to remove write access.
+Settings that narrowed the tool list or toggled single features in older versions are removed. They are ignored, and the startup log names each one that is still set. This includes the fixed limits (10 items read back per bulk write, 100 registrations per IP per hour, 500 failed token requests per IP per 15 minutes, 60 minute idle sessions, 1000 sessions, 14 day refresh tokens), the separate log format and level settings, and the per-scheme credential variables: Polarion takes one token. Code Mode makes them unnecessary; use `MCP_READ_ONLY=true` to remove write access.
 
 ## Network paths
 

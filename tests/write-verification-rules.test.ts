@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { executeApiTool } from '../src/executor.js';
-import { compareAttribute, isVerifiableRoute, parseVerifyMaxItems, richTextContent, writeLimitsFromEnv } from '../src/write-verification.js';
+import { compareAttribute, isVerifiableRoute, richTextContent, writeLimitsFromEnv } from '../src/write-verification.js';
 import { securitySchemes, toolDefinitionMap } from '../src/tools.js';
 import { parseUploadMaxBytes } from '../src/utils.js';
 import type { McpToolDefinition } from '../src/types.js';
@@ -214,33 +214,6 @@ test('the verify item limit is configurable', async () => {
   assert.equal(all.verification.skipped, undefined);
 });
 
-// ---- Read-back requests keep query-parameter authentication ----
-
-test('read-back and dry-run diff GETs merge fields[workitems]=@all into existing query params such as an apiKey', async () => {
-  const requests: Array<{ method: string; url: string }> = [];
-  const server = createServer((req, res) => {
-    requests.push({ method: req.method ?? '', url: req.url ?? '' });
-    if (req.method === 'PATCH') return res.writeHead(204).end();
-    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: { attributes: { title: 'new' } } }));
-  });
-  server.listen(0, '127.0.0.1'); await once(server, 'listening');
-  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  const previous = process.env.API_KEY_QUERYKEY; process.env.API_KEY_QUERYKEY = 'query-secret-value';
-  const def: McpToolDefinition = { ...documentDefinition, name: 'patchQueryAuth', pathTemplate: '/projects/{projectId}/workitems/{workItemId}', executionParameters: [{ name: 'projectId', in: 'path' }, { name: 'workItemId', in: 'path' }], securityRequirements: [{ queryKey: [] }], inputSchema: { type: 'object', properties: { projectId: { type: 'string' }, workItemId: { type: 'string' }, requestBody: { type: 'object' } }, required: ['projectId', 'workItemId', 'requestBody'] } };
-  const schemes = { queryKey: { type: 'apiKey', in: 'query', name: 'api_key' } };
-  try {
-    for (const dry_run of [false, true]) {
-      requests.length = 0;
-      await executeApiTool('patchQueryAuth', def, { projectId: 'p', workItemId: 'W-1', dry_run, requestBody: { data: { attributes: { title: 'new' } } } }, schemes, FAST, undefined, base, true);
-      const get = requests.find(item => item.method === 'GET');
-      assert.ok(get, `a read happened (dry_run=${dry_run})`);
-      assert.match(get.url, /api_key=query-secret-value/);
-      assert.match(get.url, /fields(%5B|\[)workitems(%5D|\])=(%40|@)all/);
-      assert.doesNotMatch(get.url, /[?&]fields=/);
-    }
-  } finally { if (previous === undefined) delete process.env.API_KEY_QUERYKEY; else process.env.API_KEY_QUERYKEY = previous; server.close(); await once(server, 'close'); }
-});
-
 test('a document read-back asks for fields[documents]=@all and never a bare fields parameter', async () => {
   const urls: string[] = [];
   const server = createServer((req, res) => {
@@ -323,16 +296,11 @@ test('only routes with a read-back implementation advertise verify', () => {
   assert.equal(route('delete', '/projects/{projectId}/workitems/{workItemId}'), false);
   assert.equal(route('post', '/projects/{projectId}/workitems/{workItemId}/attachments'), false);
   assert.equal(route('patch', '/projects/{projectId}/testruns/{testRunId}'), false);
-  assert.equal(parseVerifyMaxItems(undefined), 10);
-  assert.equal(parseVerifyMaxItems('3'), 3);
-  assert.equal(parseVerifyMaxItems('0'), 10);
-  assert.equal(parseVerifyMaxItems('abc'), 10);
 });
 
 test('write limits are parsed once from the environment; the upload limit uses the one strict parser', () => {
   assert.deepEqual(writeLimitsFromEnv({}), { verifyMaxItems: 10, uploadMaxBytes: 25 * 1024 * 1024 });
-  assert.deepEqual(writeLimitsFromEnv({ MCP_VERIFY_MAX_ITEMS: '4', MCP_UPLOAD_MAX_BYTES: '50000000' }), { verifyMaxItems: 4, uploadMaxBytes: 50_000_000 });
-  assert.equal(writeLimitsFromEnv({ MCP_VERIFY_MAX_ITEMS: '-1' }).verifyMaxItems, 10);
+  assert.deepEqual(writeLimitsFromEnv({ MCP_VERIFY_MAX_ITEMS: '4', MCP_UPLOAD_MAX_BYTES: '50000000' }), { verifyMaxItems: 10, uploadMaxBytes: 50_000_000 });
   for (const invalid of ['big', '0', '-5', '1.5']) {
     assert.throws(() => writeLimitsFromEnv({ MCP_UPLOAD_MAX_BYTES: invalid }), /MCP_UPLOAD_MAX_BYTES must be a positive integer/);
     assert.throws(() => parseUploadMaxBytes(invalid), /MCP_UPLOAD_MAX_BYTES must be a positive integer/);

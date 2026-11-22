@@ -18,18 +18,12 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, flagO
 import { createPolarionServer } from './server.js';
 import { parseMaxResponseChars } from './executor.js';
 import { writeLimitsFromEnv } from './write-verification.js';
-import type { LogFormat, LogLevel } from './logger.js';
+import { parseLogSetting } from './logger.js';
 
 function parseToolRateLimit(value: string | undefined): number {
   const parsed = Number(value ?? 0);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
 }
-function logSettings(env: NodeJS.ProcessEnv): { logFormat: LogFormat; logLevel: LogLevel } {
-  const format = env.MCP_LOG_FORMAT?.trim().toLowerCase();
-  const level = env.MCP_LOG_LEVEL?.trim().toLowerCase();
-  return { logFormat: format === 'json' ? 'json' : 'text', logLevel: ['debug', 'info', 'warn', 'error'].includes(level ?? '') ? level as LogLevel : 'info' };
-}
-
 /**
  * Builds the Polarion MCP server and serves it over stdio.
  *
@@ -41,7 +35,7 @@ function logSettings(env: NodeJS.ProcessEnv): { logFormat: LogFormat; logLevel: 
 async function main(): Promise<void> {
   try {
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
-    const server = createPolarionServer({ ...logSettings(process.env), transport: 'stdio', maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: flagOn(process.env.MCP_MARK_UNTRUSTED), confirmDestructive: flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE), apiBaseUrl: API_BASE_URL });
+    const server = createPolarionServer({ ...parseLogSetting(process.env.MCP_LOG), transport: 'stdio', maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: flagOn(process.env.MCP_MARK_UNTRUSTED), confirmDestructive: flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE), apiBaseUrl: API_BASE_URL });
     const transport = new StdioServerTransport();
     await server.connect(transport);
 
