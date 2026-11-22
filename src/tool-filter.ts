@@ -8,6 +8,7 @@
  * any more: Code Mode keeps the tool list at two entries.
  */
 
+import './profile.js';
 import { toolDefinitionMap } from './tools.js';
 import { correctAnnotations } from './annotations.js';
 import type { McpToolDefinition } from './types.js';
