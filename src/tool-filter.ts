@@ -12,15 +12,9 @@ import './profile.js';
 import { toolDefinitionMap } from './tools.js';
 import { correctAnnotations } from './annotations.js';
 import type { McpToolDefinition } from './types.js';
-import { toolsetsForDefinition, type ToolsetName } from './toolsets.js';
-
 export interface ToolFilter {
-  /** Tool names to keep; undefined keeps all. */
-  allow?: string[];
   /** Keep only tools annotated as read-only. */
   readOnly?: boolean;
-  /** Keep tools whose generated REST path belongs to one of these domains. */
-  toolsets?: readonly ToolsetName[];
 }
 
 /**
@@ -51,30 +45,24 @@ export function parseToolFilter(env: NodeJS.ProcessEnv): ToolFilter {
 /**
  * @param tools - All tool definitions, by name.
  * @param filter - What to keep.
- * @returns The kept tools, plus allowlisted names that match no tool (typos,
- *   or tools renamed by a regeneration).
+ * @returns The kept tools, with corrected annotations.
  */
 export function filterTools(
   tools: ReadonlyMap<string, McpToolDefinition>,
   filter: ToolFilter
-): { tools: Map<string, McpToolDefinition>; unknown: string[] } {
-  const allow = filter.allow ? new Set(filter.allow) : undefined;
-  const toolsets = filter.toolsets ? new Set(filter.toolsets) : undefined;
-  const kept = new Map(
+): Map<string, McpToolDefinition> {
+  return new Map(
     [...tools]
-      .filter(([name, def]) => (!allow || allow.has(name))
-        && (!filter.readOnly || def.annotations?.readOnlyHint === true)
-        && (!toolsets || toolsetsForDefinition(def).some(toolset => toolsets.has(toolset))))
+      .filter(([, def]) => !filter.readOnly || def.annotations?.readOnlyHint === true)
       .map(([name, def]) => [name, correctAnnotations(def)] as const)
   );
-  return { tools: kept, unknown: (filter.allow ?? []).filter(name => !tools.has(name)) };
 }
 
 const filtered = filterTools(toolDefinitionMap, parseToolFilter(process.env));
-if (filtered.tools.size !== toolDefinitionMap.size) {
-  console.error(`[INFO] Tool filter: ${filtered.tools.size}/${toolDefinitionMap.size} tools enabled`);
+if (filtered.size !== toolDefinitionMap.size) {
+  console.error(`[INFO] Tool filter: ${filtered.size}/${toolDefinitionMap.size} tools enabled`);
 }
 
 /** The tools this deployment exposes, with corrected annotations. */
-export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered.tools;
+export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered;
 

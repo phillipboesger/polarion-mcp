@@ -8,13 +8,12 @@ process.env.MCP_READ_ONLY = "true"
 const { createMcpHttpApp } = await import("../src/mcp-http-server.js")
 
 process.env.MCP_MODE = 'full'
-type ToolsetName = import("../src/toolsets.js").ToolsetName
 
 const HEADERS = { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: "Bearer pat" }
 const initializeBody = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } } })
 
-async function startApp(allowedToolsets?: ToolsetName[]) {
-  const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true, allowedToolsets })
+async function startApp() {
+  const { app, closeAllSessions } = createMcpHttpApp({ validateToken: async () => true })
   const server = app.listen(0, "127.0.0.1")
   await new Promise<void>((resolve) => server.once("listening", resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -52,70 +51,55 @@ async function list(base: string, id: string, extraHeaders: Record<string, strin
   return payload.result.tools.map((tool: { name: string }) => tool.name)
 }
 
-test("toolset header narrows the session and later headers cannot change it; calls outside it are refused", async () => {
+test("X-MCP-Readonly narrows the session; a later header cannot lift it", async () => {
+  const app = await startApp()
+  try {
+    const { id } = await initialize(app.base, "/mcp", { "X-MCP-Readonly": "true" })
+    const ro = await list(app.base, id)
+    assert.ok(ro.includes("getWorkItem") && !ro.includes("deleteWorkItems"))
+    const refused = await send(app.base, id, {
+      jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "deleteWorkItems", arguments: { requestBody: {} } },
+    }, { "X-MCP-Readonly": "false" })
+    assert.equal(refused.payload.result.isError, true)
+    assert.match(refused.payload.result.content[0].text, /Unknown tool/)
+  } finally {
+    await app.stop()
+  }
+})
+
+test("an invalid X-MCP-Readonly value is a 400 and does not change an existing session", async () => {
+  const app = await startApp()
+  try {
+    const { id } = await initialize(app.base, "/mcp", {})
+    const bad = await fetch(`${app.base}/mcp`, {
+      method: "POST", headers: { ...HEADERS, "mcp-session-id": id, "X-MCP-Readonly": "sometimes" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/list", params: {} }),
+    })
+    assert.equal(bad.status, 400)
+    assert.match((await bad.json() as any).error.message, /X-MCP-Readonly must be true or false/)
+    assert.ok((await list(app.base, id)).includes("getWorkItem"))
+  } finally {
+    await app.stop()
+  }
+})
+
+test("X-MCP-Toolsets is ignored: it does not narrow the catalogue", async () => {
   const app = await startApp()
   try {
     const { response, id } = await initialize(app.base, "/mcp", { "X-MCP-Toolsets": "work-items" })
     assert.equal(response.status, 200)
-    const narrowed = await list(app.base, id, { "X-MCP-Toolsets": "admin" })
-    assert.ok(narrowed.includes("getWorkItem") && !narrowed.includes("getLicense"))
-
-    const outside = await send(app.base, id, {
-      jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "getLicense", arguments: {} },
-    }, { "X-MCP-Toolsets": "admin" })
-    assert.equal(outside.payload.result.isError, true)
-    assert.match(outside.payload.result.content[0].text, /Unknown tool/)
-
-    const invalidLater = await fetch(`${app.base}/mcp`, {
-      method: "POST", headers: { ...HEADERS, "mcp-session-id": id, "X-MCP-Toolsets": "work-itemz" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/list", params: {} }),
-    })
-    assert.equal(invalidLater.status, 400)
-    assert.match((await invalidLater.json() as any).error.message, /Valid toolsets/)
-    const still = await list(app.base, id)
-    assert.ok(still.includes("getWorkItem") && !still.includes("getLicense"))
+    const names = await list(app.base, id, { "X-MCP-Toolsets": "work-itemz" })
+    assert.ok(names.includes("getWorkItem") && names.includes("getLicense"))
   } finally {
     await app.stop()
   }
 })
 
-test("deployment toolsets cannot be widened by a request header", async () => {
-  const app = await startApp(["work-items"])
-  try {
-    const { id } = await initialize(app.base, "/mcp", { "X-MCP-Toolsets": "admin" })
-    assert.deepEqual(await list(app.base, id), [])
-  } finally {
-    await app.stop()
-  }
-})
-
-test("path toolsets and readonly header intersect with MCP_READ_ONLY", async () => {
+test("the /mcp/:toolsets path variant no longer exists", async () => {
   const app = await startApp()
   try {
-    const { id } = await initialize(app.base, "/mcp/work-items", { "X-MCP-Readonly": "true" })
-    const ro = await list(app.base, id)
-    assert.ok(ro.includes("getWorkItem") && !ro.includes("deleteWorkItems") && !ro.includes("getLicense"))
-    const outside = await send(app.base, id, {
-      jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "deleteWorkItems", arguments: { requestBody: {} } },
-    })
-    assert.equal(outside.payload.result.isError, true)
-
-    const adminPath = await initialize(app.base, "/mcp/admin")
-    const admin = await list(app.base, adminPath.id)
-    assert.ok(admin.includes("getLicense") && !admin.includes("getWorkItem"))
-  } finally {
-    await app.stop()
-  }
-})
-
-test("unknown request toolsets return 400 with valid names", async () => {
-  const app = await startApp()
-  try {
-    const { response, payload } = await initialize(app.base, "/mcp", { "X-MCP-Toolsets": "work-itemz" })
-    assert.equal(response.status, 400)
-    assert.equal(payload.jsonrpc, "2.0")
-    assert.equal(payload.error.code, -32602)
-    assert.match(payload.error.message, /Unknown toolset.*Valid toolsets.*work-items.*documents/s)
+    const response = await fetch(`${app.base}/mcp/foo`, { method: "POST", headers: HEADERS, body: initializeBody })
+    assert.equal(response.status, 404)
   } finally {
     await app.stop()
   }

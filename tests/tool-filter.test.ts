@@ -39,26 +39,17 @@ test("parseToolFilter: unset means no filter, and MCP_TOOLS is no longer read", 
 })
 
 test("filterTools: no filter keeps every tool", () => {
-  const result = filterTools(toolDefinitionMap, {})
-  assert.equal(result.tools.size, toolDefinitionMap.size)
-  assert.deepEqual(result.unknown, [])
+  assert.equal(filterTools(toolDefinitionMap, {}).size, toolDefinitionMap.size)
 })
 
 test("filterTools: read-only keeps exactly the readOnlyHint tools", () => {
-  const { tools } = filterTools(toolDefinitionMap, { readOnly: true })
+  const tools = filterTools(toolDefinitionMap, { readOnly: true })
   assert.ok(tools.size > 0 && tools.size < toolDefinitionMap.size)
   for (const def of tools.values()) assert.equal(def.annotations?.readOnlyHint, true, def.name)
   assert.ok(!tools.has("deleteWorkItems"))
 })
 
-test("filterTools: the allowlist and read-only intersect, unknown names are reported", () => {
-  const { tools, unknown } = filterTools(toolDefinitionMap, { allow: ["getWorkItem", "deleteWorkItems", "getWorkItems", "noSuchTool"], readOnly: true })
-  assert.deepEqual([...tools.keys()].sort(), ["getWorkItem", "getWorkItems"])
-  assert.deepEqual(unknown, ["noSuchTool"])
-  assert.deepEqual(filterTools(toolDefinitionMap, { allow: [] }).tools.size, 0)
-})
-
-test("filterTools treats missing annotations as non-read-only and reports only unknown allowlist names", () => {
+test("filterTools treats missing annotations as non-read-only", () => {
   const readOnly = [...toolDefinitionMap.values()].find((def) => def.annotations?.readOnlyHint === true)
   const write = [...toolDefinitionMap.values()].find((def) => def.annotations?.readOnlyHint !== true)
   assert.ok(readOnly && write, "generated tools should include read and write definitions")
@@ -69,9 +60,8 @@ test("filterTools treats missing annotations as non-read-only and reports only u
     ["unannotated", unannotated],
   ])
 
-  const filtered = filterTools(fixture, { allow: ["reader", "writer", "unannotated", "missing", "missing"], readOnly: true })
-  assert.deepEqual([...filtered.tools.keys()], ["reader"])
-  assert.deepEqual(filtered.unknown, ["missing", "missing"])
+  const filtered = filterTools(fixture, { readOnly: true })
+  assert.deepEqual([...filtered.keys()], ["reader"])
 })
 
 test("parseToolFilter trims flags", () => {

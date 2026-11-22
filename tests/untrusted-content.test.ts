@@ -45,7 +45,7 @@ test('generated tools annotate prefixed text and structured content on a real to
   });
   await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
   const apiBaseUrl = `http://127.0.0.1:${(upstream.address() as { port: number }).port}`;
-  const server = createPolarionServer({ apiBaseUrl, markUntrusted: true, filter: { allow: ['getProjects'] } });
+  const server = createPolarionServer({ apiBaseUrl, markUntrusted: true });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'untrusted-test', version: '1' });
   await server.connect(serverTransport); await client.connect(clientTransport);
@@ -100,7 +100,7 @@ test('upstream error text is wrapped as one untrusted value when marking is on',
   })
   await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve))
   const apiBaseUrl = `http://127.0.0.1:${(upstream.address() as { port: number }).port}`
-  const server = createPolarionServer({ apiBaseUrl, markUntrusted: true, filter: { allow: ['getProjects'] } })
+  const server = createPolarionServer({ apiBaseUrl, markUntrusted: true })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const client = new Client({ name: 'untrusted-error-test', version: '1' })
   await server.connect(serverTransport); await client.connect(clientTransport)

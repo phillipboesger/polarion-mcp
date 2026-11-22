@@ -183,13 +183,13 @@ test("CIMD client metadata and loopback preset authorize by exact random-port ca
   }
 })
 
-test("GPT REST route, work-items path toolset, and REST wrapper expose expected tools", async () => {
+test("GPT REST route and REST wrapper expose expected tools", async () => {
   const mcp = await app({ validateToken: async () => true })
   try {
-    const pair = await rpcClient(mcp.base, PAT, "/mcp/work-items")
+    const pair = await rpcClient(mcp.base, PAT, "/mcp")
     const workItemTools = (await pair.client.listTools()).tools.map(tool => tool.name)
     assert.ok(workItemTools.includes("getWorkItem") && workItemTools.includes("getWorkItems"))
-    assert.ok(!workItemTools.includes("getProjects"))
+    assert.ok(workItemTools.includes("search") && workItemTools.includes("execute"))
     await pair.transport.close()
   } finally { await mcp.close() }
 

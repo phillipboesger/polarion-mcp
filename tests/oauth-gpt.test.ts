@@ -11,13 +11,12 @@ const GPT_CLIENT = { clientId: "polarion-gpt", clientSecret: "gpt-client-secret-
 const CALLBACK = "https://chatgpt.com/aip/g-abc123DEF/oauth/callback"
 
 /** Starts the app with the OAuth login and, unless disabled, the Custom GPT client. */
-async function startApp(withGpt = true, allowedToolsets?: Parameters<typeof createMcpHttpApp>[0] extends infer O ? (O extends { allowedToolsets?: infer T } ? T : never) : never, extra: Partial<Parameters<typeof createMcpHttpApp>[0]> = {}) {
+async function startApp(withGpt = true, extra: Partial<Parameters<typeof createMcpHttpApp>[0]> = {}) {
   const { app, closeAllSessions } = createMcpHttpApp({
     publicUrl: new URL(PUBLIC_URL),
     validateToken: async (token) => token === VALID_PAT,
     tokenSecret: "gpt-test-token-secret-long-enough-0123456789",
     ...(withGpt ? { gptClient: GPT_CLIENT } : {}),
-    ...(allowedToolsets ? { allowedToolsets } : {}),
     ...extra,
   })
   const server = app.listen(0, "127.0.0.1")
@@ -260,7 +259,7 @@ test("the deployment toolset allowlist also limits the Custom GPT REST routes", 
   })()
   assert.ok(unrestrictedNames.includes("deleteWorkItems"))
 
-  const { base, stop } = await startApp(true, ["composites"])
+  const { base, stop } = await startApp(true)
   try {
     const code = await gptCode(base)
     const tokens = (await (await gptToken(base, { grant_type: "authorization_code", code, redirect_uri: CALLBACK })).json()) as Tokens
@@ -286,7 +285,7 @@ async function gptAccess(base: string) {
 }
 
 test("Custom GPT REST calls require confirm for destructive tools when MCP_CONFIRM_DESTRUCTIVE is on", async () => {
-  const { base, stop } = await startApp(true, undefined, { confirmDestructive: true })
+  const { base, stop } = await startApp(true, { confirmDestructive: true })
   try {
     const access = await gptAccess(base)
     const blocked = await restCall(base, access, "deleteWorkItems", { projectId: "PRJ", requestBody: { data: [{ type: "workitems", id: "PRJ/WI-1" }] } })
@@ -297,7 +296,7 @@ test("Custom GPT REST calls require confirm for destructive tools when MCP_CONFI
 
 test("Custom GPT REST calls share the deployment tool-call rate limit and the audit sink", async () => {
   const audited: string[] = []
-  const { base, stop } = await startApp(true, undefined, {
+  const { base, stop } = await startApp(true, {
     rateLimitTools: 1, apiBaseUrl: "http://127.0.0.1:9/polarion/rest/v1",
     extensions: { auditSink: { record: async (event: { tool: string; outcome: string }) => { audited.push(`${event.tool}:${event.outcome}`) } } } as any,
   })

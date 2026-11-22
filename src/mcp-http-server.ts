@@ -45,9 +45,9 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, reque
 import { createPolarionServer, createToolCaller } from './server.js';
 import { writeLimitsFromEnv, type WriteLimits } from './write-verification.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
-import { enabledTools, filterTools } from './tool-filter.js';
+import { enabledTools } from './tool-filter.js';
+import { parseProfile } from './profile.js';
 import type { McpToolDefinition } from './types.js';
-import { parseToolsetNames, TOOLSET_NAMES, type ToolsetName } from './toolsets.js';
 import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
 import { PolarionOAuthProvider, probePolarionToken, normalizeTokenProbeResult, formatTokenDiagnostic, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenCheckFunction, type TokenValidator } from './oauth.js';
 import { fetchClientMetadata, type CimdMetadataFetcher } from './cimd.js';
@@ -150,8 +150,6 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
 export interface McpHttpAppOptions {
   verifyWrites?: boolean;
   writeLimits?: WriteLimits;
-  /** Deployment-wide toolset allowlist. Request selectors can only narrow it. */
-  allowedToolsets?: readonly ToolsetName[];
   /** Maximum characters returned in tool text content. */
   maxResponseChars?: number;
   /** Calls per user per rolling minute; zero disables the limiter. */
@@ -247,7 +245,6 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const { allowedHosts, publicUrl, validateToken, gptClient, trustProxy, allowedRedirectUris, maxResponseChars } = options;
   const allowedPresets = parseRedirectAllowlist(undefined, options.allowedRedirectPresets);
   const effectiveAllowedRedirectUris = [...(allowedRedirectUris ?? []), ...allowedPresets];
-  const allowedToolsets = options.allowedToolsets ?? TOOLSET_NAMES;
   const cimdEnabled = options.cimdEnabled ?? false;
   const app = express();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
@@ -255,7 +252,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const corsMiddleware = cors({
     origin: true,
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'X-MCP-Toolsets', 'X-MCP-Readonly'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'X-MCP-Readonly'],
     exposedHeaders: ['mcp-session-id', 'mcp-protocol-version', 'www-authenticate'],
     optionsSuccessStatus: 204,
   });
@@ -674,8 +671,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
 
   if (oauth && publicUrl && gptClient) {
     mountCustomGpt(app, oauth, publicUrl, gptClient, bearerChallenge, options.tokenIpRateLimit ?? 500, maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
-      // The deployment's toolset allowlist applies to REST like it does to MCP sessions.
-      filterTools(enabledTools, { toolsets: [...allowedToolsets] }).tools,
+      enabledTools,
       // REST shares the deployment-wide limiter and the same policy, confirmation and audit pipeline.
       { verifyWrites: options.verifyWrites, writeLimits: options.writeLimits, rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
   }
@@ -703,35 +699,24 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   /**
-   * Parses request selectors for validation and computes a deployment-bounded
-   * filter. A session only consumes this value during initialization.
+   * Reads the X-MCP-Readonly header into the filter bound to a new session. It
+   * can only narrow: MCP_READ_ONLY=true cannot be lifted by a header.
    *
    * @param req - Incoming MCP request.
    * @returns The tool filter to bind to a newly initialized session.
-   * @throws Error when a selector is unknown or malformed.
+   * @throws Error when the header is neither true nor false.
    */
-  const requestToolFilter = (req: Request): ToolFilter => {
-    const pathToolsets = req.params.toolsets;
-    const headerToolsets = req.get('X-MCP-Toolsets');
-    const pathSelection = pathToolsets === undefined ? undefined : parseToolsetNames(Array.isArray(pathToolsets) ? pathToolsets.join(',') : pathToolsets, 'MCP path');
-    const headerSelection = headerToolsets === undefined ? undefined : parseToolsetNames(headerToolsets, 'X-MCP-Toolsets');
-    const requested = pathSelection && headerSelection
-      ? pathSelection.filter(name => headerSelection.includes(name))
-      : pathSelection ?? headerSelection;
-    const allowed = new Set(allowedToolsets);
-    return {
-      toolsets: requested ? requested.filter(name => allowed.has(name)) : [...allowed],
-      readOnly: parseFlag('X-MCP-Readonly', req.get('X-MCP-Readonly')),
-    };
-  };
+  const requestToolFilter = (req: Request): ToolFilter => ({
+    readOnly: parseFlag('X-MCP-Readonly', req.get('X-MCP-Readonly')),
+  });
 
-  /** Reject invalid selectors while leaving existing session filters immutable. */
-  const validateToolSelectors = (req: Request, res: Response, next: NextFunction): void => {
+  /** Reject an invalid X-MCP-Readonly header while leaving existing session filters immutable. */
+  const validateReadOnlyHeader = (req: Request, res: Response, next: NextFunction): void => {
     try {
       res.locals.toolFilter = requestToolFilter(req);
       next();
     } catch (error) {
-      res.status(400).json(jsonRpcError(error instanceof Error ? error.message : 'Invalid toolset selector', -32602));
+      res.status(400).json(jsonRpcError(error instanceof Error ? error.message : 'Invalid X-MCP-Readonly header', -32602));
     }
   };
 
@@ -767,7 +752,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   };
 
   // POST: initialize a new session, or dispatch into an existing one.
-  app.post([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, jsonBody, async (req: Request, res: Response) => {
+  app.post(MCP_PATH, requireBearer, validateReadOnlyHeader, jsonBody, async (req: Request, res: Response) => {
     const sessionId = req.header('mcp-session-id');
     const existing = sessionId ? useSession(sessionId) : undefined;
     let transport: StreamableHTTPServerTransport;
@@ -806,8 +791,8 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     await transport.handleRequest(req, res, req.body);
   });
 
-  app.get([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, handleSessionRequest);
-  app.delete([MCP_PATH, `${MCP_PATH}/:toolsets`], requireBearer, validateToolSelectors, handleSessionRequest);
+  app.get(MCP_PATH, requireBearer, validateReadOnlyHeader, handleSessionRequest);
+  app.delete(MCP_PATH, requireBearer, validateReadOnlyHeader, handleSessionRequest);
 
   /**
    * Closes every active transport. Used on shutdown and by tests.
@@ -1009,6 +994,8 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
  * @returns The underlying Node HTTP server once it is listening.
  */
 export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } = {}): HttpServer {
+  // Refuse to start with an unknown MCP_PROFILE; importing the modules never throws for it.
+  parseProfile(process.env);
   const port = Number(process.env.MCP_HTTP_PORT || process.env.PORT || process.env.HTTP_PORT || 3000);
   const allowedHosts = (process.env.MCP_ALLOWED_HOSTS || '')
     .split(',')

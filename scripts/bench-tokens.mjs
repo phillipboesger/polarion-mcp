@@ -26,9 +26,9 @@ process.env.BEARER_TOKEN = 'bench';
 const tokens = value => Math.ceil((typeof value === 'string' ? value : JSON.stringify(value)).length / 4);
 const resultText = r => r.content.map(c => c.text ?? '').join('\n');
 
-async function session(mode, toolsets) {
+async function session(mode) {
   process.env.MCP_MODE = mode;
-  const server = createPolarionServer({ apiBaseUrl, verifyWrites: false, filter: toolsets ? { toolsets } : undefined });
+  const server = createPolarionServer({ apiBaseUrl, verifyWrites: false });
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'bench', version: '1' });
   await server.connect(b); await client.connect(a);
@@ -60,7 +60,6 @@ const scenarios = {
 
 const modes = [
   { label: 'full (all tools)', mode: 'full', kind: 'direct' },
-  { label: 'full + toolsets work-items,documents', mode: 'full', toolsets: ['work-items', 'documents'], kind: 'direct' },
   { label: 'discover', mode: 'discover', kind: 'discover' },
   { label: 'code', mode: 'code', kind: 'code' },
 ];
@@ -68,10 +67,10 @@ const rows = [];
 await quiet(async () => {
   for (const m of modes) {
     const row = { label: m.label };
-    const idle = await session(m.mode, m.toolsets);
+    const idle = await session(m.mode);
     row.list = idle.listTokens; await idle.close();
     for (const [name, scenario] of Object.entries(scenarios)) {
-      const s = await session(m.mode, m.toolsets);
+      const s = await session(m.mode);
       try { await scenario[m.kind](s); row[name] = s.total(); } catch (error) { row[name] = `error: ${error.message}`; }
       await s.close();
     }

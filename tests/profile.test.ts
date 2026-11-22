@@ -31,10 +31,21 @@ test("an explicit switch wins over the profile, including an explicit off", () =
   assert.equal(env.MCP_MARK_UNTRUSTED, "0")
 })
 
-test("an unknown profile is an error and the server refuses to start with it", () => {
+test("an unknown profile is an error and applies nothing, without throwing on import", () => {
   assert.throws(() => parseProfile({ MCP_PROFILE: "paranoid" }), /MCP_PROFILE must be standard, safe, readonly/)
-  const result = spawnSync(process.execPath, ["-e", "import('./build-tests/src/server.js').then(() => console.log('1'))"], {
+  const env: NodeJS.ProcessEnv = { MCP_PROFILE: "paranoid" }
+  assert.deepEqual(applyProfile(env), [])
+  assert.equal(env.MCP_READ_ONLY, undefined)
+  const imported = spawnSync(process.execPath, ["-e", "import('./build-tests/src/server.js').then(() => console.log('imported'))"], {
     env: { ...process.env, MCP_PROFILE: "paranoid" }, encoding: "utf8",
+  })
+  assert.equal(imported.status, 0, imported.stderr)
+  assert.match(imported.stdout, /imported/)
+})
+
+test("the startup entry refuses to run with an unknown profile", () => {
+  const result = spawnSync(process.execPath, ["build-tests/src/index.js"], {
+    env: { ...process.env, MCP_PROFILE: "paranoid" }, encoding: "utf8", timeout: 20_000,
   })
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /MCP_PROFILE must be/)
