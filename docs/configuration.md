@@ -43,7 +43,7 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 
 Mutating generated and composite tools accept `dry_run` as a boolean or the compatibility values `"true"`, `"false"`, `1`, and `0`. These normalize to canonical booleans; malformed values are rejected before side effects. Composite inputs are validated against their declared schemas before handlers run.
 
-The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Toolsets` and `X-MCP-Readonly` headers, or a path such as `/mcp/projects,work-items`. Toolset names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`. These selectors only narrow and apply to `MCP_MODE=full`.
+The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Toolsets` and `X-MCP-Readonly` headers, or a path such as `/mcp/projects,work-items`. Toolset names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`. These selectors only narrow, in both modes (in Code Mode they limit the operations `search` and `execute` can reach).
 
 `MCP_ALLOWED_ORIGINS` protects MCP and OAuth routes from browser-origin abuse and DNS rebinding. The request path is matched case-insensitively. The public origin in `MCP_PUBLIC_URL` is always accepted; otherwise configure trusted origins. Requests without an Origin header are not rejected. The REST wrapper uses the separate `HTTP_CORS_ORIGINS` setting.
 
