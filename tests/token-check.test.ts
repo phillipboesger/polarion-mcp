@@ -6,6 +6,9 @@ import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import axios from "axios"
 
+// These tests exercise the full tool catalogue; the unset default resolves to Code Mode for catalogues this large.
+process.env.MCP_MODE = 'full'
+
 // Each test file runs in its own process, so API_BASE_URL can point at a stub
 // Polarion before oauth.js reads it at import time.
 // Captured from GET /users on Polarion 2506; reused for permission-denied tool responses.

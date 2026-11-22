@@ -49,6 +49,8 @@ import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
 import { decodePolarionIdentifier, registerCompositeTools } from './composite-search.js';
 import { executeTool as executeToolWithPagination } from './tool-execution.js';
+import { buildSdk, codeModeTools, CODE_MODE_INSTRUCTIONS, type CodeModeConfig, type SdkOperation } from './code-mode.js';
+import { toolsetsForDefinition } from './toolsets.js';
 
 /**
  * Creates a new, fully-configured Polarion MCP server.
@@ -70,6 +72,9 @@ function toolsForClient(tools: ReadonlyMap<string, import('./types.js').McpToolD
   }));
 }
 
+/** Above this many exposed operations, MCP_MODE=auto selects Code Mode. */
+export const AUTO_CODE_MODE_MIN_TOOLS = 100;
+
 interface ToolCallPipelineOptions {
   clientTools: ReadonlyMap<string, import('./types.js').McpToolDefinition>;
   virtualTools: readonly VirtualTool[];
@@ -86,6 +91,8 @@ interface ToolCallPipelineOptions {
   correlationId?: string;
   server: Server;
   reportProgress?: (progress: { progress: number; total?: number; message?: string }) => Promise<void>;
+  /** Set in code mode: the SDK behind `execute`. Inner calls run with these composites and without this field. */
+  codeMode?: { ops: readonly SdkOperation[]; config: CodeModeConfig; composites: readonly VirtualTool[] };
 }
 
 function requiresConfirmation(toolName: string, annotations: import('./types.js').McpToolAnnotations | undefined): boolean {
@@ -129,6 +136,9 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       return callToolPipeline(target, (args.arguments ?? {}) as Record<string, unknown>, options);
     }
   }
+  if (options.codeMode && !options.virtualTools.some(tool => tool.name === toolName)) {
+    return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${toolName}. Code Mode exposes only search and execute.` }], isError: true };
+  }
   const started = Date.now();
   const correlationId = options.correlationId ?? randomUUID();
   const virtual = options.virtualTools.find(tool => tool.name === toolName);
@@ -149,6 +159,9 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       if (virtual) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
         result = await virtual.handler(callArgs, {
+          callTool: options.codeMode ? (name, innerArgs) => callToolPipeline(name, innerArgs, {
+            ...options, virtualTools: options.codeMode!.composites, codeMode: undefined, correlationId: undefined,
+          }) : undefined,
           callPolarionTool: async (name, callArgs) => {
             // Composite dependencies remain callable when a request narrows the
             // visible toolset to `composites`; deployment-level MCP_TOOLS and
@@ -350,9 +363,20 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     toolsets: options.filter?.toolsets,
   };
   const clientTools = filterTools(enabledTools, options.filter ?? {}).tools;
-  const mode = process.env.MCP_MODE ?? 'full';
-  if (mode !== 'full' && mode !== 'discover') throw new Error('MCP_MODE must be full or discover');
-  const virtualTools = mode === 'discover' ? discoverVirtualTools(clientTools) : listVirtualTools(filter);
+  const configuredMode = process.env.MCP_MODE?.trim() || 'auto';
+  if (configuredMode !== 'auto' && configuredMode !== 'full' && configuredMode !== 'discover' && configuredMode !== 'code') throw new Error('MCP_MODE must be auto, full, discover or code');
+  const composites = listVirtualTools(filter);
+  // auto: a catalog this large costs tens of thousands of tokens per conversation, so offer Code Mode; a narrowed catalog (toolsets, MCP_TOOLS) stays a plain tool list.
+  const mode = configuredMode === 'auto' ? (clientTools.size + composites.length > AUTO_CODE_MODE_MIN_TOOLS ? 'code' : 'full') : configuredMode;
+  const codeConfig: CodeModeConfig = {
+    writes: !/^(0|false|no|off)$/i.test(process.env.MCP_CODE_MODE_WRITES ?? '') && !filter.readOnly,
+    maxWriteCalls: 20,
+  };
+  const codeOps = mode === 'code'
+    ? buildSdk(clientTools, composites, codeConfig, name => toolsetsForDefinition(clientTools.get(name)!)[0] ?? 'other', def => sanitizeInputSchema(withVerifyProperty(def as never)))
+    : [];
+  const codeMode = mode === 'code' ? { ops: codeOps, config: codeConfig, composites: composites.filter(tool => codeOps.some(op => op.name === tool.name)) } : undefined;
+  const virtualTools = mode === 'discover' ? discoverVirtualTools(clientTools) : mode === 'code' ? codeModeTools(codeOps, codeConfig) : composites;
   const allNames = new Set(clientTools.keys());
   for (const tool of virtualTools) {
     if (allNames.has(tool.name)) throw new Error(`Virtual tool conflicts with generated tool: ${tool.name}`);
@@ -379,7 +403,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
         prompts: {},    // Pre-configured task templates
         ...(completionsEnabled ? { completions: {} } : {}),
       },
-      instructions: SERVER_INSTRUCTIONS,
+      instructions: mode === 'code' ? `${CODE_MODE_INSTRUCTIONS}\n\n${SERVER_INSTRUCTIONS}` : SERVER_INSTRUCTIONS,
     },
   );
 
@@ -389,7 +413,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Sanitizes each tool's input schema so property names are MCP-safe; the
    * executor maps the sanitized names back to the originals.
    */
-  const listedTools = mode === 'discover' ? virtualTools.map(def => ({ name: def.name, title: def.title, description: def.description, inputSchema: sanitizeInputSchema(def.inputSchema), annotations: def.annotations })) : [
+  const listedTools = mode === 'discover' || mode === 'code' ? virtualTools.map(def => ({ name: def.name, title: def.title, description: def.description, inputSchema: sanitizeInputSchema(def.inputSchema), annotations: def.annotations })) : [
     ...toolsForClient(clientTools),
     ...virtualTools.map(def => ({
       name: def.name,
@@ -415,7 +439,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
       request.params.name,
       (request.params.arguments ?? {}) as Record<string, unknown>,
       {
-        clientTools, virtualTools, extensions,
+        clientTools, virtualTools, codeMode, extensions,
         maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
         logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
         telemetry: options.telemetry ?? NOOP_TELEMETRY,

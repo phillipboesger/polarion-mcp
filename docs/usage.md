@@ -23,7 +23,7 @@ Start with `npm run start:mcp-http`. The MCP endpoint is `/mcp`; `/health` is un
 
 The HTTP MCP transport supports toolsets. `MCP_TOOLSETS` limits the deployment's available domains; clients may further narrow a request with the supported toolset selectors. `MCP_READ_ONLY` restricts the available tools to read-only operations.
 
-Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` over the tools left enabled by deployment and request filters. The default `full` mode preserves the normal catalog. Set `MCP_COMPLETIONS=true` to advertise metadata-backed prompt argument completions.
+Set `MCP_MODE=discover` to expose `search_tools`, `describe_tool`, and `call_tool` over the tools left enabled by deployment and request filters. The default `auto` mode selects Code Mode for the full catalog and the normal tool list once `MCP_TOOLSETS` or `MCP_TOOLS` narrow it to a hundred tools or fewer; set `MCP_MODE=full` to always list every tool. Set `MCP_MODE=code` for two tools, `search` and `execute`, where the agent writes a short script against typed operations; see [Code Mode](code-mode.md). Set `MCP_COMPLETIONS=true` to advertise metadata-backed prompt argument completions.
 
 ## REST HTTP mode
 

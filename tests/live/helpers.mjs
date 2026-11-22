@@ -26,7 +26,7 @@ export async function connectStdio(env = {}) {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [path.join(root, "build", "index.js")],
-    env: { PATH: process.env.PATH ?? "", API_BASE_URL, BEARER_TOKEN: PAT, ...env },
+    env: { PATH: process.env.PATH ?? "", API_BASE_URL, BEARER_TOKEN: PAT, MCP_MODE: "full", ...env },
     stderr: "pipe",
   });
   const client = new Client({ name: "live-suite", version: "1" }, { capabilities: {} });
@@ -72,6 +72,7 @@ export async function startHttpServer() {
     env: {
       PATH: process.env.PATH ?? "",
       API_BASE_URL,
+      MCP_MODE: "full",
       MCP_HTTP_PORT: String(port),
       MCP_PUBLIC_URL: base,
       MCP_TOKEN_SECRET: randomBytes(32).toString("hex"),

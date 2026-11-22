@@ -54,6 +54,7 @@
     "evals": "node evals/run.mjs",
     "check:package": "node scripts/check-package.mjs",
     "make:deeplinks": "node scripts/make-deeplinks.mjs",
+    "bench:tokens": "node scripts/bench-tokens.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:docs:strict": "node scripts/check-docs.mjs --strict",
     "check:rest-coverage": "node scripts/rest-coverage.mjs --offline --check",
@@ -67,7 +68,6 @@
     "regenerate": "npm run download-spec && npm run fix-sparse-fields && npm run generate-mcp && npm run generate-tools && npm run build && npm test",
     "update": "npm run regenerate",
     "version": "node scripts/sync-server-json.mjs && git add server.json mcpb/manifest.json python/polarion_alm_mcp/__init__.py python/README.md",
-    "docs:site": "node scripts/render-site.mjs",
     "test:docs-ui": "playwright test --config tests/docs-ui/playwright.config.mjs"
   },
   "engines": {
@@ -88,6 +88,7 @@
     "ipaddr.js": "^2.5.0",
     "json-schema-to-zod": "^2.8.1",
     "pdf-parse": "^1.1.4",
+    "quickjs-emscripten": "0.32.0",
     "turndown": "^7.2.4",
     "zod": "^4.6.7"
   },

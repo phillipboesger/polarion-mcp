@@ -4,6 +4,9 @@ import assert from "node:assert/strict"
 import { toolDefinitionMap } from "../src/tools.js"
 import { TOOLSET_NAMES, toolsetsForDefinition } from "../src/toolsets.js"
 
+// These tests exercise the full tool catalogue; the unset default resolves to Code Mode for catalogues this large.
+process.env.MCP_MODE = 'full'
+
 test("every generated tool belongs to exactly one domain toolset", () => {
   const assignments = new Map<string, string[]>()
   for (const def of toolDefinitionMap.values()) {

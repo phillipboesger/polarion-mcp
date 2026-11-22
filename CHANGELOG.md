@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Behavior change:** `MCP_MODE` defaults to `auto`. When the enabled catalogue is large (the full catalog) the server now lists `search` and `execute` (Code Mode, see `docs/code-mode.md`) instead of every tool; a narrowed catalog (`MCP_TOOLSETS`, `MCP_TOOLS`) stays a normal tool list. Set `MCP_MODE=full` to keep the previous behavior. Direct calls to generated tools are refused in Code Mode; the same operations are `polarion.<operation>()` inside `execute`.
 - Polarion 2612 support: the generated tool map is regenerated from the 2612 REST definition and grows from 284 to 304 tools (Spaces, license types and slot relationships, per-user field metadata, `patchDocumentParts`). On older releases these answer 404. 2612 joins the release matrix as `latest` (non-blocking until its image is verified), 2606 and 2512 are guaranteed, 2506 is best-effort. `docs/polarion-versioning.md` lists the 2612 behaviors seen live.
 - Added work item workflow action discovery and verified status transition composites with dry-run support.
 
