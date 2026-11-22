@@ -43,15 +43,8 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_LOG_FORMAT` | `text` | `src/index.ts`, `src/mcp-http-server.ts` | No | Tool-call log format: `text` preserves current output; `json` writes structured JSON lines to stderr. |
 | `MCP_LOG_LEVEL` | `info` | `src/index.ts`, `src/mcp-http-server.ts` | No | Minimum tool-call log level: `debug`, `info`, `warn`, or `error`. |
 | `MCP_CONFIRM_DESTRUCTIVE` | `false` | `src/index.ts`, `src/mcp-http-server.ts` | No | Set to `true` (or `1`, `yes`, `on`) to require confirmation for destructive, delete, `patchAll*`, and bulk tools. Elicitation-capable clients receive a confirmation prompt; other clients may provide `confirm: true` on the first call. Previewing with `dry_run: true` is recommended, not enforced. |
-| `MCP_VERSION_CHECK` | `false` | `src/server.ts` | No | Set to `true` to check Polarion `/metadata` once on the first tool call and log a warning when the server version differs from the generated tool surface. The check has a three-second timeout and never blocks tool execution. |
-| `MCP_COMPLETIONS` | `false` | `src/server.ts` | No | Advertise MCP `completion/complete` and suggest cached project, Work Item type, status, and user values. Metadata is isolated by deployment and caller, expires after five minutes, and is bounded to 500 entries. |
-| `MCP_MODE` | `auto` | `src/server.ts` | No | `auto` (default) selects `code` when more than a hundred tools are enabled and `full` otherwise, so a narrowed catalogue (`MCP_TOOLSETS`, `MCP_TOOLS`) stays a plain tool list. `full` exposes the normal tools. `discover` exposes search_tools, describe_tool, and call_tool over the enabled tool set. `code` exposes `search` and `execute`: the agent writes JavaScript against a typed SDK of the enabled tools, see [Code Mode](code-mode.md). |
-| `MCP_CODE_MODE_WRITES` | `true` | `src/server.ts` | No | Set to `false` to make Code Mode read-only: write operations are not listed and `execute` refuses them. `MCP_READ_ONLY=true` already removes them. |
-| `MCP_RESOURCE_LINKS` | `false` | `src/server.ts` | No | Add MCP resource_link items to successful getWorkItem and getDocument results. |
-| `MCP_TOOLSETS` | Unset, all toolsets | `src/config.ts`, `src/mcp-http-server.ts` | No | Deployment-wide comma-separated toolset allowlist. Names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`. Requests may narrow this list. |
-| `MCP_TOOLS` | Unset, all tools | `src/tool-filter.ts` | No | Tool name allowlist, separated by commas, spaces, or newlines. |
+| `MCP_MODE` | `code` | `src/server.ts` | No | `code` (default) lists two tools, `search` and `execute`, and reaches every Polarion operation through them. `full` lists the whole catalogue; use it only for a client that cannot approve `execute` (for example `codex exec` with approval policy "never"). `auto` and `discover` are removed and run as `code` with a startup warning. |
 | `MCP_READ_ONLY` | `false` | `src/tool-filter.ts` | No | Keep only tools annotated read-only. Accepts true/1/yes/on or false/0/no/off. |
-| `MCP_OMIT_OUTPUT_SCHEMA` | `false` | `src/tool-filter.ts` | No | Omit output schemas from tools/list while retaining structured results. Same boolean values as `MCP_READ_ONLY`. |
 | `TRUST_PROXY` | Unset | `src/http-server.ts`, `src/mcp-http-server.ts` | No | Express trusted proxy setting (for example `loopback`, hop count `1`, or proxy addresses). Required behind a proxy for client IP rate limiting. `true` is rejected. |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | TLS verification enabled | `src/config.ts` | No | Set to `0` to disable certificate verification. Use only with trusted internal TLS endpoints. |
 | `API_KEY_<SCHEME>` | Unset | `src/executor.ts` | Yes | API key for an OpenAPI security scheme. Replace `<SCHEME>` with the uppercased scheme name, replacing non-alphanumeric characters with `_`. |
@@ -64,9 +57,11 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 
 Mutating generated and composite tools accept `dry_run` as a boolean or the compatibility values `"true"`, `"false"`, `1`, and `0`. These normalize to canonical booleans; malformed values are rejected before side effects. Composite inputs are validated against their declared schemas before handlers run.
 
-The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Toolsets` and `X-MCP-Readonly` headers, or a path such as `/mcp/projects,work-items`. Toolset names are listed above. These selectors can only narrow `MCP_TOOLSETS` and the tool filters.
+The Streamable HTTP MCP endpoint supports per-request narrowing with `X-MCP-Toolsets` and `X-MCP-Readonly` headers, or a path such as `/mcp/projects,work-items`. Toolset names: `work-items`, `documents`, `test-management`, `plans`, `collections`, `projects`, `users`, `admin`, `jobs`, `pages`, `enumerations`. These selectors only narrow, in both modes (in Code Mode they limit the operations `search` and `execute` can reach).
 
 `MCP_ALLOWED_ORIGINS` protects MCP and OAuth routes from browser-origin abuse and DNS rebinding. The request path is matched case-insensitively. The public origin in `MCP_PUBLIC_URL` is always accepted; otherwise configure trusted origins. Requests without an Origin header are not rejected. The REST wrapper uses the separate `HTTP_CORS_ORIGINS` setting.
+
+Settings that narrowed the tool list or toggled single features in older versions are removed. They are ignored, and the startup log names each one that is still set. Code Mode makes them unnecessary; use `MCP_READ_ONLY=true` to remove write access.
 
 ## Network paths
 

@@ -27,11 +27,9 @@ The two do not conflict. Both act as the signed-in Polarion user, so permissions
 
 ## Token cost
 
-A large tool list costs tokens on every conversation. This server offers three ways to keep that low:
+A large tool list costs tokens on every conversation. This server avoids that by default:
 
-1. **Toolsets** (`MCP_TOOLSETS`): expose only the groups you need.
-2. **`MCP_MODE=discover`**: three small tools to search, describe and call the rest.
-3. **`MCP_MODE=code`**: two tools, `search` and `execute`. The agent writes a short script against typed operations. Writes still go through validation, `dry_run`, read-only mode and verification.
+**Code Mode** (the default): two tools, `search` and `execute`. The agent writes a short script against typed operations. Writes still go through validation, `dry_run`, read-only mode and verification.
 
 Measured numbers for each mode are in [Code Mode](code-mode.md#token-cost).
 

@@ -1,16 +1,11 @@
 /**
  * Server-side tool filter.
  *
- * The full generated surface is ~280 tools and ~1 MB of tools/list, which
- * makes client tool selection unreliable. A deployment can narrow it:
- * - MCP_TOOLS: comma-separated allowlist of tool names.
- * - MCP_READ_ONLY=true: only tools annotated `readOnlyHint: true`.
- * - MCP_OMIT_OUTPUT_SCHEMA=true: leave `outputSchema` out of tools/list
- *   (roughly halves its size; results still carry structured content).
- *
- * A filtered tool is neither listed nor callable over any transport, which
- * makes the allowlist a real boundary (e.g. against prompt injection asking
- * for a delete), not just a client-side hint.
+ * MCP_READ_ONLY=true keeps only tools annotated `readOnlyHint: true`. A
+ * filtered tool is neither listed nor callable over any transport, which makes
+ * it a real boundary (e.g. against prompt injection asking for a delete), not
+ * just a client-side hint. Narrowing the catalogue by name is not a setting
+ * any more: Code Mode keeps the tool list at two entries.
  */
 
 import { toolDefinitionMap } from './tools.js';
@@ -44,17 +39,12 @@ export function parseFlag(name: string, value: string | undefined): boolean {
 }
 
 /**
- * @param env - Environment to read `MCP_TOOLS` and `MCP_READ_ONLY` from.
+ * @param env - Environment to read `MCP_READ_ONLY` from.
  * @returns The filter it describes.
- * @throws Error for an invalid flag, or an `MCP_TOOLS` with no tool name in it.
+ * @throws Error for an invalid flag.
  */
 export function parseToolFilter(env: NodeJS.ProcessEnv): ToolFilter {
-  const raw = env.MCP_TOOLS?.trim();
-  // Names may be separated by commas, spaces or newlines (a YAML block value).
-  const allow = raw ? raw.split(/[\s,]+/).filter(Boolean) : undefined;
-  // Set but without names (e.g. ","): a typo, not a request for zero or all tools.
-  if (raw && allow?.length === 0) throw new Error(`MCP_TOOLS="${raw}" lists no tool names`);
-  return { allow, readOnly: parseFlag('MCP_READ_ONLY', env.MCP_READ_ONLY) };
+  return { readOnly: parseFlag('MCP_READ_ONLY', env.MCP_READ_ONLY) };
 }
 
 /**
@@ -87,5 +77,3 @@ if (filtered.tools.size !== toolDefinitionMap.size) {
 /** The tools this deployment exposes, with corrected annotations. */
 export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered.tools;
 
-/** Whether tools/list leaves out output schemas. */
-export const omitOutputSchema = parseFlag('MCP_OMIT_OUTPUT_SCHEMA', process.env.MCP_OMIT_OUTPUT_SCHEMA);

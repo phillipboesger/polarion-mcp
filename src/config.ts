@@ -17,7 +17,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
-import { parseToolsetNames, type ToolsetName } from './toolsets.js';
 
 // Load environment variables from .env file
 // This allows configuration without modifying code
@@ -45,18 +44,6 @@ function packageVersion(): string {
 
 /** Reported in serverInfo and /health, so a deployment shows which build runs. */
 export const SERVER_VERSION = packageVersion();
-
-/**
- * Parses the deployment-wide HTTP toolset allowlist.
- *
- * @param env - Environment read by the transport start function.
- * @returns Configured toolsets, or undefined to allow all toolsets.
- * @throws Error when the value is malformed or names an unknown toolset.
- */
-export function configuredToolsets(env: NodeJS.ProcessEnv): ToolsetName[] | undefined {
-  const value = env.MCP_TOOLSETS?.trim();
-  return value ? parseToolsetNames(value, 'MCP_TOOLSETS') : undefined;
-}
 
 /**
  * API Base URL - configurable via environment variable
@@ -88,6 +75,31 @@ export function configurationWarnings(env: NodeJS.ProcessEnv, options: { needsTo
   if (options.needsToken && !env.BEARER_TOKEN?.trim()) {
     warnings.push('BEARER_TOKEN is not set: every tool call is refused until it holds a Polarion Personal Access Token.');
   }
+  warnings.push(...deprecatedConfigWarnings(env));
+  return warnings;
+}
+
+/** Settings that no longer exist: ignored at startup, with a note on what applies now (never the value). */
+const REMOVED_SETTINGS: Record<string, string> = {
+  MCP_TOOLSETS: 'NOT enforced any more: the full catalogue is available and writes are allowed. Set MCP_READ_ONLY=true to block writes.',
+  MCP_TOOLS: 'NOT enforced any more: the full catalogue is available and writes are allowed. Set MCP_READ_ONLY=true to block writes.',
+  MCP_OMIT_OUTPUT_SCHEMA: 'tools/list holds two tools in the default Code Mode, so output schemas no longer matter.',
+  MCP_COMPLETIONS: 'argument completions were removed.',
+  MCP_RESOURCE_LINKS: 'resource links were removed.',
+  MCP_VERSION_CHECK: 'the Polarion version check was removed.',
+  MCP_CODE_MODE_WRITES: 'NOT enforced any more: the full catalogue is available and writes are allowed. Set MCP_READ_ONLY=true to block writes.',
+};
+
+/**
+ * @param env - Environment to inspect.
+ * @returns One warning per removed setting that is set, naming what applies now.
+ */
+export function deprecatedConfigWarnings(env: NodeJS.ProcessEnv): string[] {
+  const warnings = Object.entries(REMOVED_SETTINGS)
+    .filter(([name]) => env[name]?.trim())
+    .map(([name, hint]) => `${name} is no longer supported and is ignored: ${hint}`);
+  const mode = env.MCP_MODE?.trim();
+  if (mode === 'auto' || mode === 'discover') warnings.push(`MCP_MODE=${mode} is no longer supported and runs as "code" (the default). Set MCP_MODE=full only if your client cannot approve the execute tool.`);
   return warnings;
 }
 

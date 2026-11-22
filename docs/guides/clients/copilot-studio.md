@@ -8,7 +8,7 @@ Verification status:
 
 - Server: verified by documentation only
 
-Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but this server offers more than that by default: narrow it first with MCP_TOOLSETS or MCP_READ_ONLY, then select only the tools your agent needs. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).
+Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but the default Code Mode lists only two tools (`search`, `execute`), which stays far below that limit. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).
 
 - **Local is not supported:** Cloud service; it cannot run npx. Use the Docker or Remote URL mode.
 
@@ -56,7 +56,7 @@ Header name:  Authorization
 API key value: Bearer YOUR_POLARION_PAT
 ```
 
-Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but this server offers more than that by default: narrow it first with MCP_TOOLSETS or MCP_READ_ONLY, then select only the tools your agent needs. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).
+Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but the default Code Mode lists only two tools (`search`, `execute`), which stays far below that limit. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).
 
 ## Check
 

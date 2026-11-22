@@ -106,7 +106,7 @@ The REST API is not enabled or the path is wrong. Open `https://YOUR-POLARION/po
 An administrator must set `com.siemens.polarion.rest.security.restApiToken.enabled=true` and restart Polarion before PATs exist. A token also stops working when it expires or is revoked. Create a new one and replace it in your client; never paste it into a chat.
 
 **My client warns about too many tools (VS Code 128, Cursor, Windsurf 100).**
-The full catalog has 304 tools. Set `MCP_TOOLSETS` (for example `work-items,documents`) or `MCP_TOOLS` on the server, add `MCP_READ_ONLY=true`, or use `MCP_MODE=discover`. In VS Code you can also untick tools in the tools picker.
+The server lists two tools (`search`, `execute`) by default, so tool-count limits do not apply. Only `MCP_MODE=full` lists the 304-tool catalog; leave it unset. In VS Code you can also untick tools in the tools picker.
 
 **GitHub Copilot shows no MCP servers on Business or Enterprise.**
 The organization policy "MCP servers in Copilot" is off by default. An organization or enterprise owner must enable it in the Copilot policies. Free and Pro plans are not affected by this policy.
@@ -187,7 +187,7 @@ The PAT is not printed or placed in command arguments. An authenticated metadata
 
 ## Tool Not Found
 
-- Use `GET /api/tools` to list REST tool names. Check `MCP_TOOLS`, `MCP_READ_ONLY`, `MCP_TOOLSETS`, and request selectors for filters that hide the tool.
+- Use `GET /api/tools` to list REST tool names. Check `MCP_READ_ONLY` and, over the MCP endpoint, request selectors for filters that hide the tool.
 
 ## SDK PDF Not Found
 
