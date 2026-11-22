@@ -52,7 +52,7 @@ On this page:
 | Plans and collections | Review release scope and document collections. |
 | Projects, people and configuration | Discover accessible projects, users, allowed field values and metadata. |
 
-The [landing page](https://polarion-mcp.boesger.com/#features) shows counts by domain, computed from `src/tools.ts`. The **304 tools** count covers generated REST operations; configured toolsets and additional helpers change the exposed catalog. Selected Work Item writes validate enumeration values, custom-field keys and user references. [Features and limits](docs/features.md) describe the scope. To keep the tool list small for large catalogs, see [Code Mode](docs/code-mode.md).
+The [landing page](https://polarion-mcp.boesger.com/#features) shows counts by domain, computed from `src/tools.ts`. The **304 tools** count covers generated REST operations; configured toolsets and additional helpers change the exposed catalog. Selected Work Item writes validate enumeration values, custom-field keys and user references. [Features and limits](docs/features.md) describe the scope. To keep the tool list small for large catalogs, see [Code Mode](docs/code-mode.md). Polarion 2612 has a built-in MCP server too: [how the two compare](docs/comparison.md).
 
 ## Get connected
 
