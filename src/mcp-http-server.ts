@@ -55,7 +55,7 @@ import { Sealer, isSealed, safeEqual } from './sealed.js';
 import { createRestToolsRouter } from './rest-api.js';
 import { bearerCredential, parseTrustProxy } from './utils.js';
 import type { PolarionExtensions } from './extensions.js';
-import type { LogFormat, LogLevel } from './logger.js';
+import { parseLogSetting, type LogFormat, type LogLevel } from './logger.js';
 import type { TelemetryHooks } from './telemetry.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
 export { parseTrustProxy } from './utils.js';
@@ -1003,7 +1003,7 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
  * `MCP_ALLOWED_REDIRECT_PRESETS` (comma-separated client presets: claude, chatgpt,
  * vscode, cursor, copilot-studio, gemini, loopback),
  * `MCP_CIMD_ENABLED` (`true` enables Client ID Metadata Documents; default false),
- * `MCP_SESSION_IDLE_MINUTES` (default 60), `MCP_MAX_SESSIONS` (default 1000). No Polarion credentials are read here — each client
+ * Sessions idle out after 60 minutes, at most 1000 are kept. No Polarion credentials are read here — each client
  * brings its own Polarion PAT.
  *
  * @returns The underlying Node HTTP server once it is listening.
@@ -1029,17 +1029,6 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   if (publicUrl && trustProxy === undefined) {
     (options.logger ?? console).warn('[SECURITY WARNING] MCP_PUBLIC_URL is set while TRUST_PROXY is unset. Behind a reverse proxy, rate limits see one shared IP and can lock out users; set TRUST_PROXY to the trusted proxy hop count or address.');
   }
-  const idleMinutes = Number(process.env.MCP_SESSION_IDLE_MINUTES);
-  const sessionIdleMs = idleMinutes > 0 ? idleMinutes * 60_000 : undefined;
-  const maxSessions = Number(process.env.MCP_MAX_SESSIONS) > 0 ? Number(process.env.MCP_MAX_SESSIONS) : undefined;
-  const configuredRegisterLimit = Number(process.env.MCP_RATE_LIMIT_REGISTER);
-  const registerRateLimit = Number.isInteger(configuredRegisterLimit) && configuredRegisterLimit > 0 ? configuredRegisterLimit : 100;
-  const configuredTokenIpLimit = Number(process.env.MCP_RATE_LIMIT_TOKEN_IP);
-  const tokenIpRateLimit = Number.isInteger(configuredTokenIpLimit) && configuredTokenIpLimit > 0 ? configuredTokenIpLimit : 500;
-  const configuredRefreshTokenTtl = Number(process.env.MCP_REFRESH_TOKEN_TTL);
-  const refreshTokenTtlSeconds = Number.isInteger(configuredRefreshTokenTtl) && configuredRefreshTokenTtl > 0
-    ? configuredRefreshTokenTtl
-    : 14 * 24 * 60 * 60;
   const allowedRedirectUris = parseRedirectAllowlist(process.env.MCP_ALLOWED_REDIRECT_PREFIXES);
   const allowedRedirectPresets = (process.env.MCP_ALLOWED_REDIRECT_PRESETS ?? '').split(',').map(preset => preset.trim()).filter(Boolean);
   const cimdEnabled = process.env.MCP_CIMD_ENABLED?.trim().toLowerCase() === 'true';
@@ -1051,13 +1040,11 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const configuredToolRateLimit = Number(process.env.MCP_RATE_LIMIT_TOOLS ?? 0);
   const rateLimitTools = Number.isSafeInteger(configuredToolRateLimit) && configuredToolRateLimit >= 0 ? configuredToolRateLimit : 0;
   const markUntrusted = flagOn(process.env.MCP_MARK_UNTRUSTED);
-  const logFormat = process.env.MCP_LOG_FORMAT?.trim().toLowerCase() === 'json' ? 'json' : 'text';
-  const configuredLogLevel = process.env.MCP_LOG_LEVEL?.trim().toLowerCase();
-  const logLevel = ['debug', 'info', 'warn', 'error'].includes(configuredLogLevel ?? '') ? configuredLogLevel as LogLevel : 'info';
+  const { logFormat, logLevel } = parseLogSetting(process.env.MCP_LOG);
   const confirmDestructive = flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, cimdEnabled, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, apiBaseUrl: API_BASE_URL,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

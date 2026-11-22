@@ -169,7 +169,7 @@ The PAT is not printed or placed in command arguments. An authenticated metadata
 
 - A 429 means the in-memory rate limit for that route and client/IP bucket was exceeded. Wait for its 15-minute or one-hour window to reset.
 - Behind a reverse proxy, set `TRUST_PROXY` to the trusted hop count or address. Otherwise traffic may be counted under the proxy's shared IP and one client can block everyone. Check server logs and response rate-limit headers before raising limits.
-- OAuth failed token ceilings can be adjusted with `MCP_RATE_LIMIT_TOKEN_IP`; registration ceiling with `MCP_RATE_LIMIT_REGISTER`. Successful token requests do not count against failure ceilings.
+- OAuth failure ceilings are fixed. Successful token requests do not count against them.
 
 ## redirect_uri Rejected
 

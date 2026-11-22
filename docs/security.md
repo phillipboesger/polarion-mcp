@@ -38,7 +38,7 @@ Tool calls can also be limited per authenticated user in a rolling minute with `
 
 With `MCP_MARK_UNTRUSTED=true`, JSON results carry a `_notice` that user-authored content is data, not instructions, and likely user-authored text fields are wrapped in `<polarion-untrusted>` markers. Embedded closing markers are neutralized. These markers help models distinguish data but do not replace tool authorization or output review.
 
-Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts (configurable with `MCP_RATE_LIMIT_TOKEN_IP`); successful requests do not count toward token failure ceilings. Failed Basic-auth requests count against these per-client and per-IP ceilings before rejection; successful requests are excluded. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour by default (`MCP_RATE_LIMIT_REGISTER`). Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
+Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts; successful requests do not count toward token failure ceilings. Failed Basic-auth requests count against these per-client and per-IP ceilings before rejection; successful requests are excluded. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour. Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
 
 ## Destructive tool confirmation
 
@@ -46,7 +46,7 @@ Limits are in-memory per process. OAuth authorization is 100 requests per IP per
 
 ## Logging and telemetry
 
-Set `MCP_LOG_FORMAT=json` to emit structured tool-call records to stderr. Records include a validated or generated correlation ID, tool, outcome, duration, and timestamp. Credential-like values and the current caller token are scrubbed before writing. Keep any custom log sinks private and avoid recording tool arguments. `MCP_LOG_LEVEL` filters records.
+Set `MCP_LOG=json` to emit structured tool-call records to stderr. Records include a validated or generated correlation ID, tool, outcome, duration, and timestamp. Credential-like values and the current caller token are scrubbed before writing. Keep any custom log sinks private and avoid recording tool arguments. `MCP_LOG=json,warn` also sets the minimum level.
 
 Telemetry callbacks receive span start and end metadata through the optional extension hook; the default implementation is no-op and adds no SDK dependency.
 

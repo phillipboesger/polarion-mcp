@@ -54,3 +54,14 @@ export function createLogger(options: { format?: LogFormat; level?: LogLevel; wr
 export function correlationIdFrom(value: string | undefined): string {
   return value && value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value) ? value : randomUUID();
 }
+
+/**
+ * Parses `MCP_LOG`: a comma-separated mix of a format (`text`, `json`) and a
+ * level (`debug`, `info`, `warn`, `error`), e.g. `json,debug`. Unknown words
+ * are ignored, so the default stays text at info.
+ */
+export function parseLogSetting(value: string | undefined): { logFormat: LogFormat; logLevel: LogLevel } {
+  const words = (value ?? '').split(',').map(word => word.trim().toLowerCase());
+  const level = words.find(word => ['debug', 'info', 'warn', 'error'].includes(word)) as LogLevel | undefined;
+  return { logFormat: words.includes('json') ? 'json' : 'text', logLevel: level ?? 'info' };
+}

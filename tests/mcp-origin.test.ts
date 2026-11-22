@@ -393,8 +393,8 @@ test("distinct OAuth client ids from one IP hit the per-IP token ceiling", async
   }
 })
 
-test("public OAuth startup warns when no trusted proxy is configured, ignores unknown presets and reads the token IP limit", async () => {
-  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_ALLOWED_REDIRECT_PRESETS", "MCP_RATE_LIMIT_TOKEN_IP", "TRUST_PROXY"] as const
+test("public OAuth startup warns when no trusted proxy is configured and ignores unknown presets", async () => {
+  const envKeys = ["MCP_HTTP_PORT", "MCP_HTTP_HOST", "MCP_PUBLIC_URL", "MCP_TOKEN_SECRET", "MCP_ALLOWED_REDIRECT_PREFIXES", "MCP_ALLOWED_REDIRECT_PRESETS", "TRUST_PROXY"] as const
   const previous = new Map(envKeys.map(key => [key, process.env[key]]))
   const warnings: string[] = []
   const originalLog = console.log
@@ -406,7 +406,6 @@ test("public OAuth startup warns when no trusted proxy is configured, ignores un
     process.env.MCP_TOKEN_SECRET = "a-secret-long-enough-for-startup-warning-test"
     process.env.MCP_ALLOWED_REDIRECT_PREFIXES = "https://claude.ai/api/mcp/auth_callback"
     process.env.MCP_ALLOWED_REDIRECT_PRESETS = "unknown-client"
-    process.env.MCP_RATE_LIMIT_TOKEN_IP = "1"
     delete process.env.TRUST_PROXY
     console.log = () => undefined
     server = startMcpHttpServer({ logger: { warn: message => warnings.push(message) } })
@@ -420,13 +419,6 @@ test("public OAuth startup warns when no trusted proxy is configured, ignores un
       body: JSON.stringify({ client_name: "test", redirect_uris: ["https://attacker.example/callback"], token_endpoint_auth_method: "none" }),
     })
     assert.equal(registration.status, 400)
-    const post = (clientId: string) => fetch(`http://127.0.0.1:${port}/token`, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "authorization_code", client_id: clientId, code: "bad" }),
-    })
-    assert.equal((await post("startup-cap-a")).status, 400)
-    assert.equal((await post("startup-cap-b")).status, 429)
   } finally {
     console.log = originalLog
     if (server?.listening) await new Promise<void>((resolve) => server?.close(() => resolve()))

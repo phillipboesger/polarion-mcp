@@ -87,6 +87,20 @@ test("deprecatedConfigWarnings names every removed setting that is set and nothi
   assert.match(configurationWarnings({ API_BASE_URL: "https://p/polarion/rest/v1", BEARER_TOKEN: "x", MCP_TOOLS: "a" }, { needsToken: true }).join("\n"), /MCP_TOOLS/)
 })
 
+test("deprecatedConfigWarnings covers the fixed tunables, split log settings and per-scheme credentials", async () => {
+  const { deprecatedConfigWarnings } = await importFreshConfig("deprecated2")
+  const text = deprecatedConfigWarnings({
+    MCP_VERIFY_MAX_ITEMS: "4", MCP_RATE_LIMIT_REGISTER: "1", MCP_RATE_LIMIT_TOKEN_IP: "1", MCP_SESSION_IDLE_MINUTES: "5",
+    MCP_MAX_SESSIONS: "2", MCP_REFRESH_TOKEN_TTL: "60", MCP_LOG_FORMAT: "json", MCP_LOG_LEVEL: "debug",
+    API_KEY_X: "k", BEARER_TOKEN_BEARERAUTH: "t", BASIC_USERNAME_X: "u", OAUTH_CLIENT_ID_X: "c", OPENID_TOKEN_X: "o",
+  }).join("\n")
+  for (const name of ["MCP_VERIFY_MAX_ITEMS", "MCP_RATE_LIMIT_REGISTER", "MCP_RATE_LIMIT_TOKEN_IP", "MCP_SESSION_IDLE_MINUTES", "MCP_MAX_SESSIONS", "MCP_REFRESH_TOKEN_TTL", "MCP_LOG_FORMAT", "MCP_LOG_LEVEL", "API_KEY_X", "BEARER_TOKEN_BEARERAUTH", "BASIC_USERNAME_X", "OAUTH_CLIENT_ID_X", "OPENID_TOKEN_X"]) {
+    assert.match(text, new RegExp(name))
+  }
+  // The plain token and empty values are not deprecated.
+  assert.deepEqual(deprecatedConfigWarnings({ BEARER_TOKEN: "pat", API_KEY_X: "  " }), [])
+})
+
 test("configurationWarnings tells a stdio user what is missing, and an HTTP deployment only about the base URL", async () => {
   const { configurationWarnings } = await importFreshConfig("warnings")
   const none = configurationWarnings({ API_BASE_URL: "https://polarion.test/polarion/rest/v1", BEARER_TOKEN: "pat" }, { needsToken: true })
