@@ -81,8 +81,8 @@ export function configurationWarnings(env: NodeJS.ProcessEnv, options: { needsTo
 
 /** Settings that no longer exist: ignored at startup, with a note on what applies now (never the value). */
 const REMOVED_SETTINGS: Record<string, string> = {
-  MCP_TOOLSETS: 'Code Mode exposes the whole catalogue through two tools, so narrowing it is no longer needed. Use MCP_READ_ONLY=true to forbid writes.',
-  MCP_TOOLS: 'Code Mode exposes the whole catalogue through two tools, so narrowing it is no longer needed. Use MCP_READ_ONLY=true to forbid writes.',
+  MCP_TOOLSETS: 'NOT enforced any more: the full catalogue is available and writes are allowed. Set MCP_READ_ONLY=true to block writes.',
+  MCP_TOOLS: 'NOT enforced any more: the full catalogue is available and writes are allowed. Set MCP_READ_ONLY=true to block writes.',
   MCP_OMIT_OUTPUT_SCHEMA: 'tools/list holds two tools in the default Code Mode, so output schemas no longer matter.',
   MCP_COMPLETIONS: 'argument completions were removed.',
   MCP_RESOURCE_LINKS: 'resource links were removed.',
@@ -95,7 +95,7 @@ const REMOVED_SETTINGS: Record<string, string> = {
   MCP_REFRESH_TOKEN_TTL: 'the value is fixed at 14 days.',
   MCP_LOG_FORMAT: 'use MCP_LOG, for example MCP_LOG=json,debug.',
   MCP_LOG_LEVEL: 'use MCP_LOG, for example MCP_LOG=json,debug.',
-  MCP_CODE_MODE_WRITES: 'use MCP_READ_ONLY=true to make Code Mode read-only.',
+  MCP_CODE_MODE_WRITES: 'NOT enforced any more: the full catalogue is available and writes are allowed. Set MCP_READ_ONLY=true to block writes.',
 };
 
 /**
