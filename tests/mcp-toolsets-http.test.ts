@@ -2,11 +2,12 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import type { AddressInfo } from "node:net"
 
-// Set deployment tool filters before importing modules that capture them.
-process.env.MCP_TOOLS = "getWorkItem,getWorkItems,deleteWorkItems,getLicense"
+// Set deployment filters before importing modules that capture them.
 process.env.MCP_READ_ONLY = "true"
 
 const { createMcpHttpApp } = await import("../src/mcp-http-server.js")
+
+process.env.MCP_MODE = 'full'
 type ToolsetName = import("../src/toolsets.js").ToolsetName
 
 const HEADERS = { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: "Bearer pat" }
@@ -56,7 +57,8 @@ test("toolset header narrows the session and later headers cannot change it; cal
   try {
     const { response, id } = await initialize(app.base, "/mcp", { "X-MCP-Toolsets": "work-items" })
     assert.equal(response.status, 200)
-    assert.deepEqual(await list(app.base, id, { "X-MCP-Toolsets": "admin" }), ["getWorkItem", "getWorkItems"])
+    const narrowed = await list(app.base, id, { "X-MCP-Toolsets": "admin" })
+    assert.ok(narrowed.includes("getWorkItem") && !narrowed.includes("getLicense"))
 
     const outside = await send(app.base, id, {
       jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "getLicense", arguments: {} },
@@ -70,7 +72,8 @@ test("toolset header narrows the session and later headers cannot change it; cal
     })
     assert.equal(invalidLater.status, 400)
     assert.match((await invalidLater.json() as any).error.message, /Valid toolsets/)
-    assert.deepEqual(await list(app.base, id), ["getWorkItem", "getWorkItems"])
+    const still = await list(app.base, id)
+    assert.ok(still.includes("getWorkItem") && !still.includes("getLicense"))
   } finally {
     await app.stop()
   }
@@ -86,18 +89,20 @@ test("deployment toolsets cannot be widened by a request header", async () => {
   }
 })
 
-test("path toolsets and readonly header intersect with MCP_TOOLS and MCP_READ_ONLY", async () => {
+test("path toolsets and readonly header intersect with MCP_READ_ONLY", async () => {
   const app = await startApp()
   try {
     const { id } = await initialize(app.base, "/mcp/work-items", { "X-MCP-Readonly": "true" })
-    assert.deepEqual(await list(app.base, id), ["getWorkItem", "getWorkItems"])
+    const ro = await list(app.base, id)
+    assert.ok(ro.includes("getWorkItem") && !ro.includes("deleteWorkItems") && !ro.includes("getLicense"))
     const outside = await send(app.base, id, {
       jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "deleteWorkItems", arguments: { requestBody: {} } },
     })
     assert.equal(outside.payload.result.isError, true)
 
     const adminPath = await initialize(app.base, "/mcp/admin")
-    assert.deepEqual(await list(app.base, adminPath.id), ["getLicense"])
+    const admin = await list(app.base, adminPath.id)
+    assert.ok(admin.includes("getLicense") && !admin.includes("getWorkItem"))
   } finally {
     await app.stop()
   }

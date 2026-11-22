@@ -6,6 +6,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createPolarionServer } from '../src/server.js';
 
+process.env.MCP_MODE = 'full'
+
 test('default-off annotation keeps user fields unchanged and adds a valid top-level notice', () => {
   const text = '{"data":{"attributes":{"title":"hello","description":"Keep this exact"}}}';
   const result = JSON.parse(annotateToolText(text, false));

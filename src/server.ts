@@ -22,29 +22,26 @@ import {
   ReadResourceRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
-  CompleteRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.js';
 import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
-import { securitySchemes, toolDefinitionMap } from './tools.js';
-import { enabledTools, filterTools, omitOutputSchema, type ToolFilter } from './tool-filter.js';
+import { securitySchemes } from './tools.js';
+import { enabledTools, filterTools, type ToolFilter } from './tool-filter.js';
 import { withVerifyProperty, type WriteLimits } from './write-verification.js';
 import { executeApiTool, capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
-import { listVirtualTools, discoverVirtualTools, type VirtualTool } from './virtual-tools.js';
+import { listVirtualTools, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
-import { API_BASE_URL, getBearerToken, tokenScope, callerCacheScope } from './config.js';
+import { API_BASE_URL, getBearerToken, tokenScope } from './config.js';
 import { parseToolFilter } from './tool-filter.js';
-import { MetadataCache, type MetadataKind } from './metadata-cache.js';
 import { renderRichTextFieldsAsMarkdown } from './markdown.js';
 import { randomUUID, createHash } from 'node:crypto';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
 import { annotatePolarionResult, annotateToolText, markUntrustedText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
-import { createVersionCheck } from './version-check.js';
 import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
 import { decodePolarionIdentifier, registerCompositeTools } from './composite-search.js';
@@ -68,12 +65,10 @@ function toolsForClient(tools: ReadonlyMap<string, import('./types.js').McpToolD
     description: def.description,
     inputSchema: sanitizeInputSchema(withVerifyProperty(def)),
     ...(def.annotations ? { annotations: def.annotations } : {}),
-    ...(def.outputSchema && !omitOutputSchema ? { outputSchema: lenientOutputSchema(def.outputSchema) } : {}),
+    ...(def.outputSchema ? { outputSchema: lenientOutputSchema(def.outputSchema) } : {}),
   }));
 }
 
-/** Above this many exposed operations, MCP_MODE=auto selects Code Mode. */
-export const AUTO_CODE_MODE_MIN_TOOLS = 100;
 
 interface ToolCallPipelineOptions {
   clientTools: ReadonlyMap<string, import('./types.js').McpToolDefinition>;
@@ -194,11 +189,6 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
           },
         });
-        if (/^(1|true|yes|on)$/i.test(process.env.MCP_RESOURCE_LINKS ?? '') && !result.isError) {
-        const uri = toolName === 'getWorkItem' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/workitem/${encodeURIComponent(String(args.workItemId ?? ''))}`
-          : toolName === 'getDocument' ? `polarion://project/${encodeURIComponent(String(args.projectId ?? ''))}/document/${encodeURIComponent(String(args.spaceId ?? ''))}/${encodeURIComponent(String(args.documentName ?? ''))}` : undefined;
-        if (uri) result.content.push({ type: 'resource_link', uri, name: toolName === 'getWorkItem' ? String(args.workItemId) : String(args.documentName), mimeType: 'text/markdown' });
-      }
       outcome = result.isError ? 'error' : 'success';
       } else {
         options.logger.error(`[ERROR] Unknown tool requested: ${toolName}`);
@@ -322,7 +312,6 @@ export interface PolarionServerOptions {
   /** Shared across HTTP sessions to enforce a deployment-wide per-user budget. */
   rateLimiter?: ToolCallRateLimiter;
   /** Shared across HTTP sessions; keys remain scoped by caller and deployment. */
-  metadataCache?: MetadataCache;
   /** Wrap user-authored Polarion strings in untrusted-content markers. */
   markUntrusted?: boolean;
   /** Current transport; local file uploads are restricted to stdio. Defaults to HTTP-safe. */
@@ -363,37 +352,29 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     toolsets: options.filter?.toolsets,
   };
   const clientTools = filterTools(enabledTools, options.filter ?? {}).tools;
-  const configuredMode = process.env.MCP_MODE?.trim() || 'auto';
-  if (configuredMode !== 'auto' && configuredMode !== 'full' && configuredMode !== 'discover' && configuredMode !== 'code') throw new Error('MCP_MODE must be auto, full, discover or code');
+  // `auto` and `discover` were removed; configurationWarnings tells the operator, the server behaves as `code`.
+  const requestedMode = process.env.MCP_MODE?.trim() || 'code';
+  if (!['code', 'full', 'auto', 'discover'].includes(requestedMode)) throw new Error('MCP_MODE must be code or full');
   const composites = listVirtualTools(filter);
-  // auto: a catalog this large costs tens of thousands of tokens per conversation, so offer Code Mode; a narrowed catalog (toolsets, MCP_TOOLS) stays a plain tool list.
-  const mode = configuredMode === 'auto' ? (clientTools.size + composites.length > AUTO_CODE_MODE_MIN_TOOLS ? 'code' : 'full') : configuredMode;
+  const mode = requestedMode === 'full' ? 'full' : 'code';
   const codeConfig: CodeModeConfig = {
-    writes: !/^(0|false|no|off)$/i.test(process.env.MCP_CODE_MODE_WRITES ?? '') && !filter.readOnly,
+    writes: !filter.readOnly,
     maxWriteCalls: 20,
   };
   const codeOps = mode === 'code'
     ? buildSdk(clientTools, composites, codeConfig, name => toolsetsForDefinition(clientTools.get(name)!)[0] ?? 'other', def => sanitizeInputSchema(withVerifyProperty(def as never)))
     : [];
   const codeMode = mode === 'code' ? { ops: codeOps, config: codeConfig, composites: composites.filter(tool => codeOps.some(op => op.name === tool.name)) } : undefined;
-  const virtualTools = mode === 'discover' ? discoverVirtualTools(clientTools) : mode === 'code' ? codeModeTools(codeOps, codeConfig) : composites;
+  const virtualTools = mode === 'code' ? codeModeTools(codeOps, codeConfig) : composites;
   const allNames = new Set(clientTools.keys());
   for (const tool of virtualTools) {
     if (allNames.has(tool.name)) throw new Error(`Virtual tool conflicts with generated tool: ${tool.name}`);
     allNames.add(tool.name);
   }
-  const knownNames = new Set([...toolDefinitionMap.keys(), ...listVirtualTools().map(tool => tool.name)]);
-  const unknown = (filter.allow ?? []).filter(name => !knownNames.has(name));
-  if (unknown.length > 0) logger.warn(`[WARN] MCP_TOOLS names unknown tools, ignored: ${unknown.join(', ')}`);
-    if (allNames.size === 0 && !options.filter) throw new Error('The tool filter (MCP_TOOLS, MCP_READ_ONLY, MCP_TOOLSETS) leaves no tools; check the names and toolsets');
+  if (allNames.size === 0 && !options.filter) throw new Error('MCP_READ_ONLY leaves no tools');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
-  const checkVersion = process.env.MCP_VERSION_CHECK?.trim().toLowerCase() === 'true'
-    ? createVersionCheck({ apiBaseUrl, bearerToken: options.transport === 'stdio' ? process.env.BEARER_TOKEN : undefined, logger })
-    : undefined;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
-  const completionsEnabled = /^(1|true|yes|on)$/i.test(process.env.MCP_COMPLETIONS ?? '');
-  const metadataCache = options.metadataCache ?? new MetadataCache();
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
@@ -401,7 +382,6 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
         tools: {},      // API operations (GET, POST, PATCH, DELETE endpoints)
         resources: {},  // Documentation and configuration files
         prompts: {},    // Pre-configured task templates
-        ...(completionsEnabled ? { completions: {} } : {}),
       },
       instructions: mode === 'code' ? `${CODE_MODE_INSTRUCTIONS}\n\n${SERVER_INSTRUCTIONS}` : SERVER_INSTRUCTIONS,
     },
@@ -413,7 +393,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Sanitizes each tool's input schema so property names are MCP-safe; the
    * executor maps the sanitized names back to the originals.
    */
-  const listedTools = mode === 'discover' || mode === 'code' ? virtualTools.map(def => ({ name: def.name, title: def.title, description: def.description, inputSchema: sanitizeInputSchema(def.inputSchema), annotations: def.annotations })) : [
+  const listedTools = mode === 'code' ? virtualTools.map(def => ({ name: def.name, title: def.title, description: def.description, inputSchema: sanitizeInputSchema(def.inputSchema), annotations: def.annotations })) : [
     ...toolsForClient(clientTools),
     ...virtualTools.map(def => ({
       name: def.name,
@@ -432,7 +412,6 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * call, response formatting) to {@link executeApiTool}.
    */
   server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
-    checkVersion?.();
     const requestHeader = extra?.requestInfo?.headers['x-request-id'];
     const progressToken = extra?._meta?.progressToken;
     return callToolPipeline(
@@ -494,58 +473,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     return getPolarionPrompt(name, args);
   });
 
-  if (completionsEnabled) server.setRequestHandler(CompleteRequestSchema, async request => {
-    const { argument, context } = request.params;
-    const projectId = context?.arguments?.projectId ?? '';
-    const scope = callerCacheScope();
-    const kind: MetadataKind | undefined = argument.name === 'projectId' ? 'projects'
-      : argument.name === 'workItemType' || argument.name === 'type' ? 'work-item-types'
-      : argument.name === 'status' ? 'statuses'
-      : argument.name === 'enum' || argument.name === 'enumValue' ? 'enums'
-      : argument.name === 'user' || argument.name === 'assignee' ? 'users' : undefined;
-    let values: string[] = [];
-    try {
-      if (kind) {
-        const fieldId = String(context?.arguments?.fieldId ?? (kind === 'work-item-types' ? 'type' : kind === 'statuses' ? 'status' : ''));
-        const workItemType = String(context?.arguments?.workItemType ?? '');
-        const cached = metadataCache.get(apiBaseUrl, scope, kind, projectId, fieldId, workItemType);
-        if (cached) values = cached;
-        else {
-          const tool = kind === 'projects' ? 'getProjects' : kind === 'users' ? 'getUsers' : 'getAvailableEnumOptionsForWorkItemType';
-          const args: Record<string, unknown> = kind === 'projects' || kind === 'users' ? {}
-            : kind === 'work-item-types' ? { projectId, fieldId, type: '~' }
-            : kind === 'statuses' ? { projectId, fieldId, type: context?.arguments?.workItemType ?? '~' }
-            : kind === 'enums' ? { projectId, fieldId, type: context?.arguments?.workItemType ?? '~' }
-            : { projectId, resourceType: 'workitems' };
-          const result = await callToolPipeline(tool, args, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: options.transport ?? 'http', server });
-          const raw = result.structuredContent ?? result.content?.map(item => item.type === 'text' ? item.text : '').join(' ') ?? '';
-          let parsed: unknown = raw;
-          if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = raw; } }
-          values = extractCompletionValues(parsed, argument.name);
-          metadataCache.set(apiBaseUrl, scope, kind, values, projectId, fieldId, workItemType);
-        }
-      }
-    } catch { values = []; }
-    const prefix = argument.value.toLowerCase();
-    const matches = [...new Set(values)].filter(value => value.toLowerCase().includes(prefix)).slice(0, 100);
-    return { completion: { values: matches, total: matches.length, isIncomplete: false } };
-  });
-
   return server;
-}
-
-function extractCompletionValues(value: unknown, argument: string): string[] {
-  const fields = argument === 'projectId' ? ['id'] : ['id', 'name', 'label', 'value'];
-  const found = new Set<string>();
-  const walk = (item: unknown) => {
-    if (Array.isArray(item)) { item.forEach(walk); return; }
-    if (!item || typeof item !== 'object') return;
-    const record = item as Record<string, unknown>;
-    for (const field of fields) if (typeof record[field] === 'string' && (field !== 'id' || record.type !== undefined || argument === 'projectId')) found.add(record[field] as string);
-    Object.values(record).forEach(walk);
-  };
-  walk(value);
-  return [...found];
 }
 
 const MAX_DYNAMIC_RESOURCE_CHARS = 100_000;

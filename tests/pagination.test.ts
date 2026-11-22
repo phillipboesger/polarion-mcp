@@ -5,6 +5,8 @@ import type { AddressInfo } from 'node:net';
 import { paginate, pageNumberFromLink, type JsonApiPage } from '../src/pagination.js';
 import { executeTool } from '../src/tool-execution.js';
 
+process.env.MCP_MODE = 'full'
+
 test('pagination merges pages, retains totalCount, and truncates at item and page limits', async () => {
   const fetched: number[] = [];
   const page = (n: number) => ({ data: [{ id: n }], links: { next: n < 5 ? `?page%5Bnumber%5D=${n + 1}` : null }, meta: { totalCount: 5 } });

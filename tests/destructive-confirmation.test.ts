@@ -6,6 +6,8 @@ import { ElicitRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createPolarionServer } from '../src/server.js';
 import { registerVirtualTool } from '../src/virtual-tools.js';
 
+process.env.MCP_MODE = 'full'
+
 async function invoke(options: { confirmDestructive?: boolean; capabilities?: Record<string, unknown>; action?: 'accept' | 'decline' | 'cancel'; name?: string; annotations?: Record<string, boolean>; args?: Record<string, unknown> }) {
   let calls = 0;
   let confirmationMessage = '';

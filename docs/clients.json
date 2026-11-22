@@ -1169,7 +1169,7 @@
         "https://learn.microsoft.com/en-us/microsoft-copilot-studio/requirements-licensing"
       ],
       "checked": "2026-10-30",
-      "note": "Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but this server offers more than that by default: narrow it first with MCP_TOOLSETS or MCP_READ_ONLY, then select only the tools your agent needs. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).",
+      "note": "Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but the default Code Mode lists only two tools (`search`, `execute`), which stays far below that limit. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).",
       "redirectUris": [],
       "defaultMode": "server",
       "unverified": [
@@ -1197,7 +1197,7 @@
           "Under Details, leave Authentication on End user so each person supplies their own PAT. Optionally set Ask the end user before running",
           "Test the agent with the prompt under Verify"
         ],
-        "note": "Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but this server offers more than that by default: narrow it first with MCP_TOOLSETS or MCP_READ_ONLY, then select only the tools your agent needs. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).",
+        "note": "Generative orchestration must be on (it is the default for new agents); MCP tools cannot be called from topics. Only the Streamable transport is supported (SSE is not). Microsoft caps the tools per agent (the limit is 128) and 25 to 30 give the best results, but the default Code Mode lists only two tools (`search`, `execute`), which stays far below that limit. Alternative: Add a tool > New tool > Custom connector with an OpenAPI file (Power Apps).",
         "snippet": "https://YOUR-SERVER/mcp\n\nHeader name:  Authorization\nAPI key value: Bearer YOUR_POLARION_PAT",
         "needs": [
           "A Copilot Studio agent you can edit, with generative orchestration turned on",
@@ -2006,7 +2006,7 @@
           },
           {
             "symptom": "Server starts but no tools appear",
-            "fix": "Some clients limit tool count. Enable tools in the client or reduce them with MCP_TOOLSETS."
+            "fix": "The server lists two tools, `search` and `execute`. Enable them in the client; a client that cannot approve `execute` needs `MCP_MODE=full` or `MCP_READ_ONLY=true`."
           },
           {
             "symptom": "401 \"Polarion did not accept this token\"",
@@ -2928,7 +2928,7 @@
     {
       "id": "tool-limit",
       "q": "My client warns about too many tools (VS Code 128, Cursor, Windsurf 100).",
-      "a": "The full catalog has 304 tools. Set `MCP_TOOLSETS` (for example `work-items,documents`) or `MCP_TOOLS` on the server, add `MCP_READ_ONLY=true`, or use `MCP_MODE=discover`. In VS Code you can also untick tools in the tools picker."
+      "a": "The server lists two tools (`search`, `execute`) by default, so tool-count limits do not apply. Only `MCP_MODE=full` lists the 304-tool catalog; leave it unset. In VS Code you can also untick tools in the tools picker."
     },
     {
       "id": "org-mcp-policy",

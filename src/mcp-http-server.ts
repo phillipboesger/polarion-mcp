@@ -41,7 +41,7 @@ import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, configuredToolsets, flagOn } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, flagOn } from './config.js';
 import { createPolarionServer, createToolCaller } from './server.js';
 import { writeLimitsFromEnv, type WriteLimits } from './write-verification.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
@@ -58,7 +58,6 @@ import type { PolarionExtensions } from './extensions.js';
 import type { LogFormat, LogLevel } from './logger.js';
 import type { TelemetryHooks } from './telemetry.js';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
-import { MetadataCache } from './metadata-cache.js';
 export { parseTrustProxy } from './utils.js';
 
 dotenv.config({ quiet: true });
@@ -302,7 +301,6 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   // These instances are app-wide so opening additional MCP sessions cannot
   // multiply a caller's tool-call budget or fragment metadata cache entries.
   const rateLimiter = new ToolCallRateLimiter(options.rateLimitTools ?? 0);
-  const metadataCache = new MetadataCache();
 
   /**
    * Active sessions by MCP session id. A Map iterates in insertion order and
@@ -795,7 +793,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         }
       };
 
-      const server = createPolarionServer({ transport: 'http', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits, rateLimitTools: options.rateLimitTools, rateLimiter, metadataCache, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
+      const server = createPolarionServer({ transport: 'http', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits, rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger });
       await server.connect(transport);
     } else if (sessionId) {
       sessionNotFound(res);
@@ -1049,7 +1047,6 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   for (const preset of allowedRedirectPresets) {
     if (!knownRedirectPresets.has(preset)) (options.logger ?? console).warn(`[WARN] Ignoring unknown MCP_ALLOWED_REDIRECT_PRESETS entry: ${preset}`);
   }
-  const allowedToolsets = configuredToolsets(process.env);
   const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
   const configuredToolRateLimit = Number(process.env.MCP_RATE_LIMIT_TOOLS ?? 0);
   const rateLimitTools = Number.isSafeInteger(configuredToolRateLimit) && configuredToolRateLimit >= 0 ? configuredToolRateLimit : 0;
@@ -1060,7 +1057,7 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const confirmDestructive = flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, allowedToolsets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
+    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, cimdEnabled, sessionIdleMs, maxSessions, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, registerRateLimit, tokenIpRateLimit, refreshTokenTtlSeconds, apiBaseUrl: API_BASE_URL,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

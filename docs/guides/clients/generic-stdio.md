@@ -105,7 +105,7 @@ Expected: The assistant calls a Polarion tool and shows your Polarion user.
 | Symptom | Fix |
 |---|---|
 | Server disconnected or failed | Run npx -y polarion-mcp in a terminal (Node 22+). On Windows try command cmd, args /c npx. |
-| Server starts but no tools appear | Some clients limit tool count. Enable tools in the client or reduce them with MCP_TOOLSETS. |
+| Server starts but no tools appear | The server lists two tools, `search` and `execute`. Enable them in the client; a client that cannot approve `execute` needs `MCP_MODE=full` or `MCP_READ_ONLY=true`. |
 | 401 "Polarion did not accept this token" | The PAT was cut off, has expired or is for another Polarion. Create a new token and paste it unchanged. |
 
 ### Server

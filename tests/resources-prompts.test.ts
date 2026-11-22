@@ -57,8 +57,7 @@ test("prompts require their arguments and reject unknown names", () => {
 
 test("all plugin skill and prompt tool names exist in the generated or virtual catalog", async () => {
   const { readdir, readFile } = await import("node:fs/promises")
-  const { discoverVirtualTools } = await import("../src/virtual-tools.js")
-  const valid = new Set([...toolDefinitionMap.keys(), ...discoverVirtualTools(new Map()).map(tool => tool.name)])
+  const valid = new Set([...toolDefinitionMap.keys(), ])
   const walk = async (directory: string): Promise<string[]> => (await Promise.all((await readdir(directory, { withFileTypes: true })).map(entry => entry.isDirectory() ? walk(resolve(directory, entry.name)) : Promise.resolve(entry.name.endsWith(".md") ? [resolve(directory, entry.name)] : [])))).flat()
   const paths = await walk(resolve("plugin"))
   for (const path of paths) {
