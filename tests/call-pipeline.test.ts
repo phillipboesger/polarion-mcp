@@ -69,7 +69,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
     replacementUnregister()
   })
 
-  await t.test('MCP_TOOLS can select a registered virtual tool without enabling generated tools', async () => {
+  await t.test('a registered virtual tool is served in read-only full mode', async () => {
     const { spawnSync } = await import('node:child_process')
     const script = `
       const { registerVirtualTool } = await import('./build-tests/src/virtual-tools.js');
@@ -79,7 +79,7 @@ test('call pipeline preserves generated catalogue and gates synthetic/generated 
       console.log('virtual-enabled');
     `
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
-      env: { ...process.env, MCP_TOOLS: 'only_virtual', MCP_READ_ONLY: 'true' }, encoding: 'utf8',
+      env: { ...process.env, MCP_MODE: 'full', MCP_READ_ONLY: 'true' }, encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /virtual-enabled/)
