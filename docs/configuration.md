@@ -1,5 +1,17 @@
 # Configuration
 
+## What you need
+
+**Using the server on your computer (stdio):** two variables, your Polarion REST URL (`API_BASE_URL`, ending in `/polarion/rest/v1`) and your personal access token (`BEARER_TOKEN`).
+
+Everything else has a working default. The server lists two tools, `search` and `execute` (see [Code Mode](code-mode.md)), and reaches the whole Polarion API through them.
+
+**Running a shared server (Streamable HTTP):** each user sends their own token, so `BEARER_TOKEN` is not set. You need `API_BASE_URL`, and `MCP_ALLOWED_HOSTS` with the server's own public hostname. For claude.ai, ChatGPT and other cloud clients add `MCP_PUBLIC_URL`, `MCP_TOKEN_SECRET` and the OAuth redirect allowlist, and put the server behind TLS with `TRUST_PROXY` set. See [deployment](deployment.md).
+
+**Making it safer, in one word:** `MCP_PROFILE=safe` asks for confirmation before destructive tools and marks user-written text as untrusted. `MCP_PROFILE=readonly` adds a hard block on every write.
+
+The table below is the complete reference for operators.
+
 ## Environment variables
 
 The server loads `.env` in local runs. Secret values belong in the deployment's secret manager or environment, never in committed files.
@@ -7,7 +19,7 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | Variable | Default | Read by | Secret? | Purpose |
 |---|---|---|---|---|
 | `API_BASE_URL` | `https://polarion.example.com/polarion/rest/v1` | `src/config.ts` at import | No | Polarion REST API base URL reachable from the MCP process or container, ending in `/polarion/rest/v1`. For cloud MCP, Polarion may be private or VPN-only if the container can reach it. |
-| `BEARER_TOKEN` | Unset | `src/config.ts` when making calls | Yes | Polarion PAT for stdio and REST HTTP mode; fallback when a scheme-specific credential is absent. Streamable HTTP uses each request's PAT instead. |
+| `BEARER_TOKEN` | Unset | `src/config.ts` when making calls | Yes | Polarion PAT for stdio and REST HTTP mode. Streamable HTTP uses each request's PAT instead. |
 | `HTTP_PORT` | `3000` | `src/http-server.ts` startup | No | REST wrapper port; `PORT` takes precedence. |
 | `PORT` | Platform supplied, otherwise ignored | `src/http-server.ts`, `src/mcp-http-server.ts` | No | Hosting platform port. Takes precedence over `HTTP_PORT`. |
 | `HTTP_API_KEY` | Unset, required by REST HTTP mode | `src/http-server.ts` startup | Yes | REST wrapper bearer key. Does not apply to Streamable HTTP MCP. |
