@@ -343,3 +343,43 @@ test('attachment missing, empty and oversized file parts fail before a request',
     assert.equal(result.isError, true); assert.match(JSON.stringify(result), pattern); assert.equal(requests.length, 0);
   }
 });
+
+function previewOf(result: Awaited<ReturnType<typeof executeApiTool>>) {
+  const text = (result.content[0] as { text: string }).text
+  const prefix = "Dry run: no mutating request was sent to Polarion. Preview:\n"
+  assert.ok(text.startsWith(prefix), text)
+  return JSON.parse(text.slice(prefix.length))
+}
+
+test("dry run of a single patch includes the exact before and after attributes", async () => {
+  const { result, requests } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "W-1", dry_run: true,
+    requestBody: { data: { type: "workitems", id: "P/W-1", attributes: { title: "new" } } },
+  }, () => ({ data: { data: { attributes: { title: "old" } } } }))
+  const preview = previewOf(result)
+  assert.deepEqual(preview.diff, { before: { title: "old" }, after: { title: "new" } })
+  assert.equal(preview.method, "PATCH")
+  assert.equal(preview.headers.authorization, "[REDACTED]")
+  assert.equal(requests.filter(r => r.method === "GET").length, 1)
+  assert.equal(requests.some(r => r.method === "PATCH"), false)
+})
+
+test("dry run reports a missing read response as an unavailable diff", async () => {
+  const { result, requests } = await run("patchWorkItem", {
+    projectId: "P", workItemId: "W-1", dry_run: true,
+    requestBody: { data: { type: "workitems", id: "P/W-1", attributes: { title: "new" } } },
+  })
+  assert.deepEqual(previewOf(result).diff, { status: "unavailable", reason: "Read response has no attributes" })
+  assert.equal(requests.some(r => r.method === "PATCH"), false)
+})
+
+test("dry run of a collection patch skips the diff and sends no write", async () => {
+  const { result, requests } = await run("patchWorkItems", {
+    projectId: "P", dry_run: true,
+    requestBody: { data: [{ type: "workitems", id: "P/W-1", attributes: { title: "new" } }] },
+  })
+  const preview = previewOf(result)
+  assert.deepEqual(preview.warnings, ["Before/after diff skipped: this route addresses a collection, not a single resource."])
+  assert.equal(preview.diff, undefined)
+  assert.equal(requests.some(r => r.method === "PATCH"), false)
+})
