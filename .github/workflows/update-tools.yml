@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tools: ${{ steps.count.outputs.tools }}
+      older: ${{ steps.compare.outputs.older }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -43,18 +44,40 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      # The default source (public demo) can be older than the committed surface
+      # (e.g. 2612 tools are in src/tools.ts before the demo serves them).
+      # Regenerating from it would drop tools and fail the guidance check, so
+      # skip instead of opening a regression PR. Dispatch manually with spec_url
+      # to move to a newer or different spec.
+      - name: Compare spec with committed tool surface
+        id: compare
+        env:
+          SPEC_URL: ${{ github.event.inputs.spec_url }}
+        run: |
+          npm run download-spec
+          spec=$(node -e "const s=require('./openapi.json');console.log(Object.values(s.paths).flatMap(p=>Object.keys(p).filter(m=>['get','post','put','patch','delete'].includes(m))).length)")
+          committed=$(grep -c 'name: "' src/tools.ts)
+          echo "spec=$spec committed=$committed"
+          if [ -z "$SPEC_URL" ] && [ "$spec" -lt "$committed" ]; then
+            echo "::notice::Default spec has $spec operations, fewer than the $committed committed tools. Skipping; dispatch manually with spec_url for a newer spec."
+            echo "older=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Regenerate tools from the Polarion spec
+        if: steps.compare.outputs.older != 'true'
         env:
           # Empty for scheduled runs -> the npm script falls back to the public demo.
           SPEC_URL: ${{ github.event.inputs.spec_url }}
         run: npm run regenerate
 
       - name: Report tool count
+        if: steps.compare.outputs.older != 'true'
         id: count
         run: |
           echo "tools=$(grep -c 'name: "' src/tools.ts)" >> "$GITHUB_OUTPUT"
 
       - name: Keep the regenerated file
+        if: steps.compare.outputs.older != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: tools-ts
@@ -63,6 +86,7 @@ jobs:
   # Only this job can write, and it runs no generated code.
   pull-request:
     needs: regenerate
+    if: needs.regenerate.outputs.older != 'true'
     runs-on: ubuntu-latest
     permissions:
       actions: write

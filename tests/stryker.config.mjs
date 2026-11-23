@@ -1,3 +1,16 @@
+import { readFileSync } from 'node:fs';
+
+function executorDispatchRange() {
+  const file = 'build-tests/src/executor.js';
+  const lines = readFileSync(file, 'utf8').split('\n');
+  const start = lines.findIndex((line) => line.includes('===== STEP 7: Execute the HTTP Request'));
+  const end = lines.findIndex((line) => line.includes('===== STEP 8: Format the Response'));
+  if (start < 0 || end <= start) {
+    throw new Error(`STEP 7 / STEP 8 markers not found in ${file}; update tests/stryker.config.mjs`);
+  }
+  return `${file}:${start + 1}-${end}`;
+}
+
 const projects = {
   oauth: {
     mutate: ['build-tests/src/oauth.js'],
@@ -16,8 +29,9 @@ const projects = {
     command: 'node --test --test-concurrency=1 build-tests/tests/tool-filter.test.js build-tests/tests/annotations.test.js build-tests/tests/guidance-filter.test.js build-tests/tests/mcp-http.test.js',
   },
   executor: {
-    // This compiled line range maps to guarded HTTP dispatch in src/executor.ts (lines 959-1052).
-    mutate: ['build-tests/src/executor.js:884-969'],
+    // Guarded HTTP dispatch: from the STEP 7 marker to the STEP 8 marker in src/executor.ts. The compiled
+    // line range is derived from those markers so it cannot drift when the file changes.
+    mutate: [executorDispatchRange()],
     command: 'node --test --test-concurrency=1 build-tests/tests/executor*.test.js build-tests/tests/http-client.test.js build-tests/tests/httpClient.test.js build-tests/tests/security-coverage.test.js',
   },
 };
