@@ -185,3 +185,45 @@ test('unset MCP_MODE is code; auto and discover still map to code; full lists th
     assert.ok((await client.listTools()).tools.length > 100)
   })
 })
+
+test('description summaries preserve complete sentences and alternatives', async () => {
+  const { summarizeDescription } = await import('../src/code-mode.js')
+  assert.equal(summarizeDescription('Short. (The same as the corresponding Java API method.)'), 'Short.')
+  assert.equal(summarizeDescription('A short sentence.'), 'A short sentence.')
+  assert.equal(summarizeDescription('Try e.g. This example and `foo. Bar` here. Next sentence.', 43), 'Try e.g. This example and `foo. Bar` here.')
+  assert.equal(summarizeDescription('A long first sentence with several words.', 19), 'A long first…')
+  assert.equal(summarizeDescription('First sentence. An omitted sentence. To act on one, use `other` instead.', 20), 'First sentence. To act on one, use `other` instead.')
+})
+
+test('search pages and returns full detail', async () => {
+  await withCodeMode({}, async client => {
+    const search = async (args: Record<string, unknown>) => text(await client.callTool({ name: 'search', arguments: args }))
+    const first = await search({ query: 'work item', limit: 1 })
+    const second = await search({ query: 'work item', limit: 1, offset: 1 })
+    assert.match(first, /more matches: call search again with offset: 1/)
+    assert.notEqual(first.match(/polarion\.\w+/)?.[0], second.match(/polarion\.\w+/)?.[0])
+    const all = await search({ query: 'zzzqqq' })
+    assert.doesNotMatch(all, /more matches/)
+    const detail = await search({ detail: ['getProjects', 'doesNotExist'] })
+    assert.match(detail, /polarion\.getProjects/)
+    assert.match(detail, /unknown operation: doesNotExist/)
+    assert.ok(detail.length > (await search({ query: 'getProjects', limit: 1 })).length)
+    assert.equal((await search({ limit: 0 })).match(/polarion\./g)?.length, 1)
+    assert.equal((await search({ limit: 100 })).match(/polarion\./g)?.length, 25)
+  })
+})
+
+test('catalogue summaries preserve alternative recommendations and word boundaries', async () => {
+  const { summarizeDescription } = await import('../src/code-mode.js')
+  await withCodeMode({ env: { MCP_MODE: 'full' } }, async client => {
+    const catalogue = (await client.listTools()).tools
+    assert.ok(catalogue.length > 100)
+    for (const tool of catalogue) {
+      const description = tool.description ?? ''
+      const summary = summarizeDescription(description)
+      const alternative = description.match(/[^.!?]*use `[^`]+` instead[^.!?]*[.!?]?/i)?.[0].trim()
+      if (alternative) assert.ok(summary.includes(alternative), tool.name)
+      if (summary.endsWith('…')) assert.ok(description.startsWith(summary.slice(0, -1) + ' '), tool.name)
+    }
+  })
+})
