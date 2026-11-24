@@ -210,6 +210,8 @@ test('search pages and returns full detail', async () => {
     assert.ok(detail.length > (await search({ query: 'getProjects', limit: 1 })).length)
     assert.equal((await search({ limit: 0 })).match(/polarion\./g)?.length, 1)
     assert.equal((await search({ limit: 100 })).match(/polarion\./g)?.length, 25)
+    assert.match(await search({ query: 'work item', detail: [] }), /polarion\.\w+/)
+    assert.match(await search({ query: 'work item', offset: 100000 }), /No more matches: "work item" has \d+, offset 100000 is past the end/)
   })
 })
 

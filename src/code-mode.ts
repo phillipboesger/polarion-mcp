@@ -138,7 +138,7 @@ function rank(ops: readonly SdkOperation[], query: string, toolset: string | und
 export const CODE_MODE_INSTRUCTIONS = [
   'Code Mode: this server exposes two tools. `search` finds Polarion operations and returns TypeScript declarations; `execute` runs JavaScript that calls them.',
   'Inside `execute`, call `await polarion.<operation>({...})` (the declarations from `search`), use plain JavaScript to loop, filter and join, `return` a small JSON value, and use console.log sparingly.',
-  'Use `search` detail for full operation descriptions. Search first, then write one script that does the whole task. Writes honour dry_run, read-only mode, validation and read-back verification exactly as direct tool calls do; run with dry_run: true first.',
+  'Search first (pass `detail` with operation names when a summary is not enough), then write one script that does the whole task. Writes honour dry_run, read-only mode, validation and read-back verification exactly as direct tool calls do; run with dry_run: true first.',
 ].join(' ');
 
 /** The two tools shown to the client in code mode. `execute` is dispatched by the pipeline (it needs the full call pipeline), so its handler only guards direct misuse. */
@@ -147,10 +147,10 @@ export function codeModeTools(ops: readonly SdkOperation[], config: CodeModeConf
   const search: VirtualTool = {
     name: 'search', title: 'Search Polarion operations', toolset: 'composites',
     description: `Find Polarion operations by keyword and get their TypeScript declarations for use inside \`execute\`. Returns at most ${'`limit`'} matches (default 8, maximum 25). Use \`offset\` for paging and \`detail\` with operation names for full descriptions.`,
-    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Keywords, e.g. "trace links" or "create work item".' }, toolset: { type: 'string', description: 'Optional toolset filter, e.g. composites.' }, limit: { type: 'number', default: 8 }, offset: { type: 'number', default: 0 }, detail: { type: 'array', items: { type: 'string' } } } },
+    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Keywords, e.g. "trace links" or "create work item".' }, toolset: { type: 'string', description: 'Optional toolset filter, e.g. composites.' }, limit: { type: 'number', default: 8, description: 'Matches per page, 1 to 25.' }, offset: { type: 'number', default: 0, description: 'Skip this many matches; the result names the next offset when more remain.' }, detail: { type: 'array', items: { type: 'string' }, description: 'Operation names, e.g. ["patchWorkItem"]: returns each declaration with its full description instead of a search.' } } },
     annotations: { readOnlyHint: true },
     handler: ({ query = '', toolset, limit = 8, offset = 0, detail }) => {
-      if (Array.isArray(detail)) {
+      if (Array.isArray(detail) && detail.length > 0) {
         const output = detail.map(name => {
           const op = ops.find(item => item.name === name);
           return op ? `${declarationFor(op)}\n/* ${op.description.replace(/\*\//g, '* /')} */` : `// unknown operation: ${String(name)}`;
@@ -161,6 +161,7 @@ export function codeModeTools(ops: readonly SdkOperation[], config: CodeModeConf
       const start = Math.max(0, Math.floor(Number(offset) || 0));
       const all = rank(ops, String(query), typeof toolset === 'string' ? toolset : undefined, ops.length);
       const matches = all.slice(start, start + pageSize);
+      if (matches.length === 0 && all.length > 0) return { content: [{ type: 'text' as const, text: `No more matches: "${String(query)}" has ${all.length}, offset ${start} is past the end.` }] };
       if (matches.length === 0) return { content: [{ type: 'text' as const, text: `No operations match "${String(query)}". ${ops.length} operations are available; try broader keywords.` }] };
       const more = all.length - start - matches.length;
       return { content: [{ type: 'text' as const, text: matches.map(declarationFor).join('\n\n') + (more > 0 ? `\n// ${more} more matches: call search again with offset: ${start + matches.length}` : '') }] };
