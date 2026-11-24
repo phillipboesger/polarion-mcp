@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Code Mode search returns readable summaries, supports paging and provides full descriptions on request.
+
 ## 1.6.0
 
 - Per-request toolset selectors removed: the `X-MCP-Toolsets` header and the `/mcp/<toolsets>` paths are gone (`/mcp/<anything>` now returns 404, and the header is ignored). `X-MCP-Readonly` stays.

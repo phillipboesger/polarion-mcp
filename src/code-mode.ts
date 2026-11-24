@@ -61,10 +61,41 @@ function objectType(schema: any, depth: number): string {
   return `{ ${shown.join('; ')} }`;
 }
 
+/** Retains complete sentences, including recommendations for alternative operations. */
+export function summarizeDescription(text: string, max = 240): string {
+  const clean = text.replace(/\(\s*the\s+same\s+as\s+the\s+corresponding\s+java\s+api\s+method\s*\.\s*\)/gi, '').trim();
+  const sentences: string[] = [];
+  let start = 0;
+  let inCode = false;
+  for (let i = 0; i < clean.length; i++) {
+    if (clean[i] === '`') inCode = !inCode;
+    if (!inCode && /[.!?]/.test(clean[i]) && /\s/.test(clean[i + 1] ?? '') && !/(?:e\.g|i\.e)\.$/i.test(clean.slice(start, i + 1))) {
+      const next = clean.slice(i + 1).match(/^\s+([A-Z`])/);
+      if (next) { sentences.push(clean.slice(start, i + 1).trim()); start = i + 1; }
+    }
+  }
+  if (clean.slice(start).trim()) sentences.push(clean.slice(start).trim());
+  const selected: string[] = [];
+  for (const sentence of sentences) {
+    if ((selected.join(' ').length + (selected.length ? 1 : 0) + sentence.length) > max) break;
+    selected.push(sentence);
+  }
+  if (!selected.length && sentences.length) {
+    const prefix = sentences[0].slice(0, Math.max(0, max - 1));
+    selected.push((prefix.replace(/\s+\S*$/, '') || prefix).trimEnd() + '…');
+  }
+  const alternative = sentences.find(sentence => /use `[^`]+` instead/i.test(sentence));
+  if (alternative && !selected.includes(alternative)) {
+    if (alternative === sentences[0] && selected[0]?.endsWith('…')) selected[0] = alternative;
+    else selected.push(alternative);
+  }
+  return selected.join(' ');
+}
+
 /** TypeScript declaration the model reads from `search`. */
 export function declarationFor(op: SdkOperation): string {
   const args = schemaToType(op.inputSchema);
-  const doc = op.description.split(/[\r\n]/)[0].slice(0, 200);
+  const doc = summarizeDescription(op.description).replace(/\*\//g, '* /');
   const flags = op.readOnly ? '' : ' [write]';
   return `/** ${doc}${flags} */\npolarion.${op.name}(args: ${args === 'Record<string, unknown>' ? '{}' : args}): Promise<any>;`;
 }
@@ -107,7 +138,7 @@ function rank(ops: readonly SdkOperation[], query: string, toolset: string | und
 export const CODE_MODE_INSTRUCTIONS = [
   'Code Mode: this server exposes two tools. `search` finds Polarion operations and returns TypeScript declarations; `execute` runs JavaScript that calls them.',
   'Inside `execute`, call `await polarion.<operation>({...})` (the declarations from `search`), use plain JavaScript to loop, filter and join, `return` a small JSON value, and use console.log sparingly.',
-  'Search first, then write one script that does the whole task. Writes honour dry_run, read-only mode, validation and read-back verification exactly as direct tool calls do; run with dry_run: true first.',
+  'Search first (pass `detail` with operation names when a summary is not enough), then write one script that does the whole task. Writes honour dry_run, read-only mode, validation and read-back verification exactly as direct tool calls do; run with dry_run: true first.',
 ].join(' ');
 
 /** The two tools shown to the client in code mode. `execute` is dispatched by the pipeline (it needs the full call pipeline), so its handler only guards direct misuse. */
@@ -115,13 +146,25 @@ export function codeModeTools(ops: readonly SdkOperation[], config: CodeModeConf
   const writeNote = config.writes ? '' : ' This deployment is read-only for Code Mode: write operations are not available.';
   const search: VirtualTool = {
     name: 'search', title: 'Search Polarion operations', toolset: 'composites',
-    description: `Find Polarion operations by keyword and get their TypeScript declarations for use inside \`execute\`. Returns at most ${'`limit`'} matches (default 8).`,
-    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Keywords, e.g. "trace links" or "create work item".' }, toolset: { type: 'string', description: 'Optional toolset filter, e.g. composites.' }, limit: { type: 'number', default: 8 } } },
+    description: `Find Polarion operations by keyword and get their TypeScript declarations for use inside \`execute\`. Returns at most ${'`limit`'} matches (default 8, maximum 25). Use \`offset\` for paging and \`detail\` with operation names for full descriptions.`,
+    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Keywords, e.g. "trace links" or "create work item".' }, toolset: { type: 'string', description: 'Optional toolset filter, e.g. composites.' }, limit: { type: 'number', default: 8, description: 'Matches per page, 1 to 25.' }, offset: { type: 'number', default: 0, description: 'Skip this many matches; the result names the next offset when more remain.' }, detail: { type: 'array', items: { type: 'string' }, description: 'Operation names, e.g. ["patchWorkItem"]: returns each declaration with its full description instead of a search.' } } },
     annotations: { readOnlyHint: true },
-    handler: ({ query = '', toolset, limit = 8 }) => {
-      const matches = rank(ops, String(query), typeof toolset === 'string' ? toolset : undefined, Math.max(1, Math.min(25, Number(limit) || 8)));
+    handler: ({ query = '', toolset, limit = 8, offset = 0, detail }) => {
+      if (Array.isArray(detail) && detail.length > 0) {
+        const output = detail.map(name => {
+          const op = ops.find(item => item.name === name);
+          return op ? `${declarationFor(op)}\n/* ${op.description.replace(/\*\//g, '* /')} */` : `// unknown operation: ${String(name)}`;
+        }).join('\n\n');
+        return { content: [{ type: 'text' as const, text: output }] };
+      }
+      const pageSize = Math.max(1, Math.min(25, Math.floor(Number(limit) || (Number(limit) === 0 ? 1 : 8))));
+      const start = Math.max(0, Math.floor(Number(offset) || 0));
+      const all = rank(ops, String(query), typeof toolset === 'string' ? toolset : undefined, ops.length);
+      const matches = all.slice(start, start + pageSize);
+      if (matches.length === 0 && all.length > 0) return { content: [{ type: 'text' as const, text: `No more matches: "${String(query)}" has ${all.length}, offset ${start} is past the end.` }] };
       if (matches.length === 0) return { content: [{ type: 'text' as const, text: `No operations match "${String(query)}". ${ops.length} operations are available; try broader keywords.` }] };
-      return { content: [{ type: 'text' as const, text: matches.map(declarationFor).join('\n\n') }] };
+      const more = all.length - start - matches.length;
+      return { content: [{ type: 'text' as const, text: matches.map(declarationFor).join('\n\n') + (more > 0 ? `\n// ${more} more matches: call search again with offset: ${start + matches.length}` : '') }] };
     },
   };
   const execute: VirtualTool = {

@@ -5,6 +5,8 @@ Code Mode is the default and replaces the tool list with two tools, so the model
 - `search` finds operations by keyword and returns TypeScript declarations for them.
 - `execute` runs JavaScript that calls those operations as `await polarion.<operation>({...})`, then returns a small JSON result.
 
+`search` returns declarations with sentence-based summaries. Use `offset` to page through matches and `detail` with operation names to retrieve full descriptions.
+
 The model searches first, then writes one script for the whole task: loop, filter, join and return only what it needs. Intermediate data stays in the sandbox instead of passing through the model.
 
 ## When to use which mode
