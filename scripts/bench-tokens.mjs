@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Token benchmark for MCP_MODE=full|discover|code. Run `npm run build` first.
+// Token benchmark for MCP_MODE=full|code. Run `npm run build` first.
 // Tokens are estimated as characters / 4 for everything the model reads or writes:
-// the tools/list once, then every tool call (arguments) and every tool result.
+// name, description and inputSchema from tools/list once, then every tool call (arguments) and every tool result.
 // Polarion is replaced by a local stub, so the numbers compare modes, not servers.
 import { createServer as createHttp } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -32,7 +32,7 @@ async function session(mode) {
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'bench', version: '1' });
   await server.connect(b); await client.connect(a);
-  let total = tokens((await client.listTools()).tools);
+  let total = tokens((await client.listTools()).tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })));
   const listTokens = total;
   const call = async (name, args) => { const r = await client.callTool({ name, arguments: args }); total += tokens({ name, args }) + tokens(resultText(r)); return r; };
   return { call, listTokens, total: () => total, close: async () => { await client.close(); await server.close(); } };
@@ -43,24 +43,20 @@ const quiet = fn => { const log = console.log; const err = console.error; consol
 const scenarios = {
   'A: find open requirements, list id and title': {
     direct: async s => { await s.call('getWorkItems', { projectId: 'P', query: 'type:requirement AND status:open', page_size_: 100 }); },
-    discover: async s => { await s.call('search_tools', { query: 'work items' }); await s.call('call_tool', { name: 'getWorkItems', arguments: { projectId: 'P', query: 'type:requirement AND status:open', page_size_: 100 } }); },
     code: async s => { await s.call('search', { query: 'work items' }); await s.call('execute', { code: "const r = await polarion.getWorkItems({ projectId: 'P', query: 'type:requirement AND status:open', page_size_: 100 }); return r.data.map(w => w.id + ' ' + w.attributes.title)" }); },
   },
   'B: set a field on 20 work items': {
     direct: async s => { await s.call('getWorkItems', { projectId: 'P', query: 'type:requirement', page_size_: 100 }); for (let i = 0; i < 20; i++) await s.call('patchWorkItem', { projectId: 'P', workItemId: `REQ-${i}`, requestBody: { data: { type: 'workitems', id: `P/REQ-${i}`, attributes: { severity: 'major' } } } }); },
-    discover: async s => { await s.call('search_tools', { query: 'patch work item' }); await s.call('call_tool', { name: 'getWorkItems', arguments: { projectId: 'P', query: 'type:requirement', page_size_: 100 } }); for (let i = 0; i < 20; i++) await s.call('call_tool', { name: 'patchWorkItem', arguments: { projectId: 'P', workItemId: `REQ-${i}`, requestBody: { data: { type: 'workitems', id: `P/REQ-${i}`, attributes: { severity: 'major' } } } } }); },
     code: async s => { await s.call('search', { query: 'patch work item' }); await s.call('execute', { code: "const r = await polarion.getWorkItems({ projectId: 'P', query: 'type:requirement', page_size_: 100 }); let n = 0; for (const w of r.data.slice(0, 20)) { await polarion.patchWorkItem({ projectId: 'P', workItemId: w.attributes.id, requestBody: { data: { type: 'workitems', id: w.id, attributes: { severity: 'major' } } } }); n++; } return n" }); },
   },
   'C: count open requirements in 5 projects': {
     direct: async s => { for (let i = 0; i < 5; i++) await s.call('getWorkItems', { projectId: `P${i}`, query: 'type:requirement AND status:open', page_size_: 100 }); },
-    discover: async s => { await s.call('search_tools', { query: 'work items' }); for (let i = 0; i < 5; i++) await s.call('call_tool', { name: 'getWorkItems', arguments: { projectId: `P${i}`, query: 'type:requirement AND status:open', page_size_: 100 } }); },
     code: async s => { await s.call('search', { query: 'work items' }); await s.call('execute', { code: "const out = {}; for (const p of ['P0','P1','P2','P3','P4']) { const r = await polarion.getWorkItems({ projectId: p, query: 'type:requirement AND status:open', page_size_: 100 }); out[p] = r.data.length; } return out" }); },
   },
 };
 
 const modes = [
   { label: 'full (all tools)', mode: 'full', kind: 'direct' },
-  { label: 'discover', mode: 'discover', kind: 'discover' },
   { label: 'code', mode: 'code', kind: 'code' },
 ];
 const rows = [];

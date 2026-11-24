@@ -25,15 +25,38 @@ Two things to know:
 
 ## Token cost
 
-Measured with `node scripts/bench-tokens.mjs` (after `npm run build`) against a local Polarion stub that returns 100 work items per query. Tokens are estimated as characters / 4 for the tool list plus every call and result the model sees.
+Anthropic `count_tokens` measured each tool's name, description and input schema with Claude Sonnet 5.5 on November 24, 2026.
 
-| Mode | tools/list | A: list open requirements | B: set a field on 20 items | C: count in 5 projects |
+| Server and mode | Tools | Tokens |
+|---|---:|---:|
+| polarion-mcp 1.5.0 default | 293 | 213,143 |
+| polarion-mcp 1.6.0 `MCP_MODE=full` | 315 | 229,769 |
+| polarion-mcp 1.6.0 Code Mode (default) | 2 | 698 |
+| Polarion 2612 built-in MCP, early-access build | 67 | 44,070 |
+
+One `search` returns up to eight typed declarations, measured at 511 to 1,348 tokens.
+
+Live runs used Claude Sonnet 5.5 through the Messages API, an agent loop with all tools loaded, prompt caching, and a real Polarion 2606. Each task ran twice per version. The figures are mean context tokens read across all model calls.
+
+| Task | 1.5.0 all tools | 1.6.0 Code Mode | Correct runs (1.5.0 / Code Mode) |
+|---|---:|---:|---|
+| A: list 34 draft requirements | 646,127 | 8,314 | 2 of 2 / 2 of 2 |
+| B: set severity on 20 work items | 874,107 | 40,528 | 2 of 2 / 2 of 2 |
+| C: count open requirements in 5 projects | 431,595 | 10,055 | 2 of 2 / 2 of 2 |
+| Total | 1,951,829 | 58,897 | 6 of 6 / 6 of 6 |
+
+The total is 33x lower with Code Mode. With cache reads priced at 0.1 and writes at 1.25, billed equivalents are 334,602 and 20,155 tokens, a 17x difference. All 12 runs, six per version, were correct. Wall time and output tokens were similar.
+
+Clients that load tools on demand see a smaller gap: Claude Code with tool search added 5,859 tokens at session start for 1.6.0 full and 819 for Code Mode.
+
+### Reproduce offline
+
+Run `npm run build` and `node scripts/bench-tokens.mjs`. This estimate uses characters / 4 and a local stub returning 100 work items per query.
+
+| Mode | tools/list | A: find open requirements, list id and title | B: set a field on 20 work items | C: count in 5 projects |
 |---|---|---|---|---|
-| `full`, all tools | 270,139 | 286,462 | 287,808 | 351,759 |
-| `full`, work-items and documents only (benchmark setup) |
-| `code` | 311 | 1,864 | 1,331 | 1,240 |
-
-The gain on multi-step tasks comes from two places: one script replaces many round trips, and the script returns only what the model needs instead of every raw result. The numbers compare modes against a stub; they say nothing about answer quality. `full` stays the default until quality is compared on real prompts.
+| full (all tools) | 159,094 | 175,417 | 176,763 | 240,714 |
+| code | 265 | 1,818 | 1,285 | 1,194 |
 
 ## What the sandbox is
 
