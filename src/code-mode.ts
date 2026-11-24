@@ -95,7 +95,7 @@ export function summarizeDescription(text: string, max = 240): string {
 /** TypeScript declaration the model reads from `search`. */
 export function declarationFor(op: SdkOperation): string {
   const args = schemaToType(op.inputSchema);
-  const doc = summarizeDescription(op.description);
+  const doc = summarizeDescription(op.description).replace(/\*\//g, '* /');
   const flags = op.readOnly ? '' : ' [write]';
   return `/** ${doc}${flags} */\npolarion.${op.name}(args: ${args === 'Record<string, unknown>' ? '{}' : args}): Promise<any>;`;
 }

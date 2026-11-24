@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createPolarionServer, type PolarionServerOptions } from '../src/server.js'
-import { schemaToType } from '../src/code-mode.js'
+import { declarationFor, schemaToType } from '../src/code-mode.js'
 
 interface Seen { method: string; url: string; body: string }
 async function withCodeMode<T>(opts: Partial<PolarionServerOptions> & { env?: Record<string, string> }, run: (client: Client, seen: Seen[], events: any[]) => Promise<T>): Promise<T> {
@@ -193,6 +193,12 @@ test('description summaries preserve complete sentences and alternatives', async
   assert.equal(summarizeDescription('Try e.g. This example and `foo. Bar` here. Next sentence.', 43), 'Try e.g. This example and `foo. Bar` here.')
   assert.equal(summarizeDescription('A long first sentence with several words.', 19), 'A long first…')
   assert.equal(summarizeDescription('First sentence. An omitted sentence. To act on one, use `other` instead.', 20), 'First sentence. To act on one, use `other` instead.')
+})
+
+test('declarations escape comment terminators', () => {
+  const doc = declarationFor({ name: 'x', description: 'Matches **/*.java files.', inputSchema: { type: 'object', properties: {} }, readOnly: true } as any)
+  assert.equal(doc.match(/\*\//g)?.length, 1)
+  assert.match(doc, /\*\* \/\*\.java/)
 })
 
 test('search pages and returns full detail', async () => {
