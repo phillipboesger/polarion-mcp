@@ -15,7 +15,7 @@ The two do not conflict. Both act as the signed-in Polarion user, so permissions
 |---|---|---|
 | Setup | Nothing to deploy. Set `com.siemens.polarion.mcp.enabled=true` in `polarion.properties` and use a personal access token. | Run `npx`, a container or the `.mcpb` bundle, then connect a client. |
 | Polarion releases | 2612 and newer | 2506, 2512, 2606 and 2612; features that need a newer release say so instead of failing silently |
-| Tool list size | Tool count: 67; 44,070 tokens | Code Mode (default): tool count: 2; 698 tokens, plus about 500 to 1,350 tokens per `search`. `MCP_MODE=full`: tool count: 315; 229,769 tokens |
+| Tool list size | 67 tool definitions, 44,070 tokens | Code Mode (default): 2 tool definitions, 698 tokens, plus about 500 to 1,350 tokens per `search`. `MCP_MODE=full`: 315 tool definitions, 229,769 tokens |
 | Workflow transitions | Built in | `get_workitem_actions` and `transition_workitem_status`: resolve by action name or target status, check required fields first, verify the new status afterwards |
 | Write checks | None before the call; values go to Polarion as sent | Enum labels and custom-field keys are checked before the call; a custom-enum label sent instead of an id is refused with the id to use |
 | Preview | Not available | `dry_run` on writes shows the request and a read-back diff |

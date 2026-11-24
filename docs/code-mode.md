@@ -38,14 +38,14 @@ One `search` returns up to eight typed declarations, measured at 511 to 1,348 to
 
 Live runs used Claude Sonnet 5.5 through the Messages API, an agent loop with all tools loaded, prompt caching, and a real Polarion 2606. Each task ran twice per version. The figures are mean context tokens read across all model calls.
 
-| Task | 1.5.0 all tools | 1.6.0 Code Mode | Correct answers |
+| Task | 1.5.0 all tools | 1.6.0 Code Mode | Correct runs (1.5.0 / Code Mode) |
 |---|---:|---:|---|
-| A: list 34 draft requirements | 646,127 | 8,314 | 4 of 4 |
-| B: set severity on 20 work items | 874,107 | 40,528 | 4 of 4 |
-| C: count open requirements in 5 projects | 431,595 | 10,055 | 4 of 4 |
-| Total | 1,951,829 | 58,897 | 12 of 12 |
+| A: list 34 draft requirements | 646,127 | 8,314 | 2 of 2 / 2 of 2 |
+| B: set severity on 20 work items | 874,107 | 40,528 | 2 of 2 / 2 of 2 |
+| C: count open requirements in 5 projects | 431,595 | 10,055 | 2 of 2 / 2 of 2 |
+| Total | 1,951,829 | 58,897 | 6 of 6 / 6 of 6 |
 
-The total is 33x lower with Code Mode. With cache reads priced at 0.1 and writes at 1.25, billed equivalents are 334,602 and 20,155 tokens, a 17x difference. All 12 runs in each version were correct. Wall time and output tokens were similar.
+The total is 33x lower with Code Mode. With cache reads priced at 0.1 and writes at 1.25, billed equivalents are 334,602 and 20,155 tokens, a 17x difference. All 12 runs, six per version, were correct. Wall time and output tokens were similar.
 
 Clients that load tools on demand see a smaller gap: Claude Code with tool search added 5,859 tokens at session start for 1.6.0 full and 819 for Code Mode.
 
@@ -55,8 +55,8 @@ Run `npm run build` and `node scripts/bench-tokens.mjs`. This estimate uses char
 
 | Mode | tools/list | A: find open requirements, list id and title | B: set a field on 20 work items | C: count in 5 projects |
 |---|---|---|---|---|
-| full (all tools) | 159094 | 175417 | 176763 | 240714 |
-| code | 265 | 1818 | 1285 | 1194 |
+| full (all tools) | 159,094 | 175,417 | 176,763 | 240,714 |
+| code | 265 | 1,818 | 1,285 | 1,194 |
 
 ## What the sandbox is
 
