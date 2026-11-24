@@ -21,7 +21,7 @@ Run `node build/index.js` directly when connecting a local MCP client. Configure
 
 Start with `npm run start:mcp-http`. The MCP endpoint is `/mcp`; `/health` is unauthenticated. Each MCP request must carry the caller's Polarion PAT as a Bearer token, or an access token from the optional OAuth login. Sessions are held in memory and bound to the caller's token. OAuth metadata and login routes are enabled when `MCP_PUBLIC_URL` and the required secret configuration are set. See [configuration.md](./configuration.md) and [security.md](./security.md).
 
-The server lists two tools, `search` and `execute` (Code Mode); see [Code Mode](code-mode.md). `MCP_READ_ONLY` removes write access. `MCP_MODE=full` lists every tool, and in that mode clients may narrow a request with toolset selectors.
+The server lists two tools, `search` and `execute` (Code Mode); see [Code Mode](code-mode.md). `MCP_READ_ONLY` removes write access. `MCP_MODE=full` lists every tool.
 
 
 ## REST HTTP mode
