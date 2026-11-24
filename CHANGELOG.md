@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.6.1
 
 - Code Mode search returns readable summaries, supports paging and provides full descriptions on request.
 
