@@ -20,6 +20,9 @@ import { parseMaxResponseChars } from './executor.js';
 import { writeLimitsFromEnv } from './write-verification.js';
 import { parseLogSetting } from './logger.js';
 import { parseProfile } from './profile.js';
+import { toolFilterWarnings } from './tool-filter.js';
+import { registerCompositeTools } from './composite-search.js';
+import { listVirtualTools } from './virtual-tools.js';
 
 function parseToolRateLimit(value: string | undefined): number {
   const parsed = Number(value ?? 0);
@@ -36,6 +39,8 @@ function parseToolRateLimit(value: string | undefined): number {
 async function main(): Promise<void> {
   try {
     parseProfile(process.env);
+    registerCompositeTools();
+    for (const warning of toolFilterWarnings(listVirtualTools())) console.error(`[WARN] ${warning}`);
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
     const server = createPolarionServer({ ...parseLogSetting(process.env.MCP_LOG), transport: 'stdio', maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: flagOn(process.env.MCP_MARK_UNTRUSTED), confirmDestructive: flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE), apiBaseUrl: API_BASE_URL });
     const transport = new StdioServerTransport();

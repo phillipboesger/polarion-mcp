@@ -7,9 +7,12 @@
  * - `readonly`: `safe` plus MCP_READ_ONLY, so no tool can write.
  *
  * A single switch that is set explicitly always wins over the profile.
- * Importing this module applies the profile to `process.env`, because the
- * tool filter reads its flags at import time.
+ * Importing this module loads `.env` and applies the profile to `process.env`,
+ * because the tool filter reads its flags at import time. The tool filter imports
+ * this module first, so no entry point can read the flags before `.env` is in.
  */
+
+import dotenv from 'dotenv';
 
 export const PROFILES = ['standard', 'safe', 'readonly'] as const;
 export type ProfileName = (typeof PROFILES)[number];
@@ -63,4 +66,5 @@ export function applyProfile(env: NodeJS.ProcessEnv): string[] {
   return applied;
 }
 
+dotenv.config({ quiet: true });
 applyProfile(process.env);

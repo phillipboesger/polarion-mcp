@@ -2796,7 +2796,7 @@
     {
       "id": "read-only",
       "q": "Can I limit the server to read-only?",
-      "a": "Yes: set `MCP_READ_ONLY=1` and restart. Only read tools are exposed. In write-enabled sessions every write tool can preview with `dry_run: true`."
+      "a": "Yes: set `MCP_READ_ONLY=1` and restart. To allow only some operations, list them in `MCP_TOOLS`, for example `all-reads,patchWorkItem`. In write-enabled sessions every write tool can preview with `dry_run: true`."
     },
     {
       "id": "disconnected",

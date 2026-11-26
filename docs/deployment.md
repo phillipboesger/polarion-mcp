@@ -112,6 +112,7 @@ Environment=TRUST_PROXY=loopback
 # Only these OAuth callbacks may register; add one per client you support.
 Environment=MCP_ALLOWED_REDIRECT_PREFIXES=https://claude.ai/api/mcp/auth_callback
 # Optional: MCP_READ_ONLY=true removes all write access.
+# Optional: MCP_TOOLS=all-reads,patchWorkItem limits the server to these operations (docs/configuration.md).
 ExecStart=/opt/polarion-mcp/node/bin/node build/mcp-http-server.js
 Restart=on-failure
 RestartSec=5

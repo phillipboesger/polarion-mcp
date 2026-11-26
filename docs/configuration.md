@@ -8,9 +8,53 @@ Everything else has a working default. The server lists two tools, `search` and 
 
 **Running a shared server (Streamable HTTP):** each user sends their own token, so `BEARER_TOKEN` is not set. You need `API_BASE_URL`, and `MCP_ALLOWED_HOSTS` with the server's own public hostname. For claude.ai, ChatGPT and other cloud clients add `MCP_PUBLIC_URL`, `MCP_TOKEN_SECRET` and the OAuth redirect allowlist, and put the server behind TLS with `TRUST_PROXY` set. See [deployment](deployment.md).
 
-By default, reads and writes are allowed without server confirmation. Set `MCP_PROFILE=readonly` or `MCP_READ_ONLY=true` to block writes without prompts. Your MCP client may still ask before a tool call. `MCP_PROFILE=safe` enables optional confirmation for calls classified as destructive and marks user-written text as untrusted.
+By default, reads and writes are allowed without server confirmation. Set `MCP_PROFILE=readonly` or `MCP_READ_ONLY=true` to block writes without prompts, and `MCP_TOOLS` to limit the server to selected operations (see [Restrict what the AI can do](#restrict-what-the-ai-can-do)). Your MCP client may still ask before a tool call. `MCP_PROFILE=safe` enables optional confirmation for calls classified as destructive and marks user-written text as untrusted.
 
 The table below is the complete reference for operators.
+
+## Restrict what the AI can do
+
+By default the server allows every read and every write your Polarion token allows, without asking per call. Two settings narrow that, and you only need them if you want less:
+
+- `MCP_READ_ONLY=true` removes every write.
+- `MCP_TOOLS` limits the server to the operations you list.
+
+An operation is available only if **both** allow it: it is in `MCP_TOOLS` (or `MCP_TOOLS` is unset), and read-only does not remove it. There is no separate list of allowed writes: a write is allowed when it is listed and the server is not read-only.
+
+| You want | Settings |
+|---|---|
+| Read and write everything (default) | none |
+| Read only | `MCP_READ_ONLY=true` |
+| Only certain operations | `MCP_TOOLS=getWorkItem,search_work_items,patchWorkItem` |
+| Only certain operations, and no writes | the same list plus `MCP_READ_ONLY=true` |
+| Read everything, write only selected operations | `MCP_TOOLS=all-reads,patchWorkItem,transition_workitem_status` |
+
+In an MCP client configuration the settings go into `env`, next to the URL and the token:
+
+```json
+"env": {
+  "API_BASE_URL": "https://polarion.example.com/polarion/rest/v1",
+  "BEARER_TOKEN": "YOUR_POLARION_TOKEN",
+  "MCP_TOOLS": "all-reads,patchWorkItem"
+}
+```
+
+Restart the server (or the client that starts it) after a change.
+
+### Rules for `MCP_TOOLS`
+
+- Separate names with commas, spaces or new lines. Unset or empty means no restriction.
+- Names are exact and case-sensitive: operation names such as `getWorkItem` and composite names such as `search_work_items`. There are no wildcards. To find names, ask the assistant to search for an operation on an unrestricted server (in Code Mode, `search` returns them), or list the tools with `MCP_MODE=full`.
+- `all-reads` stands for every read-only operation, including the read-only composites. It never includes a write.
+- `search` and `execute` are always present in Code Mode and need no entry. They only reach the operations the settings allow.
+- An unknown or misspelled name **does not stop the server**. It is ignored, and the startup log lists all such names in one warning. A mistake never widens access: if no name matches, the server starts with no Polarion operations at all and logs `MCP_TOOLS enables zero operations`. A list that contains only separators (`,,`) does the same.
+- With read-only on, listed writes are dropped and the startup log names them.
+- A listed [composite](usage.md) may call the operations it is built from, even if you did not list them. They stay unavailable for direct calls. So listing `transition_workitem_status` allows that status change although `patchWorkItem` is not listed, and listing `upload_attachment` allows its uploads. A composite never writes on a read-only server or session.
+- The settings apply to the whole server and every user of it; there are no per-user lists. Each user's Polarion permissions apply on top, so use Polarion roles when different people need different rights.
+- They apply to every way in: Code Mode, `MCP_MODE=full`, stdio, Streamable HTTP, the REST wrapper and Custom GPT Actions. Composites are not part of the REST wrapper or Custom GPT Actions.
+- The token check at sign-in does not depend on the list.
+
+After a change, read the startup log: warnings start with `[WARN]`, and `Tool filter: N/M tools enabled` shows how many generated operations remain (composites are not counted there).
 
 ## Environment variables
 
@@ -51,6 +95,7 @@ The server loads `.env` in local runs. Secret values belong in the deployment's 
 | `MCP_MODE` | `code` | `src/server.ts` | No | `code` (default) lists two tools, `search` and `execute`, and reaches every Polarion operation through them. `full` lists the whole catalogue; use it only for a client that cannot approve `execute` (for example `codex exec` with approval policy "never"). `auto` and `discover` are removed and run as `code` with a startup warning. |
 | `MCP_PROFILE` | `standard` | `src/profile.ts` | No | One word for the safety switches. `standard` changes nothing. `safe` turns on `MCP_CONFIRM_DESTRUCTIVE` and `MCP_MARK_UNTRUSTED`. `readonly` is `safe` plus `MCP_READ_ONLY`. A switch you set explicitly (also to `false`) wins over the profile. An unknown value stops startup. |
 | `MCP_READ_ONLY` | `false` | `src/tool-filter.ts` | No | Keep only tools annotated read-only. Accepts true/1/yes/on or false/0/no/off. |
+| `MCP_TOOLS` | Unset (all operations) | `src/tool-filter.ts` | No | Allowlist of operation and composite names; `all-reads` adds every read-only one. Combined with read-only, never widens. Unknown names are ignored with a startup warning. See [Restrict what the AI can do](#restrict-what-the-ai-can-do). |
 | `TRUST_PROXY` | Unset | `src/http-server.ts`, `src/mcp-http-server.ts` | No | Express trusted proxy setting (for example `loopback`, hop count `1`, or proxy addresses). Required behind a proxy for client IP rate limiting. `true` is rejected. |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | TLS verification enabled | `src/config.ts` | No | Set to `0` to disable certificate verification. Use only with trusted internal TLS endpoints. |
 
@@ -60,7 +105,7 @@ The Streamable HTTP MCP endpoint accepts an `X-MCP-Readonly: true` header that n
 
 `MCP_ALLOWED_ORIGINS` protects MCP and OAuth routes from browser-origin abuse and DNS rebinding. The request path is matched case-insensitively. The public origin in `MCP_PUBLIC_URL` is always accepted; otherwise configure trusted origins. Requests without an Origin header are not rejected. The REST wrapper uses the separate `HTTP_CORS_ORIGINS` setting.
 
-Settings that narrowed the tool list or toggled single features in older versions are removed. They are ignored, and the startup log names each one that is still set. This includes the fixed limits (10 items read back per bulk write, 100 registrations per IP per hour, 500 failed token requests per IP per 15 minutes, 60 minute idle sessions, 1000 sessions, 14 day refresh tokens), the separate log format and level settings, and the per-scheme credential variables: Polarion takes one token. Code Mode makes them unnecessary; use `MCP_READ_ONLY=true` to remove write access.
+Other settings that narrowed the tool list or toggled single features in older versions are removed (`MCP_TOOLS` is supported again). They are ignored, and the startup log names each one that is still set. This includes the fixed limits (10 items read back per bulk write, 100 registrations per IP per hour, 500 failed token requests per IP per 15 minutes, 60 minute idle sessions, 1000 sessions, 14 day refresh tokens), the separate log format and level settings, and the per-scheme credential variables: Polarion takes one token. To restrict access, use `MCP_TOOLS` and `MCP_READ_ONLY=true`.
 
 ## Network paths
 

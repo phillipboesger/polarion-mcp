@@ -187,7 +187,7 @@ The PAT is not printed or placed in command arguments. An authenticated metadata
 
 ## Tool Not Found
 
-- Use `GET /api/tools` to list REST tool names. Check `MCP_READ_ONLY` and, over the MCP endpoint, request selectors for filters that hide the tool.
+- Use `GET /api/tools` to list REST tool names. If an operation is missing or "Unknown tool", check `MCP_READ_ONLY`, `MCP_PROFILE=readonly`, `MCP_TOOLS` (names are case-sensitive; the startup log lists unknown ones) and, over the MCP endpoint, the `X-MCP-Readonly` header.
 
 ## SDK PDF Not Found
 

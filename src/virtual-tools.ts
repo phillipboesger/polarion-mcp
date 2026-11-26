@@ -43,5 +43,5 @@ export function registerVirtualTool(tool: VirtualTool): () => void {
 
 /** Lists registered tools after applying the same read-only constraint as generated tools. */
 export function listVirtualTools(filter: ToolFilter = {}): VirtualTool[] {
-  return [...registry.values()].filter(tool => !filter.readOnly || tool.annotations?.readOnlyHint === true);
+  return [...registry.values()].filter(tool => (!filter.readOnly || tool.annotations?.readOnlyHint === true) && (!filter.allow || filter.allow.has(tool.name) || (filter.allow.has('all-reads') && tool.annotations?.readOnlyHint === true)));
 }

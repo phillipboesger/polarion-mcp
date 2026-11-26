@@ -23,8 +23,10 @@ import { pathToFileURL } from 'node:url';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
-import { enabledTools } from './tool-filter.js';
+import { enabledTools, toolFilterWarnings } from './tool-filter.js';
 import { parseProfile } from './profile.js';
+import { registerCompositeTools } from './composite-search.js';
+import { listVirtualTools } from './virtual-tools.js';
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings } from './config.js';
 import { ESSENTIAL_GPT_TOOLS } from './gpt-tools.js';
 import { createRestToolsRouter, specServerUrl, type RestToolsOptions } from './rest-api.js';
@@ -174,6 +176,9 @@ const PORT = env.PORT || env.HTTP_PORT || 3000;
 const HTTP_API_KEY = env.HTTP_API_KEY;
 if (!HTTP_API_KEY) throw new Error('HTTP_API_KEY is required');
 parseProfile(env);
+registerCompositeTools();
+// Composites are known names, but this wrapper does not serve them.
+for (const warning of toolFilterWarnings(listVirtualTools(), undefined, [])) console.error(`[WARN] ${warning}`);
 const trustProxy = parseTrustProxy(env.TRUST_PROXY);
 const app = createHttpApp({ apiKey: HTTP_API_KEY, env, port: Number(PORT), trustProxy });
 const server = app.listen(PORT, () => {

@@ -4,7 +4,7 @@
 
 PAT validation probes `GET /metadata` first. On Polarion 2512+ it works without global REST GET permission. Only a usable metadata JSON response authenticates a PAT for MCP initialization, OAuth login, and refresh. HTTP 401 rejects the PAT and HTTP 403 denies access; neither triggers a fallback. Only a 404 from `/metadata` (Polarion 2506) falls back to `GET /projects?page[size]=1`, which does need global REST GET permission and requires a usable JSON project list. Network failures and unusable responses remain unavailable, and redirects are not followed. Session caps, token ownership, and failed-authentication limits still apply. Empty, malformed, HTML, proxy, or other unusable HTTP 200 responses cannot authenticate credentials. Successful authentication does not grant tool permissions; Polarion authorizes each tool call. Failed Basic-auth requests are counted against per-IP and per-client limits before rejection; successful exchanges do not consume the failed-request budget.
 
-The REST HTTP wrapper (`build/http-server.js`) authenticates callers with `HTTP_API_KEY` and makes Polarion calls using the deployment's `BEARER_TOKEN`. The Streamable HTTP MCP server uses each caller's Polarion PAT directly, or a sealed OAuth token containing that PAT. Polarion remains the authorization boundary for tool operations. Server-side read-only filtering reduces the callable surface. OAuth tokens and client credentials are sealed statelessly; in-memory login state, authorization codes, and MCP sessions are not shared between instances.
+The REST HTTP wrapper (`build/http-server.js`) authenticates callers with `HTTP_API_KEY` and makes Polarion calls using the deployment's `BEARER_TOKEN`. The Streamable HTTP MCP server uses each caller's Polarion PAT directly, or a sealed OAuth token containing that PAT. Polarion remains the authorization boundary for tool operations. Server-side filtering reduces the callable surface: `MCP_READ_ONLY` removes writes, and `MCP_TOOLS` limits the server to listed operations (see below). OAuth tokens and client credentials are sealed statelessly; in-memory login state, authorization codes, and MCP sessions are not shared between instances.
 
 ## Secrets and tokens
 
@@ -39,6 +39,17 @@ Tool calls can also be limited per authenticated user in a rolling minute with `
 With `MCP_MARK_UNTRUSTED=true`, JSON results carry a `_notice` that user-authored content is data, not instructions, and likely user-authored text fields are wrapped in `<polarion-untrusted>` markers. Embedded closing markers are neutralized. These markers help models distinguish data but do not replace tool authorization or output review.
 
 Limits are in-memory per process. OAuth authorization is 100 requests per IP per 15 minutes. Token exchange is 50 failed attempts per client and IP per 15 minutes, with an additional IP ceiling of 500 failed attempts; successful requests do not count toward token failure ceilings. Failed Basic-auth requests count against these per-client and per-IP ceilings before rejection; successful requests are excluded. PAT checks are limited to 50 failures per IP and token per 15 minutes, plus 500 failures per IP. Dynamic client registrations are limited to 100 per IP per hour. Set `TRUST_PROXY` to the actual trusted proxy hop or address so limits see client IPs. If omitted behind a shared-egress proxy, all users share one IP bucket and one user's failures can lock out everyone. Never set `TRUST_PROXY=true` for an untrusted network.
+
+## Restricting operations
+
+`MCP_TOOLS` and `MCP_READ_ONLY` are enforced by the server: an operation they remove is not listed, not offered inside `execute`, and refused when called by name, on every transport. This also holds against a prompt-injected request. `X-MCP-Readonly` can only narrow one HTTP session further. Settings and exact rules: [Restrict what the AI can do](configuration.md#restrict-what-the-ai-can-do).
+
+Know the limits:
+
+- A listed composite may use the operations it is built from. Review which writes your list allows through composites (`transition_workitem_status`, `run_job_and_wait`, `upload_attachment`).
+- A listed operation keeps its full reach. `patchWorkItem` can change any field the user may change; `executeJob` can start any job the user may start.
+- The list is one per server, not per user. It is a second fence, not a replacement for least-privilege Polarion roles and tokens.
+- Check the startup log after changing the list: misspelled names are ignored with a warning, so an operation you expected may be missing.
 
 ## Destructive tool confirmation
 

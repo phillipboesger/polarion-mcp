@@ -13,7 +13,7 @@ export BEARER_TOKEN="your-personal-access-token"
 polarion-alm-mcp
 ```
 
-Or run with `uvx polarion-alm-mcp`. Python 3.10+ and a REST-enabled Polarion instance are required. All configuration variables and stdio messages pass through to the server. Set `MCP_READ_ONLY=1` to block writes; supported writes accept `dry_run: true` to preview requests.
+Or run with `uvx polarion-alm-mcp`. Python 3.10+ and a REST-enabled Polarion instance are required. All configuration variables and stdio messages pass through to the server. Set `MCP_READ_ONLY=1` to block writes, or `MCP_TOOLS` to allow only listed operations; supported writes accept `dry_run: true` to preview requests.
 
 ## MCP client configuration
 

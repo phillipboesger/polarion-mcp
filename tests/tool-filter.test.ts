@@ -33,9 +33,9 @@ test("parseToolFilter: flags accept 1/true/yes/on in any case, and a value that 
   assert.throws(() => parseFlag("MCP_LOG", "maybe"), /MCP_LOG/)
 })
 
-test("parseToolFilter: unset means no filter, and MCP_TOOLS is no longer read", () => {
+test("parseToolFilter: parses the allowlist", () => {
   assert.deepEqual(parseToolFilter({}), { readOnly: false })
-  assert.deepEqual(parseToolFilter({ MCP_TOOLS: "a, b", MCP_READ_ONLY: "true" }), { readOnly: true })
+  assert.deepEqual(parseToolFilter({ MCP_TOOLS: "a, b", MCP_READ_ONLY: "true" }), { readOnly: true, allow: new Set(["a", "b"]) })
 })
 
 test("filterTools: no filter keeps every tool", () => {

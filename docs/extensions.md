@@ -8,7 +8,7 @@ Register a `VirtualTool` with `registerVirtualTool()` from `src/virtual-tools.ts
 
 Virtual tool arguments are validated against their schemas before handlers run. Schemas that intentionally allow custom properties retain their `additionalProperties` semantics. Mutating virtual tools use the same dry-run normalization and response text cap as generated tools.
 
-Virtual tools use the generated-tool filter `MCP_READ_ONLY`. The `composites` toolset is reserved for synthetic tools that combine multiple Polarion operations.
+Virtual tools follow the same filters as generated tools: `MCP_READ_ONLY` and `MCP_TOOLS` (by tool name). Their internal `callPolarionTool` calls are not limited by the name list, but read-only still applies to them. The `composites` toolset is reserved for synthetic tools that combine multiple Polarion operations.
 
 ## Per-call extensions
 

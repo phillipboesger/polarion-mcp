@@ -45,8 +45,10 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, reque
 import { createPolarionServer, createToolCaller } from './server.js';
 import { writeLimitsFromEnv, type WriteLimits } from './write-verification.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
-import { enabledTools } from './tool-filter.js';
+import { enabledTools, toolFilterWarnings } from './tool-filter.js';
 import { parseProfile } from './profile.js';
+import { registerCompositeTools } from './composite-search.js';
+import { listVirtualTools } from './virtual-tools.js';
 import type { McpToolDefinition } from './types.js';
 import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
 import { PolarionOAuthProvider, probePolarionToken, normalizeTokenProbeResult, formatTokenDiagnostic, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenCheckFunction, type TokenValidator } from './oauth.js';
@@ -996,6 +998,8 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
 export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } = {}): HttpServer {
   // Refuse to start with an unknown MCP_PROFILE; importing the modules never throws for it.
   parseProfile(process.env);
+  registerCompositeTools();
+  for (const warning of toolFilterWarnings(listVirtualTools())) console.error(`[WARN] ${warning}`);
   const port = Number(process.env.MCP_HTTP_PORT || process.env.PORT || process.env.HTTP_PORT || 3000);
   const allowedHosts = (process.env.MCP_ALLOWED_HOSTS || '')
     .split(',')

@@ -78,13 +78,13 @@ test("config drops trailing slashes and whitespace from API_BASE_URL, so request
 })
 
 test("deprecatedConfigWarnings names every removed setting that is set and nothing else", async () => {
-  const { deprecatedConfigWarnings, configurationWarnings } = await importFreshConfig("deprecated")
+  const { deprecatedConfigWarnings } = await importFreshConfig("deprecated")
   assert.deepEqual(deprecatedConfigWarnings({}), [])
   const warnings = deprecatedConfigWarnings({ MCP_TOOLS: "a", MCP_TOOLSETS: "work-items", MCP_MODE: "discover", MCP_OMIT_OUTPUT_SCHEMA: "1" })
   const text = warnings.join("\n")
-  for (const name of ["MCP_TOOLS", "MCP_TOOLSETS", "MCP_OMIT_OUTPUT_SCHEMA", "discover"]) assert.match(text, new RegExp(name))
+  for (const name of ["MCP_TOOLSETS", "MCP_OMIT_OUTPUT_SCHEMA", "discover"]) assert.match(text, new RegExp(name))
   assert.deepEqual(deprecatedConfigWarnings({ MCP_MODE: "code" }), [])
-  assert.match(configurationWarnings({ API_BASE_URL: "https://p/polarion/rest/v1", BEARER_TOKEN: "x", MCP_TOOLS: "a" }, { needsToken: true }).join("\n"), /MCP_TOOLS/)
+
 })
 
 test("deprecatedConfigWarnings covers the fixed tunables, split log settings and per-scheme credentials", async () => {
