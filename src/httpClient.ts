@@ -92,6 +92,8 @@ export interface SendWithRetryOpts {
   postMutationDelayMs?: number;
   /** Cancels the in-flight request and any retry wait, e.g. when the caller disconnected. */
   signal?: AbortSignal;
+  /** Throws to stop a write that may no longer be sent. Checked last, after pacing; not once an attempt may have reached Polarion. */
+  beforeMutatingSend?: () => void;
 }
 
 /**
@@ -120,6 +122,7 @@ export async function sendWithRetry(
   signal?.throwIfAborted();
   await paceRequest(minIntervalMs);
   const method = String(config.method ?? 'get').toLowerCase();
+  if (MUTATING_METHODS.has(method) && !mayHaveSucceeded) opts.beforeMutatingSend?.();
   try {
     const response = await httpClient({ timeout: DEFAULT_TIMEOUT_MS, ...(signal ? { signal } : {}), ...config });
     if (MUTATING_METHODS.has(method) && postMutationDelayMs > 0) {

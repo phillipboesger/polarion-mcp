@@ -17,6 +17,7 @@ export interface ExecuteToolOptions {
   apiBaseUrl: string;
   maxResponseChars?: number;
   signal?: AbortSignal;
+  beforeMutatingSend?: () => void;
   beforeNextPage?: () => void | Promise<void>;
   verifyWrites?: boolean;
   writeLimits?: WriteLimits;
@@ -51,7 +52,10 @@ export async function executeTool(
   options: ExecuteToolOptions,
 ): Promise<CallToolResult> {
   // Cancelling the call must also cancel the upstream request, not only the page loop.
-  const sendOpts = options.signal ? { signal: options.signal } : undefined;
+  const { signal, beforeMutatingSend } = options;
+  const sendOpts: SendWithRetryOpts | undefined = signal || beforeMutatingSend
+    ? { ...(signal ? { signal } : {}), ...(beforeMutatingSend ? { beforeMutatingSend } : {}) }
+    : undefined;
   const maxItems = args.max_items;
   if (maxItems === undefined || !paginatedList(definition)) {
     return executor(name, definition, args, securitySchemes, sendOpts, options.maxResponseChars, options.apiBaseUrl, options.verifyWrites, options.writeLimits);

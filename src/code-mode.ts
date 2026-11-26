@@ -173,7 +173,7 @@ export function codeModeTools(ops: readonly SdkOperation[], config: CodeModeConf
     inputSchema: { type: 'object', properties: { code: { type: 'string', description: 'Body of an async function, e.g. const r = await polarion.getProjects({}); return r.data.length;' }, dry_run: { type: 'boolean', description: 'Preview all writes without performing them.' } }, required: ['code'] },
     annotations: { readOnlyHint: !config.writes, destructiveHint: config.writes, openWorldHint: true },
     handler: (args, ctx) => ctx.callTool
-      ? runExecute(args, ops, config, (name, callArgs) => ctx.callTool!(name, callArgs), ctx.signal)
+      ? runExecute(args, ops, config, (name, callArgs, deadline) => ctx.callTool!(name, callArgs, deadline), ctx.signal)
       : { content: [{ type: 'text' as const, text: 'Error: execute needs the server pipeline' }], isError: true },
   };
   return [search, execute];
@@ -185,6 +185,9 @@ function unwrap(result: CallToolResult): unknown {
   try { return JSON.parse(text); } catch { return text; }
 }
 
+/** Result of a confirmed call that was held back because its script had already ended. */
+export const SCRIPT_ENDED = 'The execute script ended before this call could be sent; nothing was sent.';
+
 /**
  * Runs `execute`. Every `polarion.<op>` call goes through `callTool`, which is the full tool pipeline
  * (policy, rate limit, guards, verification, marking, audit), so the sandbox gains no privilege.
@@ -193,14 +196,17 @@ export async function runExecute(
   args: Record<string, unknown>,
   ops: readonly SdkOperation[],
   config: CodeModeConfig,
-  callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>,
+  callTool: (name: string, args: Record<string, unknown>, confirmationDeadline?: AbortSignal) => Promise<CallToolResult>,
   signal?: AbortSignal,
 ): Promise<CallToolResult> {
   const code = typeof args.code === 'string' ? args.code : '';
   if (!code.trim()) return { content: [{ type: 'text', text: 'Error: code is required' }], isError: true };
   const dryRun = args.dry_run === true;
   let writeCalls = 0;
+  let notSentCalls = 0;
   const inFlight = new Set<Promise<unknown>>();
+  // A confirmation is only honoured while the script runs: aborts when it returns, throws or times out.
+  const confirmationWindow = new AbortController();
   const host: Record<string, HostFunction> = {};
   for (const op of ops) {
     host[op.name] = (callArgs) => {
@@ -220,15 +226,16 @@ export async function runExecute(
         if (writeCalls > config.maxWriteCalls) throw new Error(`Write call limit of ${config.maxWriteCalls} exceeded`);
         if (dryRun) input.dry_run = true;
       }
-      const result = await callTool(op.name, input);
+      const result = await callTool(op.name, input, confirmationWindow.signal);
       if (result.isError) {
         const text = result.content.filter(item => item.type === 'text').map(item => (item as { text: string }).text).join(' ');
+        if (text.includes(SCRIPT_ENDED)) notSentCalls += 1;
         throw new Error(text || `${op.name} failed`);
       }
       return unwrap(result);
     };
   }
-  const outcome = await runInSandbox(code, host, { limits: config.limits, signal });
+  const outcome = await runInSandbox(code, host, { limits: config.limits, signal }).finally(() => confirmationWindow.abort());
   // Calls the script started but did not await keep running in the pipeline; wait for them so the counts and the result are final.
   if (inFlight.size > 0) {
     let timer: NodeJS.Timeout | undefined;
@@ -241,8 +248,10 @@ export async function runExecute(
     host_calls: outcome.hostCalls,
     ...(inFlight.size > 0 ? { pending_calls: inFlight.size } : {}),
     write_calls: writeCalls,
+    // The script cannot see these when it did not await them, so the result must say so.
+    ...(notSentCalls > 0 ? { not_sent_calls: notSentCalls } : {}),
     ...(dryRun ? { dry_run: true } : {}),
     ...(outcome.truncated ? { truncated: true } : {}),
   };
-  return { content: [{ type: 'text', text: JSON.stringify(payload) }], ...(outcome.ok ? {} : { isError: true }) };
+  return { content: [{ type: 'text', text: JSON.stringify(payload) }], ...(outcome.ok && notSentCalls === 0 ? {} : { isError: true }) };
 }

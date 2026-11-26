@@ -5,7 +5,7 @@ import type { ToolsetName } from './toolsets.js';
 export interface VirtualToolContext {
   callPolarionTool(name: string, args: Record<string, unknown>): Promise<CallToolResult>;
   /** Calls a tool through the full pipeline (policy, rate limit, audit, marking). Only set where a handler needs per-call enforcement (Code Mode). */
-  callTool?(name: string, args: Record<string, unknown>): Promise<CallToolResult>;
+  callTool?(name: string, args: Record<string, unknown>, confirmationDeadline?: AbortSignal): Promise<CallToolResult>;
   requestBearerToken?: string;
   userScope?: string;
   apiBaseUrl: string;

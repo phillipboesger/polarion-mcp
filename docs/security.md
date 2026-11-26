@@ -42,7 +42,13 @@ Limits are in-memory per process. OAuth authorization is 100 requests per IP per
 
 ## Destructive tool confirmation
 
-`MCP_CONFIRM_DESTRUCTIVE=true` enables the default policy hook for destructive and bulk operations. Clients that advertise form elicitation receive a server-side confirmation request with a concise action summary. Other clients can supply `confirm: true` on the first call. A preceding `dry_run: true` preview is recommended, but the server does not enforce that one happened. Confirmation remains an optional deployment policy; the default is `false` to preserve existing behavior, and enterprise packages can replace the policy hook. Read-only tools do not prompt.
+By default, reads and writes are allowed without server confirmation. Set `MCP_PROFILE=readonly` or `MCP_READ_ONLY=true` to block writes without prompts. Your MCP client may still ask before a tool call.
+
+`MCP_CONFIRM_DESTRUCTIVE=true` (also enabled by `MCP_PROFILE=safe`) asks for confirmation for deletes and other calls classified as destructive, including names starting with `patchAll*` or containing `bulk`. It does not cover every bulk change: `patchWorkItems` and `postWorkItems` do not prompt. Neither do `patchWorkItem` (including workflow actions), `patchDocument`, `executeJob`, or uploads. `run_job_and_wait` does prompt.
+
+Clients with form elicitation receive a server prompt. Other clients can send `confirm: true` on the first call, which lets the model confirm its own call and does not establish human approval. A `dry_run: true` preview is recommended but not enforced.
+
+With confirmation enabled and writes allowed, Code Mode prompts once for `execute`, even for read-only scripts, except with `dry_run: true`. Destructive calls inside the script prompt again; other writes do not. Script-provided `confirm` is ignored. Without form elicitation, clients can confirm `execute`, but destructive calls inside it are refused. The action summary is truncated to 800 characters.
 
 ## Logging and telemetry
 
