@@ -26,6 +26,10 @@
  * subsequent requests.
  */
 
+import { registerCompositeTools } from './composite-search.js';
+import { listVirtualTools } from './virtual-tools.js';
+import { toolFilterWarnings } from './tool-filter.js';
+
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -996,6 +1000,8 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
 export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } = {}): HttpServer {
   // Refuse to start with an unknown MCP_PROFILE; importing the modules never throws for it.
   parseProfile(process.env);
+  registerCompositeTools();
+  for (const warning of toolFilterWarnings(listVirtualTools())) console.error(`[WARN] ${warning}`);
   const port = Number(process.env.MCP_HTTP_PORT || process.env.PORT || process.env.HTTP_PORT || 3000);
   const allowedHosts = (process.env.MCP_ALLOWED_HOSTS || '')
     .split(',')

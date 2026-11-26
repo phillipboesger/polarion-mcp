@@ -15,6 +15,7 @@ import type { McpToolDefinition } from './types.js';
 export interface ToolFilter {
   /** Keep only tools annotated as read-only. */
   readOnly?: boolean;
+  allow?: ReadonlySet<string>;
 }
 
 /**
@@ -39,7 +40,9 @@ export function parseFlag(name: string, value: string | undefined): boolean {
  * @throws Error for an invalid flag.
  */
 export function parseToolFilter(env: NodeJS.ProcessEnv): ToolFilter {
-  return { readOnly: parseFlag('MCP_READ_ONLY', env.MCP_READ_ONLY) };
+  const raw = env.MCP_TOOLS;
+  const allow = raw === undefined || raw.trim() === '' ? undefined : new Set(raw.split(/[\s,]+/).filter(Boolean));
+  return { readOnly: parseFlag('MCP_READ_ONLY', env.MCP_READ_ONLY), ...(allow ? { allow } : {}) };
 }
 
 /**
@@ -53,12 +56,14 @@ export function filterTools(
 ): Map<string, McpToolDefinition> {
   return new Map(
     [...tools]
-      .filter(([, def]) => !filter.readOnly || def.annotations?.readOnlyHint === true)
       .map(([name, def]) => [name, correctAnnotations(def)] as const)
+      .filter(([name, def]) => (!filter.readOnly || def.annotations?.readOnlyHint === true) && (!filter.allow || filter.allow.has(name) || (filter.allow.has('all-reads') && def.annotations?.readOnlyHint === true)))
   );
 }
 
-const filtered = filterTools(toolDefinitionMap, parseToolFilter(process.env));
+const deployment = parseToolFilter(process.env);
+export const dependencyTools = filterTools(toolDefinitionMap, { readOnly: deployment.readOnly });
+const filtered = filterTools(toolDefinitionMap, deployment);
 if (filtered.size !== toolDefinitionMap.size) {
   console.error(`[INFO] Tool filter: ${filtered.size}/${toolDefinitionMap.size} tools enabled`);
 }
@@ -66,3 +71,14 @@ if (filtered.size !== toolDefinitionMap.size) {
 /** The tools this deployment exposes, with corrected annotations. */
 export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered;
 
+
+/** Report invalid or ineffective allowlist entries without changing access. */
+export function toolFilterWarnings(composites: readonly { name: string; annotations?: { readOnlyHint?: boolean } }[], filter: ToolFilter = deployment): string[] {
+  if (!filter.allow) return [];
+  const all = new Map([...toolDefinitionMap].map(([name, def]) => [name, correctAnnotations(def).annotations?.readOnlyHint === true] as const));
+  for (const tool of composites) all.set(tool.name, tool.annotations?.readOnlyHint === true);
+  const unknown = [...filter.allow].filter(name => !all.has(name) && !['all-reads', 'search', 'execute'].includes(name));
+  const dropped = [...filter.allow].filter(name => all.has(name) && !all.get(name) && filter.readOnly);
+  const kept = [...all].some(([name, read]) => (!filter.readOnly || read) && (filter.allow!.has(name) || (read && filter.allow!.has('all-reads'))));
+  return [unknown.length ? `Unknown MCP_TOOLS names: ${unknown.join(', ')}` : '', dropped.length ? `MCP_READ_ONLY dropped writes: ${dropped.join(', ')}` : '', !kept ? 'WARNING: MCP_TOOLS enables zero operations' : ''].filter(Boolean);
+}

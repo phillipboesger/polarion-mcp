@@ -17,6 +17,10 @@
  * - GET /openapi.json - OpenAPI 3.0 specification
  */
 
+import { registerCompositeTools } from './composite-search.js';
+import { listVirtualTools } from './virtual-tools.js';
+import { toolFilterWarnings } from './tool-filter.js';
+
 import express, { Request, Response } from 'express';
 import * as fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -174,6 +178,8 @@ const PORT = env.PORT || env.HTTP_PORT || 3000;
 const HTTP_API_KEY = env.HTTP_API_KEY;
 if (!HTTP_API_KEY) throw new Error('HTTP_API_KEY is required');
 parseProfile(env);
+  registerCompositeTools();
+  for (const warning of toolFilterWarnings(listVirtualTools())) console.error(`[WARN] ${warning}`);
 const trustProxy = parseTrustProxy(env.TRUST_PROXY);
 const app = createHttpApp({ apiKey: HTTP_API_KEY, env, port: Number(PORT), trustProxy });
 const server = app.listen(PORT, () => {

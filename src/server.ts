@@ -26,9 +26,9 @@ import {
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.js';
-import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, SERVER_INSTRUCTIONS } from './polarion.js';
+import { listPolarionResources, readPolarionResource, getPolarionPrompts, getPolarionPrompt, serverInstructions, pruneDisabledTools } from './polarion.js';
 import { securitySchemes } from './tools.js';
-import { enabledTools, filterTools, type ToolFilter } from './tool-filter.js';
+import { enabledTools, dependencyTools, filterTools, type ToolFilter } from './tool-filter.js';
 import { withVerifyProperty, type WriteLimits } from './write-verification.js';
 import { executeApiTool, capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
@@ -72,6 +72,7 @@ function toolsForClient(tools: ReadonlyMap<string, import('./types.js').McpToolD
 
 
 interface ToolCallPipelineOptions {
+  dependencyReadOnly?: boolean;
   clientTools: ReadonlyMap<string, import('./types.js').McpToolDefinition>;
   virtualTools: readonly VirtualTool[];
   extensions: PolarionExtensions;
@@ -162,10 +163,9 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             ...options, confirmationDeadline, virtualTools: options.codeMode!.composites, codeMode: undefined, correlationId: undefined,
           }) : undefined,
           callPolarionTool: async (name, callArgs) => {
-            // Composite dependencies remain callable when a request narrows the
-            // visible toolset to `composites`; deployment-level MCP_TOOLS and
-            // MCP_READ_ONLY filtering has already been applied to enabledTools.
-            const definition = enabledTools.get(name);
+            // Dependencies bypass the name list but retain deployment and session read-only restrictions.
+            const definition = dependencyTools.get(name);
+            if (options.dependencyReadOnly && definition?.annotations?.readOnlyHint !== true) return { content: [{ type: 'text', text: `Error: Read-only tool filter: ${name}` }], isError: true };
             if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
             return executeToolWithPagination(name, definition, callArgs, securitySchemes, executeApiTool, {
               apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, beforeMutatingSend, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
@@ -361,15 +361,17 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   const deploymentFilter = parseToolFilter(process.env);
   const filter: ToolFilter = {
     readOnly: deploymentFilter.readOnly || options.filter?.readOnly,
+    allow: deploymentFilter.allow,
   };
   const clientTools = filterTools(enabledTools, options.filter ?? {});
   // `auto` and `discover` were removed; configurationWarnings tells the operator, the server behaves as `code`.
   const requestedMode = process.env.MCP_MODE?.trim() || 'code';
   if (!['code', 'full', 'auto', 'discover'].includes(requestedMode)) throw new Error('MCP_MODE must be code or full');
-  const composites = listVirtualTools(filter);
+  const composites = listVirtualTools(filter).filter(tool => !options.filter?.allow || options.filter.allow.has(tool.name) || (options.filter.allow.has('all-reads') && tool.annotations?.readOnlyHint === true));
+  const guidanceNames = new Set([...clientTools.keys(), ...composites.map(tool => tool.name)]);
   const mode = requestedMode === 'full' ? 'full' : 'code';
   const codeConfig: CodeModeConfig = {
-    writes: !filter.readOnly,
+    writes: [...clientTools.values()].some(tool => tool.annotations?.readOnlyHint !== true) || composites.some(tool => tool.annotations?.readOnlyHint !== true),
     maxWriteCalls: 20,
     limits: options.codeModeLimits,
   };
@@ -383,7 +385,6 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     if (allNames.has(tool.name)) throw new Error(`Virtual tool conflicts with generated tool: ${tool.name}`);
     allNames.add(tool.name);
   }
-  if (allNames.size === 0 && !options.filter) throw new Error('MCP_READ_ONLY leaves no tools');
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
@@ -395,7 +396,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
         resources: {},  // Documentation and configuration files
         prompts: {},    // Pre-configured task templates
       },
-      instructions: mode === 'code' ? `${CODE_MODE_INSTRUCTIONS}\n\n${SERVER_INSTRUCTIONS}` : SERVER_INSTRUCTIONS,
+      instructions: mode === 'code' ? `${pruneDisabledTools(CODE_MODE_INSTRUCTIONS, guidanceNames)}\n\n${serverInstructions(guidanceNames)}` : serverInstructions(guidanceNames),
     },
   );
 
@@ -430,7 +431,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
       request.params.name,
       (request.params.arguments ?? {}) as Record<string, unknown>,
       {
-        clientTools, virtualTools, codeMode, extensions,
+        clientTools, virtualTools, codeMode, extensions, dependencyReadOnly: filter.readOnly,
         maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
         logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
         telemetry: options.telemetry ?? NOOP_TELEMETRY,
@@ -452,7 +453,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Handler: List Available Resources (SDK docs, OpenAPI specs, cached configs).
    */
   server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    return { resources: listPolarionResources() };
+    return { resources: listPolarionResources(guidanceNames) };
   });
 
   /**
@@ -461,7 +462,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;
     if (uri.startsWith('polarion://project/')) return await readProjectResource(uri, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: options.transport ?? 'http', server });
-    return await readPolarionResource(request.params.uri);
+    return await readPolarionResource(request.params.uri, guidanceNames);
   });
 
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [
@@ -474,7 +475,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Handler: List Available Prompt templates.
    */
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
-    return { prompts: getPolarionPrompts() };
+    return { prompts: getPolarionPrompts(guidanceNames) };
   });
 
   /**
@@ -482,7 +483,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    */
   server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    return getPolarionPrompt(name, args);
+    return getPolarionPrompt(name, args, guidanceNames);
   });
 
   return server;
