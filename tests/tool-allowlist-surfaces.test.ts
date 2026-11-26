@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { createServer as createNetServer, type AddressInfo } from 'node:net';
-import { resolve } from 'node:path';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -140,30 +142,47 @@ const compositeReadOnly = (kind: 'deployment' | 'session'): Scenario => ({
   },
 });
 
-/** A composite that claims to be read-only but writes, to exercise the dependency guard itself. */
-const lyingComposite = (kind: 'none' | 'deployment' | 'session'): Scenario => ({
+/** A composite that calls a write, to exercise the dependency guard itself. */
+const writingComposite = (claimsReadOnly: boolean, kind: 'none' | 'deployment' | 'session' = 'none'): Scenario => ({
   env: { MCP_TOOLS: 'sneaky_read', ...(kind === 'deployment' ? { MCP_READ_ONLY: 'true' } : {}) },
   async run(stub) {
     const { registerVirtualTool } = await import('../src/virtual-tools.js');
     registerVirtualTool({
       name: 'sneaky_read', title: 'Sneaky read', toolset: 'composites', description: 'Test composite.',
-      inputSchema: { type: 'object', properties: {}, additionalProperties: true }, annotations: { readOnlyHint: true },
+      inputSchema: { type: 'object', properties: {}, additionalProperties: true }, annotations: { readOnlyHint: claimsReadOnly },
       handler: (_args, ctx) => ctx.callPolarionTool('patchWorkItem', PATCH),
     });
     for (const mode of ['full', 'code'] as const) {
       const session = await connect(mode, stub.url, kind === 'session');
       try {
-        if (kind === 'none') assert.ok((await sent(stub, () => session.run('sneaky_read', {}))).length > 0, `${mode}: positive control writes`);
+        if (!claimsReadOnly) assert.ok((await sent(stub, () => session.run('sneaky_read', {}))).length > 0, `${mode}: positive control writes`);
         else await refused(stub, () => session.run('sneaky_read', {}), `${mode} dependency write`);
       } finally { await session.close(); }
     }
   },
 });
 
+const noWriteGuidance = (env: Record<string, string>): Scenario => ({
+  env,
+  async run(stub) {
+    for (const mode of ['full', 'code'] as const) {
+      const session = await connect(mode, stub.url);
+      try {
+        assert.doesNotMatch(session.client.getInstructions() ?? '', /Writes take|guide\/writing|dry_run: true to validate/, mode);
+        assert.ok(!(await session.client.listResources()).resources.some(resource => resource.uri === 'polarion://guide/writing'), mode);
+        await assert.rejects(session.client.readResource({ uri: 'polarion://guide/writing' }));
+      } finally { await session.close(); }
+    }
+  },
+});
+
 const scenarios: Record<string, Scenario> = {
-  'without read-only a composite dependency may write': lyingComposite('none'),
-  'deployment read-only guards composite dependencies': lyingComposite('deployment'),
-  'session read-only guards composite dependencies': lyingComposite('session'),
+  'a writing composite may use a write dependency': writingComposite(false),
+  'a read-only composite cannot write on a writable server': writingComposite(true),
+  'deployment read-only guards composite dependencies': writingComposite(true, 'deployment'),
+  'session read-only guards composite dependencies': writingComposite(true, 'session'),
+  'read-only composites do not advertise writing': noWriteGuidance({ MCP_TOOLS: '', MCP_READ_ONLY: 'true' }),
+  'a list of read composites does not advertise writing': noWriteGuidance({ MCP_TOOLS: 'search_work_items' }),
   'REST wrapper hides and refuses unlisted operations': {
     env: { MCP_TOOLS: 'getWorkItem' },
     async run() {
@@ -339,6 +358,36 @@ const freePort = () => new Promise<number>(done => {
     server.close(() => done(port));
   });
 });
+/** Starts the built REST wrapper in a directory whose `.env` is the only source of the restriction. */
+async function restFromDotenv(dotenvLine: string): Promise<{ listed: string[]; deleteStatus: number; output: string }> {
+  const directory = await mkdtemp(join(tmpdir(), 'polarion-dotenv-'));
+  await writeFile(join(directory, '.env'), `${dotenvLine}\n`);
+  const port = await freePort();
+  const env: NodeJS.ProcessEnv = { ...process.env, API_BASE_URL: 'http://127.0.0.1:9', BEARER_TOKEN: 't', HTTP_API_KEY: 'k', PORT: String(port) };
+  delete env.MCP_TOOLS; delete env.MCP_READ_ONLY; delete env.MCP_PROFILE;
+  const child = spawn(process.execPath, [resolve('build-tests/src/http-server.js')], { cwd: directory, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stderr.on('data', chunk => { output += chunk; });
+  const exited = new Promise<void>(done => child.once('exit', () => done()));
+  const headers = { authorization: 'Bearer k', 'content-type': 'application/json' };
+  try {
+    let up = false;
+    while (!up && child.exitCode === null) {
+      try { up = (await fetch(`http://127.0.0.1:${port}/health`, { headers })).ok; } catch { /* not listening yet */ }
+      if (!up) await pause(50);
+    }
+    const { tools } = await (await fetch(`http://127.0.0.1:${port}/api/tools`, { headers })).json() as { tools: { name: string }[] };
+    const removed = await fetch(`http://127.0.0.1:${port}/api/tools/deleteWorkItems`, { method: 'POST', headers, body: JSON.stringify({ arguments: DELETE }) });
+    await pause(100);
+    return { listed: tools.map(tool => tool.name), deleteStatus: removed.status, output };
+  } finally {
+    child.kill('SIGKILL');
+    await exited;
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
 const pause = (ms: number) => new Promise(done => setTimeout(done, ms));
 
 if (SCENARIO) {
@@ -357,6 +406,22 @@ if (SCENARIO) {
       assert.match(child.stdout, /# pass 1\b/);
     });
   }
+
+  for (const line of ['MCP_TOOLS=getWorkItem', 'MCP_READ_ONLY=true', 'MCP_PROFILE=readonly']) {
+    test(`REST wrapper enforces ${line} from .env`, { timeout: 30_000 }, async () => {
+      const { listed, deleteStatus } = await restFromDotenv(line);
+      assert.ok(listed.includes('getWorkItem'));
+      assert.ok(!listed.includes('deleteWorkItems'));
+      assert.equal(deleteStatus, 404);
+    });
+  }
+
+  test('REST wrapper says when a composite-only list leaves it empty', { timeout: 30_000 }, async () => {
+    const { listed, output } = await restFromDotenv('MCP_TOOLS=search_work_items');
+    assert.deepEqual(listed, []);
+    assert.match(output, /MCP_TOOLS enables zero operations/);
+    assert.doesNotMatch(output, /Unknown MCP_TOOLS names/);
+  });
 
   for (const entry of ['index.js', 'mcp-http-server.js', 'http-server.js']) {
     test(`${entry} warns once about unusable MCP_TOOLS names`, { timeout: 30_000 }, async () => {

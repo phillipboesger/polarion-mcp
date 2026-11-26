@@ -5,6 +5,7 @@
 - `MCP_TOOLS` is back as an optional allowlist: the server offers only the listed operations and composites. `all-reads` adds every read-only one. It works together with `MCP_READ_ONLY` (an operation needs both), on every transport, in Code Mode and full mode. The default is unchanged: reads and writes without per-call confirmation. See [Restrict what the AI can do](docs/configuration.md#restrict-what-the-ai-can-do).
 - Unknown or misspelled names never stop the server and never widen access: they are ignored with a startup warning. If no name matches, the server starts with no Polarion operations and says so.
 - `MCP_READ_ONLY=true` with nothing left to offer no longer stops startup in full mode.
+- **Security fix, REST wrapper:** `MCP_READ_ONLY` and `MCP_PROFILE=readonly` set only in a `.env` file were not applied by the REST wrapper (`build/http-server.js`), so writes stayed available. Settings passed as real environment variables, stdio and Streamable HTTP were not affected. If you run the REST wrapper this way, upgrade or set these as environment variables.
 
 **Upgrade note:** if your environment still contains `MCP_TOOLS` from 1.5.0 or earlier, which 1.6.x ignored with a warning, **it restricts the server again**. Check the list before upgrading, or remove it to keep full access. Operations renamed or removed since then are skipped with a warning. `MCP_TOOLSETS` and `MCP_CODE_MODE_WRITES` remain ignored; use `MCP_TOOLS` and `MCP_READ_ONLY=true`.
 

@@ -73,12 +73,13 @@ export const enabledTools: ReadonlyMap<string, McpToolDefinition> = filtered;
 
 
 /** Report invalid or ineffective allowlist entries without changing access. */
-export function toolFilterWarnings(composites: readonly { name: string; annotations?: { readOnlyHint?: boolean } }[], filter: ToolFilter = deployment): string[] {
+export function toolFilterWarnings(composites: readonly { name: string; annotations?: { readOnlyHint?: boolean } }[], filter: ToolFilter = deployment, served = composites): string[] {
   if (!filter.allow) return [];
   const all = new Map([...toolDefinitionMap].map(([name, def]) => [name, correctAnnotations(def).annotations?.readOnlyHint === true] as const));
   for (const tool of composites) all.set(tool.name, tool.annotations?.readOnlyHint === true);
   const unknown = [...filter.allow].filter(name => !all.has(name) && !['all-reads', 'search', 'execute'].includes(name));
   const dropped = [...filter.allow].filter(name => all.has(name) && !all.get(name) && filter.readOnly);
-  const kept = [...all].some(([name, read]) => (!filter.readOnly || read) && (filter.allow!.has(name) || (read && filter.allow!.has('all-reads'))));
+  const offered = new Set([...toolDefinitionMap.keys(), ...served.map(tool => tool.name)]);
+  const kept = [...all].some(([name, read]) => offered.has(name) && (!filter.readOnly || read) && (filter.allow!.has(name) || (read && filter.allow!.has('all-reads'))));
   return [unknown.length ? `Unknown MCP_TOOLS names: ${unknown.join(', ')}` : '', dropped.length ? `MCP_READ_ONLY dropped writes: ${dropped.join(', ')}` : '', !kept ? 'WARNING: MCP_TOOLS enables zero operations' : ''].filter(Boolean);
 }

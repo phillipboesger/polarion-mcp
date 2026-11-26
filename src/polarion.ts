@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 import { toolDefinitionMap } from './tools.js';
 import { enabledTools } from './tool-filter.js';
+import { listVirtualTools } from './virtual-tools.js';
 
 const require = createRequire(import.meta.url);
 
@@ -33,7 +34,8 @@ const ENABLED: EnabledTools = new Set(enabledTools.keys());
 
 /** @returns Whether any exposed tool writes (not annotated read-only). */
 function hasWriteTools(enabled: EnabledTools): boolean {
-  return [...enabled].some(name => toolDefinitionMap.get(name)?.annotations?.readOnlyHint !== true);
+  const composites = new Map(listVirtualTools().map(tool => [tool.name, tool.annotations]));
+  return [...enabled].some(name => (composites.get(name) ?? toolDefinitionMap.get(name)?.annotations)?.readOnlyHint !== true);
 }
 
 /**

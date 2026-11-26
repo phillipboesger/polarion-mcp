@@ -72,7 +72,6 @@ function toolsForClient(tools: ReadonlyMap<string, import('./types.js').McpToolD
 
 
 interface ToolCallPipelineOptions {
-  dependencyReadOnly?: boolean;
   clientTools: ReadonlyMap<string, import('./types.js').McpToolDefinition>;
   virtualTools: readonly VirtualTool[];
   extensions: PolarionExtensions;
@@ -163,9 +162,10 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             ...options, confirmationDeadline, virtualTools: options.codeMode!.composites, codeMode: undefined, correlationId: undefined,
           }) : undefined,
           callPolarionTool: async (name, callArgs) => {
-            // Dependencies bypass the name list but retain deployment and session read-only restrictions.
+            // Dependencies bypass the name list, but only a composite that may write reaches a write. Read-only
+            // deployments and sessions list read-only composites only, so this also enforces their restriction.
             const definition = dependencyTools.get(name);
-            if (options.dependencyReadOnly && definition?.annotations?.readOnlyHint !== true) return { content: [{ type: 'text', text: `Error: Read-only tool filter: ${name}` }], isError: true };
+            if (definition && virtual.annotations?.readOnlyHint === true && definition.annotations?.readOnlyHint !== true) return { content: [{ type: 'text', text: `Error: Read-only tool filter: ${name}` }], isError: true };
             if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
             return executeToolWithPagination(name, definition, callArgs, securitySchemes, executeApiTool, {
               apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, beforeMutatingSend, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
@@ -431,7 +431,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
       request.params.name,
       (request.params.arguments ?? {}) as Record<string, unknown>,
       {
-        clientTools, virtualTools, codeMode, extensions, dependencyReadOnly: filter.readOnly,
+        clientTools, virtualTools, codeMode, extensions,
         maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
         logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
         telemetry: options.telemetry ?? NOOP_TELEMETRY,

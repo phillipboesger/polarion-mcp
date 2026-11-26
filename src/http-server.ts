@@ -177,7 +177,8 @@ const HTTP_API_KEY = env.HTTP_API_KEY;
 if (!HTTP_API_KEY) throw new Error('HTTP_API_KEY is required');
 parseProfile(env);
 registerCompositeTools();
-for (const warning of toolFilterWarnings(listVirtualTools())) console.error(`[WARN] ${warning}`);
+// Composites are known names, but this wrapper does not serve them.
+for (const warning of toolFilterWarnings(listVirtualTools(), undefined, [])) console.error(`[WARN] ${warning}`);
 const trustProxy = parseTrustProxy(env.TRUST_PROXY);
 const app = createHttpApp({ apiKey: HTTP_API_KEY, env, port: Number(PORT), trustProxy });
 const server = app.listen(PORT, () => {
