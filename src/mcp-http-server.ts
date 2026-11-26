@@ -159,7 +159,7 @@ export interface McpHttpAppOptions {
   logFormat?: LogFormat;
   logLevel?: LogLevel;
   telemetry?: TelemetryHooks;
-  /** Enable the default confirmation policy for destructive and bulk calls. */
+  /** Enable the default confirmation policy for calls classified as destructive. */
   confirmDestructive?: boolean;
   /** Injected policy, audit, authentication, and instance seams. */
   extensions?: Partial<PolarionExtensions>;

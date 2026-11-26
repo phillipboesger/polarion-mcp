@@ -46,7 +46,8 @@ import { NOOP_TELEMETRY, type TelemetryHooks } from './telemetry.js';
 import './composite-tools.js';
 import { decodePolarionIdentifier, registerCompositeTools } from './composite-search.js';
 import { executeTool as executeToolWithPagination } from './tool-execution.js';
-import { buildSdk, codeModeTools, CODE_MODE_INSTRUCTIONS, type CodeModeConfig, type SdkOperation } from './code-mode.js';
+import { buildSdk, codeModeTools, CODE_MODE_INSTRUCTIONS, SCRIPT_ENDED, type CodeModeConfig, type SdkOperation } from './code-mode.js';
+import type { SandboxLimits } from './code-sandbox.js';
 import { toolsetsForDefinition } from './toolsets.js';
 
 /**
@@ -77,6 +78,8 @@ interface ToolCallPipelineOptions {
   maxResponseChars: number;
   logger: PipelineLogger;
   signal?: AbortSignal;
+  /** Set for calls inside `execute`: once aborted, a confirmation no longer authorizes the call. */
+  confirmationDeadline?: AbortSignal;
   rateLimiter: ToolCallRateLimiter;
   markUntrusted: boolean;
   telemetry: TelemetryHooks;
@@ -150,12 +153,13 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
   const span = (() => {
     try { return options.telemetry.onSpanStart({ name: 'polarion.tools.call', correlationId, tool: toolName }); } catch { return undefined; }
   })();
+    let beforeMutatingSend: (() => void) | undefined;
     const execute = async (): Promise<void> => {
       if (virtual) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
         result = await virtual.handler(callArgs, {
-          callTool: options.codeMode ? (name, innerArgs) => callToolPipeline(name, innerArgs, {
-            ...options, virtualTools: options.codeMode!.composites, codeMode: undefined, correlationId: undefined,
+          callTool: options.codeMode ? (name, innerArgs, confirmationDeadline) => callToolPipeline(name, innerArgs, {
+            ...options, confirmationDeadline, virtualTools: options.codeMode!.composites, codeMode: undefined, correlationId: undefined,
           }) : undefined,
           callPolarionTool: async (name, callArgs) => {
             // Composite dependencies remain callable when a request narrows the
@@ -164,7 +168,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
             const definition = enabledTools.get(name);
             if (!definition) return { content: [{ type: 'text', text: `Error: Unknown tool requested: ${name}` }], isError: true };
             return executeToolWithPagination(name, definition, callArgs, securitySchemes, executeApiTool, {
-              apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
+              apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, beforeMutatingSend, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
               beforeNextPage: () => {
                 const retryAfter = options.rateLimiter.check(principal.id);
                 if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
@@ -183,7 +187,7 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       } else if (generated) {
         const resolved = await options.extensions.instanceResolver.resolve(principal);
         result = await executeToolWithPagination(toolName, generated, callArgs, securitySchemes, executeApiTool, {
-          apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
+          apiBaseUrl: resolved.apiBaseUrl, maxResponseChars: options.maxResponseChars, signal: options.signal, beforeMutatingSend, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits,
           beforeNextPage: () => {
             const retryAfter = options.rateLimiter.check(principal.id);
             if (retryAfter !== undefined) throw new Error(`Tool call rate limit exceeded. Retry in ${retryAfter} seconds.`);
@@ -241,16 +245,26 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
         if (dryRun !== undefined) callArgs.dry_run = dryRun;
       }
       const safePreview = dryRun === true && (generated?.inputSchema?.properties?.dry_run !== undefined || virtual?.dryRunSafe === true);
-      if (decision.action === 'requireConfirmation' && !safePreview) {
-        const confirmation = await requestDestructiveConfirmation(options.server, toolName, args, options.signal);
-        if (confirmation !== 'accepted') {
+      // An unknown or filtered tool cannot run, so there is nothing to confirm.
+      if (decision.action === 'requireConfirmation' && !safePreview && (virtual || generated)) {
+        const expired = options.confirmationDeadline;
+        const promptSignal = expired && options.signal ? AbortSignal.any([options.signal, expired]) : expired ?? options.signal;
+        const confirmation = expired?.aborted ? 'cancelled' : await requestDestructiveConfirmation(options.server, toolName, args, promptSignal);
+        if (expired?.aborted) {
+          outcome = 'confirmation-required';
+          result = { content: [{ type: 'text', text: SCRIPT_ENDED }], isError: true };
+        } else if (confirmation !== 'accepted') {
           outcome = 'confirmation-required';
           const text = confirmation === 'fallback'
             ? 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.'
             : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
           result = { content: [{ type: 'text', text }], isError: true };
         } else {
+          // Checks before the send (guards, pacing) take time, so the window is checked again at the send itself.
+          let heldBack = false;
+          if (expired) beforeMutatingSend = () => { if (expired.aborted) { heldBack = true; throw new Error(SCRIPT_ENDED); } };
           await execute();
+          if (heldBack) outcome = 'confirmation-required';
         }
       } else {
         await execute();
@@ -303,8 +317,10 @@ export interface PolarionServerOptions {
   logFormat?: LogFormat;
   logLevel?: LogLevel;
   telemetry?: TelemetryHooks;
-  /** Require policy confirmation before destructive and bulk tools. Defaults off. */
+  /** Require policy confirmation before calls classified as destructive. Defaults off. */
   confirmDestructive?: boolean;
+  /** Overrides Code Mode sandbox limits (timeoutMs, memoryBytes, maxHostCalls, ...); unset fields keep the defaults. */
+  codeModeLimits?: Partial<SandboxLimits>;
   /** Calls per user per rolling minute; zero disables the limiter. */
   rateLimitTools?: number;
   /** Clock injection for deterministic sliding-window tests. */
@@ -355,6 +371,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   const codeConfig: CodeModeConfig = {
     writes: !filter.readOnly,
     maxWriteCalls: 20,
+    limits: options.codeModeLimits,
   };
   const codeOps = mode === 'code'
     ? buildSdk(clientTools, composites, codeConfig, name => toolsetsForDefinition(clientTools.get(name)!)[0] ?? 'other', def => sanitizeInputSchema(withVerifyProperty(def as never)))

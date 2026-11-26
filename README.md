@@ -39,7 +39,7 @@ On this page:
 
 - **Find answers:** search requirements and defects, read LiveDocs and inspect traceability links.
 - **Prepare work:** draft test cases, prepare runs and record the test outcomes your team supplies.
-- **Change data, safely:** preview writes with `dry_run: true`; supported Work Item and LiveDoc writes also verify attributes by reading them back. Prefer read access only? `MCP_READ_ONLY=1` blocks all writes. Set approval rules in your AI client; previews do not create an approval lock.
+- **Change data, safely:** by default, reads and writes are allowed without server confirmation. Your MCP client may still ask before a tool call. Set `MCP_PROFILE=readonly` to block writes without prompts. Preview writes with `dry_run: true`; supported Work Item and LiveDoc writes also verify attributes by reading them back. Set approval rules in your AI client; previews do not create an approval lock.
 - **Inspect what you run:** MIT source, build provenance and signed container images. See [supply-chain verification](docs/quality/supply-chain.md).
 
 ![Topic cards: work items, test management, plans, documents and more, covering every Polarion REST operation](docs/assets/site-coverage.png)

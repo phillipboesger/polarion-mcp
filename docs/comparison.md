@@ -20,7 +20,7 @@ The two do not conflict. Both act as the signed-in Polarion user, so permissions
 | Write checks | None before the call; values go to Polarion as sent | Enum labels and custom-field keys are checked before the call; a custom-enum label sent instead of an id is refused with the id to use |
 | Preview | Not available | `dry_run` on writes shows the request and a read-back diff |
 | Write verification | Create and update return only the ID; status transitions report `status_verified` | Create and patch read back and report `verified`, `mismatch` or `uncertain` |
-| Read-only and delete protection | Follows the user's permissions; no delete tools | `MCP_READ_ONLY`, confirmation for deletes and bulk writes, per-user rate limit |
+| Read-only and delete protection | Follows the user's permissions; no delete tools | `MCP_READ_ONLY`, optional confirmation for calls classified as destructive, per-user rate limit |
 | LiveDocs | Document metadata, create documents, create and move parts; no body or Markdown reading | Markdown reading and section patching, plus document import and attachment upload |
 | Untrusted content | Not available | Optional markers around user-written text (`MCP_MARK_UNTRUSTED`) |
 | Where it runs | Inside Polarion | Next to your client or on a server you operate; OAuth for claude.ai and ChatGPT |

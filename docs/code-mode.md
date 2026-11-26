@@ -75,7 +75,7 @@ Every `polarion.<operation>` call goes through the same pipeline as a direct too
 - Policy hook, rate limit and audit log: each inner call is recorded, plus the `execute` call itself.
 - Write guards, enum label checks, read-back verification and write limits.
 - `MCP_MARK_UNTRUSTED` marking: marked data arrives marked inside the sandbox.
-- Destructive confirmation: `confirm` set by code is ignored; only the user's confirmation counts.
+- Destructive confirmation: `confirm` set by code is ignored; only the user's confirmation counts. A call that needed confirmation is first sent only while the script is running; if the script has returned, thrown or timed out, it is held back and the `execute` result is an error that counts it in `not_sent_calls`. Await your writes.
 
 ## Limits
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.2
+
+- Code Mode: with confirmation on, a call inside `execute` could still be sent after the script had timed out or ended, for example when its prompt was accepted late. A confirmed call is now first sent only while the script is running; otherwise `execute` reports it in `not_sent_calls` as an error. Requests already attempted are not cancelled, including their automatic retries.
+- Unknown or filtered tools, such as write tools on a read-only server, no longer ask for confirmation before they are rejected.
+- Corrected the confirmation documentation. Which calls ask for confirmation is unchanged.
+
+**Upgrade note:** since 1.6.0, `MCP_TOOLS`, `MCP_TOOLSETS` and `MCP_CODE_MODE_WRITES=false` only produce warnings and no longer restrict access. Use `MCP_PROFILE=readonly` to block writes.
+
 ## 1.6.1
 
 - Code Mode search returns readable summaries, supports paging and provides full descriptions on request.
@@ -9,7 +17,7 @@
 - Per-request toolset selectors removed: the `X-MCP-Toolsets` header and the `/mcp/<toolsets>` paths are gone (`/mcp/<anything>` now returns 404, and the header is ignored). `X-MCP-Readonly` stays.
 - **Breaking:** Code Mode is the default and the only normal mode. The server lists `search` and `execute`; the same operations are `polarion.<operation>()` inside `execute` and direct calls to generated tools are refused (see `docs/code-mode.md`). `MCP_MODE=full` stays as an escape hatch for clients that cannot approve `execute` (for example `codex exec`). `MCP_MODE=auto` and `discover` run as `code` with a startup warning; `discover` mode is removed.
 - `MCP_PROFILE=standard|safe|readonly` bundles the safety switches (`MCP_CONFIRM_DESTRUCTIVE`, `MCP_MARK_UNTRUSTED`, `MCP_READ_ONLY`); explicit switches override it.
-- **Removed settings:** `MCP_TOOLS`, `MCP_TOOLSETS`, `MCP_OMIT_OUTPUT_SCHEMA`, `MCP_CODE_MODE_WRITES`, `MCP_VERSION_CHECK`, `MCP_COMPLETIONS` and `MCP_RESOURCE_LINKS`, together with the completions and resource-link features they enabled. Code Mode keeps the tool list at two entries, so narrowing it is no longer needed. A deployment that still sets one starts normally and logs a warning that names it. **`MCP_TOOLS`, `MCP_TOOLSETS` and `MCP_CODE_MODE_WRITES=false` were restrictions: after the upgrade they no longer apply, so the full catalogue and writes are available until you set `MCP_READ_ONLY=true`.** `MCP_READ_ONLY=true` remains the way to remove write access. Per-request toolset selectors (`X-MCP-Toolsets`, `/mcp/<toolsets>`) still work in `MCP_MODE=full`.
+- **Removed settings:** `MCP_TOOLS`, `MCP_TOOLSETS`, `MCP_OMIT_OUTPUT_SCHEMA`, `MCP_CODE_MODE_WRITES`, `MCP_VERSION_CHECK`, `MCP_COMPLETIONS` and `MCP_RESOURCE_LINKS`, together with the completions and resource-link features they enabled. Code Mode keeps the tool list at two entries, so narrowing it is no longer needed. A deployment that still sets one starts normally and logs a warning that names it. **`MCP_TOOLS`, `MCP_TOOLSETS` and `MCP_CODE_MODE_WRITES=false` were restrictions: after the upgrade they no longer apply, so the full catalogue and writes are available until you set `MCP_READ_ONLY=true`.** `MCP_READ_ONLY=true` remains the way to remove write access.
 - Polarion 2612 support: the generated tool map is regenerated from the 2612 REST definition and grows from 284 to 304 tools (Spaces, license types and slot relationships, per-user field metadata, `patchDocumentParts`). On older releases these answer 404. 2612 joins the release matrix as `latest` (non-blocking until its image is verified), 2606 and 2512 are guaranteed, 2506 is best-effort. `docs/polarion-versioning.md` lists the 2612 behaviors seen live.
 - Added work item workflow action discovery and verified status transition composites with dry-run support.
 
