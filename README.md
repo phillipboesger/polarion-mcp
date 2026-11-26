@@ -101,6 +101,18 @@ Then open the guide for your client:
 
 For OpenAPI clients, Custom GPT Actions and n8n, run the separate REST wrapper (see the client guides). Keep credentials out of Git. There is no public Polarion relay. See also the [client index](docs/clients.md) and [deployment](docs/deployment.md).
 
+### Limit what the AI can do (optional)
+
+By default the assistant can read and write whatever your Polarion token allows, without a server prompt per call. To narrow that, add to the server's environment:
+
+| You want | Settings |
+|---|---|
+| Read only | `MCP_READ_ONLY=true` |
+| Only certain operations | `MCP_TOOLS=getWorkItem,search_work_items,patchWorkItem` |
+| Read everything, write only selected operations | `MCP_TOOLS=all-reads,patchWorkItem` |
+
+Both settings together mean an operation needs both. Misspelled names are ignored with a startup warning and never widen access. [All rules](docs/configuration.md#restrict-what-the-ai-can-do).
+
 ## FAQ
 
 <!-- faq:start -->
@@ -121,7 +133,7 @@ Polarion enforces the permissions of the token owner. Server mode uses each call
 </details>
 <details><summary>Can I limit the server to read-only?</summary>
 
-Yes: set `MCP_READ_ONLY=1` and restart. Only read tools are exposed. In write-enabled sessions every write tool can preview with `dry_run: true`.
+Yes: set `MCP_READ_ONLY=1` and restart. To allow only some operations, list them in `MCP_TOOLS`, for example `all-reads,patchWorkItem`. In write-enabled sessions every write tool can preview with `dry_run: true`.
 
 </details>
 <details><summary>My AI client says "Disconnected" or "Failed to connect".</summary>

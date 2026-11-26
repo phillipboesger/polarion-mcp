@@ -21,7 +21,7 @@ Run `node build/index.js` directly when connecting a local MCP client. Configure
 
 Start with `npm run start:mcp-http`. The MCP endpoint is `/mcp`; `/health` is unauthenticated. Each MCP request must carry the caller's Polarion PAT as a Bearer token, or an access token from the optional OAuth login. Sessions are held in memory and bound to the caller's token. OAuth metadata and login routes are enabled when `MCP_PUBLIC_URL` and the required secret configuration are set. See [configuration.md](./configuration.md) and [security.md](./security.md).
 
-The server lists two tools, `search` and `execute` (Code Mode); see [Code Mode](code-mode.md). `MCP_READ_ONLY` removes write access. `MCP_MODE=full` lists every tool.
+The server lists two tools, `search` and `execute` (Code Mode); see [Code Mode](code-mode.md). `MCP_READ_ONLY` removes write access, and `MCP_TOOLS` limits the server to [selected operations](configuration.md#restrict-what-the-ai-can-do). `MCP_MODE=full` lists every tool.
 
 
 ## REST HTTP mode
@@ -62,7 +62,7 @@ Read tools accept `response_format: "concise" | "detailed"`. It defaults to `det
 
 ## Composite tools
 
-The `composites` toolset adds higher-level tools that call existing Polarion REST operations through the normal executor. In Code Mode they are `polarion.<name>()` operations. `MCP_READ_ONLY=true` exposes the read-only trace and LiveDoc tools but blocks `run_job_and_wait`.
+The `composites` toolset adds higher-level tools that call existing Polarion REST operations through the normal executor. In Code Mode they are `polarion.<name>()` operations. `MCP_READ_ONLY=true` exposes the read-only trace and LiveDoc tools but blocks `run_job_and_wait`. With `MCP_TOOLS`, a composite is available only if you list it (or `all-reads`, for read-only ones).
 
 `upload_attachment` uploads a local file or fetches a URL and sends the bytes as a normal Polarion multipart attachment, so the model does not need to put base64 in the prompt. For example, use `target: {type: "work_item", projectId: "P", id: "WI-123"}` with either an absolute `filePath` or a URL, plus optional `fileName`, `title`, and `dry_run`. Configure `MCP_UPLOAD_ROOTS` for stdio-only path uploads or `MCP_UPLOAD_URL_HOSTS` for URL uploads; URL access is HTTPS-only unless `MCP_UPLOAD_ALLOW_HTTP=true`. Both modes use `MCP_UPLOAD_MAX_BYTES` (25 MiB by default). `dry_run: true` returns file name, byte count, MIME type inferred from the extension, multipart part names, and SHA-256 without calling Polarion. See [configuration.md](./configuration.md) and [security.md](./security.md).
 

@@ -53,6 +53,7 @@ The server lists two tools, `search` and `execute` (Code Mode), so client tool-c
 
 - **Local stdio clients (Claude Desktop, Claude Code, Codex, VS Code, Cursor, Windsurf, Antigravity):** nothing to set. Add `MCP_READ_ONLY=true` to remove write access. A client that cannot approve `execute` (for example `codex exec`) needs `MCP_MODE=full` or `MCP_READ_ONLY=true`.
 - **HTTP clients (claude.ai, ChatGPT, Copilot Studio):** the server administrator can set `MCP_READ_ONLY` for every connection.
+- **Only some operations:** `MCP_TOOLS` limits the server to the operations you list, for example `all-reads,patchWorkItem`. See [Restrict what the AI can do](configuration.md#restrict-what-the-ai-can-do).
 - **REST wrapper clients:** `/api/tools` lists the wrapper's configured operations. The wrapper does not use Code Mode; use the MCP endpoint for it.
 
 See [Code Mode](code-mode.md) and [configuration](configuration.md) for the modes and settings.

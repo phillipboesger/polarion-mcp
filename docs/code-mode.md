@@ -22,7 +22,7 @@ Code Mode uses two ordinary MCP tools, so any client with MCP tool support can c
 
 Two things to know:
 
-- `execute` is annotated as able to write, so clients that ask for approval per tool call will ask before running it. A client that cannot ask (for example `codex exec` with approval policy `never`) refuses the call, even with `dry_run: true`. For read-only use set `MCP_READ_ONLY=true`: `execute` is then annotated read-only and runs without a prompt. For writes, approve the tool in the client's settings, or set `MCP_MODE=full`.
+- `execute` is annotated as able to write, so clients that ask for approval per tool call will ask before running it. A client that cannot ask (for example `codex exec` with approval policy `never`) refuses the call, even with `dry_run: true`. For read-only use set `MCP_READ_ONLY=true`: `execute` is then annotated read-only and runs without a prompt (the same happens when `MCP_TOOLS` leaves no write). For writes, approve the tool in the client's settings, or set `MCP_MODE=full`.
 - Models differ in how well they write the script. Check your model on a real task before relying on it for bulk changes; `MCP_MODE=full` remains available.
 
 ## Token cost
@@ -72,6 +72,7 @@ Every `polarion.<operation>` call goes through the same pipeline as a direct too
 
 - Authentication and the per-user token: the token never enters the sandbox.
 - `MCP_READ_ONLY`: write operations are not in the SDK.
+- `MCP_TOOLS`: only listed operations are in the SDK, so `search` does not return the others and `execute` cannot call them. `search` and `execute` need no entry. See [Restrict what the AI can do](configuration.md#restrict-what-the-ai-can-do).
 - Policy hook, rate limit and audit log: each inner call is recorded, plus the `execute` call itself.
 - Write guards, enum label checks, read-back verification and write limits.
 - `MCP_MARK_UNTRUSTED` marking: marked data arrives marked inside the sandbox.

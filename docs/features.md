@@ -6,6 +6,7 @@
 - MCP over stdio and Streamable HTTP, plus an optional REST HTTP wrapper.
 - Runtime input validation, OpenAPI authentication schemes, and output schemas where the operation defines a JSON response.
 - Read-only filtering: `MCP_READ_ONLY` for the deployment, and `X-MCP-Readonly` per HTTP session.
+- Operation allowlist: `MCP_TOOLS` limits the server to listed operations, together with read-only ([rules](configuration.md#restrict-what-the-ai-can-do)).
 - Response text cap controlled by `MCP_MAX_RESPONSE_CHARS` (default 100,000 characters) for generated and composite output. Ordinary unpaged generated `structuredContent` remains complete; auto-collected paginated content is bounded by the cap and signals omitted results with `truncated: true`.
 
 ## Polarion-specific behavior
