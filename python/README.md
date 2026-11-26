@@ -24,7 +24,7 @@ For clients that accept a JSON MCP configuration:
   "mcpServers": {
     "polarion": {
       "command": "uvx",
-      "args": ["polarion-alm-mcp==1.6.2"],
+      "args": ["polarion-alm-mcp==1.7.0"],
       "env": {
         "API_BASE_URL": "https://your-polarion.example/polarion/rest/v1",
         "BEARER_TOKEN": "your-personal-access-token",
