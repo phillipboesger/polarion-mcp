@@ -26,10 +26,6 @@
  * subsequent requests.
  */
 
-import { registerCompositeTools } from './composite-search.js';
-import { listVirtualTools } from './virtual-tools.js';
-import { toolFilterWarnings } from './tool-filter.js';
-
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -49,8 +45,10 @@ import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, reque
 import { createPolarionServer, createToolCaller } from './server.js';
 import { writeLimitsFromEnv, type WriteLimits } from './write-verification.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
-import { enabledTools } from './tool-filter.js';
+import { enabledTools, toolFilterWarnings } from './tool-filter.js';
 import { parseProfile } from './profile.js';
+import { registerCompositeTools } from './composite-search.js';
+import { listVirtualTools } from './virtual-tools.js';
 import type { McpToolDefinition } from './types.js';
 import { DEFAULT_MAX_RESPONSE_CHARS, parseMaxResponseChars } from './executor.js';
 import { PolarionOAuthProvider, probePolarionToken, normalizeTokenProbeResult, formatTokenDiagnostic, renderLoginPage, parseRedirectAllowlist, isCimdClientIdentifier, REDIRECT_PRESET_URIS, setLoginPageHeaders, withCimdClientMemo, LOGIN_PATH, POLARION_SCOPE, type TokenCheckFunction, type TokenValidator } from './oauth.js';
