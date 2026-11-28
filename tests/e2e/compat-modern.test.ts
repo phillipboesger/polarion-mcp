@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import type { AddressInfo } from 'node:net';
+import { createConnection, type AddressInfo, type Socket } from 'node:net';
 import { once } from 'node:events';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
@@ -354,7 +354,19 @@ test('shutdown lets a slow non-MCP request finish and cuts a stalled one after t
   }
 });
 
-test('SIGTERM ends the HTTP server with a modern call in flight', async () => {
+test('shutdown still cuts a stalled request when closing the sessions fails', { timeout: 30_000 }, async () => {
+  let arrived!: () => void;
+  const started = new Promise<void>(resolve => { arrived = resolve; });
+  const server = createServer(() => arrived());
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const answer = fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/tools/patchWorkItem`, { method: 'POST' }).then(response => response.text(), () => 'cut');
+  await started;
+  await shutdownHttpServer(server, async () => { throw new Error('close failed'); }, 500);
+  assert.equal(await answer, 'cut');
+});
+
+test('SIGTERM ends the HTTP server with a modern call and a half-sent request in flight', { timeout: 30_000 }, async () => {
   let arrived!: () => void;
   const started = new Promise<void>(resolve => { arrived = resolve; });
   const upstream = createServer((req, res) => {
@@ -370,6 +382,7 @@ test('SIGTERM ends the HTTP server with a modern call in flight', async () => {
   await new Promise<void>(resolve => probe.close(() => resolve()));
   const child = spawn(process.execPath, ['build/mcp-http-server.js'], { env: stdioEnv(`http://127.0.0.1:${(upstream.address() as AddressInfo).port}/polarion/rest/v1`, { MCP_HTTP_PORT: String(port), MCP_HTTP_HOST: '127.0.0.1' }), stdio: ['ignore', 'pipe', 'ignore'] });
   const c = client();
+  let halfSent: Socket | undefined;
   try {
     const lines = createInterface({ input: child.stdout! });
     for await (const line of lines) if (line.includes('listening on port')) break;
@@ -377,9 +390,15 @@ test('SIGTERM ends the HTTP server with a modern call in flight', async () => {
     await c.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), { requestInit: { headers: { authorization: `Bearer ${PAT}` } } }));
     void c.callTool({ name: 'execute', arguments: { code: 'return await polarion.getProjects({});' } }).catch(() => {});
     await started;
+    // Only the grace-time force close ends this connection, so a SIGTERM handler that skips it never exits in time.
+    halfSent = createConnection({ host: '127.0.0.1', port });
+    halfSent.on('error', () => {});
+    await once(halfSent, 'connect');
+    await new Promise<void>(resolve => halfSent!.write('POST /api/tools/getProjects HTTP/1.1\r\nHost: 127.0.0.1\r\n', () => resolve()));
+    await new Promise(resolve => setTimeout(resolve, 200));
     const exit = once(child, 'exit');
     child.kill('SIGTERM');
-    const [code] = await Promise.race([exit, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('no exit')), 5000).unref())]);
+    const [code] = await Promise.race([exit, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('no exit')), 15_000).unref())]);
     assert.equal(code, 0);
-  } finally { child.kill('SIGKILL'); await c.close(); upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); }
+  } finally { halfSent?.destroy(); child.kill('SIGKILL'); await c.close(); upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); }
 });

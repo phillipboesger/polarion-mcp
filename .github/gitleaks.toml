@@ -5,9 +5,13 @@ useDefault = true
 
 [allowlist]
 description = "Test-only TLS fixtures and fixed token secrets, and YOUR_* placeholders in the setup guides"
-regexes = ['''YOUR_[A-Z_]+''']
+regexes = [
+  '''YOUR_[A-Z_]+''',
+  # The fixed fake values in tests/e2e/compat-helpers.ts, listed one by one so that file is still scanned.
+  '''^e2e-stub-pat(-user-b)?$''',
+  '''^e2e-sealing-secret-that-is-long-enough-123$''',
+]
 paths = [
   '''tests/fixtures/cimd-test-(key|cert)\.pem''',
   '''tests/[A-Za-z0-9_./-]+\.test\.ts''',
-  '''tests/e2e/compat-helpers\.ts$''',
 ]
