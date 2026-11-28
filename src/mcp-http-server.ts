@@ -788,19 +788,37 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
 
   let modernRequests = 0;
   const inFlightModern = new Set<Promise<void>>();
+  const modernHandlers = new Set<ReturnType<typeof createMcpHandler>>();
+  let closing = false;
   // POST: initialize a new session, or dispatch into an existing one.
   app.post(MCP_PATH, requireBearer, validateReadOnlyHeader, jsonBody, async (req: Request, res: Response) => {
-    const legacy = await isLegacyRequest(await toWebRequest(req, req.body), req.body);
+    if (closing) {
+      res.status(503).json(jsonRpcError('Server shutting down'));
+      return;
+    }
+    if (req.body?.method === 'subscriptions/listen') {
+      res.json({ jsonrpc: '2.0', id: req.body.id ?? null, error: { code: -32601, message: 'Method not found' } });
+      return;
+    }
+    let webRequest: globalThis.Request;
+    try {
+      webRequest = await toWebRequest(req, req.body);
+    } catch {
+      res.status(400).json(jsonRpcError('Bad Request'));
+      return;
+    }
+    const legacy = await isLegacyRequest(webRequest, req.body);
     if (!legacy) {
       if (options.protocolEra === 'legacy') {
         res.status(400).json(jsonRpcError('Unsupported protocol version'));
         return;
       }
       modernRequests++;
-      const handler = toNodeHandler(createMcpHandler(() => createPolarionServer({ transport: 'http', protocolEra: 'modern', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits, rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger }), { legacy: 'reject' }));
-      const pending = Promise.resolve(handler(req, res, req.body)).then(() => undefined);
+      const modernHandler = createMcpHandler(() => createPolarionServer({ transport: 'http', protocolEra: 'modern', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits, rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger }), { legacy: 'reject' });
+      modernHandlers.add(modernHandler);
+      const pending = Promise.resolve(toNodeHandler(modernHandler)(req, res, req.body)).then(() => undefined);
       inFlightModern.add(pending);
-      try { await pending; } finally { inFlightModern.delete(pending); }
+      try { await pending; } finally { inFlightModern.delete(pending); modernHandlers.delete(modernHandler); }
       return;
     }
 
@@ -852,8 +870,15 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    */
   const closeAllSessions = async (): Promise<void> => {
     clearInterval(sweep);
-    await Promise.all([...inFlightModern].map(p => p.catch(() => undefined)));
-    await Promise.all([...sessions.values()].map(s => s.transport.close().catch(() => undefined)));
+    closing = true;
+    const drain = Promise.all([
+      ...[...modernHandlers].map(handler => handler.close().catch(() => undefined)),
+      ...[...inFlightModern].map(p => p.catch(() => undefined)),
+      ...[...sessions.values()].map(s => s.transport.close().catch(() => undefined)),
+    ]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([drain, new Promise<void>(resolve => { timer = setTimeout(resolve, 2000); })]);
+    if (timer) clearTimeout(timer);
     sessions.clear();
   };
 
@@ -1131,6 +1156,7 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const shutdown = () => {
     console.log('\n[INFO] Shutting down MCP Streamable HTTP server...');
     void closeAllSessions().finally(() => {
+      httpServer.closeAllConnections();
       httpServer.close(() => process.exit(0));
     });
   };

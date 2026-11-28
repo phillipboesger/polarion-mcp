@@ -24,6 +24,26 @@ import { toolFilterWarnings } from './tool-filter.js';
 import { registerCompositeTools } from './composite-search.js';
 import { listVirtualTools } from './virtual-tools.js';
 
+class GuardedStdioTransport extends StdioServerTransport {
+  constructor(private readonly legacyOnly: boolean) { super(); }
+
+  override async start(): Promise<void> {
+    const dispatch = this.onmessage;
+    this.onmessage = message => {
+      if ('method' in message && 'id' in message) {
+        const meta = 'params' in message && message.params && typeof message.params === 'object' ? message.params._meta : undefined;
+        const modern = meta && typeof meta === 'object' && 'io.modelcontextprotocol/protocolVersion' in meta;
+        if (message.method === 'subscriptions/listen' || (this.legacyOnly && modern)) {
+          void this.send({ jsonrpc: '2.0', id: message.id, error: { code: message.method === 'subscriptions/listen' ? -32601 : -32600, message: message.method === 'subscriptions/listen' ? 'Method not found' : 'Unsupported protocol version' } });
+          return;
+        }
+      }
+      dispatch?.(message);
+    };
+    await super.start();
+  }
+}
+
 function parseToolRateLimit(value: string | undefined): number {
   const parsed = Number(value ?? 0);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
@@ -45,9 +65,9 @@ async function main(): Promise<void> {
     const protocolEra = parseProtocolEra(process.env.MCP_PROTOCOL_ERA);
     const serverOptions = { ...parseLogSetting(process.env.MCP_LOG), transport: 'stdio', maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: flagOn(process.env.MCP_MARK_UNTRUSTED), confirmDestructive: flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE), apiBaseUrl: API_BASE_URL } as const;
     if (protocolEra === 'legacy') {
-      await createPolarionServer(serverOptions).connect(new StdioServerTransport());
+      await createPolarionServer(serverOptions).connect(new GuardedStdioTransport(true));
     } else {
-      serveStdio(context => createPolarionServer({ ...serverOptions, protocolEra: context.era }));
+      serveStdio(context => createPolarionServer({ ...serverOptions, protocolEra: context.era }), { transport: new GuardedStdioTransport(false) });
     }
 
     // Info messages go to stderr in MCP (stdout is reserved for protocol)

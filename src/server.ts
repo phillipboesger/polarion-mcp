@@ -13,7 +13,7 @@
  * expose exactly the same tools, resources, and prompts.
  */
 
-import { McpServer, type Server } from "@modelcontextprotocol/server";
+import { Server } from "@modelcontextprotocol/server";
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.js';
@@ -409,10 +409,10 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
-  const mcp = new McpServer(
+  const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
-      supportedProtocolVersions: [...(options.protocolEra === 'modern' ? ['2026-07-28'] : []), '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'],
+      supportedProtocolVersions: [...(options.protocolEra === 'modern' ? ['2026-07-28'] : []), '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05', '2024-10-07'],
       capabilities: {
         tools: {},      // API operations (GET, POST, PATCH, DELETE endpoints)
         resources: {},  // Documentation and configuration files
@@ -422,7 +422,6 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
     },
   );
 
-  const server = mcp.server;
 
   /**
    * Handler: List Available Tools.
