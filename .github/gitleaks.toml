@@ -9,4 +9,5 @@ regexes = ['''YOUR_[A-Z_]+''']
 paths = [
   '''tests/fixtures/cimd-test-(key|cert)\.pem''',
   '''tests/[A-Za-z0-9_./-]+\.test\.ts''',
+  '''tests/e2e/compat-helpers\.ts''',
 ]
