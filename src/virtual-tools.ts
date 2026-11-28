@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { ToolFilter } from './tool-filter.js';
 import type { ToolsetName } from './toolsets.js';
 

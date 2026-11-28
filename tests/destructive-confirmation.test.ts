@@ -45,6 +45,12 @@ test('elicitation accept executes and decline/cancel never execute', async () =>
   assert.match((cancelled.result.content as Array<{ text: string }>)[0].text, /cancelled/);
 });
 
+test('empty elicitation capability supports form confirmation', async () => {
+  const result = await invoke({ confirmDestructive: true, capabilities: { elicitation: {} }, name: 'delete_probe' });
+  assert.equal(result.calls, 1);
+  assert.match(result.confirmationMessage, /Confirm this Polarion action/);
+});
+
 test('clients without elicitation can confirm in one step and receive preview guidance', async () => {
   const blocked = await invoke({ confirmDestructive: true, capabilities: {}, name: 'bulk_probe' });
   assert.equal(blocked.calls, 0);

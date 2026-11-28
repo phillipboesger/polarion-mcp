@@ -12,7 +12,7 @@
  * resources, and prompts from src/server.ts.
  */
 
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, flagOn } from './config.js';
 import { createPolarionServer } from './server.js';

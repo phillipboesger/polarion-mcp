@@ -1,5 +1,5 @@
 import type { VirtualTool } from './virtual-tools.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { attrs, boundedNumber, first, parseWorkItemId, relData, rows, textResult, type JsonObject } from './composite-utils.js';
 
 interface TraceNode { id: string; title: string; type: string; status: string }

@@ -8,7 +8,7 @@
  * content depending on what they are.
  */
 
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { McpToolDefinition } from './types.js';
 
 /** Largest file returned inline; base64 grows it by a third. */

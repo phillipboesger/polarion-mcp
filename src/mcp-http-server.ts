@@ -34,12 +34,12 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { isInitializeRequest } from '@modelcontextprotocol/server';
 
 import { randomBytes } from 'node:crypto';
-import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
-import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/server-legacy/auth';
+import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/server-legacy/auth';
 
 import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, flagOn } from './config.js';
 import { createPolarionServer, createToolCaller } from './server.js';
@@ -307,13 +307,13 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * recently used. `owner` is a hash of the caller's Polarion token: a session
    * id alone must not let another user end or hijack the stream of a session.
    */
-  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; owner: string; lastSeen: number; openStreams: number }>();
+  const sessions = new Map<string, { transport: NodeStreamableHTTPServerTransport; owner: string; lastSeen: number; openStreams: number }>();
 
   /**
    * @param id - Session id.
    * @param session - The session.
    */
-  const closeSession = (id: string, session: { transport: StreamableHTTPServerTransport }): void => {
+  const closeSession = (id: string, session: { transport: NodeStreamableHTTPServerTransport }): void => {
     void session.transport.close().catch(() => undefined);
     sessions.delete(id);
   };
@@ -323,7 +323,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * @returns The caller's live session, refreshed as most recently used; or
    *   undefined if it is unknown, expired, or belongs to someone else.
    */
-  const useSession = (sessionId: string): StreamableHTTPServerTransport | undefined => {
+  const useSession = (sessionId: string): NodeStreamableHTTPServerTransport | undefined => {
     const session = sessions.get(sessionId);
     if (!session || session.owner !== callerCacheScope()) return undefined;
     if (session.openStreams === 0 && Date.now() - session.lastSeen > sessionIdleMs) {
@@ -778,13 +778,13 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   app.post(MCP_PATH, requireBearer, validateReadOnlyHeader, jsonBody, async (req: Request, res: Response) => {
     const sessionId = req.header('mcp-session-id');
     const existing = sessionId ? useSession(sessionId) : undefined;
-    let transport: StreamableHTTPServerTransport;
+    let transport: NodeStreamableHTTPServerTransport;
 
     if (existing) {
       transport = existing;
     } else if (!sessionId && isInitializeRequest(req.body)) {
       const owner = callerCacheScope();
-      transport = new StreamableHTTPServerTransport({
+      transport = new NodeStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
           sessions.set(sid, { transport, owner, lastSeen: Date.now(), openStreams: 0 });

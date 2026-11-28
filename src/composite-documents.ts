@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { VirtualTool, VirtualToolContext } from './virtual-tools.js';
 import { attrs, boundedNumber, errorResult, first, object, parseWorkItemId, relData, resultFailed, richMarkdown, rows, textResult, type JsonObject } from './composite-utils.js';
 

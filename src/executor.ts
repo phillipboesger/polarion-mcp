@@ -20,7 +20,7 @@
 import { ZodError, type ZodIssue } from "zod";
 import axios, { type AxiosRequestConfig } from "axios";
 import FormData from "form-data";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { JsonObject, McpToolDefinition } from "./types.js";
 import { readArg, encodeSegment, formatApiError, getZodSchemaFromJsonSchema, logSafe, normalizeDryRun, sanitizeInputSchema, mimeTypeForFile, describeByteLimit, DEFAULT_UPLOAD_MAX_BYTES } from "./utils.js";
 import { DEFAULT_VERIFY_MAX_ITEMS, isSingleResourceRoute, isVerifiableRoute, readBackFields, verificationMessage, verifyTargets, type VerifyTarget, type WriteLimits, type WriteVerification } from "./write-verification.js";

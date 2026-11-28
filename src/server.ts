@@ -13,16 +13,7 @@
  * expose exactly the same tools, resources, and prompts.
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  ListResourcesRequestSchema,
-  ListResourceTemplatesRequestSchema,
-  ReadResourceRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { McpServer, type Server } from "@modelcontextprotocol/server";
 
 import { SERVER_NAME, SERVER_VERSION } from './config.js';
 import { compileZodSchema, normalizeDryRun, sanitizeInputSchema } from './utils.js';
@@ -38,7 +29,7 @@ import { API_BASE_URL, getBearerToken, tokenScope } from './config.js';
 import { parseToolFilter } from './tool-filter.js';
 import { renderRichTextFieldsAsMarkdown } from './markdown.js';
 import { randomUUID, createHash } from 'node:crypto';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { ToolCallRateLimiter } from './tool-rate-limit.js';
 import { annotatePolarionResult, annotateToolText, markUntrustedText } from './untrusted-content.js';
 import { correlationIdFrom, createLogger, type LogFormat, type LogLevel, type PipelineLogger } from './logger.js';
@@ -104,9 +95,10 @@ function actionSummary(toolName: string, args: Record<string, unknown>): string 
 }
 
 async function requestDestructiveConfirmation(server: Server, toolName: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<'accepted' | 'declined' | 'cancelled' | 'fallback'> {
-  if (!server.getClientCapabilities()?.elicitation?.form) return args.confirm === true ? 'accepted' : 'fallback';
+  const elicitation = server.getClientCapabilities()?.elicitation;
+  if (!elicitation || (!elicitation.form && elicitation.url)) return args.confirm === true ? 'accepted' : 'fallback';
   try {
-    const response = await server.elicitInput({
+    const response = await server.request({ method: 'elicitation/create', params: {
       mode: 'form',
       message: `Confirm this Polarion action: ${actionSummary(toolName, args)}`,
       requestedSchema: {
@@ -114,7 +106,7 @@ async function requestDestructiveConfirmation(server: Server, toolName: string, 
         properties: { confirm: { type: 'boolean', title: 'Confirm action', description: 'Allow this Polarion tool call to proceed.' } },
         required: ['confirm'],
       },
-    }, { signal });
+    } }, { signal });
     if (response.action === 'accept' && response.content?.confirm === true) return 'accepted';
     return response.action === 'cancel' ? 'cancelled' : 'declined';
   } catch {
@@ -388,9 +380,10 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
-  const server = new Server(
+  const mcp = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
+      supportedProtocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'],
       capabilities: {
         tools: {},      // API operations (GET, POST, PATCH, DELETE endpoints)
         resources: {},  // Documentation and configuration files
@@ -399,6 +392,8 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
       instructions: mode === 'code' ? `${pruneDisabledTools(CODE_MODE_INSTRUCTIONS, guidanceNames)}\n\n${serverInstructions(guidanceNames)}` : serverInstructions(guidanceNames),
     },
   );
+
+  const server = mcp.server;
 
   /**
    * Handler: List Available Tools.
@@ -416,7 +411,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
       ...(def.annotations ? { annotations: def.annotations } : {}),
     })),
   ].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listedTools as any[] }));
+  server.setRequestHandler('tools/list', async () => ({ tools: listedTools as any[] }));
 
   /**
    * Handler: Execute a Tool (API Call).
@@ -424,23 +419,23 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Looks up the requested tool and delegates execution (validation, auth, HTTP
    * call, response formatting) to {@link executeApiTool}.
    */
-  server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
-    const requestHeader = extra?.requestInfo?.headers['x-request-id'];
-    const progressToken = extra?._meta?.progressToken;
+  server.setRequestHandler('tools/call', (request, extra) => {
+    const requestHeader = extra.http?.req?.headers.get('x-request-id');
+    const progressToken = extra.mcpReq._meta?.progressToken;
     return callToolPipeline(
       request.params.name,
       (request.params.arguments ?? {}) as Record<string, unknown>,
       {
         clientTools, virtualTools, codeMode, extensions,
         maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS,
-        logger, signal: extra?.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
+        logger, signal: extra.mcpReq.signal, rateLimiter, markUntrusted: options.markUntrusted ?? false,
         telemetry: options.telemetry ?? NOOP_TELEMETRY,
         transport: options.transport ?? 'http',
         verifyWrites: options.verifyWrites,
         writeLimits: options.writeLimits,
         correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined), server,
         reportProgress: progressToken === undefined ? undefined : async progress => {
-          await extra.sendNotification({
+          await extra.mcpReq.notify({
             method: 'notifications/progress',
             params: { progressToken, ...progress },
           });
@@ -452,20 +447,20 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   /**
    * Handler: List Available Resources (SDK docs, OpenAPI specs, cached configs).
    */
-  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  server.setRequestHandler('resources/list', async () => {
     return { resources: listPolarionResources(guidanceNames) };
   });
 
   /**
    * Handler: Read a Specific Resource by its `polarion://` URI.
    */
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.setRequestHandler('resources/read', async (request) => {
     const uri = request.params.uri;
     if (uri.startsWith('polarion://project/')) return await readProjectResource(uri, { clientTools, virtualTools, extensions, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, logger, rateLimiter, markUntrusted: options.markUntrusted ?? false, telemetry: options.telemetry ?? NOOP_TELEMETRY, transport: options.transport ?? 'http', server });
     return await readPolarionResource(request.params.uri, guidanceNames);
   });
 
-  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [
+  server.setRequestHandler('resources/templates/list', async () => ({ resourceTemplates: [
     ...(clientTools.has('getWorkItem') ? [{ uriTemplate: 'polarion://project/{projectId}/workitem/{workItemId}', name: 'Polarion Work Item', mimeType: 'text/markdown' }] : []),
     ...(clientTools.has('getDocument') ? [{ uriTemplate: 'polarion://project/{projectId}/document/{spaceId}/{documentName}', name: 'Polarion Document', mimeType: 'text/markdown' }] : []),
     ...(clientTools.has('getProject') ? [{ uriTemplate: 'polarion://project/{projectId}', name: 'Polarion project', mimeType: 'text/markdown' }] : []),
@@ -474,14 +469,14 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
   /**
    * Handler: List Available Prompt templates.
    */
-  server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  server.setRequestHandler('prompts/list', async () => {
     return { prompts: getPolarionPrompts(guidanceNames) };
   });
 
   /**
    * Handler: Get a Specific Prompt template, customized with the given arguments.
    */
-  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  server.setRequestHandler('prompts/get', async (request) => {
     const { name, arguments: args } = request.params;
     return getPolarionPrompt(name, args, guidanceNames);
   });

@@ -20,12 +20,12 @@ import { randomBytes } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import axios from 'axios';
 import type { Response } from 'express';
-import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/sdk/server/auth/clients.js';
-import type { AuthorizationParams, OAuthServerProvider } from '@modelcontextprotocol/sdk/server/auth/provider.js';
-import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, InvalidTokenError, ServerError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
-import { redirectUriMatches } from '@modelcontextprotocol/sdk/server/auth/handlers/authorize.js';
+import type { OAuthRegisteredClientsStore } from '@modelcontextprotocol/server-legacy/auth';
+import type { AuthorizationParams, OAuthServerProvider } from '@modelcontextprotocol/server-legacy/auth';
+import type { AuthInfo } from '@modelcontextprotocol/server-legacy/auth';
+import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/server';
+import { InvalidClientMetadataError, InvalidGrantError, InvalidRequestError, InvalidTokenError, ServerError } from '@modelcontextprotocol/server-legacy/auth';
+import { redirectUriMatches } from '@modelcontextprotocol/server-legacy/auth';
 
 import { API_BASE_URL, shouldRejectUnauthorized } from './config.js';
 import { httpsAgent } from './httpClient.js';
