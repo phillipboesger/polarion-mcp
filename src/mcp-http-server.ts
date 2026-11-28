@@ -1053,6 +1053,25 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
   return url;
 }
 
+/** Longest wait for open requests on shutdown; below Docker's default 10 s stop timeout. */
+const SHUTDOWN_GRACE_MS = 8_000;
+
+/**
+ * Stops accepting connections and closes MCP sessions, while other requests
+ * (Custom GPT writes, OAuth) may still finish. Connections open after
+ * `graceMs` are cut, so a stalled request cannot block the exit.
+ */
+export async function shutdownHttpServer(httpServer: HttpServer, closeAllSessions: () => Promise<void>, graceMs = SHUTDOWN_GRACE_MS): Promise<void> {
+  const closed = new Promise<void>(resolve => httpServer.close(() => resolve()));
+  const force = setTimeout(() => httpServer.closeAllConnections(), graceMs);
+  await closeAllSessions().catch(() => undefined);
+  // A keep-alive connection that turns idle after close() would otherwise stay open.
+  const idle = setInterval(() => httpServer.closeIdleConnections(), 100);
+  await closed;
+  clearInterval(idle);
+  clearTimeout(force);
+}
+
 /**
  * Starts the Streamable HTTP MCP server using environment configuration.
  *
@@ -1155,10 +1174,7 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
 
   const shutdown = () => {
     console.log('\n[INFO] Shutting down MCP Streamable HTTP server...');
-    void closeAllSessions().finally(() => {
-      httpServer.closeAllConnections();
-      httpServer.close(() => process.exit(0));
-    });
+    void shutdownHttpServer(httpServer, closeAllSessions).finally(() => process.exit(0));
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);

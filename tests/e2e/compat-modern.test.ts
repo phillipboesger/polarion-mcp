@@ -13,7 +13,7 @@ import { createFakePolarion, stdioEnv, PAT, SECRET, rawRpc, rawHttp, GUIDE_URI }
 
 const fake = await createFakePolarion();
 process.env.API_BASE_URL = fake.base;
-const { createMcpHttpApp } = await import('../../src/mcp-http-server.js');
+const { createMcpHttpApp, shutdownHttpServer } = await import('../../src/mcp-http-server.js');
 after(async () => { await fake.close(); });
 
 async function app(options: Parameters<typeof createMcpHttpApp>[0] = {}) {
@@ -202,7 +202,8 @@ test('stdio rejects subscriptions and legacy mode rejects modern envelopes', asy
 test('shutdown completes when a modern upstream request never finishes', async () => {
   let arrived!: () => void;
   const started = new Promise<void>(resolve => { arrived = resolve; });
-  const upstream = createServer((_req, _res) => { arrived(); });
+  let upstreamAborted = false;
+  const upstream = createServer((_req, res) => { res.on('close', () => { upstreamAborted = true; }); arrived(); });
   upstream.listen(0, '127.0.0.1');
   await once(upstream, 'listening');
   const instance = createMcpHttpApp({ validateToken: async () => true, tokenSecret: SECRET, apiBaseUrl: `http://127.0.0.1:${(upstream.address() as AddressInfo).port}` });
@@ -212,9 +213,16 @@ test('shutdown completes when a modern upstream request never finishes', async (
   const c = client();
   try {
     await c.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${(http.address() as AddressInfo).port}/mcp`), { requestInit: { headers: { authorization: `Bearer ${PAT}` } } }));
-    void c.callTool({ name: 'execute', arguments: { code: 'return await polarion.getProjects({});' } }).catch(() => {});
+    let settled = false;
+    void c.callTool({ name: 'execute', arguments: { code: 'return await polarion.getProjects({});' } }).catch(() => {}).finally(() => { settled = true; });
     await started;
-    await Promise.race([instance.closeAllSessions(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('shutdown timeout')), 3000).unref())]);
+    const begin = Date.now();
+    await instance.closeAllSessions();
+    // Well below the 2 s drain fallback: the handler must end the call itself.
+    assert.ok(Date.now() - begin < 1500, `drain took ${Date.now() - begin} ms`);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.equal(settled, true);
+    assert.equal(upstreamAborted, true);
   } finally { await c.close(); http.closeAllConnections(); upstream.closeAllConnections(); await Promise.all([new Promise<void>(resolve => http.close(() => resolve())), new Promise<void>(resolve => upstream.close(() => resolve()))]); }
 });
 
@@ -242,9 +250,18 @@ test('modern scripts fail closed for every elicitation capability shape', async 
     for (const elicitation of [{}, { form: {} }, { url: {} }]) {
       const before = fake.calls('DELETE') + fake.calls('POST') + fake.calls('PATCH');
       const response = await rawRpc(server.base, PAT, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'execute', arguments: { code: "await polarion.deleteProject({projectId:'demo',confirm:true}); return 'ok';" }, _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': { elicitation }, 'io.modelcontextprotocol/clientInfo': { name: 'test', version: '1' } } } }, { 'mcp-protocol-version': '2026-07-28', 'mcp-method': 'tools/call', 'mcp-name': 'execute' });
-      assert.match(JSON.stringify(response.json), /error|confirmation/i);
+      assert.equal(response.status, 200, JSON.stringify(response.json));
+      assert.match(JSON.stringify(response.json?.result), /not yet available for modern clients/);
       assert.equal(fake.calls('DELETE') + fake.calls('POST') + fake.calls('PATCH'), before);
     }
+    // Positive control: without elicitation a confirmed script runs, and its destructive call is still refused.
+    const run = (id: number, code: string) => rawRpc(server.base, PAT, { jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'execute', arguments: { code, confirm: true }, _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {}, 'io.modelcontextprotocol/clientInfo': { name: 'test', version: '1' } } } }, { 'mcp-protocol-version': '2026-07-28', 'mcp-method': 'tools/call', 'mcp-name': 'execute' });
+    const read = await run(2, "const p = await polarion.getProjects({}); return p.data.map(x => x.id);");
+    assert.match(JSON.stringify(read.json?.result), /demo/);
+    const deletes = fake.calls('DELETE');
+    const inner = await run(3, "await polarion.deleteProject({projectId:'demo',confirm:true}); return 'ok';");
+    assert.match(JSON.stringify(inner.json?.result), /requires confirmation/);
+    assert.equal(fake.calls('DELETE'), deletes);
   } finally { await server.close(); }
 });
 
@@ -318,4 +335,50 @@ test('all v1 SDK legacy protocol versions negotiate and accept their request hea
       assert.equal((await rawRpc(server.base, PAT, { jsonrpc: '2.0', id: 2, method: 'tools/list' }, { 'mcp-session-id': init.sessionId!, 'mcp-protocol-version': version })).status, 200);
     }
   } finally { await server.close(); }
+});
+
+test('shutdown lets a slow non-MCP request finish and cuts a stalled one after the grace time', async () => {
+  for (const stalled of [false, true]) {
+    let arrived!: () => void;
+    const started = new Promise<void>(resolve => { arrived = resolve; });
+    const server = createServer((_req, res) => { arrived(); if (!stalled) setTimeout(() => res.end('written'), 300); });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const answer = fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/tools/patchWorkItem`, { method: 'POST' }).then(response => response.text(), () => 'cut');
+    await started;
+    const begin = Date.now();
+    await shutdownHttpServer(server, async () => {}, stalled ? 500 : 5000);
+    assert.equal(await answer, stalled ? 'cut' : 'written');
+    assert.ok(Date.now() - begin < 2000, `shutdown took ${Date.now() - begin} ms`);
+  }
+});
+
+test('SIGTERM ends the HTTP server with a modern call in flight', async () => {
+  let arrived!: () => void;
+  const started = new Promise<void>(resolve => { arrived = resolve; });
+  const upstream = createServer((req, res) => {
+    if (req.url?.includes('/metadata')) { res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: { type: 'metadata', id: 'metadata' } })); return; }
+    arrived();
+  });
+  upstream.listen(0, '127.0.0.1');
+  await once(upstream, 'listening');
+  const probe = createServer();
+  probe.listen(0, '127.0.0.1');
+  await once(probe, 'listening');
+  const port = (probe.address() as AddressInfo).port;
+  await new Promise<void>(resolve => probe.close(() => resolve()));
+  const child = spawn(process.execPath, ['build/mcp-http-server.js'], { env: stdioEnv(`http://127.0.0.1:${(upstream.address() as AddressInfo).port}/polarion/rest/v1`, { MCP_HTTP_PORT: String(port), MCP_HTTP_HOST: '127.0.0.1' }), stdio: ['ignore', 'pipe', 'ignore'] });
+  const c = client();
+  try {
+    const lines = createInterface({ input: child.stdout! });
+    for await (const line of lines) if (line.includes('listening on port')) break;
+    child.stdout!.resume();
+    await c.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), { requestInit: { headers: { authorization: `Bearer ${PAT}` } } }));
+    void c.callTool({ name: 'execute', arguments: { code: 'return await polarion.getProjects({});' } }).catch(() => {});
+    await started;
+    const exit = once(child, 'exit');
+    child.kill('SIGTERM');
+    const [code] = await Promise.race([exit, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('no exit')), 5000).unref())]);
+    assert.equal(code, 0);
+  } finally { child.kill('SIGKILL'); await c.close(); upstream.closeAllConnections(); await new Promise<void>(resolve => upstream.close(() => resolve())); }
 });
