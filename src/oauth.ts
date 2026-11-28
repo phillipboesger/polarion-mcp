@@ -609,6 +609,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
    * @param resourceAudience - Canonical protected-resource URL for issued tokens.
    * @param cimdEnabled - Whether HTTPS client identifier URLs may be fetched.
    * @param metadataFetcher - SSRF-guarded metadata fetcher; injectable for tests.
+   * @param issuer - Authorization server issuer from its public URL.
    */
   constructor(
     private readonly polarionUrl: string,
@@ -618,7 +619,8 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     private readonly refreshTokenTtlSeconds = DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
     private readonly resourceAudience?: string,
     cimdEnabled = false,
-    metadataFetcher: CimdMetadataFetcher = fetchClientMetadata
+    metadataFetcher: CimdMetadataFetcher = fetchClientMetadata,
+    private readonly issuer?: string
   ) {
     this.clients = new SealedClientsStore(sealer, redirectAllowlist, cimdEnabled, metadataFetcher);
   }
@@ -722,6 +724,7 @@ export class PolarionOAuthProvider implements OAuthServerProvider {
     this.codes.set(code, { ...pending, polarionToken, expiresAt: Date.now() + AUTHORIZATION_CODE_TTL_MS });
 
     const target = new URL(pending.redirectUri);
+    if (this.issuer) target.searchParams.set('iss', this.issuer);
     target.searchParams.set('code', code);
     if (pending.state) target.searchParams.set('state', pending.state);
     return { ok: true, redirectTo: target.href };

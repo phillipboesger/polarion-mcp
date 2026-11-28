@@ -366,7 +366,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     : undefined;
   const resourceAudience = publicUrl ? new URL(MCP_PATH, publicUrl).href : undefined;
   const oauth = publicUrl && sealer
-    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, effectiveAllowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience, cimdEnabled, options.fetchClientMetadata ?? fetchClientMetadata)
+    ? new PolarionOAuthProvider(getPolarionBaseUrl(), sealer, checkToken, effectiveAllowedRedirectUris, options.refreshTokenTtlSeconds, resourceAudience, cimdEnabled, options.fetchClientMetadata ?? fetchClientMetadata, publicUrl.href)
     : undefined;
   const resourceMetadataUrl = publicUrl ? getOAuthProtectedResourceMetadataUrl(new URL(MCP_PATH, publicUrl)) : undefined;
 
@@ -445,6 +445,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
             ...metadata,
             ...(Array.isArray(methods) ? { token_endpoint_auth_methods_supported: [...new Set([...methods, 'client_secret_basic'])] } : {}),
             client_id_metadata_document_supported: cimdEnabled,
+            authorization_response_iss_parameter_supported: true,
           };
         }
         return sendJson(body);
@@ -487,6 +488,26 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
         withCimdClientMemo(client, next);
       });
     }
+    // The SDK only redirects OAuth errors after validating the client and callback.
+    app.use('/authorize', express.urlencoded({ extended: false }), (req: Request, res: Response, next: NextFunction) => {
+      const redirect = res.redirect.bind(res);
+      res.redirect = ((statusOrLocation: number | string, destination?: string) => {
+        const status = typeof statusOrLocation === 'number' ? statusOrLocation : 302;
+        let location = typeof statusOrLocation === 'string' ? statusOrLocation : destination;
+        const requested = (req.method === 'POST' ? req.body : req.query)?.redirect_uri;
+        if (status === 302 && typeof location === 'string' && URL.canParse(location)) {
+          const target = new URL(location);
+          const callback = typeof requested === 'string' && URL.canParse(requested) ? new URL(requested) : undefined;
+          if ((!callback || (target.origin === callback.origin && target.pathname === callback.pathname))
+            && target.searchParams.has('error') && target.searchParams.has('error_description')) {
+            target.searchParams.set('iss', publicUrl.href);
+            location = target.href;
+          }
+        }
+        return redirect(status, location ?? '');
+      }) as Response['redirect'];
+      next();
+    });
     app.use(
       mcpAuthRouter({
         provider: oauth,

@@ -16,6 +16,8 @@ The REST HTTP wrapper (`build/http-server.js`) authenticates callers with `HTTP_
 
 ## OAuth and revocation
 
+OAuth authorization responses include the authorization server issuer as the `iss` parameter (RFC 9207), matching the issuer in its metadata.
+
 Access tokens last one hour. Refresh tokens last 14 days by default, slide forward when used, and have a 90-day family cap. Refresh tokens are stateless: a previously issued refresh token remains valid until its own expiry, including after a later refresh. The server has no token-family revocation store or OAuth revocation endpoint. Revoking the backing PAT in Polarion prevents successful renewal and access. Tokens are bound to the protected resource URL under RFC 8707.
 
 Existing deployments upgrading to resource-bound tokens require each user to authenticate once again after the upgrade.

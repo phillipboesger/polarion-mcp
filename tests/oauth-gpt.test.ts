@@ -52,6 +52,8 @@ async function gptCode(base: string) {
   const target = new URL(submitted.headers.get("location") as string)
   assert.equal(`${target.origin}${target.pathname}`, CALLBACK)
   assert.equal(target.searchParams.get("state"), "gpt-state")
+  const metadata = await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json() as { issuer: string }
+  assert.deepEqual(target.searchParams.getAll("iss"), [metadata.issuer])
   return target.searchParams.get("code") as string
 }
 
