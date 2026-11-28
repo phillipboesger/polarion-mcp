@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- OAuth authorization responses include the metadata issuer as `iss` (RFC 9207).
+
 ## 1.7.0
 
 - `MCP_TOOLS` is back as an optional allowlist: the server offers only the listed operations and composites. `all-reads` adds every read-only one. It works together with `MCP_READ_ONLY` (an operation needs both), on every transport, in Code Mode and full mode. The default is unchanged: reads and writes without per-call confirmation. See [Restrict what the AI can do](docs/configuration.md#restrict-what-the-ai-can-do).
