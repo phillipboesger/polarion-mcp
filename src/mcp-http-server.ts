@@ -34,14 +34,14 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { NodeStreamableHTTPServerTransport, toNodeHandler, toWebRequest } from '@modelcontextprotocol/node';
+import { isInitializeRequest, isLegacyRequest, createMcpHandler } from '@modelcontextprotocol/server';
 
 import { randomBytes } from 'node:crypto';
-import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/sdk/server/auth/router.js';
-import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
+import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/server-legacy/auth';
+import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/server-legacy/auth';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, flagOn } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, flagOn, parseProtocolEra } from './config.js';
 import { createPolarionServer, createToolCaller } from './server.js';
 import { writeLimitsFromEnv, type WriteLimits } from './write-verification.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
@@ -150,6 +150,7 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
  * Options for {@link createMcpHttpApp}.
  */
 export interface McpHttpAppOptions {
+  protocolEra?: 'dual' | 'legacy';
   verifyWrites?: boolean;
   writeLimits?: WriteLimits;
   /** Maximum characters returned in tool text content. */
@@ -254,7 +255,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const corsMiddleware = cors({
     origin: true,
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'X-MCP-Readonly'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'mcp-method', 'mcp-name', 'X-MCP-Readonly', 'X-Request-Id'],
     exposedHeaders: ['mcp-session-id', 'mcp-protocol-version', 'www-authenticate'],
     optionsSuccessStatus: 204,
   });
@@ -307,13 +308,13 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * recently used. `owner` is a hash of the caller's Polarion token: a session
    * id alone must not let another user end or hijack the stream of a session.
    */
-  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; owner: string; lastSeen: number; openStreams: number }>();
+  const sessions = new Map<string, { transport: NodeStreamableHTTPServerTransport; owner: string; lastSeen: number; openStreams: number }>();
 
   /**
    * @param id - Session id.
    * @param session - The session.
    */
-  const closeSession = (id: string, session: { transport: StreamableHTTPServerTransport }): void => {
+  const closeSession = (id: string, session: { transport: NodeStreamableHTTPServerTransport }): void => {
     void session.transport.close().catch(() => undefined);
     sessions.delete(id);
   };
@@ -323,7 +324,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    * @returns The caller's live session, refreshed as most recently used; or
    *   undefined if it is unknown, expired, or belongs to someone else.
    */
-  const useSession = (sessionId: string): StreamableHTTPServerTransport | undefined => {
+  const useSession = (sessionId: string): NodeStreamableHTTPServerTransport | undefined => {
     const session = sessions.get(sessionId);
     if (!session || session.owner !== callerCacheScope()) return undefined;
     if (session.openStreams === 0 && Date.now() - session.lastSeen > sessionIdleMs) {
@@ -707,6 +708,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       version: SERVER_VERSION,
       transport: 'streamable-http',
       activeSessions: sessions.size,
+      modernRequests,
     });
   });
 
@@ -774,17 +776,61 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     await transport.handleRequest(req, res);
   };
 
+  // Apply the transport's exact Host allowlist before either protocol era.
+  app.use(MCP_PATH, (req: Request, res: Response, next: NextFunction) => {
+    const host = req.get('host');
+    if (allowedHosts?.length && (!host || !allowedHosts.includes(host))) {
+      res.status(403).json(jsonRpcError(`Invalid Host header: ${host}`));
+      return;
+    }
+    next();
+  });
+
+  let modernRequests = 0;
+  const inFlightModern = new Set<Promise<void>>();
+  const modernHandlers = new Set<ReturnType<typeof createMcpHandler>>();
+  let closing = false;
   // POST: initialize a new session, or dispatch into an existing one.
   app.post(MCP_PATH, requireBearer, validateReadOnlyHeader, jsonBody, async (req: Request, res: Response) => {
+    if (closing) {
+      res.status(503).json(jsonRpcError('Server shutting down'));
+      return;
+    }
+    if (req.body?.method === 'subscriptions/listen') {
+      res.json({ jsonrpc: '2.0', id: req.body.id ?? null, error: { code: -32601, message: 'Method not found' } });
+      return;
+    }
+    let webRequest: globalThis.Request;
+    try {
+      webRequest = await toWebRequest(req, req.body);
+    } catch {
+      res.status(400).json(jsonRpcError('Bad Request'));
+      return;
+    }
+    const legacy = await isLegacyRequest(webRequest, req.body);
+    if (!legacy) {
+      if (options.protocolEra === 'legacy') {
+        res.status(400).json(jsonRpcError('Unsupported protocol version'));
+        return;
+      }
+      modernRequests++;
+      const modernHandler = createMcpHandler(() => createPolarionServer({ transport: 'http', protocolEra: 'modern', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits, rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger }), { legacy: 'reject' });
+      modernHandlers.add(modernHandler);
+      const pending = Promise.resolve(toNodeHandler(modernHandler)(req, res, req.body)).then(() => undefined);
+      inFlightModern.add(pending);
+      try { await pending; } finally { inFlightModern.delete(pending); modernHandlers.delete(modernHandler); }
+      return;
+    }
+
     const sessionId = req.header('mcp-session-id');
     const existing = sessionId ? useSession(sessionId) : undefined;
-    let transport: StreamableHTTPServerTransport;
+    let transport: NodeStreamableHTTPServerTransport;
 
     if (existing) {
       transport = existing;
     } else if (!sessionId && isInitializeRequest(req.body)) {
       const owner = callerCacheScope();
-      transport = new StreamableHTTPServerTransport({
+      transport = new NodeStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sid) => {
           sessions.set(sid, { transport, owner, lastSeen: Date.now(), openStreams: 0 });
@@ -824,7 +870,15 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    */
   const closeAllSessions = async (): Promise<void> => {
     clearInterval(sweep);
-    await Promise.all([...sessions.values()].map(s => s.transport.close().catch(() => undefined)));
+    closing = true;
+    const drain = Promise.all([
+      ...[...modernHandlers].map(handler => handler.close().catch(() => undefined)),
+      ...[...inFlightModern].map(p => p.catch(() => undefined)),
+      ...[...sessions.values()].map(s => s.transport.close().catch(() => undefined)),
+    ]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([drain, new Promise<void>(resolve => { timer = setTimeout(resolve, 2000); })]);
+    if (timer) clearTimeout(timer);
     sessions.clear();
   };
 
@@ -999,6 +1053,25 @@ export function parsePublicUrl(value: string | undefined): URL | undefined {
   return url;
 }
 
+/** Longest wait for open requests on shutdown; below Docker's default 10 s stop timeout. */
+const SHUTDOWN_GRACE_MS = 8_000;
+
+/**
+ * Stops accepting connections and closes MCP sessions, while other requests
+ * (Custom GPT writes, OAuth) may still finish. Connections open after
+ * `graceMs` are cut, so a stalled request cannot block the exit.
+ */
+export async function shutdownHttpServer(httpServer: HttpServer, closeAllSessions: () => Promise<void>, graceMs = SHUTDOWN_GRACE_MS): Promise<void> {
+  const closed = new Promise<void>(resolve => httpServer.close(() => resolve()));
+  const force = setTimeout(() => httpServer.closeAllConnections(), graceMs);
+  await closeAllSessions().catch(() => undefined);
+  // A keep-alive connection that turns idle after close() would otherwise stay open.
+  const idle = setInterval(() => httpServer.closeIdleConnections(), 100);
+  await closed;
+  clearInterval(idle);
+  clearTimeout(force);
+}
+
 /**
  * Starts the Streamable HTTP MCP server using environment configuration.
  *
@@ -1056,7 +1129,7 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const confirmDestructive = flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, cimdEnabled, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, apiBaseUrl: API_BASE_URL,
+    protocolEra: parseProtocolEra(process.env.MCP_PROTOCOL_ERA), allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, cimdEnabled, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, apiBaseUrl: API_BASE_URL,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext
@@ -1101,9 +1174,7 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
 
   const shutdown = () => {
     console.log('\n[INFO] Shutting down MCP Streamable HTTP server...');
-    void closeAllSessions().finally(() => {
-      httpServer.close(() => process.exit(0));
-    });
+    void shutdownHttpServer(httpServer, closeAllSessions).finally(() => process.exit(0));
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);

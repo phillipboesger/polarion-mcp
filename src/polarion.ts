@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import type { Resource } from '@modelcontextprotocol/sdk/types.js';
+import type { Resource } from '@modelcontextprotocol/server';
 import { toolDefinitionMap } from './tools.js';
 import { enabledTools } from './tool-filter.js';
 import { listVirtualTools } from './virtual-tools.js';

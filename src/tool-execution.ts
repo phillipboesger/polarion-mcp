@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import type { SendWithRetryOpts } from './httpClient.js';
 import { MAX_AUTO_ITEMS, MAX_AUTO_PAGE_SIZE, paginate, pageNumberFromLink, type JsonApiPage } from './pagination.js';

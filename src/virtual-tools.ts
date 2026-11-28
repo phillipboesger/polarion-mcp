@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { ToolFilter } from './tool-filter.js';
 import type { ToolsetName } from './toolsets.js';
 
@@ -33,12 +33,17 @@ export interface VirtualTool {
 }
 
 const registry = new Map<string, VirtualTool>();
+let revision = 0;
+
+/** Changes whenever the registered catalog changes. */
+export function virtualToolRevision(): number { return revision; }
 
 /** Registers a synthetic tool and returns an unregister function for isolated consumers/tests. */
 export function registerVirtualTool(tool: VirtualTool): () => void {
   if (registry.has(tool.name)) throw new Error(`Virtual tool already registered: ${tool.name}`);
   registry.set(tool.name, tool);
-  return () => { if (registry.get(tool.name) === tool) registry.delete(tool.name); };
+  revision++;
+  return () => { if (registry.get(tool.name) === tool) { registry.delete(tool.name); revision++; } };
 }
 
 /** Lists registered tools after applying the same read-only constraint as generated tools. */

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { buildWorkItemQuery, clearCompositeToolsForTests, compositeTools, escapeLuceneValue, lintLuceneQuery, parsePolarionUrl, setCompositeSearchClockForTests } from '../src/composite-search.js';
 import type { VirtualToolContext } from '../src/virtual-tools.js';
 

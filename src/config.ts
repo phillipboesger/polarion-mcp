@@ -197,3 +197,10 @@ export function getPolarionBaseUrl(): string {
 export function flagOn(value: string | undefined): boolean {
   return /^(1|true|yes|on)$/i.test(value?.trim() ?? '');
 }
+
+/** Select the supported MCP protocol eras at startup. */
+export function parseProtocolEra(value: string | undefined): 'dual' | 'legacy' {
+  const era = value?.trim() || 'dual';
+  if (era !== 'dual' && era !== 'legacy') throw new Error('MCP_PROTOCOL_ERA must be dual or legacy');
+  return era;
+}

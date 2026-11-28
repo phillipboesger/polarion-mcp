@@ -14,7 +14,7 @@
  * - GET /openapi-gpt.json - OpenAPI 3.1 spec with the Custom GPT subset
  */
 
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import express, { type Request, type RequestHandler, type Response } from 'express';
 import { executeApiTool } from './executor.js';
 import { executeTool as executeToolWithPagination, PaginationArgumentError } from './tool-execution.js';

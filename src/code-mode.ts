@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { runInSandbox, type HostFunction, type SandboxLimits } from './code-sandbox.js';
 import { sanitizeInputSchema } from './utils.js';
 import type { VirtualTool } from './virtual-tools.js';
