@@ -337,7 +337,8 @@ test('all v1 SDK legacy protocol versions negotiate and accept their request hea
   } finally { await server.close(); }
 });
 
-test('shutdown lets a slow non-MCP request finish and cuts a stalled one after the grace time', async () => {
+// The timeout makes a missing force-close fail the test instead of hanging the run.
+test('shutdown lets a slow non-MCP request finish and cuts a stalled one after the grace time', { timeout: 30_000 }, async () => {
   for (const stalled of [false, true]) {
     let arrived!: () => void;
     const started = new Promise<void>(resolve => { arrived = resolve; });
