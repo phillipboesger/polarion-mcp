@@ -12,9 +12,9 @@
  * resources, and prompts from src/server.ts.
  */
 
-import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import { serveStdio, StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, flagOn } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, flagOn, parseProtocolEra } from './config.js';
 import { createPolarionServer } from './server.js';
 import { parseMaxResponseChars } from './executor.js';
 import { writeLimitsFromEnv } from './write-verification.js';
@@ -42,9 +42,13 @@ async function main(): Promise<void> {
     registerCompositeTools();
     for (const warning of toolFilterWarnings(listVirtualTools())) console.error(`[WARN] ${warning}`);
     const maxResponseChars = parseMaxResponseChars(process.env.MCP_MAX_RESPONSE_CHARS);
-    const server = createPolarionServer({ ...parseLogSetting(process.env.MCP_LOG), transport: 'stdio', maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: flagOn(process.env.MCP_MARK_UNTRUSTED), confirmDestructive: flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE), apiBaseUrl: API_BASE_URL });
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+    const protocolEra = parseProtocolEra(process.env.MCP_PROTOCOL_ERA);
+    const serverOptions = { ...parseLogSetting(process.env.MCP_LOG), transport: 'stdio', maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools: parseToolRateLimit(process.env.MCP_RATE_LIMIT_TOOLS), markUntrusted: flagOn(process.env.MCP_MARK_UNTRUSTED), confirmDestructive: flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE), apiBaseUrl: API_BASE_URL } as const;
+    if (protocolEra === 'legacy') {
+      await createPolarionServer(serverOptions).connect(new StdioServerTransport());
+    } else {
+      serveStdio(context => createPolarionServer({ ...serverOptions, protocolEra: context.era }));
+    }
 
     // Info messages go to stderr in MCP (stdout is reserved for protocol)
     console.error(`[INFO] ${SERVER_NAME} MCP Server ${SERVER_VERSION} running on stdio${API_BASE_URL ? `, proxying API at ${API_BASE_URL}` : ''}`);

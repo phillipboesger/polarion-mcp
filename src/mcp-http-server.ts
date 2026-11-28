@@ -34,14 +34,14 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
-import { isInitializeRequest } from '@modelcontextprotocol/server';
+import { NodeStreamableHTTPServerTransport, toNodeHandler, toWebRequest } from '@modelcontextprotocol/node';
+import { isInitializeRequest, isLegacyRequest, createMcpHandler } from '@modelcontextprotocol/server';
 
 import { randomBytes } from 'node:crypto';
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/server-legacy/auth';
 import { OAuthError, ServerError, InvalidRequestError } from '@modelcontextprotocol/server-legacy/auth';
 
-import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, flagOn } from './config.js';
+import { SERVER_NAME, SERVER_VERSION, API_BASE_URL, configurationWarnings, requestBearerToken, getPolarionBaseUrl, callerCacheScope, tokenScope, flagOn, parseProtocolEra } from './config.js';
 import { createPolarionServer, createToolCaller } from './server.js';
 import { writeLimitsFromEnv, type WriteLimits } from './write-verification.js';
 import { parseFlag, type ToolFilter } from './tool-filter.js';
@@ -150,6 +150,7 @@ function basicCredentials(header: string | undefined): { clientId: string; clien
  * Options for {@link createMcpHttpApp}.
  */
 export interface McpHttpAppOptions {
+  protocolEra?: 'dual' | 'legacy';
   verifyWrites?: boolean;
   writeLimits?: WriteLimits;
   /** Maximum characters returned in tool text content. */
@@ -254,7 +255,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
   const corsMiddleware = cors({
     origin: true,
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'X-MCP-Readonly'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'mcp-session-id', 'mcp-protocol-version', 'mcp-method', 'mcp-name', 'X-MCP-Readonly', 'X-Request-Id'],
     exposedHeaders: ['mcp-session-id', 'mcp-protocol-version', 'www-authenticate'],
     optionsSuccessStatus: 204,
   });
@@ -707,6 +708,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
       version: SERVER_VERSION,
       transport: 'streamable-http',
       activeSessions: sessions.size,
+      modernRequests,
     });
   });
 
@@ -774,8 +776,34 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
     await transport.handleRequest(req, res);
   };
 
+  // Apply the transport's exact Host allowlist before either protocol era.
+  app.use(MCP_PATH, (req: Request, res: Response, next: NextFunction) => {
+    const host = req.get('host');
+    if (allowedHosts?.length && (!host || !allowedHosts.includes(host))) {
+      res.status(403).json(jsonRpcError(`Invalid Host header: ${host}`));
+      return;
+    }
+    next();
+  });
+
+  let modernRequests = 0;
+  const inFlightModern = new Set<Promise<void>>();
   // POST: initialize a new session, or dispatch into an existing one.
   app.post(MCP_PATH, requireBearer, validateReadOnlyHeader, jsonBody, async (req: Request, res: Response) => {
+    const legacy = await isLegacyRequest(await toWebRequest(req, req.body), req.body);
+    if (!legacy) {
+      if (options.protocolEra === 'legacy') {
+        res.status(400).json(jsonRpcError('Unsupported protocol version'));
+        return;
+      }
+      modernRequests++;
+      const handler = toNodeHandler(createMcpHandler(() => createPolarionServer({ transport: 'http', protocolEra: 'modern', filter: res.locals.toolFilter as ToolFilter, maxResponseChars: options.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS, verifyWrites: options.verifyWrites, writeLimits: options.writeLimits, rateLimitTools: options.rateLimitTools, rateLimiter, markUntrusted: options.markUntrusted, logFormat: options.logFormat, logLevel: options.logLevel, telemetry: options.telemetry, confirmDestructive: options.confirmDestructive, extensions: options.extensions, apiBaseUrl: options.apiBaseUrl ?? API_BASE_URL, logger: options.logger }), { legacy: 'reject' }));
+      const pending = Promise.resolve(handler(req, res, req.body)).then(() => undefined);
+      inFlightModern.add(pending);
+      try { await pending; } finally { inFlightModern.delete(pending); }
+      return;
+    }
+
     const sessionId = req.header('mcp-session-id');
     const existing = sessionId ? useSession(sessionId) : undefined;
     let transport: NodeStreamableHTTPServerTransport;
@@ -824,6 +852,7 @@ export function createMcpHttpApp(options: McpHttpAppOptions = {}): {
    */
   const closeAllSessions = async (): Promise<void> => {
     clearInterval(sweep);
+    await Promise.all([...inFlightModern].map(p => p.catch(() => undefined)));
     await Promise.all([...sessions.values()].map(s => s.transport.close().catch(() => undefined)));
     sessions.clear();
   };
@@ -1056,7 +1085,7 @@ export function startMcpHttpServer(options: { logger?: Pick<Console, 'warn'> } =
   const confirmDestructive = flagOn(process.env.MCP_CONFIRM_DESTRUCTIVE);
 
   const { app, closeAllSessions } = createMcpHttpApp({
-    allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, cimdEnabled, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, apiBaseUrl: API_BASE_URL,
+    protocolEra: parseProtocolEra(process.env.MCP_PROTOCOL_ERA), allowedHosts, publicUrl, tokenSecret, previousTokenSecrets, gptClient, trustProxy, allowedOrigins: configuredAllowedOrigins.length ? configuredAllowedOrigins : undefined, allowedRedirectUris, allowedRedirectPresets, cimdEnabled, maxResponseChars, verifyWrites: process.env.MCP_VERIFY_WRITES?.trim().toLowerCase() !== 'false', writeLimits: writeLimitsFromEnv(process.env), rateLimitTools, markUntrusted, logFormat, logLevel, confirmDestructive, apiBaseUrl: API_BASE_URL,
   });
 
   // Behind a TLS reverse proxy, set MCP_HTTP_HOST=127.0.0.1 so the plaintext

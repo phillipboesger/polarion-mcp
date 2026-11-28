@@ -1,5 +1,7 @@
 # Deployment
 
+Streamable HTTP serves MCP 2026-07-28 and the existing 2024/2025 protocol versions. Set `MCP_PROTOCOL_ERA=legacy` to disable 2026 support.
+
 ## Render Deployment
 
 - render.yaml defines a web service using Node.

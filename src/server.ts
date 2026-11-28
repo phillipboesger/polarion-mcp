@@ -23,7 +23,7 @@ import { enabledTools, dependencyTools, filterTools, type ToolFilter } from './t
 import { withVerifyProperty, type WriteLimits } from './write-verification.js';
 import { executeApiTool, capToolResponseText, DEFAULT_MAX_RESPONSE_CHARS } from './executor.js';
 import { lenientOutputSchema } from './output-schema.js';
-import { listVirtualTools, type VirtualTool } from './virtual-tools.js';
+import { listVirtualTools, virtualToolRevision, type VirtualTool } from './virtual-tools.js';
 import { createDefaultExtensions, hashAuditValue, type PolarionExtensions } from './extensions.js';
 import { API_BASE_URL, getBearerToken, tokenScope } from './config.js';
 import { parseToolFilter } from './tool-filter.js';
@@ -79,6 +79,7 @@ interface ToolCallPipelineOptions {
   writeLimits?: WriteLimits;
   correlationId?: string;
   server: Server;
+  modernElicitation?: boolean;
   reportProgress?: (progress: { progress: number; total?: number; message?: string }) => Promise<void>;
   /** Set in code mode: the SDK behind `execute`. Inner calls run with these composites and without this field. */
   codeMode?: { ops: readonly SdkOperation[]; config: CodeModeConfig; composites: readonly VirtualTool[] };
@@ -241,13 +242,13 @@ async function callToolPipeline(toolName: string, args: Record<string, unknown>,
       if (decision.action === 'requireConfirmation' && !safePreview && (virtual || generated)) {
         const expired = options.confirmationDeadline;
         const promptSignal = expired && options.signal ? AbortSignal.any([options.signal, expired]) : expired ?? options.signal;
-        const confirmation = expired?.aborted ? 'cancelled' : await requestDestructiveConfirmation(options.server, toolName, args, promptSignal);
+        const confirmation = expired?.aborted ? 'cancelled' : options.modernElicitation === true ? 'unavailable' : options.modernElicitation === false ? (args.confirm === true ? 'accepted' : 'fallback') : await requestDestructiveConfirmation(options.server, toolName, args, promptSignal);
         if (expired?.aborted) {
           outcome = 'confirmation-required';
           result = { content: [{ type: 'text', text: SCRIPT_ENDED }], isError: true };
         } else if (confirmation !== 'accepted') {
           outcome = 'confirmation-required';
-          const text = confirmation === 'fallback'
+          const text = confirmation === 'unavailable' ? 'This destructive tool requires confirmation, which is not yet available for modern clients.' : confirmation === 'fallback'
             ? 'This destructive tool requires confirmation; repeat the call with confirm: true; use dry_run: true first to preview.'
             : confirmation === 'declined' ? 'The destructive tool call was declined.' : 'The destructive tool call was cancelled.';
           result = { content: [{ type: 'text', text }], isError: true };
@@ -324,6 +325,7 @@ export interface PolarionServerOptions {
   markUntrusted?: boolean;
   /** Current transport; local file uploads are restricted to stdio. Defaults to HTTP-safe. */
   transport?: 'stdio' | 'http';
+  protocolEra?: 'modern' | 'legacy';
 }
 
 /**
@@ -347,43 +349,70 @@ export function createToolCaller(options: PolarionServerOptions & { tools: Reado
   });
 }
 
+const catalogCache = new Map<string, {
+  clientTools: Map<string, import('./types.js').McpToolDefinition>;
+  guidanceNames: Set<string>;
+  mode: 'full' | 'code';
+  codeMode: { ops: readonly SdkOperation[]; config: CodeModeConfig; composites: readonly VirtualTool[] } | undefined;
+  virtualTools: readonly VirtualTool[];
+  listedTools: any[];
+}>();
+
 export function createPolarionServer(options: PolarionServerOptions = {}): Server {
   const logger: PipelineLogger = options.logger ?? createLogger({ format: options.logFormat, level: options.logLevel });
   registerCompositeTools();
-  const deploymentFilter = parseToolFilter(process.env);
-  const filter: ToolFilter = {
-    readOnly: deploymentFilter.readOnly || options.filter?.readOnly,
-    allow: deploymentFilter.allow,
-  };
-  const clientTools = filterTools(enabledTools, options.filter ?? {});
-  // `auto` and `discover` were removed; configurationWarnings tells the operator, the server behaves as `code`.
-  const requestedMode = process.env.MCP_MODE?.trim() || 'code';
-  if (!['code', 'full', 'auto', 'discover'].includes(requestedMode)) throw new Error('MCP_MODE must be code or full');
-  const composites = listVirtualTools(filter).filter(tool => !options.filter?.allow || options.filter.allow.has(tool.name) || (options.filter.allow.has('all-reads') && tool.annotations?.readOnlyHint === true));
-  const guidanceNames = new Set([...clientTools.keys(), ...composites.map(tool => tool.name)]);
-  const mode = requestedMode === 'full' ? 'full' : 'code';
-  const codeConfig: CodeModeConfig = {
-    writes: [...clientTools.values()].some(tool => tool.annotations?.readOnlyHint !== true) || composites.some(tool => tool.annotations?.readOnlyHint !== true),
-    maxWriteCalls: 20,
-    limits: options.codeModeLimits,
-  };
-  const codeOps = mode === 'code'
-    ? buildSdk(clientTools, composites, codeConfig, name => toolsetsForDefinition(clientTools.get(name)!)[0] ?? 'other', def => sanitizeInputSchema(withVerifyProperty(def as never)))
-    : [];
-  const codeMode = mode === 'code' ? { ops: codeOps, config: codeConfig, composites: composites.filter(tool => codeOps.some(op => op.name === tool.name)) } : undefined;
-  const virtualTools = mode === 'code' ? codeModeTools(codeOps, codeConfig) : composites;
-  const allNames = new Set(clientTools.keys());
-  for (const tool of virtualTools) {
-    if (allNames.has(tool.name)) throw new Error(`Virtual tool conflicts with generated tool: ${tool.name}`);
-    allNames.add(tool.name);
+  const catalogKey = JSON.stringify({ registry: virtualToolRevision(), mode: process.env.MCP_MODE, readOnly: process.env.MCP_READ_ONLY, tools: process.env.MCP_TOOLS, filterReadOnly: options.filter?.readOnly, filterAllow: options.filter?.allow ? [...options.filter.allow].sort() : null, limits: options.codeModeLimits });
+  let catalog = catalogCache.get(catalogKey);
+  if (!catalog) {
+    const deploymentFilter = parseToolFilter(process.env);
+    const filter: ToolFilter = {
+      readOnly: deploymentFilter.readOnly || options.filter?.readOnly,
+      allow: deploymentFilter.allow,
+    };
+    const clientTools = filterTools(enabledTools, options.filter ?? {});
+    // `auto` and `discover` were removed; configurationWarnings tells the operator, the server behaves as `code`.
+    const requestedMode = process.env.MCP_MODE?.trim() || 'code';
+    if (!['code', 'full', 'auto', 'discover'].includes(requestedMode)) throw new Error('MCP_MODE must be code or full');
+    const composites = listVirtualTools(filter).filter(tool => !options.filter?.allow || options.filter.allow.has(tool.name) || (options.filter.allow.has('all-reads') && tool.annotations?.readOnlyHint === true));
+    const guidanceNames = new Set([...clientTools.keys(), ...composites.map(tool => tool.name)]);
+    const mode = requestedMode === 'full' ? 'full' : 'code';
+    const codeConfig: CodeModeConfig = {
+      writes: [...clientTools.values()].some(tool => tool.annotations?.readOnlyHint !== true) || composites.some(tool => tool.annotations?.readOnlyHint !== true),
+      maxWriteCalls: 20,
+      limits: options.codeModeLimits,
+    };
+    const codeOps = mode === 'code'
+      ? buildSdk(clientTools, composites, codeConfig, name => toolsetsForDefinition(clientTools.get(name)!)[0] ?? 'other', def => sanitizeInputSchema(withVerifyProperty(def as never)))
+      : [];
+    const codeMode = mode === 'code' ? { ops: codeOps, config: codeConfig, composites: composites.filter(tool => codeOps.some(op => op.name === tool.name)) } : undefined;
+    const virtualTools = mode === 'code' ? codeModeTools(codeOps, codeConfig) : composites;
+    const allNames = new Set(clientTools.keys());
+    for (const tool of virtualTools) {
+      if (allNames.has(tool.name)) throw new Error(`Virtual tool conflicts with generated tool: ${tool.name}`);
+      allNames.add(tool.name);
+    }
+    const listedTools = mode === 'code' ? virtualTools.map(def => ({ name: def.name, title: def.title, description: def.description, inputSchema: sanitizeInputSchema(def.inputSchema), annotations: def.annotations })) : [
+      ...toolsForClient(clientTools),
+      ...virtualTools.map(def => ({
+      name: def.name,
+      title: def.title,
+      description: def.description,
+      inputSchema: sanitizeInputSchema(def.inputSchema),
+      ...(def.annotations ? { annotations: def.annotations } : {}),
+    })),
+  ].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    catalog = { clientTools, guidanceNames, mode, codeMode, virtualTools, listedTools };
+    if (catalogCache.size >= 32) catalogCache.delete(catalogCache.keys().next().value!);
+    catalogCache.set(catalogKey, catalog);
   }
+  const { clientTools, guidanceNames, mode, codeMode, virtualTools, listedTools } = catalog;
   const apiBaseUrl = options.apiBaseUrl ?? API_BASE_URL;
   const extensions = { ...createDefaultExtensions(apiBaseUrl, options.confirmDestructive ?? false), ...options.extensions };
   const rateLimiter = options.rateLimiter ?? new ToolCallRateLimiter(options.rateLimitTools ?? 0, options.now);
   const mcp = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
-      supportedProtocolVersions: ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'],
+      supportedProtocolVersions: [...(options.protocolEra === 'modern' ? ['2026-07-28'] : []), '2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'],
       capabilities: {
         tools: {},      // API operations (GET, POST, PATCH, DELETE endpoints)
         resources: {},  // Documentation and configuration files
@@ -401,16 +430,6 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
    * Sanitizes each tool's input schema so property names are MCP-safe; the
    * executor maps the sanitized names back to the originals.
    */
-  const listedTools = mode === 'code' ? virtualTools.map(def => ({ name: def.name, title: def.title, description: def.description, inputSchema: sanitizeInputSchema(def.inputSchema), annotations: def.annotations })) : [
-    ...toolsForClient(clientTools),
-    ...virtualTools.map(def => ({
-      name: def.name,
-      title: def.title,
-      description: def.description,
-      inputSchema: sanitizeInputSchema(def.inputSchema),
-      ...(def.annotations ? { annotations: def.annotations } : {}),
-    })),
-  ].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   server.setRequestHandler('tools/list', async () => ({ tools: listedTools as any[] }));
 
   /**
@@ -434,6 +453,7 @@ export function createPolarionServer(options: PolarionServerOptions = {}): Serve
         verifyWrites: options.verifyWrites,
         writeLimits: options.writeLimits,
         correlationId: correlationIdFrom(typeof requestHeader === 'string' ? requestHeader : undefined), server,
+        modernElicitation: options.protocolEra === 'modern' ? Boolean((extra.mcpReq.envelope as Record<string, { elicitation?: unknown }> | undefined)?.['io.modelcontextprotocol/clientCapabilities']?.elicitation) : undefined,
         reportProgress: progressToken === undefined ? undefined : async progress => {
           await extra.mcpReq.notify({
             method: 'notifications/progress',

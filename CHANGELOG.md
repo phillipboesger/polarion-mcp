@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Serve MCP 2026-07-28 alongside the existing 2024/2025 versions over stdio and Streamable HTTP. Set `MCP_PROTOCOL_ERA=legacy` to disable the modern era.
+
 - OAuth authorization responses include the metadata issuer as `iss` (RFC 9207).
 
 ## 1.7.0
